@@ -1,0 +1,64 @@
+;; Copyright © 2021, JUXT LTD.
+
+{:paths ["src" "test"]
+ :deps {org.clojure/clojure {:mvn/version "1.10.1"}
+        integrant/integrant {:mvn/version "0.7.0"}
+
+        juxt.edge/lib.app
+        {:git/url "https://github.com/juxt/edge.git"
+         :sha "5ea50fc777adbdf2129b541ad07a13dda1c273b8"
+         :deps/root "lib/edge.app"}
+
+        org.clojure/tools.logging {:mvn/version "0.5.0-alpha"}
+
+        juxt/crux-core {:mvn/version "20.12-1.13.0-beta"}
+        juxt/crux-rocksdb {:mvn/version "20.12-1.13.0-beta"}
+        juxt/crux-http-server {:mvn/version "20.12-1.13.0-alpha"}
+
+        tick/tick {:mvn/version "0.4.26-alpha"}
+
+        juxt/spin
+        #_{:git/url "https://github.com/juxt/spin.git"
+         :sha "d2b1f8c62419bb1fe102f0ac22dbfc9743a72e3a"}
+        {:local/root "../spin"}
+
+        hiccup/hiccup {:mvn/version "2.0.0-alpha2"}
+        metosin/jsonista {:mvn/version "0.2.7"}
+
+        clj-yaml/clj-yaml {:mvn/version "0.4.0"}
+        jinx/jinx {:mvn/version "0.1.6"}
+
+        crypto-password/crypto-password {:mvn/version "0.2.1"}}
+
+ :aliases
+ {:dev
+  {:extra-paths ["dev"]
+   :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
+   :extra-deps
+   {juxt.edge/lib.app.dev
+    {:git/url "https://github.com/juxt/edge.git"
+     :sha "5ea50fc777adbdf2129b541ad07a13dda1c273b8"
+     :deps/root "lib/edge.app.dev"}
+    juxt.edge/edge.system
+    {:git/url "https://github.com/juxt/edge.git"
+     :sha "5ea50fc777adbdf2129b541ad07a13dda1c273b8"
+     :deps/root "lib/edge.system"}
+    juxt.edge/logging.dev
+    {:git/url "https://github.com/juxt/edge.git"
+     :sha "5ea50fc777adbdf2129b541ad07a13dda1c273b8"
+     :deps/root "lib/edge.logging.dev"}}}
+
+  :prod
+  {:extra-deps
+   {juxt.edge/lib.app.prod
+    {:git/url "https://github.com/juxt/edge.git"
+     :sha "5ea50fc777adbdf2129b541ad07a13dda1c273b8"
+     :deps/root "lib/edge.app.prod"}
+    juxt.edge/edge.system
+    {:git/url "https://github.com/juxt/edge.git"
+     :sha "5ea50fc777adbdf2129b541ad07a13dda1c273b8"
+     :deps/root "lib/edge.system"}
+    juxt.edge/lib.socket-server
+    {:git/url "https://github.com/juxt/edge.git"
+     :sha "5ea50fc777adbdf2129b541ad07a13dda1c273b8"
+     :deps/root "lib/edge.socket-server"}}}}}

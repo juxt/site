@@ -1,0 +1,72 @@
+{:juxt.jinx.alpha/id :juxt.site.alpha/representation
+
+ :juxt.jinx.alpha/type :object
+
+ :juxt.jinx.alpha/required
+ [:crux.db/id]
+
+ :juxt.jinx.alpha/properties
+ {:crux.db/id
+  {:juxt.jinx.alpha/one-of
+   [{:juxt.jinx.alpha/type :uuid}
+    {:juxt.jinx.alpha/type :keyword}]}
+
+  ;; Representation metadata
+
+  :juxt.spin.alpha/content-type
+  {:juxt.jinx.alpha/type :string
+   :juxt.spin.alpha/header "content-type"}
+
+  :juxt.spin.alpha/content-encoding
+  {:juxt.jinx.alpha/type :string
+   :juxt.spin.alpha/header "content-encoding"}
+
+  :juxt.spin.alpha/content-language
+  {:juxt.jinx.alpha/type :string
+   :juxt.spin.alpha/header "content-language"}
+
+  ;; This does not imply a mapping between a resource and this representation,
+  ;; however, if specified, it must reference a resource and becomes the
+  ;; "Content-Location" header.
+  :juxt.spin.alpha/content-location
+  {:juxt.jinx.alpha/type :uri
+   :juxt.spin.alpha/header "content-location"
+   :juxt.jinx.alpha/description "References a resource"}
+
+  ;; Validators
+
+  :juxt.spin.alpha/last-modified
+  ;; A java.util.Date
+  {:juxt.jinx.alpha/type :inst
+   :juxt.spin.alpha/header "last-modified"}
+
+  :juxt.spin.alpha/etag
+  {:juxt.jinx.alpha/type :string
+   :juxt.jinx.alpha/format "\"[A-Za-z0-9-]+\""
+   :juxt.spin.alpha/header "etag"}
+
+  ;; Vary
+
+  :juxt.spin.alpha/vary
+  {:juxt.jinx.alpha/type :string
+   :juxt.jinx.alpha/description "Not used when the representation is stored in a database. Can be
+  added to a representation prior to a response."
+   :juxt.spin.alpha/header "vary"}
+
+  ;; Payload header fields
+
+  :juxt.spin.alpha/content-length
+  {:juxt.jinx.alpha/type :integer
+   :juxt.spin.alpha/header "content-length"}
+
+  :juxt.spin.alpha/content-range
+  {:juxt.jinx.alpha/type :string
+   :juxt.spin.alpha/header "content-range"}
+
+  :juxt.spin.alpha/trailer
+  {:juxt.jinx.alpha/type :string
+   :juxt.spin.alpha/header "trailer"}
+
+  :juxt.spin.alpha/transfer-encoding
+  {:juxt.jinx.alpha/type :string
+   :juxt.spin.alpha/header "transfer-encoding"}}}

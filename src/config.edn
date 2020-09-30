@@ -1,0 +1,12 @@
+;; Copyright © 2021, JUXT LTD.
+
+{:ig/system
+ {:juxt.site.alpha.db/crux {}
+
+  :juxt.site.alpha.openapi/module {}
+
+  :juxt.site.alpha.server/server
+  {:crux #ig/ref :juxt.site.alpha.db/crux
+   :port 8082
+   :dynamic? #profile {:prod false
+                       :default true}}}}

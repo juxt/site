@@ -1,0 +1,25 @@
+{:juxt.jinx.alpha/id :juxt.site.alpha/resource-representation-mapping
+
+ :juxt.jinx.alpha/type :object
+
+ :juxt.jinx.alpha/required
+ [:crux.db/id
+  :juxt.spin.alpha/resource
+  :juxt.spin.alpha/representation]
+
+ :juxt.jinx.alpha/properties
+ {:crux.db/id
+  {:juxt.jinx.alpha/one-of
+   [{:juxt.jinx.alpha/type :uuid}
+    {:juxt.jinx.alpha/type :keyword}]
+   :juxt.jinx.alpha/description "Maps a resource onto a representation"}
+
+  :juxt.spin.alpha/resource
+  {:juxt.jinx.alpha/type :uri
+   :juxt.jinx.alpha/description "References a resource"}
+
+  :juxt.spin.alpha/representation
+  {:juxt.jinx.alpha/one-of
+   [{:juxt.jinx.alpha/type :uuid}
+    {:juxt.jinx.alpha/type :keyword}]
+   :juxt.jinx.alpha/description "References a representation"}}}
