@@ -8,4 +8,4 @@
 #     -F "end=2020-10-16" \
 #     http://localhost:8888/holidays $*
 
-http -v POST http://localhost:8888/holidays description="Beach holiday" beginning=2020-10-02 end=2020-10-16
+http --form -v POST http://localhost:8888/holidays description="Beach holiday" beginning=2020-10-02 end=2020-10-16 destination="Miami" script@post-holiday

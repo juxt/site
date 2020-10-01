@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# How to PUT using multipart/form-data, useful in creating resources
+curl \
+    -i \
+    -X PUT \
+    --data-binary @../../look/assets/logo/white-plain.png \
+    -H "Content-Type: image/png" \
+    http://localhost:8888/juxt-logo.png $*

@@ -1,11 +1,15 @@
 {:ig/system
- {:juxt.vext.ig/server {:vertx #ig/ref :juxt.vext.ig/vertx
-                        :port 8888
-                        :create-handler juxt.site.server/handler
-                        :dynamic? true
-                        :crux #ig/ref :juxt.site.db/crux}
-  :juxt.vext.ig/vertx {}
-
+ {:juxt.vext.ig/vertx {}
   :juxt.site.db/crux {}
-  }
- }
+
+  :juxt.vext.ig/server
+  {:vertx #ig/ref :juxt.vext.ig/vertx
+   :port 8888
+   :create-handler juxt.site.server/handler
+   :dynamic? true
+   :crux #ig/ref :juxt.site.db/crux
+   :content-store #ig/ref :juxt.site.server/content-store}
+
+  :juxt.site.server/content-store
+  {:vertx #ig/ref :juxt.vext.ig/vertx
+   :dir "/tmp/site-content-store"}}}
