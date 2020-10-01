@@ -1,0 +1,32 @@
+#+TITLE: Crux 'Site' TODO list
+
+* DONE Query our holidays back
+
+* DONE Holidays should be 'owned' by the individual taking the holiday
+
+* DONE Count the number of days an individual has taken off in total
+
+* DONE Segment the count by year
+
+
+* DONE Make web server dependent upon Crux node
+
+* DONE Add a holiday 'relation' to the Crux database
+
+* DONE Get the holiday relation in response to a GET on /holidays
+
+* DONE Generate the HTML of a form to fill out
+
+* TODO Fill out the form and send back to the server
+
+* TODO Support JSON & HTML
+* TODO Use the relation, and the form fields, to submit a holiday in Crux
+
+* TODO Calculate the number of days a person has taken
+
+* TODO [#B] Don't count public holidays and weekends against the holiday 'length'
+  DEADLINE: <2020-10-02 Fri>
+
+* TODO Use the Crux Console to display holidays by user
+
+* TODO Generate an iCalendar feed to show holidays in JUXT's Google Calendar
