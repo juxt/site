@@ -22,7 +22,8 @@
 
         juxt/spin
         {:git/url "https://github.com/juxt/spin.git"
-         :sha "88c2b2b886a11342ca86aa385ab2ec91f8425bb1"}
+         :sha "0ec01b92c995926d73ae28c7313194edef914247"}
+        #_{:local/root "../spin"}
 
         hiccup {:mvn/version "2.0.0-alpha2"}
         metosin/jsonista {:mvn/version "0.2.7"}}

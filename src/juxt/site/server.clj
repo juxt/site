@@ -19,35 +19,43 @@
 (defn handler [{:keys [crux content-store]}]
   (assert crux)
   (spin.handler/handler
-   (reify ;; resource interface
-
-     ;; TODO: Implement a POST!!
-
+   (reify
      spin.resource/ResourceLocator
      (locate-resource [_ uri request]
        (let [db (crux/db crux)]
-         (when-let [eid (ffirst (crux/q db {:find ['?e]
-                                            :where [['?e :juxt.site/url uri]]}))]
+         (when-let [eid (ffirst
+                         (crux/q db {:find ['?e]
+                                     :where [['?e :juxt.site/url uri]]}))]
            (crux/entity db eid))))
 
      spin.resource/GET
      (get-or-head [_ server resource response request respond raise]
-       ;; TODO: Reply with James' holidays
-       (respond
-        {:status 200
-         :headers {"content-type" "text/html;charset=utf8"}
-         :body
-         (html5
-          [:form {:method "POST" :enctype "multipart/form-data"}
-           (into
-            [:field-set]
-            (for [[att-k {:crux.schema/keys [_ label]}]
-                  (:crux.schema/attributes resource)
-                  :let [n (name att-k)]]
-              [:div
-               (when label [:label {:for n} label])
-               [:input {:name n :type "text"}]]))
-           [:input {:type "submit" :value "Submit"}]])}))
+
+       (cond
+         ;; If there's some content, send it over
+         (:juxt.vext.content-store/file resource)
+         (respond
+          {:status 200
+           :body (io/file (:juxt.vext.content-store/file resource))})
+
+         :else
+         ;; If the resource represents a relation, reply with a form
+         ;; representing that relation:
+         (respond
+          {:status 200
+           :headers {"content-type" "text/html;charset=utf8"}
+           :body
+           (html5
+            [:form {:method "POST" :enctype "multipart/form-data"}
+             (into
+              [:field-set]
+              (for [[att-k {:crux.schema/keys [_ label]}]
+                    (:crux.schema/attributes resource)
+                    :let [n (name att-k)]]
+                [:div
+                 (when label [:label {:for n} label])
+                 [:input {:name n :type "text"}]]))
+             [:input {:type "submit" :value "Submit"}]])})))
 
      spin.resource/POST
      (post [_ server resource response request respond raise]
@@ -58,7 +66,6 @@
             vtxreq
             (reify io.vertx.core.Handler
               (handle [_ buffer]
-                (prn (json/read-value (.getBytes buffer)))
                 (respond
                  {:status 200
                   :headers {"content-type" "text/plain;charset=utf8"}
@@ -71,7 +78,7 @@
               vtxreq
               (reify io.vertx.core.Handler
                 (handle [_ _]
-                  (prn "attriubtes are" (into {} (.formAttributes vtxreq)))
+                  (prn "attributes are" (into {} (.formAttributes vtxreq)))
                   (respond
                    {:status 200
                     :headers {"content-type" "text/plain;charset=utf8"}
@@ -86,11 +93,19 @@
             (cstore/post-content content-store (.toFlowable (:juxt.vext/request request)))
             (.subscribe
              (reify io.reactivex.functions.Consumer ;; happy path!
-               (accept [_ v]
+               (accept [_ {:keys [k file]}]
+                 (let [id (java.util.UUID/randomUUID)]
+                   (crux/submit-tx
+                    crux
+                    [[:crux.tx/put
+                      {:crux.db/id id
+                       :juxt.site/url (juxt.spin.alpha.handler/request-url request)
+                       :juxt.vext.content-store/k k
+                       :juxt.vext.content-store/file (.getAbsolutePath file)}]])
+                   (crux/sync crux))
                  (respond
                   (merge
                    response
-                   ;; TODO Why is this not coming through?
                    {:body "Thanks, that looks like a wonderful image!\n"}))))
              (reify io.reactivex.functions.Consumer ;; sad path!
                (accept [_ t]
