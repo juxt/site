@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# How to PUT using multipart/form-data, useful in creating resources
+# curl \
+#     -i \
+#     -F "description=Beach holiday" \
+#     -F "beginning=2020-10-02" \
+#     -F "end=2020-10-16" \
+#     http://localhost:8888/holidays $*
+
+http -v POST http://localhost:8888/holidays description="Beach holiday" beginning=2020-10-02 end=2020-10-16
