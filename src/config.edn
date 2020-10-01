@@ -1,1 +1,11 @@
-{:ig/system {}}
+{:ig/system
+ {:juxt.vext.ig/server {:vertx #ig/ref :juxt.vext.ig/vertx
+                        :port 8888
+                        :create-handler juxt.site.server/handler
+                        :dynamic? true
+                        :crux #ig/ref :juxt.site.db/crux}
+  :juxt.vext.ig/vertx {}
+
+  :juxt.site.db/crux {}
+  }
+ }

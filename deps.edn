@@ -7,7 +7,16 @@
 
         juxt/crux-core {:mvn/version "20.09-1.12.1-beta"}
         juxt/crux-rocksdb {:mvn/version "20.09-1.12.1-beta"}
-        juxt/crux-http-server {:mvn/version "20.09-1.12.1-alpha"}}
+        juxt/crux-http-server {:mvn/version "20.09-1.12.1-alpha"}
+
+        tick/tick {:mvn/version "0.4.26-alpha"}
+
+        juxt.vext/ig {:local/root "../edge/lib/juxt.vext.ig"}
+
+        juxt/spin {:local/root "../spin"}
+
+        hiccup {:mvn/version "2.0.0-alpha2"}
+        metosin/jsonista {:mvn/version "0.2.7"}}
 
  :aliases
  {:dev
