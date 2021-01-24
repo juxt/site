@@ -4,10 +4,53 @@
   (:require
    [crux.api :as crux]
    [integrant.core :as ig]
+   [juxt.site.alpha.locate :refer [locate-resource]]
+   [juxt.site.alpha.perf :refer [fast-get-in]]
    [juxt.site.alpha.put :refer [put-representation]]
    [juxt.site.alpha.util :refer [hexdigest]]
    [juxt.spin.alpha :as spin]
    [jsonista.core :as json]))
+
+(defmethod locate-resource *ns* [uri db]
+  ;; Do we have any OpenAPIs in the database?
+  (when-let [api-ent
+             (some
+              (fn [[e]]
+                (when (.startsWith (.getPath uri) (.getPath e))
+                  (crux/entity db e)))
+              (crux/q db '{:find [e]
+                           :where [[e :openapi]]}))]
+
+    ;; Yes?
+    (let [openapi (:openapi api-ent)
+          paths (get openapi "paths")]
+      ;; Any of these paths match the request's URL?
+      (when-let [[path path-item-object]
+                 (some
+                  (fn [[path path-item-object]]
+                    (when (= (str (.getPath (:crux.db/id api-ent)) path) (.getPath uri))
+                      [path path-item-object]))
+                  paths)]
+        ;; Yes? Then construct a resource map
+        (let [content-types (fast-get-in path-item-object ["get" "responses" "200" "content"])]
+          ;; TODO: Use java.net.URI/resolve
+
+          {:crux.db/id (java.net.URI. (str (.getPath (:crux.db/id api-ent)) path))
+           ::spin/methods (set (map keyword (keys path-item-object)))
+           ::spin/representations
+           (for [[ct _] content-types]
+             {::spin/content-type ct
+              ::spin/bytes (cond
+                             (and
+                              (= ct "application/json")
+                              (= (get-in path-item-object ["get" "crux.site/query"]) "crux.site/api-info"))
+                             (json/write-value-as-bytes (get openapi "info"))
+                             (and
+                              (= ct "text/html;charset=utf-8")
+                              (= (get-in path-item-object ["get" "crux.site/query"]) "crux.site/api-info"))
+                             (.getBytes (str "<pre>" (json/write-value-as-string (get openapi "info"))))
+                             :else (.getBytes "(unknown)"))})
+           ::path-item-object path-item-object})))))
 
 (defmethod put-representation
   "application/vnd.oai.openapi+json;version=3.0.2"
@@ -47,6 +90,8 @@
      :headers {"location" (str new-resource-uri)}
      ;; Add :body to describe the new resource
      }))
+
+()
 
 
 (defmethod ig/init-key ::module [_ _]

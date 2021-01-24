@@ -5,18 +5,16 @@
    [crypto.password.bcrypt :as password]
    [clojure.string :as str]
    [crux.api :as crux]
-   [jsonista.core :as json]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
    [juxt.spin.alpha :as spin]
    [juxt.spin.alpha.representation :as spin.representation]
    [juxt.spin.alpha.auth :as spin.auth]
    [juxt.pick.alpha.ring :refer [pick]]
    [juxt.site.alpha.put :refer [put-representation]]
-   [juxt.site.alpha.perf :refer [fast-get-in]]))
+   [juxt.site.alpha.locate :refer [locate-resource]]))
 
 (defn assoc-when-some [m k v]
-  (cond-> m
-    v (assoc k v)))
+  (cond-> m v (assoc k v)))
 
 ;; This deviates from Spin, but we want to upgrade Spin accordingly in the near
 ;; future. When that is done, this version can be removed and the function in
@@ -47,60 +45,26 @@
     (cond-> selected-representation
       (not-empty vary) (assoc ::spin/vary (str/join ", " vary)))))
 
-(defmulti locate-resource (fn [request db]))
+(defmethod locate-resource *ns* [uri db]
+  ;; If resource is in the database, explicitly, return it.
+  (crux/entity db uri))
 
-(defn locate-resource* [request db]
-
-  (let [request-uri (java.net.URI. (:uri request))]
-
-    (or
-     ;; Resource is in the database, explicitly.
-     (crux/entity db request-uri)
-
-     ;; TODO: This needs to be dispatched, put this form in openapi
-     ;; Do we have any OpenAPIs in the database?
-     (when-let [api-ent
-                (some
-                 (fn [[e]]
-                   (when (.startsWith (.getPath request-uri) (.getPath e))
-                     (crux/entity db e)))
-                 (crux/q db '{:find [e]
-                              :where [[e :openapi]]}))]
-
-       ;; Yes?
-       (let [openapi (:openapi api-ent)
-             paths (get openapi "paths")]
-         ;; Any of these paths match the request's URL?
-         (when-let [[path path-item-object]
-                    (some
-                     (fn [[path path-item-object]]
-                       (when (= (str (.getPath (:crux.db/id api-ent)) path) (.getPath request-uri))
-                         [path path-item-object]))
-                     paths)]
-           ;; Yes? Then construct a resource map
-           (let [content-types (fast-get-in path-item-object ["get" "responses" "200" "content"])]
-             ;; TODO: Use java.net.URI/resolve
-
-             {:crux.db/id (java.net.URI. (str (.getPath (:crux.db/id api-ent)) path))
-              ::spin/methods (set (map keyword (keys path-item-object)))
-              ::spin/representations
-              (for [[ct _] content-types]
-                {::spin/content-type ct
-                 ::spin/bytes (cond
-                                (and
-                                 (= ct "application/json")
-                                 (= (get-in path-item-object ["get" "crux.site/query"]) "crux.site/api-info"))
-                                (json/write-value-as-bytes (get openapi "info"))
-                                (and
-                                 (= ct "text/html;charset=utf-8")
-                                 (= (get-in path-item-object ["get" "crux.site/query"]) "crux.site/api-info"))
-                                (.getBytes (str "<pre>" (json/write-value-as-string (get openapi "info"))))
-                                :else (.getBytes "(unknown)"))})
-              ::path-item-object path-item-object}))))
-
-     ;; Return an 'empty' resource
-     {::spin/methods #{:get :head :options}
-      ::spin/representations []})))
+(defn locate-resource*
+  "Call each locate-resource defmethod, in a particular order, ending
+  in :default."
+  [request db]
+  (let [uri (java.net.URI. (:uri request))
+        meths (methods locate-resource)]
+    (some
+     (fn [[_ meth]] (meth uri db))
+     (let [order {*ns* 1 :else 2 :default 3}]
+       (sort-by
+        first
+        (comparator (fn [x y]
+                      (<
+                       (get order x (get order :else))
+                       (get order y (get order :else)))))
+        meths)))))
 
 (defn current-representations [db resource date]
   (or
@@ -180,8 +144,6 @@
 (defn PUT [request resource selected-representation date crux-node]
   (let [new-representation (receive-representation request resource date)]
     (assert new-representation)
-
-    ;; TODO: Decompose new-representation
 
     ;; TODO: evaluate preconditions in tx fn!
     (put-representation request resource new-representation selected-representation crux-node)))
