@@ -1,0 +1,217 @@
+{:openapi "3.0.2"
+ :info
+ {:version "1.0.0"
+  :title "Crux PBAC API"
+  :description
+  "Policy Based Access Control"
+  :contact
+  {:name "Malcolm Sparks"
+   :email "mal@juxt.pro"
+   :url "https://juxt.pro"}}
+ :servers [{:url "http://localhost:8082/_crux/apis/people"}]
+
+ :paths
+ {"/info"
+  {:get
+   {:description "Get the current API info"
+    :operationId "getStatus"
+    :responses
+    {200
+     {"content"
+      {"application/json" {}
+       "text/html;charset=utf-8" {}}}}}}
+
+  "/user-groups"
+  {:options
+   {:responses
+    {200 {:description "User groups contain users and a set of roles from which they can choose to assume."}}}
+
+   :get
+   {:description "Returns all user-groups"
+    :operationId "findUserGroups"
+    :parameters
+    [{:name "limit"
+      :in "query"
+      :description "Maximum number of results to return"
+      :required false
+      :schema {:type "integer"}}]
+    :responses
+    {200 {:content
+          {"application/json"
+           {:schema
+            {:type "array"
+             :items {"$ref" "#/components/schemas/IdentifiedUserGroup"}}}}}}}}
+
+  "/user-groups/{id}"
+  {:get
+   {:description "Returns a given user-group",
+    :operationId "findUserGroupById",
+    :parameters
+    [{:name "id"
+      :in "path"
+      :description "ID of user-group to fetch"
+      :required true
+      :schema {:type "string"}}]
+    :responses
+    {:200
+     {:description "Single identified user-group"
+      :content
+      {"application/json" {:schema {"$ref" "#/components/schemas/IdentifiedUserGroup"}}}}}}
+
+   :put
+   {:description "Upserts a user-group"
+    :operationId "putUserGroup"
+    :requestBody
+    {:required true
+     :content
+     {"application/json" {:schema {"$ref" "#/components/schemas/IdentifiedUserGroup"}}}}
+    :responses
+    {201 {:description "Usergroup successfully upserted"
+          :content
+          {"test/plain" {}}}}}}}
+
+ :components
+ {:schemas
+  {"Identified"
+   {"$id" "/schemas/Identified"
+    :type "object"
+    :description
+    "The unique identifier of the document in the database. This is maps
+    directly to the crux.db/id attribute."
+    :required ["id"]
+    :properties
+    {"id"
+     {:type "string"
+      :format "uri-reference"}}}
+
+   "Named"
+   {"$id" "/schemas/Named"
+    :type "object"
+    :required ["name"]
+    :properties
+    {"name"
+     {:type "string"
+      :minLength 1}}}
+
+   "Owned"
+   {"$id" "/schemas/Owned"
+    :type "object"
+    :required ["owner"]
+    :properties
+    {"owner"
+     {:type "string"
+      :format "uri-reference"
+      ;; This hints that the property owner is a reference to a Crux
+      ;; entity
+      :crux.json-schema/reference? true
+      :crux.json-schema/schema-of-target "/schemas/IdentifiedOrganization"}}}
+
+   "Organization"
+   {"$id" "/schemas/Organization"
+    :allOf
+    [{"$ref" "#/components/schemas/Named"}
+     {:type "object"
+      :properties
+      {"address"
+       {:type "string"
+        :minLength 1}}}]}
+
+   "IdentifiedOrganization"
+   {"$id" "/schemas/IdentifiedOrganization"
+    :allOf
+    [{"$ref" "#/components/schemas/Identified"}
+     {"$ref" "#/components/schemas/Organization"}]}
+
+   "Role"
+   {"$id" "/schemas/Role"
+    :description "Every interaction with a protected part of the system must be
+    taken with a single role. Roles are owned by organisations, and this
+    determines the organisation the interaction is taken on behalf of."
+    :allOf
+    [{"$ref" "#/components/schemas/Named"}
+     {"$ref" "#/components/schemas/Owned"}]}
+
+   "IdentifiedRole"
+   {"$id" "/schemas/IdentifiedRole"
+    :allOf
+    [{"$ref" "#/components/schemas/Identified"}
+     {"$ref" "#/components/schemas/Role"}]}
+
+   ;;   Rule = target + effect (allow/deny) + condition.
+   ;;   Target = subject + resource + action
+
+   ;; subject = role
+
+   ;; /users - body must be of type 'user'
+
+   ;; Rule = (isInstance(PUT-rep, 'user') + dealership-manager + POST) + allow + (PUT-rep.owner = subject.owner)
+
+
+   ;; POST
+
+   "UserGroup"
+   {"$id" "/schemas/UserGroup"
+    :description "Users are organized into groups. User groups can have multiple
+    roles, users in the user-group assume one of these roles for each
+    interaction with the system."
+    :allOf
+    [{"$ref" "#/components/schemas/Named"}
+     {"$ref" "#/components/schemas/Owned"}
+     {:properties
+      {"roles"
+       {:type "array"
+        :items
+        {:type "string"
+         :format "uri-reference"
+         :crux.json-schema/reference? true
+         :crux.json-schema/schema-of-target "/schemas/IdentifiedRole"}}}}]}
+
+   "IdentifiedUserGroup"
+   {"$id" "/schemas/IdentifiedUserGroup"
+    :allOf
+    [{"$ref" "#/components/schemas/Identified"}
+     {"$ref" "#/components/schemas/UserGroup"}]}
+
+   "User"
+   {"$id" "/schemas/User"
+    :allOf
+    [{"$ref" "#/components/schemas/Named"}
+     {"$ref" "#/components/schemas/Owned"}
+     {:type "object"
+      :required ["email"
+                 "user-group"]
+      :properties
+      {"email"
+       {:type "string"
+        :format "email"}
+       "password-hash"
+       {:type "string"
+        :description "Bcrypt password hash"}
+       "user-group"
+       {:type "string"
+        :format "uri-reference"
+        :crux.json-schema/reference? true
+        :crux.json-schema/schema-of-target "/schemas/IdentifiedUserGroup"}}}]}
+
+   "IdentifiedUser"
+   {"$id" "/schemas/IdentifiedUser"
+    :allOf
+    [{"$ref" "#/components/schemas/Identified"}
+     {"$ref" "#/components/schemas/User"}]}}
+
+  "Asset"
+  {"$id" "/schemas/Asset"
+   :allOf
+   [{"$ref" "#/components/schemas/Named"}
+    {:type "object"
+     :properties
+     {"location"
+      {:type "string"
+       :minLength 1}}}
+    {"$ref" "#/components/schemas/Owned"}]}
+
+  "IdentifiedAsset"
+  {"$id" "/schemas/IdentifiedAsset"
+   :allOf
+   [{"$ref" "#/components/schemas/Identified"}
+    {"$ref" "#/components/schemas/Asset"}]}}}

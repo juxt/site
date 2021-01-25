@@ -1,0 +1,108 @@
+#_( ;; Allow this script to be executed directly
+   "exec" "bb" "--classpath" "$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')" "$0" "$@"
+   )
+
+;;"$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')"
+
+;; Local Variables:
+;; mode: clojure
+;; End:
+
+(ns bootstrap
+  (:require
+   [io.aviso.ansi :as ansi]
+   [babashka.curl :as curl]
+   [clojure.java.io :as io]
+   [cheshire.core :as json]
+   [clojure.pprint :refer [pprint]]
+   [clojure.edn :as edn]))
+
+(def CURL_DEBUG false)
+(def HOST "localhost:8082")
+(def CREDS ["crux/admin" "FunkyForest"])
+
+(defn url [path]
+  (format "%s%s" HOST path))
+
+(defmacro with-status-message [msg & body]
+  `(do
+     (print (str ansi/yellow-font ~msg ansi/reset-font "..."))
+     (let [result# ~@body]
+       (println (str "[" ansi/bold-red-font "done" ansi/reset-font "]"))
+       (println "Response was:")
+       (pprint (select-keys result# [:status :headers]))
+       result#)))
+
+(def put-openapi-response
+  (with-status-message
+    "PUT API definition"
+    (curl/put
+     (url "/_crux/apis/people")
+     {:headers {"content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
+      :body (json/generate-string (edn/read-string (slurp "openapi.edn")))
+      :throw true
+      :basic-auth CREDS
+      :debug CURL_DEBUG})))
+
+(assert (= 201 (:status put-openapi-response)))
+
+(def get-openapi-json-response
+  (with-status-message
+    "Getting API JSON definition back"
+    (curl/get
+     (url "/_crux/apis/people")
+     {:basic-auth CREDS
+      :throw true
+      :debug CURL_DEBUG})))
+
+(assert (= 200 (:status get-openapi-json-response)))
+
+(def get-openapi-root-response
+  (with-status-message
+    "Getting API root"
+    (curl/get
+     (url "/_crux/apis/people")
+     {:headers {"accept" "text/plain"}
+      :basic-auth CREDS
+      :throw true
+      :debug CURL_DEBUG})))
+
+(assert (= 200 (:status get-openapi-root-response)))
+(assert (= "Crux PBAC API\r\n" (:body get-openapi-root-response)))
+
+;; Now we are ready to POST a new user-group
+
+(def put-user-group-response
+  (with-status-message
+    "PUT user-group"
+    (curl/put
+     (url "/_crux/apis/people/user-groups")
+     {:headers {"content-type" "application/json"}
+      :body (json/generate-string {:name})
+      :throw true
+      :basic-auth CREDS
+      :debug CURL_DEBUG})))
+
+#_(def get-openapi-info-response
+  (with-status-message
+    "Getting API info"
+    (curl/get
+     (url "/_crux/apis/people/info")
+     {:headers {"accept" "application/json"}
+      :basic-auth CREDS
+      :throw true
+      :debug CURL_DEBUG})))
+
+#_(assert (= 200 (:status get-openapi-info-response)))
+
+#_(def get-openapi-user-groups-response
+  (with-status-message
+    "Getting UserGroups (1 expected)"
+    (curl/get
+     (url "/_crux/apis/people/user-groups")
+     {:headers {"accept" "application/json"}
+      :basic-auth CREDS
+      :throw true
+      :debug CURL_DEBUG})))
+
+#_(:body get-openapi-user-groups-response)
