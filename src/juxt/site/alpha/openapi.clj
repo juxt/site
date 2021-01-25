@@ -5,6 +5,7 @@
    [crux.api :as crux]
    [integrant.core :as ig]
    [juxt.site.alpha.locate :refer [locate-resource]]
+   [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.perf :refer [fast-get-in]]
    [juxt.site.alpha.put :refer [put-representation]]
    [juxt.site.alpha.util :refer [hexdigest]]
@@ -52,6 +53,30 @@
                              :else (.getBytes "(unknown)"))})
            ::path-item-object path-item-object})))))
 
+(defmethod generate-representation-body :api-console-generator [representation db]
+  (.getBytes
+   (.toString
+    (doto (StringBuilder.)
+      (.append "<h1>API Console</h1>\r\n")
+      (.append "<ul>")
+      (.append
+       (apply str
+              (for [[openapi] (crux/q db '{:find [openapi]
+                                           :where [[e :openapi openapi]]})]
+                (str
+
+                 "<li>" (get-in openapi ["info" "title"])
+                 "&nbsp<small>[&nbsp;"
+                 (format "<a href='/_crux/swagger-ui/index.html?url=%s%s'>"
+                         (get-in openapi ["servers" 0 "url"]) "/openapi.json")
+                 "Swagger UI"
+                 "&nbsp;]</small>"
+                 "</a></li>"))
+              ))
+      (.append "</ul>")
+      ))))
+
+
 (defmethod put-representation
   "application/vnd.oai.openapi+json;version=3.0.2"
   [request resource new-representation old-representation crux-node]
@@ -83,8 +108,7 @@
        {:crux.db/id new-resource-uri
         ::spin/methods #{:get :head :options}
         ::spin/representations
-        [(assoc new-representation
-                ::spin/etag etag ::spin/last-modified last-modified)]}]])
+        [(assoc new-representation ::spin/etag etag ::spin/last-modified last-modified)]}]])
 
     {:status 201
      :headers {"location" (str new-resource-uri)}

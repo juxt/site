@@ -10,8 +10,9 @@
    [juxt.spin.alpha.representation :as spin.representation]
    [juxt.spin.alpha.auth :as spin.auth]
    [juxt.pick.alpha.ring :refer [pick]]
+   [juxt.site.alpha.locate :refer [locate-resource]]
    [juxt.site.alpha.put :refer [put-representation]]
-   [juxt.site.alpha.locate :refer [locate-resource]]))
+   [juxt.site.alpha.payload :refer [generate-representation-body]]))
 
 (defn assoc-when-some [m k v]
   (cond-> m v (assoc k v)))
@@ -107,7 +108,7 @@
 
     ;; This is naïve, some representations won't just have bytes ready, they'll
     ;; need to be generated somehow
-    (let [{::spin/keys [payload-header-fields bytes]} selected-representation
+    (let [{::spin/keys [payload-header-fields bytes bytes-generator]} selected-representation
           {::keys [path-item-object]} resource]
 
       (spin/response
@@ -119,7 +120,8 @@
        date
        (cond
          bytes bytes
-         path-item-object (.getBytes (get-in path-item-object ["get" "description"])))))))
+         path-item-object (.getBytes (get-in path-item-object ["get" "description"]))
+         bytes-generator (generate-representation-body selected-representation db))))))
 
 (defn receive-representation [request resource date]
   (let [{metadata ::spin/representation-metadata
