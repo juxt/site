@@ -8,7 +8,7 @@ Site as a versioned
 https://en.wikipedia.org/wiki/Content_management_system[Content Management
 System].
 
-== What is Site? What problem is it attemping to solve?
+== What is Site?
 
 CAUTION: This section describes functionality that may not yet be available.
 
