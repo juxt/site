@@ -8,7 +8,103 @@ Site as a versioned
 https://en.wikipedia.org/wiki/Content_management_system[Content Management
 System].
 
-== Resources
+== What is Site? What problem is it attemping to Site?
+
+CAUTION: This section describes functionality that may not yet be available.
+
+Site is a web-server, built on a database.
+
+You can put anything you like into Site via HTTP with a PUT requests. When you
+do this, Site will put your thing (document, image, video, data…) into the
+database. You can get these later with a (HTTP) GET request with the same URI.
+
+=== APIs
+
+If you PUT a JSON document with a `Content-Type` of
+`application/vnd.oai.openapi+json;version=3.0.2`, Site will treat this as an
+https://www.openapis.org/[OpenAPI] API definition, and serve that API for
+you. This OpenAPI API definition will contain the API endpoints, and provide
+schemas for the data transferred by the API. This tells the server how to
+validate data coming in to the API, and how to construct data on the way out.
+
+== Test drive
+
+Before you start, you'll need to have
+https://github.com/babashka/babashka[Babashka] installed on your system.
+
+Start the API Server, or jack-in with your favorite editor.
+
+----
+$ clj -Adev
+----
+
+On the first startup, there will be a number of repos cloned, which may take up to a few minutes.
+
+Wait for the Clojure prompt:
+
+----
+Clojure 1.10.1
+user=>
+----
+
+Type `(dev)`
+
+----
+user=> (dev)
+----
+
+Wait for the code to compile, and then start the API server with `(go)`:
+
+----
+[Edge] Loading Clojure code, please wait...
+[Edge] Enter (go) to start the dev system
+dev=> (go)
+----
+
+You should get something similar to the following:
+
+----
+Starting Crux node
+00:22:18.870 WARN  crux.api [main]
+MALLOC_ARENA_MAX not set, memory usage might be high, recommended setting for Crux is 2
+Adding OpenAPI module
+[Edge] Now make code changes, then enter (reset) here
+:initiated
+----
+
+From another terminal, enter the following:
+
+----
+$ cd test/juxt/site/alpha/pass/
+$ ./bootstrap
+----
+
+If there are no errors reported, browse to http://localhost:8082/_crux/api-console
+
+== Status
+
+Site is very new, and is evolving. There isn't much to see yet.
+
+Be encouraged to study the code to improve your knowledge & understanding, for
+example, on how you can build a web application with Crux and spin.
+
+[CAUTION]
+--
+Please be aware that many of the data structures are gradually evolving and are
+therefore labelled with `alpha`, meaning you may need to make explicitly changes
+to your application when upgrading to future versions of Site.
+
+To remove the need for wholesale changes to your code when Site and some of its
+supporting libraries leave alpha, it is recommended that you use namespace
+aliases. For example, write `::spin/methods` instead of
+`:juxt.site.alpha/methods`.
+--
+
+== Technical Details
+
+Site is a RESTful web-layer over Crux. This section describes the concepts.
+
+=== Resources
 
 In Site, Web resources are Crux entities.
 
@@ -101,79 +197,6 @@ The OpenAPI features are supported by some additional libraries:
 
 * https://github.com/juxt/jinx[jinx] -- A library for JSON Schema validation and
   coercion in Clojure and ClojureScript.
-
-== Test drive
-
-Before you start, you'll need to have
-https://github.com/babashka/babashka[Babashka] installed on your system.
-
-Start the API Server, or jack-in with your favorite editor.
-
-----
-$ clj -Adev
-----
-
-On the first startup, there will be a number of repos cloned, which may take up to a few minutes.
-
-Wait for the Clojure prompt:
-
-----
-Clojure 1.10.1
-user=>
-----
-
-Type `(dev)`
-
-----
-user=> (dev)
-----
-
-Wait for the code to compile, and then start the API server with `(go)`:
-
-----
-[Edge] Loading Clojure code, please wait...
-[Edge] Enter (go) to start the dev system
-dev=> (go)
-----
-
-You should get something similar to the following:
-
-----
-Starting Crux node
-00:22:18.870 WARN  crux.api [main]
-MALLOC_ARENA_MAX not set, memory usage might be high, recommended setting for Crux is 2
-Adding OpenAPI module
-[Edge] Now make code changes, then enter (reset) here
-:initiated
-----
-
-From another terminal, enter the following:
-
-----
-$ cd test/juxt/site/alpha/pass/
-$ ./bootstrap
-----
-
-If there are no errors reported, browse to http://localhost:8082/_crux/api-console
-
-== Status
-
-Site is very new, and is evolving. There isn't much to see yet.
-
-Be encouraged to study the code to improve your knowledge & understanding, for
-example, on how you can build a web application with Crux and spin.
-
-[CAUTION]
---
-Please be aware that many of the data structures are gradually evolving and are
-therefore labelled with `alpha`, meaning you may need to make explicitly changes
-to your application when upgrading to future versions of Site.
-
-To remove the need for wholesale changes to your code when Site and some of its
-supporting libraries leave alpha, it is recommended that you use namespace
-aliases. For example, write `::spin/methods` instead of
-`:juxt.site.alpha/methods`.
---
 
 == Consulting
 
