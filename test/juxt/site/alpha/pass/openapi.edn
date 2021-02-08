@@ -1,14 +1,15 @@
 {:openapi "3.0.2"
  :info
  {:version "1.0.0"
-  :title "Crux PBAC API"
+  :title "Pass API"
   :description
-  "Policy Based Access Control"
+  "Managing people, permissions and policies with Policy Based Access Control
+  built on Crux's Datalog."
   :contact
   {:name "Malcolm Sparks"
    :email "mal@juxt.pro"
    :url "https://juxt.pro"}}
- :servers [{:url "http://localhost:8082/_crux/apis/people"}]
+ :servers [{:url "/_crux/pass"}]
 
  :paths
  {"/info"
@@ -40,23 +41,27 @@
           {"application/json"
            {:schema
             {:type "array"
-             :items {"$ref" "#/components/schemas/IdentifiedUserGroup"}}}}}}}}
+             :items {"$ref" "#/components/schemas/IdentifiedUserGroup"}}}
+           }}}}}
 
   "/user-groups/{id}"
-  {:get
+  {:parameters
+   [{:name "id"
+     :in "path"
+     :description "User-group id"
+     :required true
+     :schema {:type "string"}}]
+
+   :get
    {:description "Returns a given user-group",
     :operationId "findUserGroupById",
-    :parameters
-    [{:name "id"
-      :in "path"
-      :description "ID of user-group to fetch"
-      :required true
-      :schema {:type "string"}}]
+
     :responses
-    {:200
+    {200
      {:description "Single identified user-group"
       :content
-      {"application/json" {:schema {"$ref" "#/components/schemas/IdentifiedUserGroup"}}}}}}
+      {"application/json" {:schema {"$ref" "#/components/schemas/IdentifiedUserGroup"}}
+       "text/html;charset=utf-8" {}}}}}
 
    :put
    {:description "Upserts a user-group"
@@ -66,9 +71,47 @@
      :content
      {"application/json" {:schema {"$ref" "#/components/schemas/IdentifiedUserGroup"}}}}
     :responses
-    {201 {:description "Usergroup successfully upserted"
+    {200 {:description "User-group successfully updated"
           :content
-          {"test/plain" {}}}}}}}
+          {"text/plain;charset=utf-8" {}}}
+
+     201 {:description "User-group successfully created"
+          :content
+          {"text/plain;charset=utf-8" {}}}}}}
+
+  "/users/{id}"
+  {:parameters
+   [{:name "id"
+     :in "path"
+     :description "User id"
+     :required true
+     :schema {:type "string"}}]
+
+   :get
+   {:description "Returns a given user",
+    :operationId "findUserById",
+
+    :responses
+    {200
+     {:description "Single identified user"
+      :content
+      {"application/json" {:schema {"$ref" "#/components/schemas/IdentifiedUser"}}}}}}
+
+   :put
+   {:description "Upserts a user"
+    :operationId "putUser"
+    :requestBody
+    {:required true
+     :content
+     {"application/json" {:schema {"$ref" "#/components/schemas/IdentifiedUser"}}}}
+    :responses
+    {200 {:description "User successfully updated"
+          :content
+          {"text/plain;charset=utf-8" {}}}
+
+     201 {:description "User successfully created"
+          :content
+          {"text/plain;charset=utf-8" {}}}}}}}
 
  :components
  {:schemas
@@ -79,32 +122,40 @@
     "The unique identifier of the document in the database. This is maps
     directly to the crux.db/id attribute."
     :required ["id"]
+    :juxt.jinx.alpha/keyword-mappings {"id" "crux.db/id"}
     :properties
     {"id"
      {:type "string"
-      :format "uri-reference"}}}
+      :format "uri-reference"
+      :juxt.jinx.alpha/as "uri"}}}
 
    "Named"
    {"$id" "/schemas/Named"
     :type "object"
     :required ["name"]
+    :juxt.jinx.alpha/keyword-mappings {"name" "name"}
     :properties
     {"name"
      {:type "string"
       :minLength 1}}}
 
-   "Owned"
-   {"$id" "/schemas/Owned"
+   "MaybeOwned"
+   {"$id" "/schemas/MaybeOwned"
     :type "object"
-    :required ["owner"]
+    :juxt.jinx.alpha/keyword-mappings {"owner" "owner"}
     :properties
     {"owner"
      {:type "string"
       :format "uri-reference"
       ;; This hints that the property owner is a reference to a Crux
       ;; entity
-      :crux.json-schema/reference? true
-      :crux.json-schema/schema-of-target "/schemas/IdentifiedOrganization"}}}
+      :juxt.jinx.alpha/as "uri"}}}
+
+   "Owned"
+   {"$id" "/schemas/Owned"
+    :allOf
+    [{"$ref" "#/components/schemas/MaybeOwned"}
+     {:required ["owner"]}]}
 
    "Organization"
    {"$id" "/schemas/Organization"
@@ -158,13 +209,15 @@
     [{"$ref" "#/components/schemas/Named"}
      {"$ref" "#/components/schemas/Owned"}
      {:properties
-      {"roles"
+      {"description"
+       {:type "string"}
+       "roles"
        {:type "array"
         :items
         {:type "string"
          :format "uri-reference"
-         :crux.json-schema/reference? true
-         :crux.json-schema/schema-of-target "/schemas/IdentifiedRole"}}}}]}
+         :juxt.jinx.alpha/as "uri"
+         }}}}]}
 
    "IdentifiedUserGroup"
    {"$id" "/schemas/IdentifiedUserGroup"
@@ -175,23 +228,26 @@
    "User"
    {"$id" "/schemas/User"
     :allOf
-    [{"$ref" "#/components/schemas/Named"}
-     {"$ref" "#/components/schemas/Owned"}
-     {:type "object"
-      :required ["email"
-                 "user-group"]
+    [{:type "object"
+      :required ["email" "userGroup"]
       :properties
       {"email"
        {:type "string"
         :format "email"}
-       "password-hash"
+       "password"
        {:type "string"
-        :description "Bcrypt password hash"}
-       "user-group"
+        ;;:crux/classification :crux/restricted
+        :juxt.jinx.alpha/as "password"
+        :description "The user's password, stored as a hash at rest, and only
+        transmitted in the clear when being set."
+        }
+       "userGroup"
        {:type "string"
         :format "uri-reference"
-        :crux.json-schema/reference? true
-        :crux.json-schema/schema-of-target "/schemas/IdentifiedUserGroup"}}}]}
+        :juxt.jinx.alpha/as "uri"
+        :crux/reference? true
+        ;;:crux.json-schema/schema-of-target "/schemas/IdentifiedUserGroup"
+        }}}]}
 
    "IdentifiedUser"
    {"$id" "/schemas/IdentifiedUser"

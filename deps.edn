@@ -18,17 +18,24 @@
         tick/tick {:mvn/version "0.4.26-alpha"}
 
         juxt/spin
-        #_{:git/url "https://github.com/juxt/spin.git"
-         :sha "d2b1f8c62419bb1fe102f0ac22dbfc9743a72e3a"}
-        {:local/root "../spin"}
+        {:git/url "https://github.com/juxt/spin.git"
+         :sha "d5f7e88df46f2a222bc3773f795fba067dd408a5"}
+        ;;{:local/root "../spin"}
 
         hiccup/hiccup {:mvn/version "2.0.0-alpha2"}
         metosin/jsonista {:mvn/version "0.2.7"}
 
         clj-yaml/clj-yaml {:mvn/version "0.4.0"}
-        jinx/jinx {:mvn/version "0.1.6"}
+        jinx/jinx
+        {:git/url "https://github.com/juxt/jinx.git"
+         :sha "d056c349d2478d6f3295f423dccc65bb89df1b19"}
+        ;;{:local/root "../jinx"}
 
-        crypto-password/crypto-password {:mvn/version "0.2.1"}}
+        crypto-password/crypto-password {:mvn/version "0.2.1"}
+
+        ;; Swagger UI
+        org.webjars/swagger-ui {:mvn/version "3.42.0"}
+        }
 
  :aliases
  {:dev

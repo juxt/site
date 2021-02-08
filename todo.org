@@ -1,32 +1,72 @@
 #+TITLE: Crux 'Site' TODO list
 
-* DONE Query our holidays back
+* Holidays
+** DONE Query our holidays back
 
-* DONE Holidays should be 'owned' by the individual taking the holiday
+** DONE Holidays should be 'owned' by the individual taking the holiday
 
-* DONE Count the number of days an individual has taken off in total
+** DONE Count the number of days an individual has taken off in total
 
-* DONE Segment the count by year
+** DONE Segment the count by year
 
+** DONE Make web server dependent upon Crux node
 
-* DONE Make web server dependent upon Crux node
+** DONE Add a holiday 'relation' to the Crux database
 
-* DONE Add a holiday 'relation' to the Crux database
+** DONE Get the holiday relation in response to a GET on /holidays
 
-* DONE Get the holiday relation in response to a GET on /holidays
+** DONE Generate the HTML of a form to fill out
 
-* DONE Generate the HTML of a form to fill out
+** TODO Fill out the form and send back to the server
 
-* TODO Fill out the form and send back to the server
+** TODO Support JSON & HTML
 
-* TODO Support JSON & HTML
-* TODO Use the relation, and the form fields, to submit a holiday in Crux
+** TODO Use the relation, and the form fields, to submit a holiday in Crux
 
-* TODO Calculate the number of days a person has taken
+** TODO Calculate the number of days a person has taken
 
-* TODO [#B] Don't count public holidays and weekends against the holiday 'length'
+** TODO [#B] Don't count public holidays and weekends against the holiday 'length'
   DEADLINE: <2020-10-02 Fri>
 
-* TODO Use the Crux Console to display holidays by user
+** TODO Use the Crux Console to display holidays by user
 
-* TODO Generate an iCalendar feed to show holidays in JUXT's Google Calendar
+** TODO Generate an iCalendar feed to show holidays in JUXT's Google Calendar
+
+* PBAC
+
+
+** TODO Policies
+And rules inherit their attributes
+Policies can match targets
+
+** TODO Rule-combining algorithms
+
+** TODO Policy-set, policy-combining algorithms
+
+** TODO Ingestion
+
+** TODO OpenAPI PUT
+
+*** TODO Routing
+
+*** TODO Crux 'owner' group
+
+
+** Snaglist
+
+*** TODO Why does the first PUT of /user-groups/{id} get a Vary header?
+
+*** TODO Why do subsequent puts of /user-groups/{id} have a nil old-representation?
+
+*** TODO put-representation: Dispatch on some aspect of the resource, not the representation content-type
+Multiple ways of handling application/json
+
+*** TODO Why does this not return json by default?
+curl -i localhost:8082/_crux/users/crux/admin -K cruxadmin
+Pick has a way to weight preferred responses, we should use it.
+
+
+** <2021-02-05 Fri> GOALS
+
+*** TODO PUT user into a Crux with a hashed-password
+SCHEDULED: <2021-02-05 Fri 16:00>

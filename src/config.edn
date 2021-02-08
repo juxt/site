@@ -3,7 +3,8 @@
 {:ig/system
  {:juxt.site.alpha.db/crux {}
 
-  :juxt.site.alpha.openapi/module {}
+  :juxt.apex.alpha.openapi/module
+  {:crux #ig/ref :juxt.site.alpha.db/crux}
 
   :juxt.site.alpha.server/server
   {:crux #ig/ref :juxt.site.alpha.db/crux

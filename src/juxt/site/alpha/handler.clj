@@ -4,18 +4,20 @@
   (:require
    [crypto.password.bcrypt :as password]
    [clojure.string :as str]
+   [clojure.tools.logging :as log]
+   [clojure.pprint :refer [pprint]]
    [crux.api :as crux]
-   [juxt.reap.alpha.encoders :refer [format-http-date]]
-   [juxt.spin.alpha :as spin]
-   [juxt.spin.alpha.representation :as spin.representation]
-   [juxt.spin.alpha.auth :as spin.auth]
    [juxt.pick.alpha.ring :refer [pick]]
-   [juxt.site.alpha.locate :refer [locate-resource]]
+   [juxt.apex.alpha.openapi :as openapi]
+   [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
+   [juxt.site.alpha :as site]
+   [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.put :refer [put-representation]]
-   [juxt.site.alpha.payload :refer [generate-representation-body]]))
-
-(defn assoc-when-some [m k v]
-  (cond-> m v (assoc k v)))
+   [juxt.site.alpha.response :as response]
+   [juxt.site.alpha.util :refer [assoc-when-some]]
+   [juxt.spin.alpha :as spin]
+   [juxt.spin.alpha.auth :as spin.auth]
+   [juxt.spin.alpha.representation :as spin.representation]))
 
 ;; This deviates from Spin, but we want to upgrade Spin accordingly in the near
 ;; future. When that is done, this version can be removed and the function in
@@ -46,26 +48,25 @@
     (cond-> selected-representation
       (not-empty vary) (assoc ::spin/vary (str/join ", " vary)))))
 
-(defmethod locate-resource *ns* [uri db]
-  ;; If resource is in the database, explicitly, return it.
-  (crux/entity db uri))
-
-(defn locate-resource*
+(defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
   in :default."
   [request db]
-  (let [uri (java.net.URI. (:uri request))
-        meths (methods locate-resource)]
-    (some
-     (fn [[_ meth]] (meth uri db))
-     (let [order {*ns* 1 :else 2 :default 3}]
-       (sort-by
-        first
-        (comparator (fn [x y]
-                      (<
-                       (get order x (get order :else))
-                       (get order y (get order :else)))))
-        meths)))))
+  (or
+   (log/debugf "%s: Looking up entity in openapi" (:uri request))
+   (when-let [resource (openapi/locate-resource request db)]
+     ;;(prn "resource of openapi path-object, path is" (:uri request))
+     ;;(println (with-out-str (pprint resource)))
+     resource)
+
+   (log/debugf "%s: Looking up entity in Crux" (:uri request))
+   (crux/entity db (java.net.URI. (:uri request)))
+
+   (log/debugf "%s: Failed to lookup entity, returning 404" (:uri request))
+   {::site/description
+    "Backstop resource indicating exhausted attempts to locate a resource."
+    ::spin/methods #{:get :head :options}
+    ::spin/representations []}))
 
 (defn current-representations [db resource date]
   (or
@@ -85,43 +86,27 @@
                 [resource ::spin/representation representation-id]]}
       (:crux.db/id resource))))))
 
-(defn representation-metadata-headers [rep]
-  (-> {}
-      (assoc-when-some "content-type" (some-> rep ::spin/content-type))
-      (assoc-when-some "content-encoding" (some-> rep ::spin/content-encoding))
-      (assoc-when-some "content-language" (some-> rep ::spin/content-language))
-      (assoc-when-some "content-location" (some-> rep ::spin/content-location str))
-      (assoc-when-some "last-modified" (some-> rep ::spin/last-modified format-http-date))
-      (assoc-when-some "etag" (some-> rep ::spin/etag))
-      (assoc-when-some "vary" (some-> rep ::spin/vary))))
-
-(defn payload-headers [rep]
-  (-> {}
-      (assoc-when-some "content-length" (some-> rep ::spin/content-length str))
-      (assoc-when-some "content-range" (::spin/content-range rep))
-      (assoc-when-some "trailer" (::spin/trailer rep))
-      (assoc-when-some "transfer-encoding" (::spin/transfer-encoding rep))))
-
 (defn GET [request resource date selected-representation db]
-  (let [representation-metadata-headers (representation-metadata-headers selected-representation)]
+  (let [representation-metadata-headers (response/representation-metadata-headers selected-representation)]
     (spin/evaluate-preconditions! request resource representation-metadata-headers date)
 
     ;; This is naïve, some representations won't just have bytes ready, they'll
     ;; need to be generated somehow
-    (let [{::spin/keys [payload-header-fields bytes bytes-generator]} selected-representation
+    (let [{::spin/keys [payload-header-fields bytes bytes-generator content charset]} selected-representation
           {::keys [path-item-object]} resource]
 
       (spin/response
        200
        representation-metadata-headers
-       (payload-headers payload-header-fields)
+       (response/payload-headers payload-header-fields)
        request
        nil
        date
        (cond
+         content (.getBytes content (or charset "utf-8"))
          bytes bytes
          path-item-object (.getBytes (get-in path-item-object ["get" "description"]))
-         bytes-generator (generate-representation-body selected-representation db))))))
+         bytes-generator (generate-representation-body resource selected-representation db))))))
 
 (defn receive-representation [request resource date]
   (let [{metadata ::spin/representation-metadata
@@ -147,6 +132,14 @@
   (let [new-representation (receive-representation request resource date)]
     (assert new-representation)
 
+    (when (get-in request [:headers "content-range"])
+      (throw
+       (ex-info
+        "Content-Range header not allowed on a PUT request"
+        {::spin/response
+         {:status 400
+          :body "Bad Request\r\n"}})))
+
     ;; TODO: evaluate preconditions in tx fn!
     (put-representation request resource new-representation selected-representation crux-node)))
 
@@ -156,6 +149,9 @@
 (defn OPTIONS [_ resource _ _]
   ;; TODO: Implement *
   (spin/options (::spin/methods resource)))
+
+(defmethod transform-value "password" [_ instance]
+  (password/encrypt instance))
 
 (defn authenticate
   "Authenticate a request. Return the request with any credentials, roles and
@@ -181,15 +177,7 @@
   [request resource]
 
   (when resource
-
-    ;; TODO: Let's load some policies and rules!
-
     (cond
-      (and
-       (.startsWith (:uri request) "/_crux/")
-       (= (:crux.site/username request) "crux/admin"))
-      resource
-
       (and
        (.startsWith (:uri request) "/_crux/")
        (not= (:crux.site/username request) "crux/admin"))
@@ -205,24 +193,18 @@
               ::spin/realm "Crux Administration"}])}
           :body "Unauthorized\r\n"}}))
 
-      ;; When a resource outside /_crux, and admin, allow PUT of OpenAPI
-      (and
-       (not (.startsWith (:uri request) "/_crux/"))
-       (not (.endsWith (:uri request) "/"))
-       (= (:crux.site/username request) "crux/admin"))
-      (-> resource
-       (update ::spin/methods conj :put)
-       (assoc ::spin/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.0.2"}))
-
       :else resource)))
 
 (defn make-handler [crux-node]
   (fn [request]
     (let [db (crux/db crux-node)]
       (spin/check-method-not-implemented! request)
-      (let [resource (locate-resource* request db)
-            request (authenticate request resource db)
+      (let [resource (locate-resource request db)
 
+;;            _ (prn "resource located")
+;;            _ (pprint resource)
+
+            request (authenticate request resource db)
             resource (authorize request resource)
 
             _ (spin/check-method-not-allowed! request resource)
@@ -261,6 +243,7 @@
       (catch clojure.lang.ExceptionInfo e
         ;;          (tap> e)
         (prn e)
+        (pprint (into {::spin/request req} (ex-data e)))
         (let [exdata (ex-data e)]
           (or
            (::spin/response exdata)

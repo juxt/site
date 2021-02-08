@@ -4,4 +4,4 @@
   (:require [juxt.spin.alpha :as spin]))
 
 (defmulti generate-representation-body
-  (fn [representation db] (::spin/bytes-generator representation)))
+  (fn [resource representation db] (::spin/bytes-generator representation)))
