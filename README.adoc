@@ -12,7 +12,7 @@ System].
 
 CAUTION: This section describes functionality that may not yet be available.
 
-Site is a web-server, built on a database.
+Site is a web and API server, built on the Crux database.
 
 You can put things into Site with (HTTP) PUT requests. When you do this, Site
 will put your thing (document, image, video, data…) into the database. You can
