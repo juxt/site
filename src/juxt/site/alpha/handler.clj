@@ -201,9 +201,6 @@
       (spin/check-method-not-implemented! request)
       (let [resource (locate-resource request db)
 
-;;            _ (prn "resource located")
-;;            _ (pprint resource)
-
             request (authenticate request resource db)
             resource (authorize request resource)
 
