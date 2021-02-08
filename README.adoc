@@ -102,10 +102,65 @@ The OpenAPI features are supported by some additional libraries:
 * https://github.com/juxt/jinx[jinx] -- A library for JSON Schema validation and
   coercion in Clojure and ClojureScript.
 
+== Test drive
+
+Before you start, you'll need to have
+https://github.com/babashka/babashka[Babashka] installed on your system.
+
+Start the API Server, or jack-in with your favorite editor.
+
+----
+$ clj -Adev
+----
+
+On the first startup, there will be a number of repos cloned, which may take up to a few minutes.
+
+Wait for the Clojure prompt:
+
+----
+Clojure 1.10.1
+user=>
+----
+
+Type `(dev)`
+
+----
+user=> (dev)
+----
+
+Wait for the code to compile, and then start the API server with `(go)`:
+
+----
+[Edge] Loading Clojure code, please wait...
+[Edge] Enter (go) to start the dev system
+dev=> (go)
+----
+
+You should get something similar to the following:
+
+----
+Starting Crux node
+00:22:18.870 WARN  crux.api [main]
+MALLOC_ARENA_MAX not set, memory usage might be high, recommended setting for Crux is 2
+Adding OpenAPI module
+[Edge] Now make code changes, then enter (reset) here
+:initiated
+----
+
+From another terminal, enter the following:
+
+----
+$ cd test/juxt/site/alpha/pass/
+$ ./bootstrap
+----
+
+If there are no errors reported, browse to http://localhost:8082/_crux/api-console
+
 == Status
 
-Site is evolving and maturing. It may not be ready for your project. Be
-encouraged to study the code to improve your knowledge & understanding, for
+Site is very new, and is evolving. There isn't much to see yet.
+
+Be encouraged to study the code to improve your knowledge & understanding, for
 example, on how you can build a web application with Crux and spin.
 
 [CAUTION]
