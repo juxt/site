@@ -1,3 +1,149 @@
 = Site
 
-https://opencrux.com[Crux] + https://www.rest.guide[REST]
+Site is a project from https://juxt.pro[JUXT] to build a RESTful web-layer over
+our open-source https://opencrux.com[Crux] database.
+
+Site supports web content, and https://www.openapis.org/[OpenAPI]. You can use
+Site as a versioned
+https://en.wikipedia.org/wiki/Content_management_system[Content Management
+System].
+
+== Resources
+
+In Site, Web resources are Crux entities.
+
+Since a resource is identified by a URI, we use its URI (or at least its path)
+to identify the Crux entity too.
+
+[source,clojure]
+----
+{:crux.db/id (java.net.URI. "/hello")}
+----
+
+The resource's state is stored in the Crux entity's attributes, or in other Crux
+entities it may reference.
+
+[source,clojure]
+----
+{:crux.db/id (java.net.URI. "/hello")
+ :message-today "Hello World!"}
+----
+
+The resource usually has some extra special attributes, defined by our
+https://github.com/juxt/spin[spin] library, which provide the resource's
+configuration, such as the methods allowed on the resource.
+
+[source,clojure]
+----
+{:crux.db/id (java.net.URI. "/hello")
+ :message-today "Hello World!"
+ :juxt.spin.alpha/methods #{:get :head :options}}
+----
+
+TIP: If you want to learn more about resources, see
+https://tools.ietf.org/html/rfc7231#section-2[Section 2 of RFC 7231].
+
+=== Representations
+
+Representations are Clojure maps. You can either store these as Crux entities
+too (for example, if the current representations are likely to change
+often). But usually, you can store them with the resource's Crux entity, shown
+in <<ex-hello-world>>.
+
+[[ex-hello-world]]
+.Hello World
+====
+
+This resource has just one plain-text representation. On this occasion, given
+this is a static resource which remains constant, we've chosen to generate its
+payload ahead-of-time.
+
+[source,clojure]
+----
+(require '[juxt.spin.alpha :as spin])
+
+{:crux.db/id (java.net.URL. "/hello")
+ :message-today "Hello World!"
+ ::spin/methods #{:get :head :options}
+ ::spin/representations
+ [{::spin/content-type "text/plain"
+   ::spin/content-language "en"
+   ::spin/text "Hello World!\r\n"
+   ::spin/content-length 14}]}
+----
+====
+
+At this stage, don't worry that in the example, the `::spin/text` value seems to
+duplicate the `:message-today` value in the resource. If we want to allow the
+resource's state to change, we can then generate the representation's data from
+the resource's state on each web request. _The key thing to remember is that
+resources and representations are separate things_.
+
+TIP: If you want to learn more about representations, see
+https://tools.ietf.org/html/rfc7231#section-3[Section 3 of RFC 7231].
+
+== Dependencies
+
+The web-layer is supported by some of our modern web libraries:
+
+* https://github.com/juxt/spin[spin] -- A set of supporting functions to model
+  web resources and representations as normal Clojure maps, supporting the REST
+  architectural style. You can learn more by reading our
+  https://www.rest.guide[guide to building RESTful Web APIs].
+
+* https://github.com/juxt/pick[pick] -- A library to negotiate the most
+  acceptable representation, if there is more than once to choose from.
+
+* https://github.com/juxt/reap[reap] -- A low-level codec library for HTTP
+  headers.
+
+The OpenAPI features are supported by some additional libraries:
+
+* https://github.com/juxt/jinx[jinx] -- A library for JSON Schema validation and
+  coercion in Clojure and ClojureScript.
+
+== Status
+
+Site is evolving and maturing. It may not be ready for your project. Be
+encouraged to study the code to improve your knowledge & understanding, for
+example, on how you can build a web application with Crux and spin.
+
+[CAUTION]
+--
+Please be aware that many of the data structures are gradually evolving and are
+therefore labelled with `alpha`, meaning you may need to make explicitly changes
+to your application when upgrading to future versions of Site.
+
+To remove the need for wholesale changes to your code when Site and some of its
+supporting libraries leave alpha, it is recommended that you use namespace
+aliases. For example, write `::spin/methods` instead of
+`:juxt.site.alpha/methods`.
+--
+
+== Consulting
+
+Consulting services are available directly from JUXT. Write to info@juxt.pro if
+you would like further details.
+
+== License
+
+The MIT License (MIT)
+
+Copyright © 2020-2021 JUXT LTD.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
