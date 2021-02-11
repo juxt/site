@@ -51,7 +51,6 @@ Policies can match targets
 
 *** TODO Crux 'owner' group
 
-
 ** Snaglist
 
 *** TODO Why does the first PUT of /user-groups/{id} get a Vary header?
@@ -64,9 +63,3 @@ Multiple ways of handling application/json
 *** TODO Why does this not return json by default?
 curl -i localhost:8082/_crux/users/crux/admin -K cruxadmin
 Pick has a way to weight preferred responses, we should use it.
-
-
-** <2021-02-05 Fri> GOALS
-
-*** TODO PUT user into a Crux with a hashed-password
-SCHEDULED: <2021-02-05 Fri 16:00>

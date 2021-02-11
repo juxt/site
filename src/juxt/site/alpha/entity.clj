@@ -5,6 +5,8 @@
    [clojure.pprint :refer [pprint]]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
+   [juxt.pass.alpha :as pass]
+   [juxt.site.alpha :as site]
    [juxt.site.alpha.util :refer [hexdigest sanitize]]
    [juxt.spin.alpha :as spin])
   (:import
@@ -51,6 +53,6 @@
 
 (defn user-entity [username password]
   (new-data-resource
-   (URI. (format "/_crux/users/%s" username))
-   {:crux.site/username "crux/admin"
-    :crux.site/password-hash!! (password/encrypt password)}))
+   (URI. (format "/_crux/pass/users/%s" username))
+   {::pass/username "crux/admin"
+    ::pass/password-hash!! (password/encrypt password)}))

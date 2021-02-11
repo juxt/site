@@ -3,8 +3,7 @@
  {:version "1.0.0"
   :title "Pass API"
   :description
-  "Managing people, permissions and policies with Policy Based Access Control
-  built on Crux's Datalog."
+  "Managing Crux users, roles, and policies."
   :contact
   {:name "Malcolm Sparks"
    :email "mal@juxt.pro"
@@ -12,72 +11,109 @@
  :servers [{:url "/_crux/pass"}]
 
  :paths
- {"/info"
+ {"/roles"
   {:get
-   {:description "Get the current API info"
-    :operationId "getStatus"
-    :responses
-    {200
-     {"content"
-      {"application/json" {}
-       "text/html;charset=utf-8" {}}}}}}
-
-  "/user-groups"
-  {:options
-   {:responses
-    {200 {:description "User groups contain users and a set of roles from which they can choose to assume."}}}
-
-   :get
-   {:description "Returns all user-groups"
-    :operationId "findUserGroups"
+   {:description "Returns all roles"
+    :operationId "findRoles"
     :parameters
     [{:name "limit"
       :in "query"
       :description "Maximum number of results to return"
       :required false
+      :default 100
       :schema {:type "integer"}}]
     :responses
-    {200 {:content
+    {200 {:crux/query
+          {:find [e]
+           :where [[e :type t]]
+           :args [{t "Role"}]
+           :limit {:in "query" :name "limit"}}
+
+          :content
           {"application/json"
            {:schema
             {:type "array"
-             :items {"$ref" "#/components/schemas/IdentifiedUserGroup"}}}
-           }}}}}
+             :items {"$ref" "#/components/schemas/IdentifiedRole"}}}
 
-  "/user-groups/{id}"
-  {:parameters
-   [{:name "id"
-     :in "path"
-     :description "User-group id"
-     :required true
-     :schema {:type "string"}}]
+           "text/html;charset=utf-8" {:title "Roles"
+                                      :type "edn-table"}}}}}}
 
+  "/roles/{id}"
+  {
    :get
-   {:description "Returns a given user-group",
-    :operationId "findUserGroupById",
+   {:description "Returns a given role"
+    ;; NOTE: Path-object level parameters not yet supported!!
+    :parameters
+    [{:name "id"
+      :in "path"
+      :description "Role id"
+      :required true
+      :schema {:type "string"}}]
+    :operationId "findRoleById"
 
     :responses
     {200
-     {:description "Single identified user-group"
+     {:description "Single identified role"
+
+      #_:juxt.site.alpha/state
+      #_{:users
+         (crux/q
+          {:find [user email]
+           :where [[(get-attr user :email) email]
+                   [user :type user-type]
+                   [user :roles this]]
+           :in [this]
+           :args [{user-type "User"}]})}
+
       :content
-      {"application/json" {:schema {"$ref" "#/components/schemas/IdentifiedUserGroup"}}
-       "text/html;charset=utf-8" {}}}}}
+      {"application/json" {:schema {"$ref" "#/components/schemas/Role"}}
+
+       "text/html;charset=utf-8" {:title "Role"}}}}}
 
    :put
-   {:description "Upserts a user-group"
-    :operationId "putUserGroup"
+   {:description "Upserts a role"
+    :operationId "putRole"
+    :parameters
+    [{:name "id"
+      :in "path"
+      :description "Role id"
+      :required true
+      :schema {:type "string"}}]
     :requestBody
     {:required true
      :content
-     {"application/json" {:schema {"$ref" "#/components/schemas/IdentifiedUserGroup"}}}}
+     {"application/json" {:schema {"$ref" "#/components/schemas/Role"}}}}
     :responses
-    {200 {:description "User-group successfully updated"
+    {200 {:description "Role successfully updated"
           :content
           {"text/plain;charset=utf-8" {}}}
 
-     201 {:description "User-group successfully created"
+     201 {:description "Role successfully created"
           :content
           {"text/plain;charset=utf-8" {}}}}}}
+
+  "/users"
+  {:get
+   {:description "Returns a list of all the users you're allowed to view"
+    :operationId "findUsers"
+
+    :responses
+    {200
+     {:crux/query
+      {:find [e]
+       :where [[e :type t]]
+       :args [{t "User"}]}
+
+      :content
+      {"application/json"
+       {:schema {"type" "array"
+                 "items" {"$ref" "#/components/schemas/IdentifiedUser"}}}
+
+       "text/html;charset=utf-8"
+       {:title "Users"
+        :type "edn-table"
+        :schema {"type" "array"
+                 "items" {"$ref" "#/components/schemas/IdentifiedUser"}}}}}}}}
 
   "/users/{id}"
   {:parameters
@@ -95,7 +131,19 @@
     {200
      {:description "Single identified user"
       :content
-      {"application/json" {:schema {"$ref" "#/components/schemas/IdentifiedUser"}}}}}}
+      {"application/json"
+       {:schema {"$ref" "#/components/schemas/User"}
+        :example
+        {"type" "User"
+         "name" "John Doe"
+         "email" "john@example.com"
+         "password" "DoReMi123"
+         "roles" ["/_crux/pass/roles/admin"
+                  "/_crux/pass/roles/manager"]}}
+
+       "text/html;charset=utf-8"
+       {:title "User"
+        :schema {"$ref" "#/components/schemas/User"}}}}}}
 
    :put
    {:description "Upserts a user"
@@ -103,13 +151,84 @@
     :requestBody
     {:required true
      :content
-     {"application/json" {:schema {"$ref" "#/components/schemas/IdentifiedUser"}}}}
+     {"application/json"
+      {:schema {"$ref" "#/components/schemas/User"}
+       :example
+       {"type" "User"
+        "name" "John Doe"
+        "email" "john@example.com"
+        "password" "DoReMi123"
+        "roles" ["/_crux/pass/roles/admin"
+                 "/_crux/pass/roles/manager"]}}}}
+
     :responses
     {200 {:description "User successfully updated"
           :content
           {"text/plain;charset=utf-8" {}}}
 
      201 {:description "User successfully created"
+          :content
+          {"text/plain;charset=utf-8" {}}}}}}
+
+
+  "/rules"
+  {:get
+   {:description "Returns a list of all the rule"
+
+    :responses
+    {200
+     {:crux/query
+      {:find [e]
+       :where [[e :type t]]
+       :args [{t "Rule"}]}
+
+      :content
+      {"application/json"
+       {:schema {"type" "array"
+                 "items" {"$ref" "#/components/schemas/IdentifiedRule"}}}
+
+       "text/html;charset=utf-8"
+       {:title "Rules"
+        :type "edn-table"
+        :schema {"type" "array"
+                 "items" {"$ref" "#/components/schemas/IdentifiedRule"}}}}}}}}
+
+  "/rules/{id}"
+  {:parameters
+   [{:name "id"
+     :in "path"
+     :description "Rule id"
+     :required true
+     :schema {:type "string"}}]
+
+   :get
+   {:description "Returns a given rule",
+
+    :responses
+    {200
+     {:description "Single identified rule"
+      :content
+      {"application/json"
+       {:schema {"$ref" "#/components/schemas/Rule"}}
+
+       "text/html;charset=utf-8"
+       {:title "Rule"
+        :schema {"$ref" "#/components/schemas/Rule"}}}}}}
+
+   :put
+   {:description "Upserts a rule"
+    :requestBody
+    {:required true
+     :content
+     {"application/json"
+      {:schema {"$ref" "#/components/schemas/Rule"}}}}
+
+    :responses
+    {200 {:description "Rule successfully updated"
+          :content
+          {"text/plain;charset=utf-8" {}}}
+
+     201 {:description "Rule successfully created"
           :content
           {"text/plain;charset=utf-8" {}}}}}}}
 
@@ -139,77 +258,24 @@
      {:type "string"
       :minLength 1}}}
 
-   "MaybeOwned"
-   {"$id" "/schemas/MaybeOwned"
+   "Typed"
+   {"$id" "/schemas/Typed"
     :type "object"
-    :juxt.jinx.alpha/keyword-mappings {"owner" "owner"}
+    :required ["type"]
+    :juxt.jinx.alpha/keyword-mappings {"type" "type"}
     :properties
-    {"owner"
+    {"type"
      {:type "string"
-      :format "uri-reference"
-      ;; This hints that the property owner is a reference to a Crux
-      ;; entity
-      :juxt.jinx.alpha/as "uri"}}}
-
-   "Owned"
-   {"$id" "/schemas/Owned"
-    :allOf
-    [{"$ref" "#/components/schemas/MaybeOwned"}
-     {:required ["owner"]}]}
-
-   "Organization"
-   {"$id" "/schemas/Organization"
-    :allOf
-    [{"$ref" "#/components/schemas/Named"}
-     {:type "object"
-      :properties
-      {"address"
-       {:type "string"
-        :minLength 1}}}]}
-
-   "IdentifiedOrganization"
-   {"$id" "/schemas/IdentifiedOrganization"
-    :allOf
-    [{"$ref" "#/components/schemas/Identified"}
-     {"$ref" "#/components/schemas/Organization"}]}
+      :minLength 1}}}
 
    "Role"
    {"$id" "/schemas/Role"
-    :description "Every interaction with a protected part of the system must be
-    taken with a single role. Roles are owned by organisations, and this
-    determines the organisation the interaction is taken on behalf of."
     :allOf
     [{"$ref" "#/components/schemas/Named"}
-     {"$ref" "#/components/schemas/Owned"}]}
-
-   "IdentifiedRole"
-   {"$id" "/schemas/IdentifiedRole"
-    :allOf
-    [{"$ref" "#/components/schemas/Identified"}
-     {"$ref" "#/components/schemas/Role"}]}
-
-   ;;   Rule = target + effect (allow/deny) + condition.
-   ;;   Target = subject + resource + action
-
-   ;; subject = role
-
-   ;; /users - body must be of type 'user'
-
-   ;; Rule = (isInstance(PUT-rep, 'user') + dealership-manager + POST) + allow + (PUT-rep.owner = subject.owner)
-
-
-   ;; POST
-
-   "UserGroup"
-   {"$id" "/schemas/UserGroup"
-    :description "Users are organized into groups. User groups can have multiple
-    roles, users in the user-group assume one of these roles for each
-    interaction with the system."
-    :allOf
-    [{"$ref" "#/components/schemas/Named"}
-     {"$ref" "#/components/schemas/Owned"}
+     {"$ref" "#/components/schemas/Typed"}
      {:properties
-      {"description"
+      {"type" {:const "Role"}
+       "description"
        {:type "string"}
        "roles"
        {:type "array"
@@ -219,55 +285,70 @@
          :juxt.jinx.alpha/as "uri"
          }}}}]}
 
-   "IdentifiedUserGroup"
-   {"$id" "/schemas/IdentifiedUserGroup"
+   "IdentifiedRole"
+   {"$id" "/schemas/IdentifiedRole"
     :allOf
     [{"$ref" "#/components/schemas/Identified"}
-     {"$ref" "#/components/schemas/UserGroup"}]}
+     {"$ref" "#/components/schemas/Role"}]}
 
    "User"
    {"$id" "/schemas/User"
     :allOf
-    [{:type "object"
-      :required ["email" "userGroup"]
+    [{"$ref" "#/components/schemas/Named"}
+     {"$ref" "#/components/schemas/Typed"}
+     {:type "object"
+      :required ["email" "password" "roles"]
+      :juxt.jinx.alpha/keyword-mappings {"email" "email"
+                                         "password" "juxt.pass.alpha/password-hash!!"
+                                         "roles" "roles"}
       :properties
-      {"email"
+      {"type" {:const "User"}
+       "email"
        {:type "string"
         :format "email"}
        "password"
        {:type "string"
-        ;;:crux/classification :crux/restricted
         :juxt.jinx.alpha/as "password"
         :description "The user's password, stored as a hash at rest, and only
-        transmitted in the clear when being set."
-        }
-       "userGroup"
-       {:type "string"
-        :format "uri-reference"
-        :juxt.jinx.alpha/as "uri"
-        :crux/reference? true
-        ;;:crux.json-schema/schema-of-target "/schemas/IdentifiedUserGroup"
-        }}}]}
+        transmitted in the clear when being set."}
+       "roles"
+       {:type "array"
+        :items
+        {:type "string"
+         :format "uri-reference"
+         :juxt.jinx.alpha/as "uri"
+         :crux/reference? true}}
+       "org" {:type "string"
+              :format "uri-reference"
+              :juxt.jinx.alpha/as "uri"}}}]}
 
    "IdentifiedUser"
    {"$id" "/schemas/IdentifiedUser"
     :allOf
     [{"$ref" "#/components/schemas/Identified"}
-     {"$ref" "#/components/schemas/User"}]}}
+     {"$ref" "#/components/schemas/User"}]}
 
-  "Asset"
-  {"$id" "/schemas/Asset"
-   :allOf
-   [{"$ref" "#/components/schemas/Named"}
-    {:type "object"
-     :properties
-     {"location"
-      {:type "string"
-       :minLength 1}}}
-    {"$ref" "#/components/schemas/Owned"}]}
+   "Rule"
+   {"$id" "/schemas/Rule"
+    :allOf
+    [{"$ref" "#/components/schemas/Typed"}
+     {:type "object"
+      :required ["target" "effect"]
+      :juxt.jinx.alpha/keyword-mappings {"description" "juxt.pass.alpha/description"
+                                         "target" "juxt.pass.alpha/target"
+                                         "effect" "juxt.pass.alpha/effect"
+                                         "limitingClauses" "juxt.pass.alpha/limiting-clauses"}
+      :properties
+      {"type" {:const "Rule"}
+       "description" {:type "string"}
+       "target" {:type "string" :juxt.jinx.alpha/as "edn"}
+       "effect" {:type "string" :juxt.jinx.alpha/as "keyword"}
+       "limitingClauses" {:type "string" :juxt.jinx.alpha/as "edn"}}}]}
 
-  "IdentifiedAsset"
-  {"$id" "/schemas/IdentifiedAsset"
-   :allOf
-   [{"$ref" "#/components/schemas/Identified"}
-    {"$ref" "#/components/schemas/Asset"}]}}}
+   "IdentifiedRule"
+   {"$id" "/schemas/IdentifiedRule"
+    :allOf
+    [{"$ref" "#/components/schemas/Identified"}
+     {"$ref" "#/components/schemas/Rule"}]}
+
+   }}}

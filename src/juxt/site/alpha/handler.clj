@@ -2,14 +2,16 @@
 
 (ns juxt.site.alpha.handler
   (:require
-   [crypto.password.bcrypt :as password]
+   [clojure.pprint :refer [pprint]]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [clojure.pprint :refer [pprint]]
    [crux.api :as crux]
-   [juxt.pick.alpha.ring :refer [pick]]
+   [crypto.password.bcrypt :as password]
    [juxt.apex.alpha.openapi :as openapi]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
+   [juxt.pass.alpha :as pass]
+   [juxt.pass.alpha.pdp :as pdp]
+   [juxt.pick.alpha.ring :refer [pick]]
    [juxt.site.alpha :as site]
    [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.put :refer [put-representation]]
@@ -86,7 +88,7 @@
                 [resource ::spin/representation representation-id]]}
       (:crux.db/id resource))))))
 
-(defn GET [request resource date selected-representation db]
+(defn GET [request resource date selected-representation db authorization]
   (let [representation-metadata-headers (response/representation-metadata-headers selected-representation)]
     (spin/evaluate-preconditions! request resource representation-metadata-headers date)
 
@@ -106,7 +108,7 @@
          content (.getBytes content (or charset "utf-8"))
          bytes bytes
          path-item-object (.getBytes (get-in path-item-object ["get" "description"]))
-         bytes-generator (generate-representation-body resource selected-representation db))))))
+         bytes-generator (generate-representation-body request resource selected-representation db authorization))))))
 
 (defn receive-representation [request resource date]
   (let [{metadata ::spin/representation-metadata
@@ -130,8 +132,10 @@
 
 (defn PUT [request resource selected-representation date crux-node]
   (let [new-representation (receive-representation request resource date)]
+
     (assert new-representation)
 
+    ;; TODO: Promote into spin
     (when (get-in request [:headers "content-range"])
       (throw
        (ex-info
@@ -151,7 +155,8 @@
   (spin/options (::spin/methods resource)))
 
 (defmethod transform-value "password" [_ instance]
-  (password/encrypt instance))
+  ;; TODO: Increase work-factor to 11 (not a reference to Spinal Tap!)
+  (password/encrypt instance 4))
 
 (defn authenticate
   "Authenticate a request. Return the request with any credentials, roles and
@@ -160,51 +165,28 @@
   scheme(s) for accessing the resource."
   [request resource db]
   (let [{::spin.auth/keys [user password]}
-        (spin.auth/decode-authorization-header request)]
+        (spin.auth/decode-authorization-header request)
+        uid (java.net.URI. (format "/_crux/pass/users/%s" user))]
     (or
-     (when-let [e (crux/entity db (java.net.URI. (format "/_crux/users/%s" user)))]
-       (when (password/check password (:crux.site/password-hash!! e))
-         (->
-          (merge request e)
-          (dissoc :crux.site/password-hash!!))))
+     (when-let [e (crux/entity db uid)]
+       (when (password/check password (::pass/password-hash!! e))
+         ;; TODO: This might be where we also add the 'on-behalf-of' info
+         (-> request
+             (assoc ::pass/user uid ::pass/username user))))
 
      ;; Default
      request)))
-
-(defn authorize
-  "Return the resource, as it appears to the request after authorization rules
-  have been applied."
-  [request resource]
-
-  (when resource
-    (cond
-      (and
-       (.startsWith (:uri request) "/_crux/")
-       (not= (:crux.site/username request) "crux/admin"))
-      (throw
-       (ex-info
-        "Authentication failed"
-        {::spin/response
-         {:status 401
-          :headers
-          {"www-authenticate"
-           (spin.auth/www-authenticate
-            [{::spin/authentication-scheme "Basic"
-              ::spin/realm "Crux Administration"}])}
-          :body "Unauthorized\r\n"}}))
-
-      :else resource)))
 
 (defn make-handler [crux-node]
   (fn [request]
     (let [db (crux/db crux-node)]
       (spin/check-method-not-implemented! request)
       (let [resource (locate-resource request db)
-
             request (authenticate request resource db)
-            resource (authorize request resource)
+            {:keys [resource authorization]} (pdp/authorize request resource db)
 
-            _ (spin/check-method-not-allowed! request resource)
+            ;; TODO: Promote this when guard to spin's demo
+            _ (when resource (spin/check-method-not-allowed! request resource))
 
             date (new java.util.Date)
 
@@ -219,7 +201,7 @@
         (case (:request-method request)
 
           (:get :head)
-          (GET request resource date selected-representation db)
+          (GET request resource date selected-representation db authorization)
 
           :post
           (POST request resource date crux-node)

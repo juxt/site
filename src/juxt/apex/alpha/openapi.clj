@@ -3,26 +3,30 @@
 (ns juxt.apex.alpha.openapi
   (:require
    [clojure.java.io :as io]
-   [clojure.string :as str]
    [clojure.pprint :refer [pprint]]
+   [clojure.string :as str]
+   [clojure.walk :refer [postwalk]]
    [crux.api :as crux]
-   [juxt.jinx.alpha :as jinx]
-   [juxt.jinx.alpha.api :as jinx.api]
    [hiccup.core :as h]
    [hiccup.page :as hp]
    [integrant.core :as ig]
+   [json-html.core :refer [edn->html]]
+   [jsonista.core :as json]
    [juxt.apex.alpha :as apex]
+   [juxt.apex.alpha.parameters :refer [extract-params-from-request]]
+   [juxt.jinx.alpha :as jinx]
+   [juxt.jinx.alpha.api :as jinx.api]
+   [juxt.jinx.alpha.vocabularies.keyword-mapping :refer [process-keyword-mappings]]
+   [juxt.jinx.alpha.vocabularies.transformation :refer [process-transformations]]
+   [juxt.pass.alpha.pdp :as pdp]
    [juxt.site.alpha :as site]
+   [juxt.site.alpha.entity :as entity]
    [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.perf :refer [fast-get-in]]
    [juxt.site.alpha.put :refer [put-representation]]
-   [juxt.jinx.alpha.vocabularies.transformation :refer [process-transformations]]
-   [juxt.jinx.alpha.vocabularies.keyword-mapping :refer [process-keyword-mappings]]
    [juxt.site.alpha.response :as response]
    [juxt.site.alpha.util :as util]
-   [juxt.site.alpha.entity :as entity]
-   [juxt.spin.alpha :as spin]
-   [jsonista.core :as json])
+   [juxt.spin.alpha :as spin])
   (:import
    (java.net URI)
    (java.util Date UUID)))
@@ -59,6 +63,8 @@
                            :openapi openapi
                            :rel-request-path (subs abs-request-path (count server-url))})))
                     (get openapi "servers")))
+                 ;; Iterate across all APIs in this server, looking for a match
+                 ;; TODO: authorization
                  (crux/q db '{:find [openapi-eid openapi]
                               :where [[openapi-eid :juxt.apex.alpha/openapi openapi]]}))]
 
@@ -75,16 +81,21 @@
                    (filter #(= (get % "in") "path")))
 
                   pattern
-                  (re-pattern
-                   (str/replace
-                    path
-                    #"\{(\p{Alpha}+)\}"
-                    (fn [[_ group]]
-                      (format "(?<%s>\\w+)" group))))
+                  (str/replace
+                   path
+                   #"\{(\p{Alpha}+)\}"
+                   (fn [[_ group]]
+                     (format "(?<%s>[\\p{Alnum}-_]+)" group)))
 
-                  matcher (re-matcher pattern rel-request-path)]
+                  ;; We have to terminate with a 'end of line' otherwise we
+                  ;; match too eagerly. So if we had /users and /users/{id},
+                  ;; then '/users/foo' might match /users.
+                  pattern (str pattern "$")
+
+                  matcher (re-matcher (re-pattern pattern) rel-request-path)]
 
               (when (.find matcher)
+                ;;(prn "REGION" (.regionStart matcher) (.regionEnd matcher))
                 (let [path-params
                       (into
                        {}
@@ -94,7 +105,10 @@
 
                       operation-object (get path-item-object (name (:request-method request)))]
 
-                  {::spin/methods
+                  {:description "OpenAPI matched path"
+                   ::apex/openid-path path
+                   ::apex/openid-path-params path-params
+                   ::spin/methods
                    (keep
                     #{:get :head :post :put :delete :options :trace :connect}
                     (let [methods (set
@@ -119,57 +133,197 @@
 
           paths))))))
 
+(defn ->query [input params]
+  (let [input (postwalk (fn [x]
+                      (if (and (map? x)
+                               (contains? x "name")
+                               (= (get x "in") "query"))
+                        (get-in params [:query (get x "name") :value]
+                                (get-in params [:query (get x "name") :param "default"]))
+                        x))
+                        input)]
+    (reduce
+     (fn [acc [k v]]
+       (assoc acc (keyword k)
+              (case (keyword k)
+                :find (mapv symbol v)
+                :where (mapv (fn [clause]
+                               (cond
+                                 (and (vector? clause) (every? (comp not coll?) clause))
+                                 (mapv (fn [item txf] (txf item)) clause [symbol keyword symbol])
+
+                                 ;;(and (vector? clause) (list? (first clause)))
+                                 ;;(mapv (fn [item txf] (txf item)) clause [#(fn ) symbol])
+                                 ))
+
+                             v)
+
+                :limit v
+                :in (mapv symbol v)
+                :args [(reduce-kv (fn [acc k v] (assoc acc (keyword k) v)) {} (first v))]
+                )))
+     {} input)))
+
+(extend-protocol json-html.core/Render
+  java.net.URI
+  (render [u]
+    [:a {:href u} u]))
+
 ;; Possibly promote up into site - by default we output the resource state, but
 ;; there may be a better rendering of collections, which can be inferred from
 ;; the schema being an array and use the items subschema. We can also use the
 ;; resource state as a
-(defmethod generate-representation-body ::entity-bytes-generator [resource representation db]
-  (let [resource-state
-        (reduce-kv
-         (fn [acc k v]
-           (cond-> acc
-             (not (and (keyword? k)
-                       (some->>
-                        (namespace k)
-                        (re-matches #"juxt\.(reap|spin|site|pick)\..*"))))
-             (assoc k v)))
-         {}
-         representation)]
+(defmethod generate-representation-body ::entity-bytes-generator [request resource representation db authorization]
+
+  (let [param-defs
+        (get-in resource [:juxt.apex.alpha/operation "parameters"])
+
+        query
+        (get-in resource [:juxt.apex.alpha/operation "responses" "200" "crux/query"])
+
+        crux-query
+        (when query (->query query (extract-params-from-request request param-defs)))
+
+        authorized-query (when crux-query
+                           ;; This is just temporary, in future, fail if no
+                           ;; authorization. We just need to make sure there's
+                           ;; an authorization for crux/admin
+                           (if authorization
+                             (pdp/->authorized-query crux-query authorization)
+                             crux-query))
+
+        resource-state
+        (if query
+          ;; TODO: authorization
+          (for [[e] (crux/q db authorized-query
+                            ;; Could put some in params here
+                            )]
+            (crux/entity db e))
+          (crux/entity db (java.net.URI. (:uri request))))]
+
     ;; TODO: Might want to filter out the spin metadata at some point
     (case (::spin/content-type representation)
       "application/json"
       ;; TODO: Might want to filter out the spin metadata at some point
-      (json/write-value-as-bytes resource-state)
+      (.getBytes (str (json/write-value-as-string resource-state) "\r\n"))
 
       "text/html;charset=utf-8"
-      (.getBytes
+      (let [config (get-in resource [:juxt.apex.alpha/operation "responses" "200" "content" (::spin/content-type representation)])
+            ]
+        (.getBytes
 
-       (hp/html5
-        [:h1 "Crux entity"]
-        [:pre (with-out-str (pprint resource-state))]
-        )
-       ))))
+         ;; We can get config from openapi
+         (str
+          (hp/html5
+           [:h1 (get config "title" "No title")]
 
-(defmethod generate-representation-body ::api-console-generator [resource representation db]
-  (.getBytes
-   (.toString
-    (doto (StringBuilder.)
-      (.append "<h1>API Console</h1>\r\n")
-      (.append "<ul>")
-      (.append
-       (apply str
-              (for [[uri openapi]
-                    (crux/q db '{:find [e openapi]
-                                 :where [[e ::apex/openapi openapi]]})]
-                (str
-                 "<li>" (get-in openapi ["info" "title"])
-                 "&nbsp<small>[&nbsp;"
-                 (format "<a href='/_crux/swagger-ui/index.html?url=%s'>" uri)
-                 "Swagger UI"
-                 "&nbsp;]</small>"
-                 "</a></li>"))))
-      (.append "</ul>")))))
+           ;; Get :path-params = {"id" "owners"}
 
+           (cond
+             (= (get config "type") "edn-table")
+             (list
+              [:style
+               (slurp (io/resource "json.human.css"))]
+              (edn->html resource-state))
+
+             (= (get config "type") "table")
+             (if (seq resource-state)
+               (let [fields (distinct (concat [:crux.db/id] (keys (first resource-state))))]
+                 [:table {:style "border: 1px solid #888; border-collapse: collapse; "}
+                  [:thead
+                   [:tr
+                    (for [field fields]
+                      [:th {:style "border: 1px solid #888; padding: 4pt; text-align: left"} (pr-str field)])]]
+                  [:tbody
+                   (for [row resource-state]
+                     [:tr
+                      (for [field fields
+                            :let [val (get row field)]]
+                        [:td {:style "border: 1px solid #888; padding: 4pt; text-align: left"}
+                         (cond
+                           (uri? val)
+                           [:a {:href val} val]
+                           :else
+                           (pr-str (get row field)))])])]])
+               [:p "No results"])
+
+             :else
+             (let [fields (distinct (concat [:crux.db/id] (keys resource-state)))]
+               [:dl
+                (for [field fields
+                      :let [val (get resource-state field)]]
+                  (list
+                   [:dt
+                    (pr-str field)]
+                   [:dd
+                    (cond
+                      (uri? val)
+                      [:a {:href val} val]
+                      :else
+                      (pr-str (get resource-state field)))]))]))
+
+           [:h2 "Debug"]
+           [:h3 "Resource"]
+           [:pre (with-out-str (pprint resource))]
+           (when query
+             (list
+              [:h3 "Query"]
+              [:pre (with-out-str (pprint query))]))
+           (when crux-query
+             (list
+              [:h3 "Crux Query"]
+              [:pre (with-out-str (pprint (->query query (extract-params-from-request request param-defs))))]))
+
+           (when (seq param-defs)
+             (list
+              [:h3 "Parameters"]
+              [:pre (with-out-str (pprint (extract-params-from-request request param-defs)))]))
+
+           [:h3 "Resource state"]
+           [:pre (with-out-str (pprint resource-state))])
+          "\r\n"))))))
+
+(defmethod generate-representation-body ::api-console-generator [request resource representation db authorization]
+  (let [cell-attrs {:style "border: 1px solid #888; padding: 4pt; text-align: left"}
+        openapis (sort-by
+                  (comp str first)
+                  (crux/q db '{:find [e openapi]
+                               :where [[e ::apex/openapi openapi]]}))]
+    (.getBytes
+     (str
+      (hp/html5
+       [:h1 "APIs"]
+       (if (pos? (count openapis))
+         (list
+          [:p "These APIs are loaded and available:"]
+          [:table {:style "border: 1px solid #888; border-collapse: collapse; "}
+           [:thead
+            [:tr
+             (for [field ["Path" "Title" "Description" "Contact" "Swagger UI"]]
+               [:th cell-attrs field])]]
+           [:tbody
+            (for [[uri openapi]
+                  ;; TODO: authorization
+                  openapis]
+              [:tr
+               [:td cell-attrs
+                (get-in openapi ["servers" 0 "url"])]
+
+               [:td cell-attrs
+                (get-in openapi ["info" "title"])]
+
+               [:td cell-attrs
+                (get-in openapi ["info" "description"])]
+
+               [:td cell-attrs
+                (get-in openapi ["info" "contact" "name"])]
+
+               [:td cell-attrs
+                [:a {:href (format "/_crux/swagger-ui/index.html?url=%s" uri)} uri]]])]])
+         (list
+          [:p "These are no APIs loaded."])))
+
+      "\r\n"))))
 
 (defmethod put-representation
   "application/vnd.oai.openapi+json;version=3.0.2"
@@ -204,9 +358,6 @@
   "application/json"
   [request resource new-representation old-representation crux-node]
 
-  #_(prn "old-representation is")
-  #_(println (with-out-str (pprint old-representation)))
-
   (let [date (java.util.Date.)
         last-modified date
         etag (format "\"%s\"" (subs (util/hexdigest (::spin/bytes new-representation)) 0 32))
@@ -214,10 +365,7 @@
                                  ::spin/last-modified last-modified}
         schema (get-in resource [::apex/operation "requestBody" "content" "application/json" "schema"])
         _ (assert schema)
-        instance (-> (json/read-value (::spin/bytes new-representation))
-                     ;; If we don't add the id, we'll fail the schema validation
-                     ;; check
-                     (assoc "id" (:uri request)))
+        instance (json/read-value (::spin/bytes new-representation))
         _ (assert instance)
         openapi (:juxt.apex.alpha/openapi resource)
         _ (assert openapi)
@@ -232,8 +380,7 @@
     ;; TODO: Validate new-representation against the JSON schema in the openapi.
 
     (when-not (::jinx/valid? validation-results)
-      (prn "validation-results")
-      (println (with-out-str (pprint validation-results)))
+      (pprint validation-results)
       (throw
        (ex-info
         "Schema validation failed"
@@ -242,22 +389,17 @@
           ;; TODO: Content negotiation for error responses
           :body (with-out-str (pprint validation-results))}})))
 
+
     (let [validation (-> validation-results process-transformations process-keyword-mappings)
-          instance (::jinx/instance validation)]
+          instance (::jinx/instance validation)
+          id (java.net.URI. (:uri request))]
 
-      (assert (:crux.db/id instance) "The doc must contain an entry for :crux.db/id")
-
+      ;; Since this resource is 'managed' by the locate-resource in this ns, we
+      ;; don't have to worry about spin attributes - these will be provided by
+      ;; the locate-resource function. We just need the resource state here.
       (crux/submit-tx
        crux-node
-       [[:crux.tx/put
-         (merge
-          instance
-          {::spin/methods #{:get :head :put :options}
-           ::spin/representations
-           [{::spin/content-type "application/json"
-             ::spin/text "TODO: Render Crux entity as JSON"}]
-           ;;::apex/openapi (::apex/openapi resource)
-           })]])
+       [[:crux.tx/put (assoc instance :crux.db/id id)]])
 
       (spin/response
        (if old-representation 200 201)
@@ -289,8 +431,9 @@
                  bytes (byte-array size)
                  path (second
                        (re-matches #"META-INF/resources/webjars/swagger-ui/[0-9.]+/(.*)"
-                                   nm))
-                 uri (URI. (format "/_crux/swagger-ui/%s" path))]
+                                   nm))]
+           :when path
+           :let [uri (URI. (format "/_crux/swagger-ui/%s" path))]
            :when (pos? size)]
        (do
          (.read (.getInputStream jar je) bytes 0 size)

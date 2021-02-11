@@ -1,7 +1,8 @@
 ;; Copyright © 2021, JUXT LTD.
 
 {:ig/system
- {:juxt.site.alpha.db/crux {}
+ {:juxt.site.alpha.db/crux
+  {:crux.http-server/server {:port 3000}}
 
   :juxt.apex.alpha.openapi/module
   {:crux #ig/ref :juxt.site.alpha.db/crux}

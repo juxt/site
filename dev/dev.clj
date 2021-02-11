@@ -17,8 +17,10 @@
   (crux/q (db) query))
 
 (defn es []
-  (sort
-   (q '{:find [e] :where [[e :crux.db/id]]})))
+  (sort-by
+   str
+   (map first
+        (q '{:find [e] :where [[e :crux.db/id]]}))))
 
 (defn uuid [s]
   (cond

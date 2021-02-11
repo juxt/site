@@ -28,14 +28,17 @@
         clj-yaml/clj-yaml {:mvn/version "0.4.0"}
         jinx/jinx
         {:git/url "https://github.com/juxt/jinx.git"
-         :sha "f5041374eca29c0a745180298a257e355ee83b9e"}
+         :sha "156b85bf283b1836748f7c333d3eeee772ed4c1b"}
         ;;{:local/root "../jinx"}
 
         crypto-password/crypto-password {:mvn/version "0.2.1"}
 
         ;; Swagger UI
         org.webjars/swagger-ui {:mvn/version "3.42.0"}
-        }
+
+        json-html/json-html {:mvn/version "0.4.0"
+                             ;;:exclusions [hiccups]
+                             }}
 
  :aliases
  {:dev
