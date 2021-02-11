@@ -7,6 +7,9 @@
   :juxt.apex.alpha.openapi/module
   {:crux #ig/ref :juxt.site.alpha.db/crux}
 
+  :juxt.site.alpha.selmer/cache
+  {:cache? false}
+
   :juxt.site.alpha.server/server
   {:crux #ig/ref :juxt.site.alpha.db/crux
    :port 8082

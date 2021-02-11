@@ -1,0 +1,75 @@
+#_( ;; Allow this script to be executed directly
+   "exec" "bb" "--classpath" "$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')" "$0" "$@"
+   )
+
+;;"$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')"
+
+(ns deploy
+  (:require
+   [babashka.curl :as curl]
+   [clojure.java.io :as io]
+   [clojure.java.shell :as sh]
+   [cheshire.core :as json]
+   [clojure.pprint :refer [pprint]]
+   [clojure.edn :as edn]
+   [io.aviso.ansi :as ansi]))
+
+(def config (edn/read-string (slurp "config.edn")))
+
+(def CURL_DEBUG (:debug config))
+(def HOST (:host config))
+(def CRUX_ADMIN ["crux/admin" (:admin-password config)])
+
+(defn url [path]
+  (format "%s%s" HOST path))
+
+(defmacro with-status-message [msg & body]
+  `(do
+     (print (str ansi/yellow-font ~msg ansi/reset-font "..."))
+     (let [result# ~@body]
+       (println (str "[" ansi/bold-red-font "done" ansi/reset-font "]"))
+       (println "Response was:")
+       (pprint (select-keys result# [:status :headers]))
+       result#)))
+
+(def put-card-openapi-response
+  (let [openapi-file (io/file "openapi.edn")
+        _ (assert (.exists openapi-file))
+        openapi (edn/read-string (slurp openapi-file))
+        openapi.json (json/generate-string openapi)]
+    (with-status-message
+      (format "PUT %s (%s)" (get-in openapi [:info :title]) (get-in openapi [:info :version]))
+      (curl/put
+       (url "/_crux/apis/card/openapi.json")
+       {:headers {"content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
+        :body openapi.json
+        :throw true
+        :basic-auth CRUX_ADMIN
+        :debug CURL_DEBUG}))))
+(assert (= 201 (:status put-card-openapi-response)))
+
+
+;; Local Variables:
+;; mode: clojure
+;; End:
+
+(doseq [fl (.listFiles (io/file "cards"))]
+  (let [{:keys [name content-type]}
+        (condp re-matches (.getName fl)
+          #"(.*)\.edn$" :>> (fn [[_ name]]
+                              {:name name :content-type "application/json"}))
+        content (->
+                 (edn/read-string (slurp fl))
+                 (assoc :type "Card"))]
+
+    (with-status-message
+      (format "PUT %s" name)
+      (curl/put
+       (url (format "/apps/card/cards/%s" name))
+       {:headers {"content-type" content-type}
+        :body (case content-type
+                "application/json"
+                (json/generate-string content))
+        :throw true
+        :basic-auth CRUX_ADMIN
+        :debug CURL_DEBUG}))))

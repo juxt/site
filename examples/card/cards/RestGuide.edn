@@ -1,0 +1,4 @@
+{:title "Rest Guide"
+ :state "draft"
+ :content "RestGuide.adoc"
+ :references ["RestServicesInClojureWithSpin"]}
