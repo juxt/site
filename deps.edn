@@ -28,7 +28,7 @@
         clj-yaml/clj-yaml {:mvn/version "0.4.0"}
         jinx/jinx
         {:git/url "https://github.com/juxt/jinx.git"
-         :sha "156b85bf283b1836748f7c333d3eeee772ed4c1b"}
+         :sha "75faa460c37d068746f7e3985c555aeeacc9e383"}
         ;;{:local/root "../jinx"}
 
         crypto-password/crypto-password {:mvn/version "0.2.1"}
