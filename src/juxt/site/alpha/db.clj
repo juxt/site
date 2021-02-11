@@ -10,7 +10,6 @@
    [juxt.site.alpha.entity :as entity]
    [juxt.site.alpha.util :as util])
   (:import
-   (java.net URI)
    (java.util Date UUID)))
 
 (defn seed-database! [crux-node]

@@ -246,7 +246,8 @@
     {"id"
      {:type "string"
       :format "uri-reference"
-      :juxt.jinx.alpha/as "uri"}}}
+      ;;:juxt.jinx.alpha/as "uri"
+      }}}
 
    "Named"
    {"$id" "/schemas/Named"
@@ -282,7 +283,7 @@
         :items
         {:type "string"
          :format "uri-reference"
-         :juxt.jinx.alpha/as "uri"
+         ;;:juxt.jinx.alpha/as "uri"
          }}}}]}
 
    "IdentifiedRole"
@@ -316,11 +317,12 @@
         :items
         {:type "string"
          :format "uri-reference"
-         :juxt.jinx.alpha/as "uri"
+         ;;:juxt.jinx.alpha/as "uri"
          :crux/reference? true}}
        "org" {:type "string"
               :format "uri-reference"
-              :juxt.jinx.alpha/as "uri"}}}]}
+              ;;:juxt.jinx.alpha/as "uri"
+              }}}]}
 
    "IdentifiedUser"
    {"$id" "/schemas/IdentifiedUser"

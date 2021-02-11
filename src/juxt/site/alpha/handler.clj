@@ -62,7 +62,7 @@
      resource)
 
    (log/debugf "%s: Looking up entity in Crux" (:uri request))
-   (crux/entity db (java.net.URI. (:uri request)))
+   (crux/entity db (:uri request))
 
    (log/debugf "%s: Failed to lookup entity, returning 404" (:uri request))
    {::site/description
@@ -166,7 +166,7 @@
   [request resource db]
   (let [{::spin.auth/keys [user password]}
         (spin.auth/decode-authorization-header request)
-        uid (java.net.URI. (format "/_crux/pass/users/%s" user))]
+        uid (format "/_crux/pass/users/%s" user)]
     (or
      (when-let [e (crux/entity db uid)]
        (when (password/check password (::pass/password-hash!! e))

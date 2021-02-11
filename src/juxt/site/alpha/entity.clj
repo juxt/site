@@ -10,7 +10,6 @@
    [juxt.site.alpha.util :refer [hexdigest sanitize]]
    [juxt.spin.alpha :as spin])
   (:import
-   (java.net URI)
    (java.util Date UUID)))
 
 (defn new-data-resource [uri resource-state]
@@ -53,6 +52,6 @@
 
 (defn user-entity [username password]
   (new-data-resource
-   (URI. (format "/_crux/pass/users/%s" username))
+   (format "/_crux/pass/users/%s" username)
    {::pass/username "crux/admin"
     ::pass/password-hash!! (password/encrypt password)}))

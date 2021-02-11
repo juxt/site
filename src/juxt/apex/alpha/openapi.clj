@@ -28,7 +28,6 @@
    [juxt.site.alpha.util :as util]
    [juxt.spin.alpha :as spin])
   (:import
-   (java.net URI)
    (java.util Date UUID)))
 
 ;; TODO: Restrict where openapis can be PUT
@@ -42,7 +41,7 @@
 
      (or
       ;; It might exist
-      (crux/entity db (URI. (:uri request)))
+      (crux/entity db (:uri request))
 
       ;; Or it might not
       ;; This last item (:put) might be granted by the PDP.
@@ -51,7 +50,7 @@
        ::spin/methods #{:get :head :options :put}
        ::spin/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.0.2"}}))
 
-   (let [abs-request-path (.getPath (URI. (:uri request)))]
+   (let [abs-request-path (:uri request)]
      (when-let [{:keys [openapi-ent openapi rel-request-path]}
                 (some
                  (fn [[openapi-eid openapi]]
@@ -164,7 +163,7 @@
                 )))
      {} input)))
 
-(extend-protocol json-html.core/Render
+#_(extend-protocol json-html.core/Render
   java.net.URI
   (render [u]
     [:a {:href u} u]))
@@ -199,7 +198,7 @@
                             ;; Could put some in params here
                             )]
             (crux/entity db e))
-          (crux/entity db (java.net.URI. (:uri request))))]
+          (crux/entity db (:uri request)))]
 
     ;; TODO: Might want to filter out the spin metadata at some point
     (case (::spin/content-type representation)
@@ -329,7 +328,7 @@
   "application/vnd.oai.openapi+json;version=3.0.2"
   [request _ openapi-json-representation old-representation crux-node]
 
-  (let [uri (URI. (:uri request))
+  (let [uri (:uri request)
         last-modified (java.util.Date.)
         openapi (json/read-value (java.io.ByteArrayInputStream. (::spin/bytes openapi-json-representation)))
         etag (format "\"%s\"" (subs (util/hexdigest (.getBytes (pr-str openapi))) 0 32))]
@@ -392,7 +391,7 @@
 
     (let [validation (-> validation-results process-transformations process-keyword-mappings)
           instance (::jinx/instance validation)
-          id (java.net.URI. (:uri request))]
+          id (:uri request)]
 
       ;; Since this resource is 'managed' by the locate-resource in this ns, we
       ;; don't have to worry about spin attributes - these will be provided by
@@ -433,7 +432,7 @@
                        (re-matches #"META-INF/resources/webjars/swagger-ui/[0-9.]+/(.*)"
                                    nm))]
            :when path
-           :let [uri (URI. (format "/_crux/swagger-ui/%s" path))]
+           :let [uri (format "/_crux/swagger-ui/%s" path)]
            :when (pos? size)]
        (do
          (.read (.getInputStream jar je) bytes 0 size)
@@ -449,7 +448,7 @@
 
 (defn api-console []
   [[:crux.tx/put
-    {:crux.db/id (URI. "/_crux/api-console")
+    {:crux.db/id "/_crux/api-console"
      ::spin/methods #{:get :head :options}
      ::spin/representations
      [{::spin/content-type "text/html;charset=utf-8"
