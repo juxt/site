@@ -14,7 +14,6 @@
    [juxt.pick.alpha.ring :refer [pick]]
    [juxt.site.alpha :as site]
    [juxt.site.alpha.payload :refer [generate-representation-body]]
-   [juxt.site.alpha.put :refer [put-representation]]
    [juxt.site.alpha.response :as response]
    [juxt.site.alpha.util :refer [assoc-when-some]]
    [juxt.spin.alpha :as spin]
@@ -145,7 +144,23 @@
           :body "Bad Request\r\n"}})))
 
     ;; TODO: evaluate preconditions in tx fn!
-    (put-representation request resource new-representation selected-representation crux-node)))
+    (case (::spin/content-type new-representation)
+
+      "application/vnd.oai.openapi+json;version=3.0.2"
+      (openapi/put-openapi
+       request resource new-representation selected-representation crux-node)
+
+      "application/json"
+      (openapi/put-json-representation
+       request resource new-representation selected-representation crux-node)
+
+      (throw
+       (ex-info
+        "Unsupported content type in request body"
+        {::spin/content-type (::spin/content-type new-representation)
+         ::spin/response
+         {:status 400
+          :body (.getBytes "Bad Request\r\n")}})))))
 
 (defn DELETE [request resource selected-representation date crux-node]
   {:status 200})

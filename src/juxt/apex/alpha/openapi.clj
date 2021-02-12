@@ -7,7 +7,6 @@
    [clojure.string :as str]
    [clojure.walk :refer [postwalk]]
    [crux.api :as crux]
-   [hiccup.core :as h]
    [hiccup.page :as hp]
    [integrant.core :as ig]
    [json-html.core :refer [edn->html]]
@@ -20,15 +19,11 @@
    [juxt.jinx.alpha.vocabularies.transformation :refer [process-transformations]]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.site.alpha :as site]
-   [juxt.site.alpha.entity :as entity]
    [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.perf :refer [fast-get-in]]
-   [juxt.site.alpha.put :refer [put-representation]]
    [juxt.site.alpha.response :as response]
    [juxt.site.alpha.util :as util]
-   [juxt.spin.alpha :as spin])
-  (:import
-   (java.util Date UUID)))
+   [juxt.spin.alpha :as spin]))
 
 ;; TODO: Restrict where openapis can be PUT
 (defn locate-resource [request db]
@@ -324,9 +319,7 @@
 
       "\r\n"))))
 
-(defmethod put-representation
-  "application/vnd.oai.openapi+json;version=3.0.2"
-  [request _ openapi-json-representation old-representation crux-node]
+(defn put-openapi [request _ openapi-json-representation _ crux-node]
 
   (let [uri (:uri request)
         last-modified (java.util.Date.)
@@ -353,8 +346,7 @@
      ;; TODO: Add :body to describe the new resource
      }))
 
-(defmethod put-representation
-  "application/json"
+(defn put-json-representation
   [request resource new-representation old-representation crux-node]
 
   (let [date (java.util.Date.)
