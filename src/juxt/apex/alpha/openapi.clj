@@ -5,6 +5,7 @@
    [clojure.java.io :as io]
    [clojure.pprint :refer [pprint]]
    [clojure.string :as str]
+   [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk]]
    [crux.api :as crux]
    [hiccup.page :as hp]
@@ -29,11 +30,9 @@
 (defn locate-resource [request db]
   ;; Do we have any OpenAPIs in the database?
   (or
-
    ;; The OpenAPI document
    (when (and (re-matches #"/_crux/apis/\w+/openapi.json" (:uri request))
               (not (.endsWith (:uri request) "/")))
-
      (or
       ;; It might exist
       (crux/entity db (:uri request))

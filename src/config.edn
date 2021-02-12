@@ -12,6 +12,4 @@
 
   :juxt.site.alpha.server/server
   {:crux #ig/ref :juxt.site.alpha.db/crux
-   :port 8082
-   :dynamic? #profile {:prod false
-                       :default true}}}}
+   :port 8082}}}

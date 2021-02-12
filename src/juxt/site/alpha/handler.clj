@@ -54,16 +54,11 @@
   in :default."
   [request db]
   (or
-   (log/debugf "%s: Looking up entity in openapi" (:uri request))
    (when-let [resource (openapi/locate-resource request db)]
-     ;;(prn "resource of openapi path-object, path is" (:uri request))
-     ;;(println (with-out-str (pprint resource)))
      resource)
 
-   (log/debugf "%s: Looking up entity in Crux" (:uri request))
    (crux/entity db (:uri request))
 
-   (log/debugf "%s: Failed to lookup entity, returning 404" (:uri request))
    {::site/description
     "Backstop resource indicating exhausted attempts to locate a resource."
     ::spin/methods #{:get :head :options}
@@ -192,43 +187,70 @@
      ;; Default
      request)))
 
-(defn make-handler [crux-node]
-  (fn [request]
-    (let [db (crux/db crux-node)]
-      (spin/check-method-not-implemented! request)
-      (let [resource (locate-resource request db)
-            request (authenticate request resource db)
-            {:keys [resource authorization]} (pdp/authorize request resource db)
+(defn handler [{db ::crux-db crux-node ::crux-node :as request}]
+  (spin/check-method-not-implemented! request)
+  (let [
+        ;; Having extracted our Crux database and node, we remove from the
+        ;; request.
+        request (dissoc request ::crux-db ::crux-node)
 
-            ;; TODO: Promote this when guard to spin's demo
-            _ (when resource (spin/check-method-not-allowed! request resource))
+        resource (locate-resource request db)
+        request (authenticate request resource db)
+        {:keys [resource authorization]} (pdp/authorize request resource db)
 
-            date (new java.util.Date)
+        ;; TODO: Promote this when guard to spin's demo
+        _ (when resource (spin/check-method-not-allowed! request resource))
 
-            current-representations (current-representations db resource date)
+        date (new java.util.Date)
 
-            _ (when (contains? #{:get :head} (:request-method request))
-                (spin/check-not-found! current-representations))
+        current-representations (current-representations db resource date)
 
-            selected-representation
-            (negotiate-representation request current-representations)]
+        _ (when (contains? #{:get :head} (:request-method request))
+            (spin/check-not-found! current-representations))
 
-        (case (:request-method request)
+        selected-representation
+        (negotiate-representation request current-representations)]
 
-          (:get :head)
-          (GET request resource date selected-representation db authorization)
+    (case (:request-method request)
 
-          :post
-          (POST request resource date crux-node)
+      (:get :head)
+      (GET request resource date selected-representation db authorization)
 
-          :put
-          (PUT request resource selected-representation date crux-node)
+      :post
+      (POST request resource date crux-node)
 
-          :delete
-          (DELETE request resource selected-representation date crux-node)
+      :put
+      (PUT request resource selected-representation date crux-node)
 
-          :options
-          (OPTIONS request resource date {::db db}))))))
+      :delete
+      (DELETE request resource selected-representation date crux-node)
+
+      :options
+      (OPTIONS request resource date {::db db}))))
+
+(defn wrap-database-request-association [h crux-node]
+  (fn [req]
+    (h (assoc req
+              ::crux-node crux-node
+              ::crux-db (crux/db crux-node)))))
+
+(defn wrap-logging [h]
+  (fn [req]
+    (let [t0 (System/currentTimeMillis)]
+      (try
+        (org.slf4j.MDC/put "uri" (:uri req))
+        (let [res (h req)]
+          (org.slf4j.MDC/remove "uri")
+          (org.slf4j.MDC/put "duration" (str (- (System/currentTimeMillis) t0) "ms"))
+          (log/infof
+           "%s %s %s %d"
+           (str/upper-case (name (:request-method req)))
+           (:uri req)
+           (:protocol req)
+           (:status res))
+          res)
+        (finally
+          (org.slf4j.MDC/clear))))))
 
 (defn wrap-exception-handler [h]
   (fn [req]
@@ -245,3 +267,9 @@
       (catch Exception e
         (prn e)
         {:status 500 :body "Internal Error\r\n"}))))
+
+(defn make-handler [crux-node]
+  (-> #'handler
+      (wrap-database-request-association crux-node)
+      wrap-exception-handler
+      wrap-logging))

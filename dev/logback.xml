@@ -1,7 +1,7 @@
 <!-- Logback Configuration. See http://logback.qos.ch/ -->
 <!-- Adapted from https://github.com/stuartsierra/log.dev/blob/master/resources/logback.xml -->
 <!-- <configuration scan="true" scanPeriod="1 seconds"> -->
-<configuration>
+<configuration scan="true" scanPeriod="1 seconds">
 
   <property resource="log_dev_app.properties" />
 
@@ -57,7 +57,7 @@
 
     <!-- Default encoder is ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
     <encoder>
-      <pattern>%date{HH:mm:ss.SSS} %-5level %logger{25}: %msg %X thread=%thread%n</pattern>
+      <pattern>%date{ISO8601} %-5level %logger{25}: %msg [%X thread=%thread]%n</pattern>
     </encoder>
 
     <!-- Default location of log file is log/app.log -->

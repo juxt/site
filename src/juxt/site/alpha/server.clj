@@ -7,16 +7,7 @@
    [juxt.site.alpha.handler :refer [make-handler wrap-exception-handler]]))
 
 (defmethod ig/init-key ::server [_ {:keys [crux port dynamic?]}]
-  (run-jetty
-   (if dynamic?
-     (fn [req]
-       ((->
-         (make-handler crux)
-         wrap-exception-handler) req))
-     (->
-         (make-handler crux)
-         wrap-exception-handler))
-   {:port port :join? false}))
+  (run-jetty (make-handler crux) {:port port :join? false}))
 
 (defmethod ig/halt-key! ::server [_ s]
   (when s
