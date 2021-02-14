@@ -42,7 +42,8 @@
      {
       :content
       {"application/json" {:schema {"$ref" "#/components/schemas/Card"}}
-       "text/html;charset=utf-8" {:title "Card"}}}}}
+       "text/html;charset=utf-8" {:type "template"
+                                  :title "Card"}}}}}
 
    :put
    {:parameters

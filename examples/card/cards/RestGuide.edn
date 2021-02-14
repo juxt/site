@@ -1,4 +1,4 @@
 {:title "Rest Guide"
- :state "draft"
- :content "RestGuide.adoc"
- :references ["RestServicesInClojureWithSpin"]}
+ :description "Found a great resource on writing REST services"
+ :type "Card"
+ :refs ["https://www.rest.guide"]}

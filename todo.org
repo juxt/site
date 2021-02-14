@@ -63,3 +63,13 @@ Multiple ways of handling application/json
 *** TODO Why does this not return json by default?
 curl -i localhost:8082/_crux/users/crux/admin -K cruxadmin
 Pick has a way to weight preferred responses, we should use it.
+
+
+
+* <2021-02-13 Sat>
+
+** DONE Bootstrap in pass first
+
+** TODO Add a policy that a template can be read locally - needs to come via metadata - so read webdav to that
+
+Propset?

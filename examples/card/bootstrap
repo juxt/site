@@ -1,0 +1,161 @@
+#_( ;; Allow this script to be executed directly
+   "exec" "bb" "--classpath" "$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')" "$0" "$@"
+   )
+
+;;"$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')"
+
+(ns bootstrap
+  (:require
+   [babashka.curl :as curl]
+   [clojure.java.io :as io]
+   [clojure.java.shell :as sh]
+   [cheshire.core :as json]
+   [clojure.pprint :refer [pprint]]
+   [clojure.edn :as edn]
+   [io.aviso.ansi :as ansi]))
+
+(def config (edn/read-string (slurp "config.edn")))
+
+(def CURL_DEBUG (:debug config))
+(def HOST (:host config))
+(def WEBMASTER ["webmaster" (:admin-password config)])
+
+(def PREFIX
+  (get-in (edn/read-string (slurp (io/file "openapi.edn"))) [:servers 0 :url]))
+
+(defn url [path]
+  (format "%s%s" HOST path))
+
+(defmacro with-status-message [msg & body]
+  `(do
+     (print (str ansi/yellow-font ~msg ansi/reset-font "..."))
+     (let [result# ~@body]
+       (println (str "[" ansi/bold-red-font "done" ansi/reset-font "]"))
+       (println "Response was:")
+       (pprint (select-keys result# [:status :headers]))
+       result#)))
+
+(def put-pass-openapi-response
+  (let [openapi (edn/read-string (slurp "../../test/juxt/site/alpha/pass/openapi.edn"))
+        openapi.json (json/generate-string openapi)]
+    (with-status-message
+      (format "PUT %s (%s)" (get-in openapi [:info :title]) (get-in openapi [:info :version]))
+      (curl/put
+       (url "/_crux/apis/pass/openapi.json")
+       {:headers {"content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
+        :body openapi.json
+        :throw true
+        :basic-auth WEBMASTER
+        :debug CURL_DEBUG}))))
+(assert (#{200 201} (:status put-pass-openapi-response)))
+
+(def pass-data (edn/read-string (slurp "data.edn")))
+
+;; Add users
+#_(doseq [[id {:keys [name email password roles]}] (:users pass-data)]
+  (with-status-message
+    (format "Uploading user: %s" id)
+    (curl/put
+     (url id)
+     {:headers {"content-type" "application/json"}
+      :body (json/generate-string
+             {:type "User"
+              :name name
+              :email email
+              :password password
+              :roles roles})
+      :throw true
+      :basic-auth WEBMASTER
+      :debug CURL_DEBUG})))
+
+;; Add rules
+(doseq [[id {:keys [description target effect limiting-clauses]}] (:rules pass-data)]
+  (with-status-message
+    (format "Uploading rule: %s" id)
+    (curl/put
+     (url id)
+     {:headers {"content-type" "application/json"}
+      :body (json/generate-string
+             (cond->
+                 {"type" "Rule"
+                  "description" description
+                  "target" (pr-str target)
+                  "effect" (str "juxt.pass.alpha/" (name effect))}
+               limiting-clauses (assoc "limitingClauses" (pr-str limiting-clauses))))
+      :throw true
+      :basic-auth WEBMASTER
+      :debug CURL_DEBUG})))
+
+(def put-card-openapi-response
+  (let [openapi-file (io/file "openapi.edn")
+        _ (assert (.exists openapi-file))
+        openapi (edn/read-string (slurp openapi-file))
+        openapi.json (json/generate-string openapi)]
+    (with-status-message
+      (format "PUT %s (%s)" (get-in openapi [:info :title]) (get-in openapi [:info :version]))
+      (curl/put
+       (url "/_crux/apis/card/openapi.json")
+       {:headers {"content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
+        :body openapi.json
+        :throw true
+        :basic-auth WEBMASTER
+        :debug CURL_DEBUG}))))
+(assert (#{200 201} (:status put-card-openapi-response)))
+
+(doseq [fl (.listFiles (io/file "cards"))]
+  (let [{:keys [name content-type]}
+        (condp re-matches (.getName fl)
+          #"(.*)\.edn$" :>> (fn [[_ name]]
+                              {:name name :content-type "application/json"}))
+        content (edn/read-string (slurp fl))]
+
+    (let [id (format "%s/cards/%s" PREFIX name)]
+      (with-status-message
+        (format "PUT %s" id)
+        (curl/put
+         (url id)
+         {:headers {"content-type" content-type}
+          :body (case content-type
+                  "application/json"
+                  (json/generate-string content))
+          :throw true
+          :basic-auth WEBMASTER
+          :debug CURL_DEBUG}))
+      (println (url id)))))
+
+(doseq [fl (.listFiles (io/file "templates"))]
+  (let [id (format "%s/templates/%s" PREFIX (.getName fl))]
+    ;; This is some code to PUT an actual resource, when we want to specify
+    ;; non-default configuration to the resource
+    #_(with-status-message
+      (format "PUT the new resource %s" id)
+      (curl/put
+       (url id)
+       {:headers {"content-type" "application/vnd.juxt.site-resource+json;version=1.0.0"}
+        :body (json/generate-string
+               {:juxt.spin.alpha/methods #{:get :head :options}
+                :juxt.site.alpha/classification "PUBLIC"
+                :juxt.site.alpha/acceptable "text/html"})
+        :throw true
+        :basic-auth WEBMASTER
+        :debug CURL_DEBUG}))
+    (with-status-message
+      (format "PUT the resource's representation" id)
+      (curl/put
+       (url id)
+       {:headers {"content-type" "text/html"}
+        :body fl
+        :throw true
+        :basic-auth WEBMASTER
+        :debug true}))))
+
+    ))
+
+
+#_:juxt.spin.alpha/representations
+#_[{:juxt.spin.alpha/content-type "text/html;charset=utf-8"
+  :juxt.spin.alpha/bytes (.getBytes (slurp fl))} ]
+
+;; Local Variables:
+;; mode: clojure
+;; End:

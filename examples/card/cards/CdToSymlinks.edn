@@ -1,0 +1,13 @@
+{:title "CD to symlinks"
+ :type "Card"
+ :state "draft"
+
+ :notes "
+A large fraction of programmer time is spent in navigation. Git repos are best organised in deep hierarchies.
+
+Create symlinks in your home directory for shortcuts
+
+Aliasing 'cd' to'cd -P' avoids most of issues."
+
+ :who "mal"
+ :refs ["https://askubuntu.com/questions/817292/cd-to-a-symlink-is-the-same-to-cd-to-original-folder"]}
