@@ -24,7 +24,9 @@
    [juxt.site.alpha.perf :refer [fast-get-in]]
    [juxt.site.alpha.response :as response]
    [juxt.site.alpha.util :as util]
-   [juxt.spin.alpha :as spin]))
+   [juxt.spin.alpha :as spin]
+   [selmer.parser :as selmer]
+   [selmer.util :refer [*custom-resource-path*]]))
 
 ;; TODO: Restrict where openapis can be PUT
 (defn locate-resource [request db]
@@ -114,9 +116,7 @@
                    (for [[media-type media-type-object]
                          (fast-get-in path-item-object ["get" "responses" "200" "content"])]
                      {::spin/content-type media-type
-                      ::spin/last-modified (java.util.Date.)
-                      ::spin/bytes-generator ::entity-bytes-generator
-                      })
+                      ::spin/bytes-generator ::entity-bytes-generator})
 
                    ::apex/operation operation-object
 
@@ -157,11 +157,6 @@
                 )))
      {} input)))
 
-#_(extend-protocol json-html.core/Render
-  java.net.URI
-  (render [u]
-    [:a {:href u} u]))
-
 ;; Possibly promote up into site - by default we output the resource state, but
 ;; there may be a better rendering of collections, which can be inferred from
 ;; the schema being an array and use the items subschema. We can also use the
@@ -186,8 +181,7 @@
                              crux-query))
 
         resource-state
-        (if query
-          ;; TODO: authorization
+        (if authorized-query
           (for [[e] (crux/q db authorized-query
                             ;; Could put some in params here
                             )]
@@ -239,6 +233,15 @@
                            :else
                            (pr-str (get row field)))])])]])
                [:p "No results"])
+
+             (= (get config "type") "template")
+             (binding [*custom-resource-path*
+                       (java.net.URL. "http://localhost:8082/apps/card/templates/")]
+               (selmer/render-file
+                (java.net.URL. "http://localhost:8082/apps/card/templates/kanban.html")
+                {}
+                :custom-resource-path
+                (java.net.URL. "http://localhost:8082/apps/card/templates/")))
 
              :else
              (let [fields (distinct (concat [:crux.db/id] (keys resource-state)))]
@@ -350,17 +353,29 @@
 
   (let [date (java.util.Date.)
         last-modified date
-        etag (format "\"%s\"" (subs (util/hexdigest (::spin/bytes new-representation)) 0 32))
-        representation-metadata {::spin/etag etag
-                                 ::spin/last-modified last-modified}
-        schema (get-in resource [::apex/operation "requestBody" "content" "application/json" "schema"])
+        etag (format "\"%s\"" (-> new-representation
+                                  ::spin/bytes
+                                  util/hexdigest
+                                  (subs 0 32)))
+
+        representation-metadata
+        {::spin/etag etag
+         ::spin/last-modified last-modified}
+
+        schema
+        (get-in
+         resource
+         [::apex/operation "requestBody" "content" "application/json" "schema"])
         _ (assert schema)
+
         instance (json/read-value (::spin/bytes new-representation))
         _ (assert instance)
+
         openapi (:juxt.apex.alpha/openapi resource)
         _ (assert openapi)
-        validation-results (jinx.api/validate schema instance {:base-document openapi})
-        ]
+
+        validation-results
+        (jinx.api/validate schema instance {:base-document openapi})]
 
     ;; TODO: extract the title/version of the API and add to the entity (as metadata)
     #_(let [openapi (crux/entity (crux/db crux-node) (::apex/!api resource))]
@@ -381,7 +396,14 @@
 
 
     (let [validation (-> validation-results process-transformations process-keyword-mappings)
-          instance (::jinx/instance validation)
+          instance
+          (->>
+           (::jinx/instance validation)
+           ;; Replace any remaining string keys with keyword equivalents.
+           (reduce-kv
+            (fn [acc k v]
+              (assoc acc (cond-> k (string? k) keyword) v))
+            {}))
           id (:uri request)]
 
       ;; Since this resource is 'managed' by the locate-resource in this ns, we
@@ -426,7 +448,7 @@
            :let [uri (format "/_crux/swagger-ui/%s" path)]
            :when (pos? size)]
        (do
-         (.read (.getInputStream jar je) bytes 0 size)
+         (.readFully (java.io.DataInputStream. (.getInputStream jar je)) bytes)
          [:crux.tx/put
           {:crux.db/id uri
            ::spin/methods #{:get :head :options}

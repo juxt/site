@@ -4,18 +4,21 @@
   (:require
    [clojure.pprint :refer [pprint]]
    [clojure.string :as str]
+   [clojure.set :as set]
    [clojure.tools.logging :as log]
    [crux.api :as crux]
    [crypto.password.bcrypt :as password]
+   [jsonista.core :as json]
    [juxt.apex.alpha.openapi :as openapi]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha :as pass]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.pick.alpha.ring :refer [pick]]
+   [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha :as site]
    [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.response :as response]
-   [juxt.site.alpha.util :refer [assoc-when-some]]
+   [juxt.site.alpha.util :refer [assoc-when-some hexdigest]]
    [juxt.spin.alpha :as spin]
    [juxt.spin.alpha.auth :as spin.auth]
    [juxt.spin.alpha.representation :as spin.representation]))
@@ -59,10 +62,7 @@
 
    (crux/entity db (:uri request))
 
-   {::site/description
-    "Backstop resource indicating exhausted attempts to locate a resource."
-    ::spin/methods #{:get :head :options}
-    ::spin/representations []}))
+   {::spin/methods #{:get :head :options}}))
 
 (defn current-representations [db resource date]
   (or
@@ -84,12 +84,14 @@
 
 (defn GET [request resource date selected-representation db authorization]
   (let [representation-metadata-headers (response/representation-metadata-headers selected-representation)]
+
     (spin/evaluate-preconditions! request resource representation-metadata-headers date)
 
     ;; This is naïve, some representations won't just have bytes ready, they'll
     ;; need to be generated somehow
     (let [{::spin/keys [payload-header-fields bytes bytes-generator content charset]} selected-representation
           {::keys [path-item-object]} resource]
+
 
       (spin/response
        200
@@ -124,6 +126,44 @@
     ;; TODO: dispatch on something
     ))
 
+(defn put-resource
+  [request _ new-representation old-representation crux-node]
+  (let [new-resource
+        (->
+         (json/read-value (::spin/bytes new-representation) (json/object-mapper {:decode-key-fn true}))
+         (update ::spin/methods #(set (map keyword %))))]
+    (log/debugf "New resource: %s" (pr-str new-resource))
+    (let [now (java.util.Date.)
+          new-resource (assoc new-resource :crux.db/id (:uri request))]
+      (->>
+       (crux/submit-tx crux-node [[:crux.tx/put new-resource]])
+       (crux/await-tx crux-node))
+      (spin/response (if old-representation 200 201) nil nil request nil now nil))))
+
+(defn put-static-representation
+  "PUT a new representation of the target resource. All other representations are
+  replaced."
+  [request resource new-representation old-representation crux-node]
+
+  (let [etag (format "\"%s\"" (subs (hexdigest (::spin/bytes new-representation)) 0 32))
+        now (java.util.Date.)
+        representation-metadata {::spin/etag etag
+                                 ::spin/last-modified now}]
+
+    (log/debugf "new-representation metadata is %s" (pr-str (dissoc new-representation ::spin/bytes)))
+
+    (->>
+     (crux/submit-tx
+      crux-node
+      [[:crux.tx/put
+        (assoc resource
+               :crux.db/id (:uri request)
+               ::spin/representations [(merge new-representation representation-metadata)])]])
+     (crux/await-tx crux-node))
+
+    (spin/response
+     (if old-representation 200 201) nil nil request nil now nil)))
+
 (defn PUT [request resource selected-representation date crux-node]
   (let [new-representation (receive-representation request resource date)]
 
@@ -139,30 +179,50 @@
           :body "Bad Request\r\n"}})))
 
     ;; TODO: evaluate preconditions in tx fn!
-    (case (::spin/content-type new-representation)
+    (let [decoded-content-type (reap.decoders/content-type (::spin/content-type new-representation))
+          {:juxt.reap.alpha.rfc7231/keys [type subtype]} decoded-content-type]
 
-      "application/vnd.oai.openapi+json;version=3.0.2"
-      (openapi/put-openapi
-       request resource new-representation selected-representation crux-node)
+      (cond
+        (and
+         (.equalsIgnoreCase "application" type)
+         (.equalsIgnoreCase "vnd.oai.openapi+json" subtype)
+         (#{"3.0.2"} (get-in decoded-content-type [:juxt.reap.alpha.rfc7231/parameter-map "version"])))
+        (openapi/put-openapi
+         request resource new-representation selected-representation crux-node)
 
-      "application/json"
-      (openapi/put-json-representation
-       request resource new-representation selected-representation crux-node)
+        (and
+         (.equalsIgnoreCase "application" type)
+         (.equalsIgnoreCase "json" subtype))
+        (openapi/put-json-representation
+         request resource new-representation selected-representation crux-node)
 
-      (throw
-       (ex-info
-        "Unsupported content type in request body"
-        {::spin/content-type (::spin/content-type new-representation)
-         ::spin/response
-         {:status 400
-          :body (.getBytes "Bad Request\r\n")}})))))
+        (and
+         (.equalsIgnoreCase "application" type)
+         (.equalsIgnoreCase "vnd.juxt.site-resource+json" subtype))
+        (put-resource
+         request resource new-representation selected-representation crux-node)
+
+        (and
+         (.equalsIgnoreCase "text" type)
+         (.equalsIgnoreCase "html" subtype))
+        (put-static-representation
+         request resource new-representation selected-representation crux-node)
+
+        :else
+        (throw
+         (ex-info
+          "Unsupported content type in request"
+          {::spin/content-type (::spin/content-type new-representation)
+           ::spin/response
+           {:status 415
+            :body (.getBytes "Unsupported Media Type\r\n")}}))))))
 
 (defn DELETE [request resource selected-representation date crux-node]
   {:status 200})
 
-(defn OPTIONS [_ resource _ _]
+(defn OPTIONS [_ _ allow-methods _ _]
   ;; TODO: Implement *
-  (spin/options (::spin/methods resource)))
+  (spin/options allow-methods))
 
 (defmethod transform-value "password" [_ instance]
   ;; TODO: Increase work-factor to 11 (not a reference to Spinal Tap!)
@@ -258,7 +318,7 @@
       (DELETE request resource selected-representation date crux-node)
 
       :options
-      (OPTIONS request resource date {::db db}))))
+      (OPTIONS request resource allow-methods date {::db db}))))
 
 (defn wrap-database-request-association [h crux-node]
   (fn [req]
@@ -274,12 +334,11 @@
         (let [res (h req)]
           (org.slf4j.MDC/remove "uri")
           (org.slf4j.MDC/put "duration" (str (- (System/currentTimeMillis) t0) "ms"))
-          (log/infof
-           "%s %s %s %d"
-           (str/upper-case (name (:request-method req)))
-           (:uri req)
-           (:protocol req)
-           (:status res))
+          (log/infof "%-7s %s %s %d"
+                     (str/upper-case (name (:request-method req)))
+                     (:uri req)
+                     (:protocol req)
+                     (:status res))
           res)
         (finally
           (org.slf4j.MDC/clear))))))
@@ -290,6 +349,9 @@
       (h req)
       (catch clojure.lang.ExceptionInfo e
         ;;          (tap> e)
+        (log/errorf
+         e "%s: %s" (.getMessage e)
+         (pr-str (into {::spin/request req} (ex-data e))))
         (prn e)
         (pprint (into {::spin/request req} (ex-data e)))
         (let [exdata (ex-data e)]
@@ -297,6 +359,7 @@
            (::spin/response exdata)
            {:status 500 :body "Internal Error\r\n"})))
       (catch Exception e
+        (log/error e (.getMessage e))
         (prn e)
         {:status 500 :body "Internal Error\r\n"}))))
 
