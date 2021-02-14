@@ -149,7 +149,22 @@
         :basic-auth WEBMASTER
         :debug true}))))
 
-    ))
+(let [id "/_crux/pass/rules/selmer-local-template-access"]
+  (with-status-message
+    (format "Add rule to allow access to templates from localhost")
+    (curl/put
+     (url id)
+     {:headers {"content-type" "application/json"}
+      :body (json/generate-string
+             {"type" "Rule"
+              "description" "Allow Selmer local access to templates"
+              "target" (pr-str
+                        '[[action :remote-addr #{"0:0:0:0:0:0:0:1"
+                                                 "127.0.0.1"}]])
+              "effect" "juxt.pass.alpha/allow"})
+      :throw true
+      :basic-auth WEBMASTER
+      :debug CURL_DEBUG})))
 
 
 #_:juxt.spin.alpha/representations
