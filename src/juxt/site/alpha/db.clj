@@ -73,7 +73,10 @@
 (defmethod ig/init-key ::crux [_ crux-opts]
   (println "Starting Crux node")
   (let [node (crux/start-node crux-opts)]
-    (seed-database! node)
+    (try
+      (seed-database! node)
+      (catch Exception e
+        (prn e)))
     node))
 
 (defmethod ig/halt-key! ::crux [_ node]
