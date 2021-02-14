@@ -127,7 +127,8 @@
     ;; TODO: dispatch on something
     ))
 
-(defn put-resource
+;; TODO: Not sure there should be a general way of writing resources like this, without a lot of authorization checks
+#_(defn put-resource
   [request _ new-representation old-representation crux-node]
   (let [new-resource
         (->
@@ -197,10 +198,10 @@
         (openapi/put-json-representation
          request resource new-representation selected-representation crux-node)
 
-        (and
+        #_(and
          (.equalsIgnoreCase "application" type)
          (.equalsIgnoreCase "vnd.juxt.site-resource+json" subtype))
-        (put-resource
+        #_(put-resource
          request resource new-representation selected-representation crux-node)
 
         (and

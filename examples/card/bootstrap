@@ -127,6 +127,7 @@
   (let [id (format "%s/templates/%s" PREFIX (.getName fl))]
     ;; This is some code to PUT an actual resource, when we want to specify
     ;; non-default configuration to the resource
+    ;; TODO: This should be done via WebDav
     #_(with-status-message
       (format "PUT the new resource %s" id)
       (curl/put
