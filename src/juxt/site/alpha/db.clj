@@ -21,17 +21,10 @@
 
   (crux/sync crux-node))
 
-;;(password/encrypt "password")
-
-(defmethod ig/init-key ::crux [_ crux-opts]
+(defmethod ig/init-key ::crux-node [_ crux-opts]
   (println "Starting Crux node")
-  (let [node (crux/start-node crux-opts)]
-    (try
-      (seed-database! node)
-      (catch Exception e
-        (prn e)))
-    node))
+  (crux/start-node crux-opts))
 
-(defmethod ig/halt-key! ::crux [_ node]
+(defmethod ig/halt-key! ::crux-node [_ node]
   (.close node)
   (println "Closed Crux node"))

@@ -229,23 +229,19 @@
   (password/encrypt instance 4))
 
 (defn authenticate
-  "Authenticate a request. Return the request with any credentials, roles and
-  entitlements added to it. The resource can be used to determine the particular
-  Protection Space that it is part of, and the appropriate authentication
-  scheme(s) for accessing the resource."
+  "Authenticate a request. Return a pass subject, with information about user,
+  roles and other credentials. The resource can be used to determine the
+  particular Protection Space that it is part of, and the appropriate
+  authentication scheme(s) for accessing the resource."
   [request resource db]
   (let [{::spin.auth/keys [user password]}
         (spin.auth/decode-authorization-header request)
         uid (format "/_crux/pass/users/%s" user)]
-    (or
-     (when-let [e (crux/entity db uid)]
-       (when (password/check password (::pass/password-hash!! e))
-         ;; TODO: This might be where we also add the 'on-behalf-of' info
-         (-> request
-             (assoc ::pass/user uid ::pass/username user))))
-
-     ;; Default
-     request)))
+    (when-let [e (crux/entity db uid)]
+      (when (password/check password (::pass/password-hash!! e))
+        ;; TODO: This might be where we also add the 'on-behalf-of' info
+        {::pass/user uid
+         ::pass/username user}))))
 
 (defn check-method-not-allowed!
   [request resource methods]
@@ -279,8 +275,12 @@
         request (dissoc request ::crux-db ::crux-node)
 
         resource (locate-resource request db)
-        request (authenticate request resource db)
-        authorization (pdp/authorize request resource db)
+        subject (authenticate request resource db)
+        authorization (pdp/authorize
+                       {::pass/subject subject
+                        ::pass/resource resource
+                        ::pass/action (dissoc request :body)
+                        ::pass/environment {:db db}})
 
         _ (log/debugf "Authorization: %s" (pr-str authorization))
 

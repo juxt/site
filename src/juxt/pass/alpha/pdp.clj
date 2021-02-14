@@ -6,7 +6,9 @@
    [clojure.walk :refer [postwalk-replace]]
    [clojure.tools.logging :as log]
    [crux.api :as crux]
+   [integrant.core :as ig]
    [juxt.pass.alpha :as pass]
+   [juxt.site.alpha.entity :as entity]
    [juxt.spin.alpha :as spin]
    [juxt.spin.alpha.auth :as spin.auth]))
 
@@ -18,7 +20,7 @@
 (defn authorization
   "Returns authorization information. Context is all the attributes that pertain to the subject, resource,
   action, environment and maybe more."
-  [db {:keys [request resource]}]
+  [{::pass/keys [subject resource action environment]}]
 
   ;; Map across each rule in the system (we can memoize later for
   ;; performance).
@@ -27,19 +29,27 @@
         ;; attributes to merge into the target, then for each rule in the
         ;; policy... the apply rule-combining algo...
 
+        db (:db environment)
+
         rules (crux/q db '{:find [rule]
                            :where [[rule :type "Rule"]]})
 
         _  (log/debugf "Rules to match are %s" (pr-str rules))
 
-        request-id (java.util.UUID/randomUUID)
-        _ (log/debugf "Submitting request to db: %s" request)
+        subject-id (java.util.UUID/randomUUID)
         resource-id (java.util.UUID/randomUUID)
-        ;;_ (log/debugf "Submitting resource to db: %s" resource)
+        action-id (java.util.UUID/randomUUID)
+
+        _ (log/debug
+           "Speculatively put request context into Crux"
+           (pr-str [[:crux.tx/put (assoc subject :crux.db/id subject-id)]
+                    [:crux.tx/put (assoc resource :crux.db/id resource-id)]
+                    [:crux.tx/put (assoc action :crux.db/id action-id)]]))
 
         db (crux/with-tx db
-             [[:crux.tx/put (assoc request :crux.db/id request-id)]
-              [:crux.tx/put (assoc resource :crux.db/id resource-id)]])
+             [[:crux.tx/put (assoc subject :crux.db/id subject-id)]
+              [:crux.tx/put (assoc resource :crux.db/id resource-id)]
+              [:crux.tx/put (assoc action :crux.db/id action-id)]])
 
         evaluated-rules
         (keep
@@ -49,8 +59,8 @@
                (let [q {:find ['success]
                         :where (into '[[(identity true) success]]
                                      target)
-                        :in ['request 'resource]}
-                     match-results (crux/q db q request-id resource-id)]
+                        :in ['subject 'resource 'action]}
+                     match-results (crux/q db q subject-id resource-id action-id)]
                  (assoc rule-ent ::pass/matched? (pos? (count match-results)))))))
          rules)
 
@@ -98,66 +108,49 @@
         ;;(assoc :in '[context])
         combined-limiting-clauses (update :where (comp vec concat) combined-limiting-clauses)))))
 
-(defn authorize
-  "Return the resource, as it appears to the request after authorization rules
-  have been applied."
-  [request resource db]
+(defn authorize [request-context]
 
-  (let [username (get request ::pass/username)]
+  (let [authorization (authorization request-context)]
 
-    (when resource
-      (cond
+    (when-not (= (::pass/access authorization) ::pass/approved)
+      (throw
+       (if (::pass/subject request-context)
+         (ex-info
+          "Forbidden"
+          {::spin/response
+           {:status 403
+            :body "Forbidden\r\n"}})
 
-        ;; Give the crux admin god-like power
-        (= username "crux/admin")
-        #::pass{:access ::pass/approved
-                :allow-methods #{:get :head :options :put :post :delete}}
+         (ex-info
+          "Unauthorized"
+          {::spin/response
+           {:status 401
+            :headers
+            {"www-authenticate"
+             (spin.auth/www-authenticate
+              [{::spin/authentication-scheme "Basic"
+                ::spin/realm "Users"}])}
+            :body "Unauthorized\r\n"}}))))
 
-        (and
-         (.startsWith (:uri request) "/_crux/")
-         (not= username "crux/admin"))
-        (throw
-         (if username
-           (ex-info
-            "Forbidden"
-            {::spin/response
-             {:status 403
-              :body "Forbidden\r\n"}})
+    authorization))
 
-           (ex-info
-            "Unauthorized"
-            {::spin/response
-             {:status 401
-              :headers
-              {"www-authenticate"
-               (spin.auth/www-authenticate
-                [{::spin/authentication-scheme "Basic"
-                  ::spin/realm "Crux Administration"}])}
-              :body "Unauthorized\r\n"}})))
+(defmethod ig/init-key ::rules [_ {:keys [crux-node]}]
+  (println "Adding built-in users/rules")
+  (try
+    (crux/submit-tx
+     crux-node
 
-        :else
-        (let [request-context {:request (dissoc request :body)
-                               :resource resource}
-              authorization (authorization db request-context)]
+     (concat
+      ;; The webmaster user - in the future, the password will be provided when
+      ;; the Crux instance is provisioned.
+      (entity/user-entity "webmaster" "FunkyForest")
 
-          (when-not (= (::pass/access authorization) ::pass/approved)
-            (throw
-             (if username
-               (ex-info
-                "Forbidden"
-                {::spin/response
-                 {:status 403
-                  :body "Forbidden\r\n"}})
-
-               (ex-info
-                "Unauthorized"
-                {::spin/response
-                 {:status 401
-                  :headers
-                  {"www-authenticate"
-                   (spin.auth/www-authenticate
-                    [{::spin/authentication-scheme "Basic"
-                      ::spin/realm "Users"}])}
-                  :body "Unauthorized\r\n"}}))))
-
-          authorization)))))
+      ;; A rule that allows the webmaster to do everything.
+      [[:crux.tx/put
+        {:crux.db/id "/_crux/pass/rules/webmaster"
+         :type "Rule"
+         ::pass/target '[[subject :juxt.pass.alpha/username "webmaster"]]
+         ::pass/effect ::pass/allow
+         ::pass/allow-methods #{:get :head :options :put :post :delete}}]]))
+    (catch Exception e
+      (prn e))))

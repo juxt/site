@@ -5,7 +5,7 @@
    [juxt.spin.alpha :as spin]))
 
 (defn crux-node []
-  (:juxt.site.alpha.db/crux system))
+  (:juxt.site.alpha.db/crux-node system))
 
 (defn db []
   (crux/db (crux-node)))

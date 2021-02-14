@@ -1,15 +1,18 @@
 ;; Copyright © 2021, JUXT LTD.
 
 {:ig/system
- {:juxt.site.alpha.db/crux
+ {:juxt.site.alpha.db/crux-node
   {:crux.http-server/server {:port 3000}}
 
   :juxt.apex.alpha.openapi/module
-  {:crux #ig/ref :juxt.site.alpha.db/crux}
+  {:crux-node #ig/ref :juxt.site.alpha.db/crux-node}
 
   :juxt.site.alpha.selmer/cache
   {:cache? false}
 
+  :juxt.pass.alpha.pdp/rules
+  {:crux-node #ig/ref :juxt.site.alpha.db/crux-node}
+
   :juxt.site.alpha.server/server
-  {:crux #ig/ref :juxt.site.alpha.db/crux
+  {:crux-node #ig/ref :juxt.site.alpha.db/crux-node
    :port 8082}}}

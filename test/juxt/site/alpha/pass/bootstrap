@@ -15,7 +15,7 @@
 
 (def CURL_DEBUG false)
 (def HOST "localhost:8082")
-(def CRUX_ADMIN ["crux/admin" "FunkyForest"])
+(def WEBMASTER ["webmaster" "FunkyForest"])
 
 (defn url [path]
   (format "%s%s" HOST path))
@@ -39,7 +39,7 @@
        {:headers {"content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
         :body openapi.json
         :throw true
-        :basic-auth CRUX_ADMIN
+        :basic-auth WEBMASTER
         :debug CURL_DEBUG}))))
 
 (assert (= 201 (:status put-openapi-response)))
@@ -49,7 +49,7 @@
     "Checking OpenAPI using GET on /_crux/apis/pass/openapi.json"
     (curl/get
      (url "/_crux/apis/pass/openapi.json")
-     {:basic-auth CRUX_ADMIN
+     {:basic-auth WEBMASTER
       :throw true
       :debug CURL_DEBUG})))
 
@@ -75,7 +75,7 @@
                    {:type "Role"
                     :name name})
             :throw false
-            :basic-auth CRUX_ADMIN
+            :basic-auth WEBMASTER
             :debug CURL_DEBUG}))]
     (assert (#{200 201} (:status response)))))
 
@@ -86,7 +86,7 @@
      (url "/_crux/pass/roles")
      {:headers {"accept" "application/json"}
       :throw true
-      :basic-auth CRUX_ADMIN
+      :basic-auth WEBMASTER
       :debug CURL_DEBUG})))
 
 (assert (= 200 (:status get-user-groups-response)))
@@ -99,7 +99,7 @@
      (url "/_crux/pass/roles/owners")
      {:headers {"accept" "application/json"}
       :throw true
-      :basic-auth CRUX_ADMIN
+      :basic-auth WEBMASTER
       :debug CURL_DEBUG})))
 
 (assert (= 200 (:status get-user-group-response)))

@@ -467,10 +467,10 @@
      [{::spin/content-type "text/html;charset=utf-8"
        ::spin/bytes-generator ::api-console-generator}]}]])
 
-(defmethod ig/init-key ::module [_ {:keys [crux]}]
+(defmethod ig/init-key ::module [_ {:keys [crux-node]}]
   (println "Adding OpenAPI module")
   (crux/submit-tx
-   crux
+   crux-node
    (concat
     ;; This should be possible to upload
     (swagger-ui)
