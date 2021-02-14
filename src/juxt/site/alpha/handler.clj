@@ -279,7 +279,7 @@
         authorization (pdp/authorize
                        {::pass/subject subject
                         ::pass/resource resource
-                        ::pass/action (dissoc request :body)
+                        ::pass/request (dissoc request :body)
                         ::pass/environment {:db db}})
 
         _ (log/debugf "Authorization: %s" (pr-str authorization))

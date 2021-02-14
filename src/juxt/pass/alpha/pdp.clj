@@ -18,9 +18,9 @@
 ;; http://docs.oasis-open.org/xacml/3.0/errata01/os/xacml-3.0-core-spec-errata01-os-complete.html#_Toc489959503
 
 (defn authorization
-  "Returns authorization information. Context is all the attributes that pertain to the subject, resource,
-  action, environment and maybe more."
-  [{::pass/keys [subject resource action environment]}]
+  "Returns authorization information. Context is all the attributes that pertain
+  to the subject, resource, request (action), environment and maybe more."
+  [{::pass/keys [subject resource request environment]}]
 
   ;; Map across each rule in the system (we can memoize later for
   ;; performance).
@@ -38,18 +38,12 @@
 
         subject-id (java.util.UUID/randomUUID)
         resource-id (java.util.UUID/randomUUID)
-        action-id (java.util.UUID/randomUUID)
-
-        _ (log/debug
-           "Speculatively put request context into Crux"
-           (pr-str [[:crux.tx/put (assoc subject :crux.db/id subject-id)]
-                    [:crux.tx/put (assoc resource :crux.db/id resource-id)]
-                    [:crux.tx/put (assoc action :crux.db/id action-id)]]))
+        request-id (java.util.UUID/randomUUID)
 
         db (crux/with-tx db
              [[:crux.tx/put (assoc subject :crux.db/id subject-id)]
               [:crux.tx/put (assoc resource :crux.db/id resource-id)]
-              [:crux.tx/put (assoc action :crux.db/id action-id)]])
+              [:crux.tx/put (assoc request :crux.db/id request-id)]])
 
         evaluated-rules
         (keep
@@ -60,7 +54,7 @@
                         :where (into '[[(identity true) success]]
                                      target)
                         :in ['subject 'resource 'action]}
-                     match-results (crux/q db q subject-id resource-id action-id)]
+                     match-results (crux/q db q subject-id resource-id request-id)]
                  (assoc rule-ent ::pass/matched? (pos? (count match-results)))))))
          rules)
 
