@@ -104,12 +104,14 @@
   [request resource db]
 
   (let [username (get request ::pass/username)]
+
     (when resource
       (cond
 
         ;; Give the crux admin god-like power
         (= username "crux/admin")
-        {:resource resource}
+        #::pass{:access ::pass/approved
+                :allow-methods #{:get :head :options :put :post :delete}}
 
         (and
          (.startsWith (:uri request) "/_crux/")
@@ -138,7 +140,7 @@
                                :resource resource}
               authorization (authorization db request-context)]
 
-          (if-not (= (::pass/access authorization) ::pass/approved)
+          (when-not (= (::pass/access authorization) ::pass/approved)
             (throw
              (if username
                (ex-info
@@ -156,6 +158,6 @@
                    (spin.auth/www-authenticate
                     [{::spin/authentication-scheme "Basic"
                       ::spin/realm "Users"}])}
-                  :body "Unauthorized\r\n"}})))
+                  :body "Unauthorized\r\n"}}))))
 
-            {:resource resource :authorization authorization}))))))
+          authorization)))))

@@ -187,6 +187,30 @@
      ;; Default
      request)))
 
+(defn check-method-not-allowed!
+  [request resource methods]
+  (if resource
+    (let [method (:request-method request)]
+      (when-not (contains? (set methods) method)
+        (throw
+         (ex-info
+          "Method not allowed"
+          {::spin/response
+           {:status 405
+            :headers {"allow" (spin/allow-header methods)}
+            :body "Method Not Allowed\r\n"}
+           ::spin/resource resource}))))
+    ;; We forbid POST, PUT and DELETE on a nil resource
+    (when-not (methods (:request-method request))
+      (throw
+       (ex-info
+        "Method not allowed"
+        {::spin/response
+         {:status 405
+          :headers {"allow" (spin/allow-header #{:get :head})}
+          :body "Method Not Allowed\r\n"}
+         ::spin/resource resource})))))
+
 (defn handler [{db ::crux-db crux-node ::crux-node :as request}]
   (spin/check-method-not-implemented! request)
   (let [
@@ -196,10 +220,18 @@
 
         resource (locate-resource request db)
         request (authenticate request resource db)
-        {:keys [resource authorization]} (pdp/authorize request resource db)
+        authorization (pdp/authorize request resource db)
 
-        ;; TODO: Promote this when guard to spin's demo
-        _ (when resource (spin/check-method-not-allowed! request resource))
+        _ (log/debugf "Authorization: %s" (pr-str authorization))
+
+        allow-methods (set/union
+                       (::spin/methods resource)
+                       (::pass/allow-methods authorization))
+
+        _ (when resource
+            (check-method-not-allowed!
+             request resource
+             allow-methods))
 
         date (new java.util.Date)
 
