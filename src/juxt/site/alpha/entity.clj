@@ -20,7 +20,7 @@
         etag
         ;; TODO: Use a proper reap encoder to ensure we don't create invalid
         ;; etags
-        (format "\"%s\"" (subs (hexdigest (.getBytes (pr-str resource-state))) 0 16))]
+        (format "\"%s\"" (subs (hexdigest (.getBytes (pr-str resource-state) "utf-8")) 0 16))]
     (concat
      [;; Resource
       [:crux.tx/put
@@ -38,7 +38,7 @@
               ::spin/etag etag
               ::spin/last-modified last-modified
               ::spin/content-length (count bytes)
-              ::spin/text content}])
+              ::spin/content content}])
           (let [content (str (json/write-value-as-string (sanitize resource-state)) "\r\n")
                 charset "utf-8"
                 bytes (.getBytes content "utf-8")]
@@ -48,7 +48,7 @@
               ::spin/etag etag
               ::spin/last-modified last-modified
               ::spin/content-length (count bytes)
-              ::spin/text content}])]})]])))
+              ::spin/content content}])]})]])))
 
 (defn user-entity [username password]
   (new-data-resource

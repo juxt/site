@@ -192,92 +192,89 @@
     (case (::spin/content-type representation)
       "application/json"
       ;; TODO: Might want to filter out the spin metadata at some point
-      (.getBytes (str (json/write-value-as-string resource-state) "\r\n"))
+      (.getBytes (str (json/write-value-as-string resource-state) "\r\n") "utf-8")
 
       "text/html;charset=utf-8"
       (let [config (get-in resource [:juxt.apex.alpha/operation "responses" "200" "content" (::spin/content-type representation)])
             ]
-        (.getBytes
+        (->
+         (hp/html5
+          [:h1 (get config "title" "No title")]
 
-         ;; We can get config from openapi
-         (str
-          (hp/html5
-           [:h1 (get config "title" "No title")]
+          ;; Get :path-params = {"id" "owners"}
 
-           ;; Get :path-params = {"id" "owners"}
+          (cond
+            (= (get config "type") "edn-table")
+            (list
+             [:style
+              (slurp (io/resource "json.human.css"))]
+             (edn->html resource-state))
 
-           (cond
-             (= (get config "type") "edn-table")
-             (list
-              [:style
-               (slurp (io/resource "json.human.css"))]
-              (edn->html resource-state))
+            (= (get config "type") "table")
+            (if (seq resource-state)
+              (let [fields (distinct (concat [:crux.db/id] (keys (first resource-state))))]
+                [:table {:style "border: 1px solid #888; border-collapse: collapse; "}
+                 [:thead
+                  [:tr
+                   (for [field fields]
+                     [:th {:style "border: 1px solid #888; padding: 4pt; text-align: left"} (pr-str field)])]]
+                 [:tbody
+                  (for [row resource-state]
+                    [:tr
+                     (for [field fields
+                           :let [val (get row field)]]
+                       [:td {:style "border: 1px solid #888; padding: 4pt; text-align: left"}
+                        (cond
+                          (uri? val)
+                          [:a {:href val} val]
+                          :else
+                          (pr-str (get row field)))])])]])
+              [:p "No results"])
 
-             (= (get config "type") "table")
-             (if (seq resource-state)
-               (let [fields (distinct (concat [:crux.db/id] (keys (first resource-state))))]
-                 [:table {:style "border: 1px solid #888; border-collapse: collapse; "}
-                  [:thead
-                   [:tr
-                    (for [field fields]
-                      [:th {:style "border: 1px solid #888; padding: 4pt; text-align: left"} (pr-str field)])]]
-                  [:tbody
-                   (for [row resource-state]
-                     [:tr
-                      (for [field fields
-                            :let [val (get row field)]]
-                        [:td {:style "border: 1px solid #888; padding: 4pt; text-align: left"}
-                         (cond
-                           (uri? val)
-                           [:a {:href val} val]
-                           :else
-                           (pr-str (get row field)))])])]])
-               [:p "No results"])
+            (= (get config "type") "template")
+            (binding [*custom-resource-path*
+                      (java.net.URL. "http://localhost:8082/apps/card/templates/")]
+              (selmer/render-file
+               (java.net.URL. "http://localhost:8082/apps/card/templates/kanban.html")
+               {}
+               :custom-resource-path
+               (java.net.URL. "http://localhost:8082/apps/card/templates/")))
 
-             (= (get config "type") "template")
-             (binding [*custom-resource-path*
-                       (java.net.URL. "http://localhost:8082/apps/card/templates/")]
-               (selmer/render-file
-                (java.net.URL. "http://localhost:8082/apps/card/templates/kanban.html")
-                {}
-                :custom-resource-path
-                (java.net.URL. "http://localhost:8082/apps/card/templates/")))
+            :else
+            (let [fields (distinct (concat [:crux.db/id] (keys resource-state)))]
+              [:dl
+               (for [field fields
+                     :let [val (get resource-state field)]]
+                 (list
+                  [:dt
+                   (pr-str field)]
+                  [:dd
+                   (cond
+                     (uri? val)
+                     [:a {:href val} val]
+                     :else
+                     (pr-str (get resource-state field)))]))]))
 
-             :else
-             (let [fields (distinct (concat [:crux.db/id] (keys resource-state)))]
-               [:dl
-                (for [field fields
-                      :let [val (get resource-state field)]]
-                  (list
-                   [:dt
-                    (pr-str field)]
-                   [:dd
-                    (cond
-                      (uri? val)
-                      [:a {:href val} val]
-                      :else
-                      (pr-str (get resource-state field)))]))]))
+          [:h2 "Debug"]
+          [:h3 "Resource"]
+          [:pre (with-out-str (pprint resource))]
+          (when query
+            (list
+             [:h3 "Query"]
+             [:pre (with-out-str (pprint query))]))
+          (when crux-query
+            (list
+             [:h3 "Crux Query"]
+             [:pre (with-out-str (pprint (->query query (extract-params-from-request request param-defs))))]))
 
-           [:h2 "Debug"]
-           [:h3 "Resource"]
-           [:pre (with-out-str (pprint resource))]
-           (when query
-             (list
-              [:h3 "Query"]
-              [:pre (with-out-str (pprint query))]))
-           (when crux-query
-             (list
-              [:h3 "Crux Query"]
-              [:pre (with-out-str (pprint (->query query (extract-params-from-request request param-defs))))]))
+          (when (seq param-defs)
+            (list
+             [:h3 "Parameters"]
+             [:pre (with-out-str (pprint (extract-params-from-request request param-defs)))]))
 
-           (when (seq param-defs)
-             (list
-              [:h3 "Parameters"]
-              [:pre (with-out-str (pprint (extract-params-from-request request param-defs)))]))
-
-           [:h3 "Resource state"]
-           [:pre (with-out-str (pprint resource-state))])
-          "\r\n"))))))
+          [:h3 "Resource state"]
+          [:pre (with-out-str (pprint resource-state))])
+         (.getBytes "utf-8"))))))
 
 (defmethod generate-representation-body ::api-console-generator [request resource representation db authorization]
   (let [cell-attrs {:style "border: 1px solid #888; padding: 4pt; text-align: left"}
@@ -285,48 +282,46 @@
                   (comp str first)
                   (crux/q db '{:find [e openapi]
                                :where [[e ::apex/openapi openapi]]}))]
-    (.getBytes
-     (str
-      (hp/html5
-       [:h1 "APIs"]
-       (if (pos? (count openapis))
-         (list
-          [:p "These APIs are loaded and available:"]
-          [:table {:style "border: 1px solid #888; border-collapse: collapse; "}
-           [:thead
-            [:tr
-             (for [field ["Path" "Title" "Description" "Contact" "Swagger UI"]]
-               [:th cell-attrs field])]]
-           [:tbody
-            (for [[uri openapi]
-                  ;; TODO: authorization
-                  openapis]
-              [:tr
-               [:td cell-attrs
-                (get-in openapi ["servers" 0 "url"])]
+    (->
+     (hp/html5
+      [:h1 "APIs"]
+      (if (pos? (count openapis))
+        (list
+         [:p "These APIs are loaded and available:"]
+         [:table {:style "border: 1px solid #888; border-collapse: collapse; "}
+          [:thead
+           [:tr
+            (for [field ["Path" "Title" "Description" "Contact" "Swagger UI"]]
+              [:th cell-attrs field])]]
+          [:tbody
+           (for [[uri openapi]
+                 ;; TODO: authorization
+                 openapis]
+             [:tr
+              [:td cell-attrs
+               (get-in openapi ["servers" 0 "url"])]
 
-               [:td cell-attrs
-                (get-in openapi ["info" "title"])]
+              [:td cell-attrs
+               (get-in openapi ["info" "title"])]
 
-               [:td cell-attrs
-                (get-in openapi ["info" "description"])]
+              [:td cell-attrs
+               (get-in openapi ["info" "description"])]
 
-               [:td cell-attrs
-                (get-in openapi ["info" "contact" "name"])]
+              [:td cell-attrs
+               (get-in openapi ["info" "contact" "name"])]
 
-               [:td cell-attrs
-                [:a {:href (format "/_crux/swagger-ui/index.html?url=%s" uri)} uri]]])]])
-         (list
-          [:p "These are no APIs loaded."])))
-
-      "\r\n"))))
+              [:td cell-attrs
+               [:a {:href (format "/_crux/swagger-ui/index.html?url=%s" uri)} uri]]])]])
+        (list
+         [:p "These are no APIs loaded."])))
+     (.getBytes "utf-8"))))
 
 (defn put-openapi [request _ openapi-json-representation _ crux-node]
 
   (let [uri (:uri request)
         last-modified (java.util.Date.)
         openapi (json/read-value (java.io.ByteArrayInputStream. (::spin/bytes openapi-json-representation)))
-        etag (format "\"%s\"" (subs (util/hexdigest (.getBytes (pr-str openapi))) 0 32))]
+        etag (format "\"%s\"" (subs (util/hexdigest (.getBytes (pr-str openapi) "utf-8")) 0 32))]
     (crux/submit-tx
      crux-node
      [

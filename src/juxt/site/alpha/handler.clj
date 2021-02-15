@@ -96,7 +96,7 @@
       (let [body (cond
                    content (.getBytes content (or charset "utf-8"))
                    bytes bytes
-                   path-item-object (.getBytes (get-in path-item-object ["get" "description"]))
+                   path-item-object (.getBytes (get-in path-item-object ["get" "description"]) "utf-8")
                    bytes-generator (generate-representation-body request resource selected-representation db authorization))]
         (spin/response
          200
@@ -217,7 +217,7 @@
           {::spin/content-type (::spin/content-type new-representation)
            ::spin/response
            {:status 415
-            :body (.getBytes "Unsupported Media Type\r\n")}}))))))
+            :body (.getBytes "Unsupported Media Type\r\n" "utf-8")}}))))))
 
 (defn DELETE [request resource selected-representation date crux-node]
   {:status 200})
