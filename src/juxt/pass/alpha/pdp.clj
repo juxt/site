@@ -145,6 +145,16 @@
          :type "Rule"
          ::pass/target '[[subject :juxt.pass.alpha/username "webmaster"]]
          ::pass/effect ::pass/allow
-         ::pass/allow-methods #{:get :head :options :put :post :delete}}]]))
+         ::pass/allow-methods #{:get :head :options :put :post :delete}}]]
+
+      ;; A rule that makes all PUBLIC classifications accessible to GET
+      [[:crux.tx/put
+        {:crux.db/id "/_crux/pass/rules/public"
+         :type "Rule"
+         ::pass/target '[[resource ::spin/classification "PUBLIC"]]
+         ::pass/effect ::pass/allow
+         ::pass/allow-methods #{:get :head :options}}]]
+
+      ))
     (catch Exception e
       (prn e))))
