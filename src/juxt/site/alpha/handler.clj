@@ -93,18 +93,19 @@
           {::keys [path-item-object]} resource]
 
 
-      (spin/response
-       200
-       representation-metadata-headers
-       (response/payload-headers payload-header-fields)
-       request
-       nil
-       date
-       (cond
-         content (.getBytes content (or charset "utf-8"))
-         bytes bytes
-         path-item-object (.getBytes (get-in path-item-object ["get" "description"]))
-         bytes-generator (generate-representation-body request resource selected-representation db authorization))))))
+      (let [body (cond
+                   content (.getBytes content (or charset "utf-8"))
+                   bytes bytes
+                   path-item-object (.getBytes (get-in path-item-object ["get" "description"]))
+                   bytes-generator (generate-representation-body request resource selected-representation db authorization))]
+        (spin/response
+         200
+         representation-metadata-headers
+         (response/payload-headers payload-header-fields body)
+         request
+         nil
+         date
+         body)))))
 
 (defn receive-representation [request resource date]
   (let [{metadata ::spin/representation-metadata

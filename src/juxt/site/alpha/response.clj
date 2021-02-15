@@ -16,9 +16,11 @@
       (assoc-when-some "etag" (some-> rep ::spin/etag))
       (assoc-when-some "vary" (some-> rep ::spin/vary))))
 
-(defn payload-headers [rep]
+(defn payload-headers [rep body]
   (-> {}
-      (assoc-when-some "content-length" (some-> rep ::spin/content-length str))
+      (assoc-when-some "content-length" (or
+                                         (some-> rep ::spin/content-length str)
+                                         (some-> body count str)))
       (assoc-when-some "content-range" (::spin/content-range rep))
       (assoc-when-some "trailer" (::spin/trailer rep))
       (assoc-when-some "transfer-encoding" (::spin/transfer-encoding rep))))
