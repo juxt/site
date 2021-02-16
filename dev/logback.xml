@@ -99,7 +99,7 @@
   <!-- Log messages from your application will be included in
        log/all.log. In addition, we will send just messages from your
        application to log/app.log -->
-  <logger name="${app_root_logger:-com.example.application}" level="ALL">
+  <logger name="juxt" level="ALL">
     <appender-ref ref="APP_LOG_FILE" />
   </logger>
 
