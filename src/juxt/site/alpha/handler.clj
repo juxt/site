@@ -277,33 +277,59 @@
         request (dissoc request ::crux-db ::crux-node)
 
         resource (locate-resource request db)
-        subject (authenticate request resource db)
-        authorization (pdp/authorize
-                       {::pass/subject subject
-                        ::pass/resource resource
-                        ::pass/request (dissoc request :body)
-                        ::pass/environment {:db db}})
-
-        _ (log/debugf "Authorization: %s" (pr-str authorization))
-
-        allow-methods (set/union
-                       (::spin/methods resource)
-                       (::pass/allow-methods authorization))
-
-        _ (when resource
-            (check-method-not-allowed!
-             request resource
-             allow-methods))
 
         date (new java.util.Date)
 
         current-representations (current-representations db resource date)
 
+        selected-representation
+        (when (seq current-representations)
+          (negotiate-representation request current-representations))
+
         _ (when (contains? #{:get :head} (:request-method request))
             (spin/check-not-found! current-representations))
 
-        selected-representation
-        (negotiate-representation request current-representations)]
+        ;; Do authorization as late as possible (in order to have as much data
+        ;; as possible to base the authorization decision on. However, note
+        ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
+        ;; before checking any HTTP conditional header.".
+        subject (authenticate request resource db)
+        authorization (pdp/authorization
+                       db
+                       {'subject (authenticate request resource db)
+                        'resource resource
+                        'request (dissoc request :body)
+                        'representation (dissoc request :body)
+                        'environment {}})
+
+        _ (when-not (= (::pass/access authorization) ::pass/approved)
+            (throw
+             (if (::pass/user subject)
+               (ex-info
+                "Forbidden"
+                {::spin/response
+                 {:status 403
+                  :body "Forbidden\r\n"}})
+
+               (ex-info
+                "Unauthorized"
+                {::spin/response
+                 {:status 401
+                  :headers
+                  {"www-authenticate"
+                   (spin.auth/www-authenticate
+                    [{::spin/authentication-scheme "Basic"
+                      ::spin/realm "Users"}])}
+                  :body "Unauthorized\r\n"}}))))
+
+        allow-methods (set/union
+                       (::spin/methods resource)
+                       (::pass/allow-methods authorization))]
+
+    (when resource
+      (check-method-not-allowed!
+       request resource
+       allow-methods))
 
     (case (:request-method request)
 

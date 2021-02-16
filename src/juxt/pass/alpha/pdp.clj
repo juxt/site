@@ -20,30 +20,28 @@
 (defn authorization
   "Returns authorization information. Context is all the attributes that pertain
   to the subject, resource, request (action), environment and maybe more."
-  [{::pass/keys [subject resource request environment]}]
+  [db request-context]
 
   ;; Map across each rule in the system (we can memoize later for
   ;; performance).
 
-  (let [ ;; TODO: But we should go through all policies, bring in their
+  (let [
+        ;; TODO: But we should go through all policies, bring in their
         ;; attributes to merge into the target, then for each rule in the
         ;; policy... the apply rule-combining algo...
-
-        db (:db environment)
 
         rules (crux/q db '{:find [rule]
                            :where [[rule :type "Rule"]]})
 
         _  (log/debugf "Rules to match are %s" (pr-str rules))
 
-        subject-id (java.util.UUID/randomUUID)
-        resource-id (java.util.UUID/randomUUID)
-        request-id (java.util.UUID/randomUUID)
+        temp-id-map (reduce-kv
+                     (fn [acc k v] (assoc acc k (assoc v :crux.db/id (java.util.UUID/randomUUID))))
+                     {} request-context)
 
-        db (crux/with-tx db
-             [[:crux.tx/put (assoc subject :crux.db/id subject-id)]
-              [:crux.tx/put (assoc resource :crux.db/id resource-id)]
-              [:crux.tx/put (assoc request :crux.db/id request-id)]])
+        ;; Speculatively put each entry of the request context into the
+        ;; database. This new database is only in scope for this authorization.
+        db (crux/with-tx db (mapv (fn [e] [:crux.tx/put e]) (vals temp-id-map)))
 
         evaluated-rules
         (keep
@@ -51,16 +49,18 @@
            (let [rule-ent (crux/entity db rule)]
              (when-let [target (::pass/target rule-ent)]
                (let [q {:find ['success]
-                        :where (into '[[(identity true) success]]
-                                     target)
-                        :in ['subject 'resource 'action]}
-                     match-results (crux/q db q subject-id resource-id request-id)]
+                        :where (into '[[(identity true) success]] target)
+                        :in (vec (keys temp-id-map))}
+                     match-results (apply crux/q db q (map :crux.db/id (vals temp-id-map)))]
                  (assoc rule-ent ::pass/matched? (pos? (count match-results)))))))
          rules)
 
         _ (log/debugf "Result of rule matching: %s" (pr-str evaluated-rules))
 
         matched-rules (filter ::pass/matched? evaluated-rules)
+
+        _ (log/debug "Rejected rules" (pr-str (filter (comp not ::pass/matched?) evaluated-rules)))
+        _ (log/debug "Matched rules" (pr-str matched-rules))
 
         allowed? (and
                   (pos? (count matched-rules))
@@ -102,32 +102,6 @@
         ;;(assoc :in '[context])
         combined-limiting-clauses (update :where (comp vec concat) combined-limiting-clauses)))))
 
-(defn authorize [request-context]
-
-  (let [authorization (authorization request-context)]
-
-    (when-not (= (::pass/access authorization) ::pass/approved)
-      (throw
-       (if (::pass/subject request-context)
-         (ex-info
-          "Forbidden"
-          {::spin/response
-           {:status 403
-            :body "Forbidden\r\n"}})
-
-         (ex-info
-          "Unauthorized"
-          {::spin/response
-           {:status 401
-            :headers
-            {"www-authenticate"
-             (spin.auth/www-authenticate
-              [{::spin/authentication-scheme "Basic"
-                ::spin/realm "Users"}])}
-            :body "Unauthorized\r\n"}}))))
-
-    authorization))
-
 (defmethod ig/init-key ::rules [_ {:keys [crux-node]}]
   (println "Adding built-in users/rules")
   (try
@@ -139,22 +113,15 @@
       ;; the Crux instance is provisioned.
       (entity/user-entity "webmaster" "FunkyForest")
 
-      ;; A rule that allows the webmaster to do everything.
+      ;; A rule that allows the webmaster to do everything, at least during the
+      ;; bootstrap phase of a deployment. This can be deleted after the initial
+      ;; users/roles have been populated, if required.
       [[:crux.tx/put
         {:crux.db/id "/_crux/pass/rules/webmaster"
          :type "Rule"
          ::pass/target '[[subject :juxt.pass.alpha/username "webmaster"]]
          ::pass/effect ::pass/allow
-         ::pass/allow-methods #{:get :head :options :put :post :delete}}]]
+         ::pass/allow-methods #{:get :head :options :put :post :delete}}]]))
 
-      ;; A rule that makes all PUBLIC classifications accessible to GET
-      [[:crux.tx/put
-        {:crux.db/id "/_crux/pass/rules/public"
-         :type "Rule"
-         ::pass/target '[[resource ::spin/classification "PUBLIC"]]
-         ::pass/effect ::pass/allow
-         ::pass/allow-methods #{:get :head :options}}]]
-
-      ))
     (catch Exception e
       (prn e))))
