@@ -342,7 +342,7 @@
         request-context {'subject subject
                          'resource resource
                          'request (dissoc request :body)
-                         'representation (dissoc request :body)
+                         'representation selected-representation
                          'environment {}}
 
         authorization (pdp/authorization db request-context)
