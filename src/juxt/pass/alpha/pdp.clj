@@ -5,10 +5,12 @@
    [clojure.set :as set]
    [clojure.walk :refer [postwalk-replace]]
    [clojure.tools.logging :as log]
+   [jsonista.core :as json]
    [crux.api :as crux]
    [integrant.core :as ig]
    [juxt.pass.alpha :as pass]
    [juxt.site.alpha.entity :as entity]
+   [juxt.site.alpha.util :refer [hexdigest]]
    [juxt.spin.alpha :as spin]
    [juxt.spin.alpha.auth :as spin.auth]))
 
@@ -122,7 +124,34 @@
          :type "Rule"
          ::pass/target '[[subject :juxt.pass.alpha/username "webmaster"]]
          ::pass/effect ::pass/allow
-         ::pass/allow-methods #{:get :head :options :put :post :delete}}]]))
+         ::pass/allow-methods #{:get :head :options}}]]
+
+      [[:crux.tx/put
+        {:crux.db/id "/_site/pass/rules/accessible-public-resources"
+         :type "Rule"
+         :description "PUBLIC resources are accessible to GET"
+         ::pass/target '[[request :request-method #{:get :head :options}]
+                         [resource ::pass/classification "PUBLIC"]]
+         ::pass/effect ::pass/allow}]]
+
+      [(let [content
+             (str
+              (json/write-value-as-string
+               {"issuer" "https://juxt.site"
+                "token_endpoint_auth_methods_supported" ["client_secret_basic"]}
+               (json/object-mapper
+                {:pretty true}))
+              "\r\n")]
+         [:crux.tx/put
+          {:crux.db/id "/.well-known/openid-configuration"
+           ::pass/classification "PUBLIC"
+           ::spin/methods #{:get :head :options}
+           ::spin/representations
+           [{::spin/content-type "application/json"
+             ::spin/last-modified (java.util.Date.)
+             ::spin/etag (subs (hexdigest (.getBytes content)) 0 32)
+             ::spin/content content
+             }]}])]))
 
     (catch Exception e
       (prn e))))
