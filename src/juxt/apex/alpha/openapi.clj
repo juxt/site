@@ -161,7 +161,7 @@
 ;; there may be a better rendering of collections, which can be inferred from
 ;; the schema being an array and use the items subschema. We can also use the
 ;; resource state as a
-(defmethod generate-representation-body ::entity-bytes-generator [request resource representation db authorization]
+(defmethod generate-representation-body ::entity-bytes-generator [request resource representation db authorization subject]
 
   (let [param-defs
         (get-in resource [:juxt.apex.alpha/operation "parameters"])
@@ -276,7 +276,7 @@
           [:pre (with-out-str (pprint resource-state))])
          (.getBytes "utf-8"))))))
 
-(defmethod generate-representation-body ::api-console-generator [request resource representation db authorization]
+(defmethod generate-representation-body ::api-console-generator [request resource representation db authorization subject]
   (let [cell-attrs {:style "border: 1px solid #888; padding: 4pt; text-align: left"}
         openapis (sort-by
                   (comp str first)

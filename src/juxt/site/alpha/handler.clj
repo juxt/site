@@ -82,7 +82,7 @@
                 [resource ::spin/representation representation-id]]}
       (:crux.db/id resource))))))
 
-(defn GET [request resource date selected-representation db authorization]
+(defn GET [request resource date selected-representation db authorization subject]
   (let [representation-metadata-headers (response/representation-metadata-headers selected-representation)]
 
     (spin/evaluate-preconditions! request resource representation-metadata-headers date)
@@ -97,7 +97,7 @@
                    content (.getBytes content (or charset "utf-8"))
                    bytes bytes
                    path-item-object (.getBytes (get-in path-item-object ["get" "description"]) "utf-8")
-                   bytes-generator (generate-representation-body request resource selected-representation db authorization))]
+                   bytes-generator (generate-representation-body request resource selected-representation db authorization subject))]
         (spin/response
          200
          representation-metadata-headers
@@ -334,7 +334,7 @@
     (case (:request-method request)
 
       (:get :head)
-      (GET request resource date selected-representation db authorization)
+      (GET request resource date selected-representation db authorization subject)
 
       :post
       (POST request resource date crux-node)
