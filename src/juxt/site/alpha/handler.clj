@@ -396,3 +396,8 @@
       (wrap-database-request-association crux-node)
       wrap-exception-handler
       wrap-logging))
+        (org.slf4j.MDC/put "method" (str/upper-case (name (:request-method req))))
+        (log/debug "Request received" (pr-str (dissoc req :body)))
+
+        ;;(prn "body:" (slurp (:body req)))
+
