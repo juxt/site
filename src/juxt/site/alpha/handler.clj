@@ -8,14 +8,14 @@
    [clojure.tools.logging :as log]
    [crux.api :as crux]
    [crypto.password.bcrypt :as password]
-   [jsonista.core :as json]
    [juxt.apex.alpha.openapi :as openapi]
+   [juxt.dave.alpha :as dave]
+   [juxt.dave.alpha.methods :as dave.methods]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha :as pass]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.pick.alpha.ring :refer [pick]]
    [juxt.reap.alpha.decoders :as reap.decoders]
-   [juxt.site.alpha :as site]
    [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.response :as response]
    [juxt.site.alpha.util :refer [assoc-when-some hexdigest]]
@@ -57,8 +57,7 @@
   in :default."
   [request db]
   (or
-   (when-let [resource (openapi/locate-resource request db)]
-     resource)
+   (openapi/locate-resource request db)
 
    (crux/entity db (:uri request))
 
@@ -125,6 +124,7 @@
   (let [new-representation (receive-representation request resource date)]
     (assert new-representation)
     ;; TODO: dispatch on something
+
     ))
 
 ;; TODO: Not sure there should be a general way of writing resources like this, without a lot of authorization checks
@@ -220,15 +220,43 @@
             :body (.getBytes "Unsupported Media Type\r\n" "utf-8")}}))))))
 
 (defn DELETE [request resource selected-representation date crux-node]
-  {:status 200})
+  (->>
+   (crux/submit-tx
+    crux-node
+    [[:crux.tx/delete (:uri request)]])
+   (crux/await-tx crux-node))
+  {:status 204})
 
-(defn OPTIONS [_ _ allow-methods _ _]
+(defn OPTIONS [_ resource allow-methods _ _]
   ;; TODO: Implement *
-  (spin/options allow-methods))
+  (->
+   (spin/options allow-methods)
+   (update :headers merge (::spin/options resource))))
+
+(defn PROPFIND [request resource date crux-node authorization subject]
+  (dave.methods/propfind request resource date crux-node authorization subject))
+
+(defn MKCOL [request resource date crux-node]
+  (let [tx (crux/submit-tx
+            crux-node
+            [[:crux.tx/put
+              {:crux.db/id (:uri request)
+               ::dave/resource-type :collection
+               ::spin/methods #{:get :head :options :propfind}
+               ::spin/representations
+               [{::spin/content-type "text/html;charset=utf-8"
+                 ::spin/content "<h1>Index</h1>\r\n"}]
+               ::spin/options {"DAV" "1"}}]])]
+    (crux/await-tx crux-node tx))
+  {:status 201
+   :headers {}
+   :body "Collection created\r\n"})
 
 (defmethod transform-value "password" [_ instance]
-  ;; TODO: Increase work-factor to 11 (not a reference to Spinal Tap!)
-  (password/encrypt instance 4))
+  (password/encrypt instance 11))
+
+(defmethod transform-value "inst" [_ instance]
+  (java.util.Date/from (java.time.Instant/parse instance)))
 
 (defn authenticate
   "Authenticate a request. Return a pass subject, with information about user,
@@ -238,12 +266,12 @@
   [request resource db]
   (let [{::spin.auth/keys [user password]}
         (spin.auth/decode-authorization-header request)
-        uid (format "/_crux/pass/users/%s" user)]
+        uid (format "/_site/pass/users/%s" user)]
     (when-let [e (crux/entity db uid)]
       (when (password/check password (::pass/password-hash!! e))
-        ;; TODO: This might be where we also add the 'on-behalf-of' info
-        {::pass/user uid
-         ::pass/username user}))))
+            ;; TODO: This might be where we also add the 'on-behalf-of' info
+            {::pass/user uid
+             ::pass/username user}))))
 
 (defn check-method-not-allowed!
   [request resource methods]
@@ -270,13 +298,19 @@
          ::spin/resource resource})))))
 
 (defn handler [{db ::crux-db crux-node ::crux-node :as request}]
-  (spin/check-method-not-implemented! request)
+  (spin/check-method-not-implemented!
+   request
+   #{:get :head :post :put :delete :options
+     :mkcol :propfind})
+
   (let [
         ;; Having extracted our Crux database and node, we remove from the
         ;; request.
         request (dissoc request ::crux-db ::crux-node)
 
         resource (locate-resource request db)
+
+        _ (log/debug "Result of locate-resource" (pr-str resource))
 
         date (new java.util.Date)
 
@@ -293,14 +327,20 @@
         ;; as possible to base the authorization decision on. However, note
         ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
         ;; before checking any HTTP conditional header.".
+
         subject (authenticate request resource db)
-        authorization (pdp/authorization
-                       db
-                       {'subject (authenticate request resource db)
-                        'resource resource
-                        'request (dissoc request :body)
-                        'representation (dissoc request :body)
-                        'environment {}})
+
+        request-context {'subject subject
+                         'resource resource
+                         'request (dissoc request :body)
+                         'representation (dissoc request :body)
+                         'environment {}}
+
+        authorization (pdp/authorization db request-context)
+
+        _ (log/debugf "Result of authorization with resource-context %s is %s"
+                      (pr-str request-context)
+                      (pr-str authorization))
 
         _ (when-not (= (::pass/access authorization) ::pass/approved)
             (throw
@@ -346,7 +386,13 @@
       (DELETE request resource selected-representation date crux-node)
 
       :options
-      (OPTIONS request resource allow-methods date {::db db}))))
+      (OPTIONS request resource allow-methods date db)
+
+      :propfind
+      (PROPFIND request resource date crux-node authorization subject)
+
+      :mkcol
+      (MKCOL request resource date crux-node))))
 
 (defn wrap-database-request-association [h crux-node]
   (fn [req]
@@ -359,6 +405,11 @@
     (let [t0 (System/currentTimeMillis)]
       (try
         (org.slf4j.MDC/put "uri" (:uri req))
+        (org.slf4j.MDC/put "method" (str/upper-case (name (:request-method req))))
+        (log/debug "Request received" (pr-str (dissoc req :body)))
+
+        ;;(prn "body:" (slurp (:body req)))
+
         (let [res (h req)]
           (org.slf4j.MDC/remove "uri")
           (org.slf4j.MDC/put "duration" (str (- (System/currentTimeMillis) t0) "ms"))
@@ -396,8 +447,3 @@
       (wrap-database-request-association crux-node)
       wrap-exception-handler
       wrap-logging))
-        (org.slf4j.MDC/put "method" (str/upper-case (name (:request-method req))))
-        (log/debug "Request received" (pr-str (dissoc req :body)))
-
-        ;;(prn "body:" (slurp (:body req)))
-
