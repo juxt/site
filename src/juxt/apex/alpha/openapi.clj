@@ -408,7 +408,6 @@
     ;; TODO: Validate new-representation against the JSON schema in the openapi.
 
     (when-not (::jinx/valid? validation-results)
-      (pprint validation-results)
       (throw
        (ex-info
         "Schema validation failed"

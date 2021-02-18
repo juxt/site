@@ -248,8 +248,6 @@
 
                      (let [validation (jinx.validate/validate schema value {:coercions default-coercions})]
 
-                       (clojure.pprint/pprint validation)
-
                        (cond-> acc
                          (::jinx/valid? validation)
                          (conj [n {:encoded-strings encoded-strings
