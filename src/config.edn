@@ -2,7 +2,19 @@
 
 {:ig/system
  {:juxt.site.alpha.db/crux-node
-  {:crux.http-server/server {:port 3000}}
+  {:crux.http-server/server {:port 3000}
+
+   :crux/index-store
+   {:kv-store {:crux/module crux.rocksdb/->kv-store
+               :db-dir "db/idxs"}}
+
+   :crux/document-store
+   {:kv-store {:crux/module crux.rocksdb/->kv-store
+               :db-dir "db/docs"}}
+
+   :crux/tx-log
+   {:kv-store {:crux/module crux.rocksdb/->kv-store
+               :db-dir "db/txes"}}}
 
   :juxt.apex.alpha.openapi/module
   {:crux-node #ig/ref :juxt.site.alpha.db/crux-node}
