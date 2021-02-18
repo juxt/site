@@ -19,7 +19,7 @@
 
 (defn authorization
   "Returns authorization information. Context is all the attributes that pertain
-  to the subject, resource, request (action), environment and maybe more."
+  to the subject, resource, request and environment and maybe more."
   [db request-context]
 
   ;; Map across each rule in the system (we can memoize later for
@@ -30,8 +30,9 @@
         ;; attributes to merge into the target, then for each rule in the
         ;; policy... the apply rule-combining algo...
 
-        rules (crux/q db '{:find [rule]
-                           :where [[rule :type "Rule"]]})
+        rules (map first
+                   (crux/q db '{:find [rule]
+                                :where [[rule :type "Rule"]]}))
 
         _  (log/debugf "Rules to match are %s" (pr-str rules))
 
@@ -45,14 +46,14 @@
 
         evaluated-rules
         (keep
-         (fn [[rule]]
-           (let [rule-ent (crux/entity db rule)]
-             (when-let [target (::pass/target rule-ent)]
+         (fn [rule-id]
+           (let [rule (crux/entity db rule-id)]
+             (when-let [target (::pass/target rule)]
                (let [q {:find ['success]
                         :where (into '[[(identity true) success]] target)
                         :in (vec (keys temp-id-map))}
                      match-results (apply crux/q db q (map :crux.db/id (vals temp-id-map)))]
-                 (assoc rule-ent ::pass/matched? (pos? (count match-results)))))))
+                 (assoc rule ::pass/matched? (pos? (count match-results)))))))
          rules)
 
         _ (log/debugf "Result of rule matching: %s" (pr-str evaluated-rules))
