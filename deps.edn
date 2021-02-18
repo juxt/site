@@ -40,7 +40,8 @@
                              ;;:exclusions [hiccups]
                              }
 
-        selmer/selmer {:mvn/version "1.12.33"}}
+        selmer/selmer {:mvn/version "1.12.33"}
+        comb/comb {:mvn/version "0.1.1"}}
 
  :aliases
  {:dev
