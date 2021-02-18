@@ -32,23 +32,21 @@
          [(let [content (str (with-out-str (pprint (sanitize resource-state)) "\r\n"))
                 charset "utf-8"
                 bytes (.getBytes content charset)]
-            [:crux.tx/put
-             {::spin/content-type "application/edn"
-              ::spin/charset charset
-              ::spin/etag etag
-              ::spin/last-modified last-modified
-              ::spin/content-length (count bytes)
-              ::spin/content content}])
+            {::spin/content-type "application/edn"
+             ::spin/charset charset
+             ::spin/etag etag
+             ::spin/last-modified last-modified
+             ::spin/content-length (count bytes)
+             ::spin/content content})
           (let [content (str (json/write-value-as-string (sanitize resource-state)) "\r\n")
                 charset "utf-8"
                 bytes (.getBytes content "utf-8")]
-            [:crux.tx/put
-             {::spin/content-type "application/json"
-              ::spin/charset charset
-              ::spin/etag etag
-              ::spin/last-modified last-modified
-              ::spin/content-length (count bytes)
-              ::spin/content content}])]})]])))
+            {::spin/content-type "application/json"
+             ::spin/charset charset
+             ::spin/etag etag
+             ::spin/last-modified last-modified
+             ::spin/content-length (count bytes)
+             ::spin/content content})]})]])))
 
 (defn user-entity [username password]
   (new-data-resource
