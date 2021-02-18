@@ -276,20 +276,23 @@
   (let [{::spin/keys [auth-scheme] :as claims}
         (spin.auth/decode-authorization-header request)]
     (when claims
-      (case auth-scheme
-        "Basic"
-        (let [{::spin.auth/keys [user password]} claims
-              uid (format "/_site/pass/users/%s" user)]
-          (when-let [e (crux/entity db uid)]
-            (when (password/check password (::pass/password-hash!! e))
-              ;; TODO: This might be where we also add the 'on-behalf-of' info
-              {::pass/user uid
-               ::pass/username user})))
+      (when-let [authentication
+                 (case auth-scheme
+                   "Basic"
+                   (let [{::spin.auth/keys [user password]} claims
+                         uid (format "/_site/pass/users/%s" user)]
+                     (when-let [e (crux/entity db uid)]
+                       (when (password/check password (::pass/password-hash!! e))
+                         ;; TODO: This might be where we also add the 'on-behalf-of' info
+                         {::pass/user uid
+                          ::pass/username user})))
 
-        "Bearer" claims
+                   "Bearer" claims
 
-        (throw (ex-info "Unknonw auth scheme" {:auth-scheme auth-scheme
-                                               :claims claims}))))))
+                   (throw (ex-info "Unknown auth scheme" {:auth-scheme auth-scheme
+                                                          :claims claims})))]
+        (org.slf4j.MDC/put "user" (::pass/username authentication))
+        authentication))))
 
 (defn check-method-not-allowed!
   [request resource methods]
@@ -342,7 +345,11 @@
 
         resource (locate-resource request db)
 
-        _ (log/debug "Result of locate-resource" (pr-str resource))
+        _ (log/debug
+           "Result of locate-resource"
+           (pr-str (select-keys
+                    resource
+                    [:crux.db/id ::spin/methods ::spin/representations])))
 
         date (new java.util.Date)
 
