@@ -35,7 +35,7 @@
     (with-status-message
       (format "PUT %s (%s)" (get-in openapi [:info :title]) (get-in openapi [:info :version]))
       (curl/put
-       (url "/_crux/apis/pass/openapi.json")
+       (url "/_site/apis/pass/openapi.json")
        {:headers {"content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
         :body openapi.json
         :throw true
@@ -46,9 +46,9 @@
 
 (def get-openapi-json-response
   (with-status-message
-    "Checking OpenAPI using GET on /_crux/apis/pass/openapi.json"
+    "Checking OpenAPI using GET on /_site/apis/pass/openapi.json"
     (curl/get
-     (url "/_crux/apis/pass/openapi.json")
+     (url "/_site/apis/pass/openapi.json")
      {:basic-auth WEBMASTER
       :throw true
       :debug CURL_DEBUG})))
@@ -69,7 +69,7 @@
         (with-status-message
           (format "PUT role '%s'" id)
           (curl/put
-           (url (format "/_crux/pass/roles/%s" id))
+           (url (format "/_site/pass/roles/%s" id))
            {:headers {"content-type" "application/json"}
             :body (json/generate-string
                    {:type "Role"
@@ -83,7 +83,7 @@
   (with-status-message
     "GET roles"
     (curl/get
-     (url "/_crux/pass/roles")
+     (url "/_site/pass/roles")
      {:headers {"accept" "application/json"}
       :throw true
       :basic-auth WEBMASTER
@@ -96,7 +96,7 @@
   (with-status-message
     "GET example role"
     (curl/get
-     (url "/_crux/pass/roles/owners")
+     (url "/_site/pass/roles/owners")
      {:headers {"accept" "application/json"}
       :throw true
       :basic-auth WEBMASTER

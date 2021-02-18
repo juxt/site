@@ -8,7 +8,7 @@
   {:name "Malcolm Sparks"
    :email "mal@juxt.pro"
    :url "https://juxt.pro"}}
- :servers [{:url "/_crux/pass"}]
+ :servers [{:url "/_site/pass"}]
 
  :paths
  {"/roles"
@@ -138,8 +138,8 @@
          "name" "John Doe"
          "email" "john@example.com"
          "password" "DoReMi123"
-         "roles" ["/_crux/pass/roles/admin"
-                  "/_crux/pass/roles/manager"]}}
+         "roles" ["/_site/pass/roles/admin"
+                  "/_site/pass/roles/manager"]}}
 
        "text/html;charset=utf-8"
        {:title "User"
@@ -158,8 +158,8 @@
         "name" "John Doe"
         "email" "john@example.com"
         "password" "DoReMi123"
-        "roles" ["/_crux/pass/roles/admin"
-                 "/_crux/pass/roles/manager"]}}}}
+        "roles" ["/_site/pass/roles/admin"
+                 "/_site/pass/roles/manager"]}}}}
 
     :responses
     {200 {:description "User successfully updated"

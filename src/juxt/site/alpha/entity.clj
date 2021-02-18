@@ -50,6 +50,6 @@
 
 (defn user-entity [username password]
   (new-data-resource
-   (format "/_crux/pass/users/%s" username)
-   {::pass/username "crux/admin"
+   (format "/_site/pass/users/%s" username)
+   {::pass/username username
     ::pass/password-hash!! (password/encrypt password)}))

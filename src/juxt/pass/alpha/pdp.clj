@@ -117,7 +117,7 @@
       ;; bootstrap phase of a deployment. This can be deleted after the initial
       ;; users/roles have been populated, if required.
       [[:crux.tx/put
-        {:crux.db/id "/_crux/pass/rules/webmaster"
+        {:crux.db/id "/_site/pass/rules/webmaster"
          :type "Rule"
          ::pass/target '[[subject :juxt.pass.alpha/username "webmaster"]]
          ::pass/effect ::pass/allow

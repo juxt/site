@@ -33,7 +33,7 @@
   ;; Do we have any OpenAPIs in the database?
   (or
    ;; The OpenAPI document
-   (when (and (re-matches #"/_crux/apis/\w+/openapi.json" (:uri request))
+   (when (and (re-matches #"/_site/apis/\w+/openapi.json" (:uri request))
               (not (.endsWith (:uri request) "/")))
      (or
       ;; It might exist
