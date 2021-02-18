@@ -1,6 +1,9 @@
 ;; Copyright © 2021, JUXT LTD.
 
-(ns juxt.site.alpha.util)
+(ns juxt.site.alpha.util
+  (:require
+   [clojure.walk :refer [postwalk]])
+  )
 
 (defn assoc-when-some [m k v]
   (cond-> m v (assoc k v)))
@@ -15,10 +18,15 @@
      (let [digest (.digest hash)]
        (apply str (map #(format "%02x" (bit-and % 0xff)) digest))))))
 
-(defn sanitize [m]
+(defn- sanitize-map [m]
   (->> m
        (remove (fn [[k _]] (.endsWith (name k) "!!")))
        (into {})))
+
+(defn sanitize [m]
+  (postwalk
+   (fn [x] (cond-> x (map? x) sanitize-map))
+   m))
 
 (def mime-types
   {"html" "text/html;charset=utf-8"
