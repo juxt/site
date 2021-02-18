@@ -3,12 +3,14 @@
 (ns juxt.pass.alpha.authentication
   (:require
    [jsonista.core :as json]
+   [clojure.tools.logging :as log]
    [crux.api :as crux]
    [integrant.core :as ig]
    [juxt.pass.alpha :as pass]
    [juxt.site.alpha.response :as response]
    [juxt.site.alpha.util :refer [hexdigest]]
-   [juxt.spin.alpha :as spin]))
+   [juxt.spin.alpha :as spin]
+   [juxt.spin.alpha.auth :refer [decode-authorization]]))
 
 (def GRANT-TYPES #{"client_credentials"})
 
@@ -55,13 +57,20 @@
 (def SECURE-RANDOM (new java.security.SecureRandom))
 (def BASE64-ENCODER (java.util.Base64/getUrlEncoder))
 
+(def sessions-by-access-token (atom {}))
+
 (defn access-token []
   (let [bytes (byte-array 24)]
     (.nextBytes SECURE-RANDOM bytes)
     (.encodeToString BASE64-ENCODER bytes)))
 
+;; FIXME: The multimethod here is the wrong level of abstaction. Needs a review.
+(defmethod decode-authorization "Bearer" [{:juxt.reap.alpha.rfc7235/keys [token68]}]
+  (when-let [session (get @sessions-by-access-token token68)]
+    (select-keys session [::pass/user ::pass/username])))
+
 (defn token-response
-  [resource date posted-representation]
+  [resource date posted-representation subject]
 
   ;; Check grant_type of posted-representation
 
@@ -82,11 +91,22 @@
         ;; TODO: Check first that the grant type is supported. This really might
         ;; be a case for a multimethod.
 
-        session {"access_token" (access-token)
+        access-token (access-token)
+
+        expires-in (get resource ::pass/expires-in 3600)
+
+        session {"access_token" access-token
                  "token_type" "example"
-                 "expires_in" (get resource ::pass/expires-in 3600)
+                 "expires_in" expires-in
                  ;;"example_parameter" "example_value"
                  }
+
+        _ (swap! sessions-by-access-token
+                 assoc access-token
+                 (merge
+                  session
+                  subject
+                  {:expiry-date (java.util.Date/from (.plusSeconds (.toInstant date) expires-in))}))
 
         ;; TODO: Put this access-token in Crux, with its expiry
 

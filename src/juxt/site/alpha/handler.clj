@@ -121,13 +121,13 @@
         (dissoc ::spin/representation-metadata)
         (dissoc ::spin/payload-header-fields))))
 
-(defn POST [request resource date crux-node db]
+(defn POST [request resource date crux-node db subject]
   (let [posted-representation (receive-representation request resource date)]
     (assert posted-representation)
 
     (case (:uri request)
       "/_site/token"
-      (authn/token-response resource date posted-representation)
+      (authn/token-response resource date posted-representation subject)
 
       (throw
        (ex-info
@@ -273,14 +273,23 @@
   particular Protection Space that it is part of, and the appropriate
   authentication scheme(s) for accessing the resource."
   [request resource db]
-  (let [{::spin.auth/keys [user password]}
-        (spin.auth/decode-authorization-header request)
-        uid (format "/_site/pass/users/%s" user)]
-    (when-let [e (crux/entity db uid)]
-      (when (password/check password (::pass/password-hash!! e))
-            ;; TODO: This might be where we also add the 'on-behalf-of' info
-            {::pass/user uid
-             ::pass/username user}))))
+  (let [{::spin/keys [auth-scheme] :as claims}
+        (spin.auth/decode-authorization-header request)]
+    (when claims
+      (case auth-scheme
+        "Basic"
+        (let [{::spin.auth/keys [user password]} claims
+              uid (format "/_site/pass/users/%s" user)]
+          (when-let [e (crux/entity db uid)]
+            (when (password/check password (::pass/password-hash!! e))
+              ;; TODO: This might be where we also add the 'on-behalf-of' info
+              {::pass/user uid
+               ::pass/username user})))
+
+        "Bearer" claims
+
+        (throw (ex-info "Unknonw auth scheme" {:auth-scheme auth-scheme
+                                               :claims claims}))))))
 
 (defn check-method-not-allowed!
   [request resource methods]
@@ -305,6 +314,20 @@
           :headers {"allow" (spin/allow-header #{:get :head})}
           :body "Method Not Allowed\r\n"}
          ::spin/resource resource})))))
+
+;; To avoid a 500 on unimplemented auth schemes
+(defmethod spin.auth/decode-authorization :default [_]
+  (throw
+   (ex-info
+    "Unauthorized"
+    {::spin/response
+     {:status 401
+      :headers
+      {"www-authenticate"
+       (spin.auth/www-authenticate
+        [{::spin/authentication-scheme "Basic"
+          ::spin/realm "Users"}])}
+      :body "Unauthorized\r\n"}})))
 
 (defn handler [{db ::crux-db crux-node ::crux-node :as request}]
   (spin/check-method-not-implemented!
@@ -386,7 +409,7 @@
       (GET request resource date selected-representation db authorization subject)
 
       :post
-      (POST request resource date crux-node db)
+      (POST request resource date crux-node db subject)
 
       :put
       (PUT request resource selected-representation date crux-node)

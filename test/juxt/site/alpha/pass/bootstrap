@@ -15,7 +15,6 @@
 
 (def CURL_DEBUG false)
 (def HOST "localhost:8082")
-(def WEBMASTER ["webmaster" "FunkyForest"])
 
 (defn url [path]
   (format "%s%s" HOST path))
@@ -54,7 +53,7 @@
      {:headers {"content-type" "application/x-www-form-urlencoded"}
       :throw true
       :body "grant_type=client_credentials"
-      :basic-auth WEBMASTER
+      :basic-auth ["webmaster" "FunkyForest"]
       :debug CURL_DEBUG})))
 
 (def access-token-data (json/decode (:body request-token-response)))
@@ -63,20 +62,6 @@
 
 (prn access-token-data)
 
-(System/exit 0)
-
-#_(def login-response
-    (with-status-message
-      (format "Acquire Access Token")
-      (curl/put
-       (url "/_site/token")
-       {:headers {"content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
-        :body openapi.json
-        :throw true
-        :basic-auth WEBMASTER
-        :debug CURL_DEBUG}))
-    )
-
 (def put-openapi-response
   (let [openapi (edn/read-string (slurp "openapi.edn"))
         openapi.json (json/generate-string openapi)]
@@ -84,10 +69,10 @@
       (format "PUT %s (%s)" (get-in openapi [:info :title]) (get-in openapi [:info :version]))
       (curl/put
        (url "/_site/apis/pass/openapi.json")
-       {:headers {"content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
+       {:headers {"content-type" "application/vnd.oai.openapi+json;version=3.0.2"
+                  "authorization" (format "Bearer %s" access-token)}
         :body openapi.json
         :throw true
-        :basic-auth WEBMASTER
         :debug CURL_DEBUG}))))
 
 (assert (= 201 (:status put-openapi-response)))
@@ -97,7 +82,7 @@
     "Checking OpenAPI using GET on /_site/apis/pass/openapi.json"
     (curl/get
      (url "/_site/apis/pass/openapi.json")
-     {:basic-auth WEBMASTER
+     {:headers {"authorization" (format "Bearer %s" access-token)}
       :throw true
       :debug CURL_DEBUG})))
 
@@ -118,12 +103,12 @@
           (format "PUT role '%s'" id)
           (curl/put
            (url (format "/_site/pass/roles/%s" id))
-           {:headers {"content-type" "application/json"}
+           {:headers {"content-type" "application/json"
+                      "authorization" (format "Bearer %s" access-token)}
             :body (json/generate-string
                    {:type "Role"
                     :name name})
             :throw false
-            :basic-auth WEBMASTER
             :debug CURL_DEBUG}))]
     (assert (#{200 201} (:status response)))))
 
@@ -132,9 +117,9 @@
     "GET roles"
     (curl/get
      (url "/_site/pass/roles")
-     {:headers {"accept" "application/json"}
+     {:headers {"accept" "application/json"
+                "authorization" (format "Bearer %s" access-token)}
       :throw true
-      :basic-auth WEBMASTER
       :debug CURL_DEBUG})))
 
 (assert (= 200 (:status get-user-groups-response)))
@@ -145,9 +130,9 @@
     "GET example role"
     (curl/get
      (url "/_site/pass/roles/owners")
-     {:headers {"accept" "application/json"}
+     {:headers {"accept" "application/json"
+                "authorization" (format "Bearer %s" access-token)}
       :throw true
-      :basic-auth WEBMASTER
       :debug CURL_DEBUG})))
 
 (assert (= 200 (:status get-user-group-response)))
