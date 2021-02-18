@@ -9,10 +9,10 @@
    [crux.api :as crux]
    [integrant.core :as ig]
    [juxt.pass.alpha :as pass]
+   [juxt.site.alpha.response :as response]
    [juxt.site.alpha.entity :as entity]
    [juxt.site.alpha.util :refer [hexdigest]]
-   [juxt.spin.alpha :as spin]
-   [juxt.spin.alpha.auth :as spin.auth]))
+   [juxt.spin.alpha :as spin]))
 
 ;; PDP (Policy Decision Point)
 
@@ -132,26 +132,7 @@
          :description "PUBLIC resources are accessible to GET"
          ::pass/target '[[request :request-method #{:get :head :options}]
                          [resource ::pass/classification "PUBLIC"]]
-         ::pass/effect ::pass/allow}]]
-
-      [(let [content
-             (str
-              (json/write-value-as-string
-               {"issuer" "https://juxt.site"
-                "token_endpoint_auth_methods_supported" ["client_secret_basic"]}
-               (json/object-mapper
-                {:pretty true}))
-              "\r\n")]
-         [:crux.tx/put
-          {:crux.db/id "/.well-known/openid-configuration"
-           ::pass/classification "PUBLIC"
-           ::spin/methods #{:get :head :options}
-           ::spin/representations
-           [{::spin/content-type "application/json"
-             ::spin/last-modified (java.util.Date.)
-             ::spin/etag (subs (hexdigest (.getBytes content)) 0 32)
-             ::spin/content content
-             }]}])]))
+         ::pass/effect ::pass/allow}]]))
 
     (catch Exception e
       (prn e))))

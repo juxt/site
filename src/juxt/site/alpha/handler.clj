@@ -14,6 +14,7 @@
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha :as pass]
    [juxt.pass.alpha.pdp :as pdp]
+   [juxt.pass.alpha.authentication :as authn]
    [juxt.pick.alpha.ring :refer [pick]]
    [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha.payload :refer [generate-representation-body]]
@@ -89,22 +90,22 @@
     ;; This is naïve, some representations won't just have bytes ready, they'll
     ;; need to be generated somehow
     (let [{::spin/keys [payload-header-fields bytes bytes-generator content charset]} selected-representation
-          {::keys [path-item-object]} resource]
+          {::keys [path-item-object]} resource
 
+          body (cond
+                 content (.getBytes content (or charset "utf-8"))
+                 bytes bytes
+                 path-item-object (.getBytes (get-in path-item-object ["get" "description"]) "utf-8")
+                 bytes-generator (generate-representation-body request resource selected-representation db authorization subject))]
 
-      (let [body (cond
-                   content (.getBytes content (or charset "utf-8"))
-                   bytes bytes
-                   path-item-object (.getBytes (get-in path-item-object ["get" "description"]) "utf-8")
-                   bytes-generator (generate-representation-body request resource selected-representation db authorization subject))]
-        (spin/response
-         200
-         representation-metadata-headers
-         (response/payload-headers payload-header-fields body)
-         request
-         nil
-         date
-         body)))))
+      (spin/response
+       200
+       representation-metadata-headers
+       (response/payload-headers payload-header-fields body)
+       request
+       nil
+       date
+       body))))
 
 (defn receive-representation [request resource date]
   (let [{metadata ::spin/representation-metadata
@@ -120,27 +121,35 @@
         (dissoc ::spin/representation-metadata)
         (dissoc ::spin/payload-header-fields))))
 
-(defn POST [request resource date crux-node]
-  (let [new-representation (receive-representation request resource date)]
-    (assert new-representation)
-    ;; TODO: dispatch on something
+(defn POST [request resource date crux-node db]
+  (let [posted-representation (receive-representation request resource date)]
+    (assert posted-representation)
 
-    ))
+    (case (:uri request)
+      "/_site/token"
+      (authn/token-response resource date posted-representation)
+
+      (throw
+       (ex-info
+        "POST not handled, returning 404"
+        {::spin/response
+         {:status 404
+          :body "Not Found\r\n"}})))))
 
 ;; TODO: Not sure there should be a general way of writing resources like this, without a lot of authorization checks
 #_(defn put-resource
-  [request _ new-representation old-representation crux-node]
-  (let [new-resource
-        (->
-         (json/read-value (::spin/bytes new-representation) (json/object-mapper {:decode-key-fn true}))
-         (update ::spin/methods #(set (map keyword %))))]
-    (log/debugf "New resource: %s" (pr-str new-resource))
-    (let [now (java.util.Date.)
-          new-resource (assoc new-resource :crux.db/id (:uri request))]
-      (->>
-       (crux/submit-tx crux-node [[:crux.tx/put new-resource]])
-       (crux/await-tx crux-node))
-      (spin/response (if old-representation 200 201) nil nil request nil now nil))))
+    [request _ new-representation old-representation crux-node]
+    (let [new-resource
+          (->
+           (json/read-value (::spin/bytes new-representation) (json/object-mapper {:decode-key-fn true}))
+           (update ::spin/methods #(set (map keyword %))))]
+      (log/debugf "New resource: %s" (pr-str new-resource))
+      (let [now (java.util.Date.)
+            new-resource (assoc new-resource :crux.db/id (:uri request))]
+        (->>
+         (crux/submit-tx crux-node [[:crux.tx/put new-resource]])
+         (crux/await-tx crux-node))
+        (spin/response (if old-representation 200 201) nil nil request nil now nil))))
 
 (defn put-static-representation
   "PUT a new representation of the target resource. All other representations are
@@ -377,7 +386,7 @@
       (GET request resource date selected-representation db authorization subject)
 
       :post
-      (POST request resource date crux-node)
+      (POST request resource date crux-node db)
 
       :put
       (PUT request resource selected-representation date crux-node)

@@ -29,6 +29,54 @@
        (pprint (select-keys result# [:status :headers]))
        result#)))
 
+(def discover-openid-configuration-response
+  (with-status-message
+    (format "Get OpenID configuration")
+    (curl/get
+     (url "/.well-known/openid-configuration")
+     {:headers {"accept" "application/json"}
+      :throw true
+      :debug CURL_DEBUG})))
+
+(def openid-config (json/decode (:body discover-openid-configuration-response)))
+
+(def token-endpoint (get openid-config "token_endpoint"))
+
+(assert token-endpoint)
+
+(assert (contains? (set (get openid-config "token_endpoint_auth_methods_supported")) "client_secret_basic"))
+
+(def request-token-response
+  (with-status-message
+    (format "Get access token")
+    (curl/post
+     (url token-endpoint)
+     {:headers {"content-type" "application/x-www-form-urlencoded"}
+      :throw true
+      :body "grant_type=client_credentials"
+      :basic-auth WEBMASTER
+      :debug CURL_DEBUG})))
+
+(def access-token-data (json/decode (:body request-token-response)))
+
+(def access-token (get access-token-data "access_token"))
+
+(prn access-token-data)
+
+(System/exit 0)
+
+#_(def login-response
+    (with-status-message
+      (format "Acquire Access Token")
+      (curl/put
+       (url "/_site/token")
+       {:headers {"content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
+        :body openapi.json
+        :throw true
+        :basic-auth WEBMASTER
+        :debug CURL_DEBUG}))
+    )
+
 (def put-openapi-response
   (let [openapi (edn/read-string (slurp "openapi.edn"))
         openapi.json (json/generate-string openapi)]

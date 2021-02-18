@@ -10,6 +10,9 @@
   :juxt.site.alpha.selmer/cache
   {:cache? false}
 
+  :juxt.pass.alpha.authentication/resources
+  {:crux-node #ig/ref :juxt.site.alpha.db/crux-node}
+
   :juxt.pass.alpha.pdp/rules
   {:crux-node #ig/ref :juxt.site.alpha.db/crux-node}
 
