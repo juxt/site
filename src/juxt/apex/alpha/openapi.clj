@@ -66,75 +66,89 @@
        ;; Yes?
        (let [paths (get openapi "paths")]
          ;; Any of these paths match the request's URL?
-         (some
-          (fn [[path path-item-object]]
-            (let [path-params
-                  (->>
-                   (or
-                    (get-in path-item-object [(name (:request-method request)) "parameters"])
-                    (get-in path-item-object ["parameters"]))
-                   (filter #(= (get % "in") "path")))
+         (or
+          (some
+           (fn [[path path-item-object]]
+             (let [path-params
+                   (->>
+                    (or
+                     (get-in path-item-object [(name (:request-method request)) "parameters"])
+                     (get-in path-item-object ["parameters"]))
+                    (filter #(= (get % "in") "path")))
 
-                  pattern
-                  (str/replace
-                   path
-                   #"\{(\p{Alpha}+)\}"
-                   (fn [[_ group]]
-                     (format "(?<%s>[\\p{Alnum}-_]+)" group)))
+                   pattern
+                   (str/replace
+                    path
+                    #"\{(\p{Alpha}+)\}"
+                    (fn [[_ group]]
+                      (format "(?<%s>[\\p{Alnum}-_]+)" group)))
 
-                  ;; We have to terminate with a 'end of line' otherwise we
-                  ;; match too eagerly. So if we had /users and /users/{id},
-                  ;; then '/users/foo' might match /users.
-                  pattern (str pattern "$")
+                   ;; We have to terminate with a 'end of line' otherwise we
+                   ;; match too eagerly. So if we had /users and /users/{id},
+                   ;; then '/users/foo' might match /users.
+                   pattern (str pattern "$")
 
-                  matcher (re-matcher (re-pattern pattern) rel-request-path)]
+                   matcher (re-matcher (re-pattern pattern) rel-request-path)]
 
-              (when (.find matcher)
-                ;;(prn "REGION" (.regionStart matcher) (.regionEnd matcher))
-                (let [path-params
-                      (into
-                       {}
-                       (for [param path-params
-                             :let [param-name (get param "name")]]
-                         [param-name (.group matcher param-name)]))
+               (when (.find matcher)
+                 ;;(prn "REGION" (.regionStart matcher) (.regionEnd matcher))
+                 (let [path-params
+                       (into
+                        {}
+                        (for [param path-params
+                              :let [param-name (get param "name")]]
+                          [param-name (.group matcher param-name)]))
 
-                      operation-object (get path-item-object (name (:request-method request)))]
+                       operation-object (get path-item-object (name (:request-method request)))]
 
-                  {:description "OpenAPI matched path"
-                   ::apex/openid-path path
-                   ::apex/openid-path-params path-params
-                   ::spin/methods
-                   (keep
-                    #{:get :head :post :put :delete :options :trace :connect}
-                    (let [methods (set
-                                   (conj (map keyword (keys path-item-object)) :options))]
-                      (cond-> methods
-                        (contains? methods :get)
-                        (conj :head))))
+                   {:description "OpenAPI matched path"
+                    ::apex/openid-path path
+                    ::apex/openid-path-params path-params
+                    ::spin/methods
+                    (keep
+                     #{:get :head :post :put :delete :options :trace :connect}
+                     (let [methods (set
+                                    (conj (map keyword (keys path-item-object)) :options))]
+                       (cond-> methods
+                         (contains? methods :get)
+                         (conj :head))))
 
-                   ::spin/representations
-                   (for [[media-type media-type-object]
-                         (fast-get-in path-item-object ["get" "responses" "200" "content"])]
-                     {::spin/content-type media-type
-                      ::spin/bytes-generator ::entity-bytes-generator})
+                    ::spin/representations
+                    (for [[media-type media-type-object]
+                          (fast-get-in path-item-object ["get" "responses" "200" "content"])]
+                      {::spin/content-type media-type
+                       ::spin/bytes-generator ::entity-bytes-generator})
 
-                   ::apex/operation operation-object
+                    ::apex/operation operation-object
 
-                   ;; This is useful, because it is the base document for any
-                   ;; relative json pointers.
-                   ::apex/openapi openapi}))))
+                    ;; This is useful, because it is the base document for any
+                    ;; relative json pointers.
+                    ::apex/openapi openapi
 
-          paths))))))
+                    ;; TODO: Merge in any properties of a resource that is in
+                    ;; Crux - e.g. if this resource is a collection, what type
+                    ;; of collection is it? Some properties that can be used in
+                    ;; the PDP.
+                    }))))
+
+           paths)
+
+          ;; An unmatched path, but within the namespace of this OpenAPI
+          {::spin/methods #{:get :head}}
+
+          ))))))
 
 (defn ->query [input params]
-  (let [input (postwalk (fn [x]
-                      (if (and (map? x)
-                               (contains? x "name")
-                               (= (get x "in") "query"))
-                        (get-in params [:query (get x "name") :value]
-                                (get-in params [:query (get x "name") :param "default"]))
-                        x))
-                        input)]
+  (let [input
+        (postwalk
+         (fn [x]
+           (if (and (map? x)
+                    (contains? x "name")
+                    (= (get x "in") "query"))
+             (get-in params [:query (get x "name") :value]
+                     (get-in params [:query (get x "name") :param "default"]))
+             x))
+         input)]
     (reduce
      (fn [acc [k v]]
        (assoc acc (keyword k)
@@ -166,6 +180,8 @@
   (let [param-defs
         (get-in resource [:juxt.apex.alpha/operation "parameters"])
 
+        in '[now subject]
+
         query
         (get-in resource [:juxt.apex.alpha/operation "responses" "200" "crux/query"])
 
@@ -180,19 +196,31 @@
                              (pdp/->authorized-query crux-query authorization)
                              crux-query))
 
+        authorized-query (when authorized-query
+                           (assoc authorized-query :in in))
+
         resource-state
         (if authorized-query
           (for [[e] (crux/q db authorized-query
-                            ;; Could put some in params here
+                            ;; time now
+                            (java.util.Date.)
+                            ;; subject
+                            subject
+
                             )]
             (crux/entity db e))
-          (crux/entity db (:uri request)))]
+          (crux/entity db (:uri request)))
+
+        resource-state (util/sanitize resource-state)]
 
     ;; TODO: Might want to filter out the spin metadata at some point
     (case (::spin/content-type representation)
       "application/json"
       ;; TODO: Might want to filter out the spin metadata at some point
-      (.getBytes (str (json/write-value-as-string resource-state) "\r\n") "utf-8")
+      (-> resource-state
+          (json/write-value-as-string (json/object-mapper {:pretty true}))
+          (str "\r\n")
+          (.getBytes "utf-8"))
 
       "text/html;charset=utf-8"
       (let [config (get-in resource [:juxt.apex.alpha/operation "responses" "200" "content" (::spin/content-type representation)])
@@ -311,7 +339,7 @@
                (get-in openapi ["info" "contact" "name"])]
 
               [:td cell-attrs
-               [:a {:href (format "/_crux/swagger-ui/index.html?url=%s" uri)} uri]]])]])
+               [:a {:href (format "/_site/swagger-ui/index.html?url=%s" uri)} uri]]])]])
         (list
          [:p "These are no APIs loaded."])))
      (.getBytes "utf-8"))))
@@ -420,7 +448,7 @@
        request
        nil
        date
-       (json/write-value-as-bytes instance)))))
+       (json/write-value-as-bytes instance (json/object-mapper {:pretty true}))))))
 
 ;; TODO: This can be PUT instead of being built-in.
 (defn swagger-ui []
@@ -440,7 +468,7 @@
                        (re-matches #"META-INF/resources/webjars/swagger-ui/[0-9.]+/(.*)"
                                    nm))]
            :when path
-           :let [uri (format "/_crux/swagger-ui/%s" path)]
+           :let [uri (format "/_site/swagger-ui/%s" path)]
            :when (pos? size)]
        (do
          (.readFully (java.io.DataInputStream. (.getInputStream jar je)) bytes)
@@ -456,7 +484,7 @@
 
 (defn api-console []
   [[:crux.tx/put
-    {:crux.db/id "/_crux/api-console"
+    {:crux.db/id "/_site/api-console"
      ::spin/methods #{:get :head :options}
      ::spin/representations
      [{::spin/content-type "text/html;charset=utf-8"
