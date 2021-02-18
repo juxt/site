@@ -19,7 +19,7 @@
 
         juxt/spin
         {:git/url "https://github.com/juxt/spin.git"
-           :sha "08034829489a4f25cec32f03899f87300eb98bb8"}
+           :sha "754f872e392e877e6dc2b1d70eced67faeb8c90e"}
         #_{:local/root "../spin"}
 
         hiccup/hiccup {:mvn/version "2.0.0-alpha2"}
