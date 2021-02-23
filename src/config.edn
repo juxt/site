@@ -6,15 +6,15 @@
 
    :crux/index-store
    {:kv-store {:crux/module crux.rocksdb/->kv-store
-               :db-dir "db/v2/idxs"}}
+               :db-dir "db/current/idxs"}}
 
    :crux/document-store
    {:kv-store {:crux/module crux.rocksdb/->kv-store
-               :db-dir "db/v2/docs"}}
+               :db-dir "db/current/docs"}}
 
    :crux/tx-log
    {:kv-store {:crux/module crux.rocksdb/->kv-store
-               :db-dir "db/v2/txes"}}}
+               :db-dir "db/current/txes"}}}
 
   :juxt.site.alpha.selmer/cache
   {:cache? false}
