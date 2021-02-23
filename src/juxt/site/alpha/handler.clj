@@ -103,9 +103,9 @@
   (let [posted-representation (receive-representation request resource date)]
     (assert posted-representation)
 
-    (let [raw-body (slurp (::spin/bytes posted-representation))
+    (let [raw-body (slurp (::http/body posted-representation))
           body (case (some-> posted-representation
-                             ::spin/content-type
+                             ::http/content-type
                              (str/split #";")
                              first)
                  "application/edn" (clojure.edn/read-string raw-body)
@@ -114,11 +114,10 @@
           service-function (some-> resource
                                    (get-in [::apex/operation "responses" "200" "site/service-function"])
                                    keyword)]
-
       (cond
         service-function
         (site.function/invoke-service-function
-         {::site/service-function service-function
+         {::http/service-function service-function
           :request request
           :resource resource
           :body body})
@@ -126,18 +125,18 @@
         (= "/_site/token" (:uri request))
         (authn/token-response resource date posted-representation subject)
 
-      (= (:uri request) "/_site/login")
-      (authn/login-response resource date posted-representation db)
+        (= (:uri request) "/_site/login")
+        (authn/login-response resource date posted-representation db)
 
-      (re-matches #"/~(\p{Alpha}[\p{Alnum}_-]*)/" (:uri request))
-      (do
-        (home/create-user-home-page request crux-node subject)
-        (throw
-         (ex-info
-          "Redirect to home page"
-          {::spin/response
-           {:status 303
-            :headers {"location" (:uri request)}}})))
+        (re-matches #"/~(\p{Alpha}[\p{Alnum}_-]*)/" (:uri request))
+        (do
+          (home/create-user-home-page request crux-node subject)
+          (throw
+           (ex-info
+            "Redirect to home page"
+            {::spin/response
+             {:status 303
+              :headers {"location" (:uri request)}}})))
 
         :else
         (throw
