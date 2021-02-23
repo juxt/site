@@ -17,12 +17,15 @@
    [juxt.pass.alpha.authentication :as authn]
    [juxt.pick.alpha.ring :refer [pick]]
    [juxt.reap.alpha.decoders :as reap.decoders]
+   [juxt.site.alpha.function :as site.function]
    [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.response :as response]
    [juxt.site.alpha.util :refer [assoc-when-some hexdigest]]
    [juxt.spin.alpha :as spin]
    [juxt.spin.alpha.auth :as spin.auth]
-   [juxt.spin.alpha.representation :as spin.representation]))
+   [juxt.spin.alpha.representation :as spin.representation]
+   [juxt.site.alpha :as site]
+   [juxt.apex.alpha :as apex]))
 
 ;; This deviates from Spin, but we want to upgrade Spin accordingly in the near
 ;; future. When that is done, this version can be removed and the function in
@@ -125,16 +128,36 @@
   (let [posted-representation (receive-representation request resource date)]
     (assert posted-representation)
 
-    (case (:uri request)
-      "/_site/token"
-      (authn/token-response resource date posted-representation subject)
+    (let [raw-body (slurp (::spin/bytes posted-representation))
+          body (case (some-> posted-representation
+                             ::spin/content-type
+                             (str/split #";")
+                             first)
+                 "application/edn" (clojure.edn/read-string raw-body)
+                 "application/json" (jsonista.core/read-value raw-body)
+                 raw-body)
+          service-function (some-> resource
+                                   (get-in [::apex/operation "responses" "200" "site/service-function"])
+                                   keyword)]
 
-      (throw
-       (ex-info
-        "POST not handled, returning 404"
-        {::spin/response
-         {:status 404
-          :body "Not Found\r\n"}})))))
+      (cond
+        service-function
+        (site.function/invoke-service-function
+         {::site/service-function service-function
+          :request request
+          :resource resource
+          :body body})
+
+        (= "/_site/token" (:uri request))
+        (authn/token-response resource date posted-representation subject)
+
+        :else
+        (throw
+         (ex-info
+          "POST not handled, returning 404"
+          {::spin/response
+           {:status 404
+            :body "Not Found\r\n"}}))))))
 
 ;; TODO: Not sure there should be a general way of writing resources like this, without a lot of authorization checks
 #_(defn put-resource
