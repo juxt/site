@@ -17,8 +17,22 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(set! *print-length* 10)
+(set! *print-length* 100)
 (set! *print-level* 4)
+
+(defn config []
+  integrant.repl.state/config)
+
+(defn local-uri []
+  (format "http://localhost:%d" (get-in (config) [:juxt.site.alpha.server/server :port])))
+
+(defn to-local [s]
+  (if-let [[_ path] (re-matches #"https://home.juxt.site(.*)" s)]
+    (str (local-uri) path)
+    s))
+
+(defn grep [re coll]
+  (filter #(re-matches (re-pattern re) %) coll))
 
 (defn crux-node []
   (:juxt.site.alpha.db/crux-node system))
@@ -44,8 +58,11 @@
     [[:crux.tx/delete id]])
    (crux/await-tx (crux-node))))
 
-(defn q [query]
-  (crux/q (db) query))
+(defn uuid []
+  (str (java.util.UUID/randomUUID)))
+
+(defn q [query & args]
+  (apply crux/q (db) query args))
 
 (defn t [t]
   (map
@@ -57,12 +74,20 @@
    first
    (crux/q (db) '{:find [e] :where [[e :type t]] :in [t]} t)))
 
-(defn ls []
-  (binding [*print-length* 100]
-    (sort-by
-     str
-     (map first
-          (q '{:find [e] :where [[e :crux.db/id]]})))))
+(defn ls
+  ([]
+   (sort-by
+    str
+    (map first
+         (q '{:find [e] :where [[e :crux.db/id]]}))))
+  ([t]
+   (sort-by
+    str
+    (map first
+         (q '{:find [(eql/project e [*])]
+              :where [[e :crux.db/id]
+                      [e ::site/type t]]
+              :in [t]} t)))))
 
 (defn rules []
   (sort-by
