@@ -1,17 +1,17 @@
 {:openapi "3.0.2"
  :info
  {:version "1.0.0"
-  :title "Pass API"
+  :title "Site API"
   :description
-  "Managing Crux users, roles, and policies."
+  "Managing Site APIs, users, roles, and policies."
   :contact
-  {:name "Malcolm Sparks"
-   :email "mal@juxt.pro"
-   :url "https://juxt.pro"}}
- :servers [{:url "/_site/pass"}]
+  {:name "Webmaster"
+   :email "webmaster@home.juxt.site"
+   :url "https://home.juxt.site"}}
+ :servers [{:url "/_site"}]
 
  :paths
- {"/roles"
+ {"/roles/"
   {:get
    {:description "Returns all roles"
     :operationId "findRoles"
@@ -25,7 +25,7 @@
     :responses
     {200 {:crux/query
           {:find [e]
-           :where [[e :type t]]
+           :where [[e :juxt.site.alpha/type t]]
            :args [{t "Role"}]
            :limit {:in "query" :name "limit"}}
 
@@ -92,7 +92,7 @@
           :content
           {"text/plain;charset=utf-8" {}}}}}}
 
-  "/users"
+  "/users/"
   {:get
    {:description "Returns a list of all the users you're allowed to view"
     :operationId "findUsers"
@@ -101,7 +101,7 @@
     {200
      {:crux/query
       {:find [e]
-       :where [[e :type t]]
+       :where [[e :juxt.site.alpha/type t]]
        :args [{t "User"}]}
 
       :content
@@ -171,7 +171,7 @@
           {"text/plain;charset=utf-8" {}}}}}}
 
 
-  "/rules"
+  "/rules/"
   {:get
    {:description "Returns a list of all the rule"
 
@@ -179,7 +179,7 @@
     {200
      {:crux/query
       {:find [e]
-       :where [[e :type t]]
+       :where [[e :juxt.site.alpha/type t]]
        :args [{t "Rule"}]}
 
       :content
@@ -263,7 +263,7 @@
    {"$id" "/schemas/Typed"
     :type "object"
     :required ["type"]
-    :juxt.jinx.alpha/keyword-mappings {"type" "type"}
+    :juxt.jinx.alpha/keyword-mappings {"type" "juxt.site.alpha/type"}
     :properties
     {"type"
      {:type "string"

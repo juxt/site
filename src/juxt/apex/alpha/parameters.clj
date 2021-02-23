@@ -3,10 +3,11 @@
 (ns juxt.apex.alpha.parameters
   (:require
    [clojure.string :as str]
-   [juxt.apex.alpha :as apex]
    [juxt.jinx.alpha :as jinx]
    [juxt.jinx.alpha.validate :as jinx.validate]
    [ring.util.codec :refer [url-decode]]))
+
+(alias 'apex (create-ns 'juxt.apex.alpha))
 
 ;; TODO: Promote?
 (defn error? [m]

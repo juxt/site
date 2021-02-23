@@ -9,10 +9,8 @@
    [clojure.walk :refer [postwalk]]
    [crux.api :as crux]
    [hiccup.page :as hp]
-   [integrant.core :as ig]
    [json-html.core :refer [edn->html]]
    [jsonista.core :as json]
-   [juxt.apex.alpha :as apex]
    [juxt.apex.alpha.parameters :refer [extract-params-from-request]]
    [juxt.jinx.alpha :as jinx]
    [juxt.jinx.alpha.api :as jinx.api]
@@ -22,14 +20,26 @@
    [juxt.site.alpha :as site]
    [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.perf :refer [fast-get-in]]
-   [juxt.site.alpha.response :as response]
    [juxt.site.alpha.util :as util]
    [juxt.spin.alpha :as spin]
    [selmer.parser :as selmer]
    [selmer.util :refer [*custom-resource-path*]]))
 
+(alias 'http (create-ns 'juxt.http.alpha))
+(alias 'apex (create-ns 'juxt.apex.alpha))
+
 ;; TODO: Restrict where openapis can be PUT
-(defn locate-resource [request db]
+(defn locate-resource
+  [db
+   ;; We'd like to locate the resource based on nothing but the URI of the
+   ;; request. This would avoid 'routing' based on other aspects of the request,
+   ;; such as headers (e.g. authorization, which should be left to the
+   ;; authorization step that follows resource location). The reason we can't
+   ;; yet do this is due to path parameters (see below). If we were to put path
+   ;; parameters at one level higher in the OpenAPI, and enforce that, then we
+   ;; could make this change.
+   request
+   ]
   ;; Do we have any OpenAPIs in the database?
   (or
    ;; The OpenAPI document
@@ -37,16 +47,19 @@
               (not (.endsWith (:uri request) "/")))
      (or
       ;; It might exist
-      (crux/entity db (:uri request))
+      (crux/entity db (str "https://home.juxt.site" (:uri request)))
 
       ;; Or it might not
       ;; This last item (:put) might be granted by the PDP.
-      {::site/description
+      {::site/resource-provider ::openapi-empty-document-resource
+       ::site/description
        "Resource with no representations accepting a PUT of an OpenAPI JSON document."
-       ::spin/methods #{:get :head :options :put}
-       ::spin/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.0.2"}}))
+       ::http/methods #{:get :head :options :put}
+       ::http/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.0.2"}}))
 
-   (let [abs-request-path (:uri request)]
+   (let [abs-request-path (:uri request)
+         openapis (crux/q db '{:find [openapi-eid openapi]
+                               :where [[openapi-eid :juxt.apex.alpha/openapi openapi]]})]
      (when-let [{:keys [openapi-ent openapi rel-request-path]}
                 (some
                  (fn [[openapi-eid openapi]]
@@ -60,8 +73,7 @@
                     (get openapi "servers")))
                  ;; Iterate across all APIs in this server, looking for a match
                  ;; TODO: authorization
-                 (crux/q db '{:find [openapi-eid openapi]
-                              :where [[openapi-eid :juxt.apex.alpha/openapi openapi]]}))]
+                 openapis)]
 
        ;; Yes?
        (let [paths (get openapi "paths")]
@@ -72,6 +84,8 @@
              (let [path-params
                    (->>
                     (or
+                     ;; TODO: We could mandate path parameters at the
+                     ;; path-object level, not the path-item-object
                      (get-in path-item-object [(name (:request-method request)) "parameters"])
                      (get-in path-item-object ["parameters"]))
                     (filter #(= (get % "in") "path")))
@@ -86,57 +100,55 @@
                    ;; We have to terminate with a 'end of line' otherwise we
                    ;; match too eagerly. So if we had /users and /users/{id},
                    ;; then '/users/foo' might match /users.
-                   pattern (str pattern "$")
+                   pattern (str "^" pattern "$")
 
                    matcher (re-matcher (re-pattern pattern) rel-request-path)]
 
                (when (.find matcher)
-                 ;;(prn "REGION" (.regionStart matcher) (.regionEnd matcher))
+
                  (let [path-params
                        (into
                         {}
                         (for [param path-params
                               :let [param-name (get param "name")]]
                           [param-name (.group matcher param-name)]))
+                       operation-object (get path-item-object (name (:request-method request)))
+                       acceptable (str/join ", " (map first (get-in operation-object ["requestBody" "content"])))]
 
-                       operation-object (get path-item-object (name (:request-method request)))]
+                   (cond->
+                       {::site/resource-provider ::openapi-path
+                        ::apex/openid-path path
+                        ::apex/openid-path-params path-params
 
-                   {:description "OpenAPI matched path"
-                    ::apex/openid-path path
-                    ::apex/openid-path-params path-params
-                    ::spin/methods
-                    (keep
-                     #{:get :head :post :put :delete :options :trace :connect}
-                     (let [methods (set
-                                    (conj (map keyword (keys path-item-object)) :options))]
-                       (cond-> methods
-                         (contains? methods :get)
-                         (conj :head))))
+                        ::apex/operation operation-object
 
-                    ::spin/representations
-                    (for [[media-type media-type-object]
-                          (fast-get-in path-item-object ["get" "responses" "200" "content"])]
-                      {::spin/content-type media-type
-                       ::spin/bytes-generator ::entity-bytes-generator})
+                        ;; This is useful, because it is the base document for any
+                        ;; relative json pointers.
+                        ::apex/openapi openapi
 
-                    ::apex/operation operation-object
+                        ::http/methods
+                        (keep
+                         #{:get :head :post :put :delete :options :trace :connect}
+                         (let [methods (set
+                                        (conj (map keyword (keys path-item-object)) :options))]
+                           (cond-> methods
+                             (contains? methods :get)
+                             (conj :head))))
 
-                    ;; This is useful, because it is the base document for any
-                    ;; relative json pointers.
-                    ::apex/openapi openapi
+                        ::http/representations
+                        (for [[media-type media-type-object]
+                              (fast-get-in path-item-object ["get" "responses" "200" "content"])]
+                          {::http/content-type media-type
+                           ::site/body-generator ::entity-bytes-generator})
 
-                    ;; TODO: Merge in any properties of a resource that is in
-                    ;; Crux - e.g. if this resource is a collection, what type
-                    ;; of collection is it? Some properties that can be used in
-                    ;; the PDP.
-                    }))))
+                        ;; TODO: Merge in any properties of a resource that is in
+                        ;; Crux - e.g. if this resource is a collection, what type
+                        ;; of collection is it? Some properties that can be used in
+                        ;; the PDP.
+                        }
+                       (seq acceptable) (assoc ::http/acceptable {"accept" acceptable}))))))
 
-           paths)
-
-          ;; An unmatched path, but within the namespace of this OpenAPI
-          {::spin/methods #{:get :head}}
-
-          ))))))
+           paths)))))))
 
 (defn ->query [input params]
   (let [input
@@ -171,11 +183,12 @@
                 )))
      {} input)))
 
-;; Possibly promote up into site - by default we output the resource state, but
-;; there may be a better rendering of collections, which can be inferred from
-;; the schema being an array and use the items subschema. We can also use the
-;; resource state as a
+;; By default we output the resource state, but there may be a better rendering
+;; of collections, which can be inferred from the schema being an array and use
+;; the items subschema.
 (defmethod generate-representation-body ::entity-bytes-generator [request resource representation db authorization subject]
+
+  (log/trace "entity-bytes-generator")
 
   (let [param-defs
         (get-in resource [:juxt.apex.alpha/operation "parameters"])
@@ -213,17 +226,17 @@
 
         resource-state (util/sanitize resource-state)]
 
-    ;; TODO: Might want to filter out the spin metadata at some point
-    (case (::spin/content-type representation)
+    ;; TODO: Might want to filter out the http metadata at some point
+    (case (::http/content-type representation)
       "application/json"
-      ;; TODO: Might want to filter out the spin metadata at some point
+      ;; TODO: Might want to filter out the http metadata at some point
       (-> resource-state
           (json/write-value-as-string (json/object-mapper {:pretty true}))
           (str "\r\n")
-          (.getBytes "utf-8"))
+          (.getBytes "UTF-8"))
 
       "text/html;charset=utf-8"
-      (let [config (get-in resource [:juxt.apex.alpha/operation "responses" "200" "content" (::spin/content-type representation)])
+      (let [config (get-in resource [:juxt.apex.alpha/operation "responses" "200" "content" (::http/content-type representation)])
             ]
         (->
          (hp/html5
@@ -302,7 +315,7 @@
 
           [:h3 "Resource state"]
           [:pre (with-out-str (pprint resource-state))])
-         (.getBytes "utf-8"))))))
+         (.getBytes "UTF-8"))))))
 
 (defmethod generate-representation-body ::api-console-generator [request resource representation db authorization subject]
   (let [cell-attrs {:style "border: 1px solid #888; padding: 4pt; text-align: left"}
@@ -342,48 +355,41 @@
                [:a {:href (format "/_site/swagger-ui/index.html?url=%s" uri)} uri]]])]])
         (list
          [:p "These are no APIs loaded."])))
-     (.getBytes "utf-8"))))
+     (.getBytes "UTF-8"))))
 
-(defn put-openapi [request _ openapi-json-representation _ crux-node]
+(defn put-openapi [request resource openapi-json-representation date crux-node]
 
-  (let [uri (:uri request)
-        last-modified (java.util.Date.)
-        openapi (json/read-value (java.io.ByteArrayInputStream. (::spin/bytes openapi-json-representation)))
-        etag (format "\"%s\"" (subs (util/hexdigest (.getBytes (pr-str openapi) "utf-8")) 0 32))]
-    (crux/submit-tx
-     crux-node
-     [
-      [:crux.tx/put
-       {:crux.db/id uri
+  (let [uri (str "https://home.juxt.site" (:uri request))
+        openapi (json/read-value (java.io.ByteArrayInputStream. (::http/body openapi-json-representation)))
+        etag (format "\"%s\"" (subs (util/hexdigest (.getBytes (pr-str openapi) "UTF-8")) 0 32))]
+    (->>
+     (crux/submit-tx
+      crux-node
+      [
+       [:crux.tx/put
+        {:crux.db/id uri
 
-        ;; Resource configuration
-        ::spin/methods #{:get :head :put :options}
-        ::spin/representations
-        [(assoc
-          openapi-json-representation
-          ::spin/etag etag
-          ::spin/last-modified last-modified)]
+         ;; Resource configuration
+         ::http/methods #{:get :head :put :options}
+         ::http/representations
+         [(assoc
+           openapi-json-representation
+           ::http/etag etag
+           ::http/last-modified date)]
 
-        ;; Resource state
-        ::apex/openapi openapi}]])
+         ;; Resource state
+         ::apex/openapi openapi}]])
+     (crux/await-tx crux-node))
 
-    {:status 201
-     ;; TODO: Add :body to describe the new resource
-     }))
+    (spin/response
+     (if (zero? (count (::http/representations resource))) 201 204)
+     nil request nil date nil)))
 
 (defn put-json-representation
-  [request resource new-representation old-representation crux-node]
+  [request resource received-representation date crux-node]
 
-  (let [date (java.util.Date.)
-        last-modified date
-        etag (format "\"%s\"" (-> new-representation
-                                  ::spin/bytes
-                                  util/hexdigest
-                                  (subs 0 32)))
-
-        representation-metadata
-        {::spin/etag etag
-         ::spin/last-modified last-modified}
+  (let [last-modified date
+        etag (format "\"%s\"" (-> received-representation ::http/body util/hexdigest (subs 0 32)))
 
         schema
         (get-in
@@ -391,7 +397,7 @@
          [::apex/operation "requestBody" "content" "application/json" "schema"])
         _ (assert schema)
 
-        instance (json/read-value (::spin/bytes new-representation))
+        instance (json/read-value (::http/body received-representation))
         _ (assert instance)
 
         openapi (:juxt.apex.alpha/openapi resource)
@@ -400,18 +406,11 @@
         validation-results
         (jinx.api/validate schema instance {:base-document openapi})]
 
-    ;; TODO: extract the title/version of the API and add to the entity (as metadata)
-    #_(let [openapi (crux/entity (crux/db crux-node) (::apex/!api resource))]
-        (prn "version of open-api used to put this resource is"
-             (get-in openapi [::apex/openapi "info" "version"])))
-
-    ;; TODO: Validate new-representation against the JSON schema in the openapi.
-
     (when-not (::jinx/valid? validation-results)
       (throw
        (ex-info
         "Schema validation failed"
-        {::spin/response
+        {::http/response
          {:status 400
           ;; TODO: Content negotiation for error responses
           :body (with-out-str (pprint validation-results))}})))
@@ -426,75 +425,19 @@
             (fn [acc k v]
               (assoc acc (cond-> k (string? k) keyword) v))
             {}))
-          id (:uri request)]
+          id (str "https://home.juxt.site" (:uri request))]
 
       ;; Since this resource is 'managed' by the locate-resource in this ns, we
-      ;; don't have to worry about spin attributes - these will be provided by
+      ;; don't have to worry about http attributes - these will be provided by
       ;; the locate-resource function. We just need the resource state here.
-      (crux/submit-tx
-       crux-node
-       [[:crux.tx/put (assoc instance :crux.db/id id)]])
+      (->>
+       (crux/submit-tx
+        crux-node
+        [[:crux.tx/put (assoc instance :crux.db/id id)]])
+       (crux/await-tx crux-node))
 
       (spin/response
-       (if old-representation 200 201)
-       (response/representation-metadata-headers
-        (merge
-         representation-metadata
-         ;; TODO: Source this from the openapi, proactively content-negotiation if
-         ;; multiple possible (for each of 200 and 201)
-         {::spin/content-type "application/json"}))
-       nil
-       request
-       nil
-       date
-       (json/write-value-as-bytes instance (json/object-mapper {:pretty true}))))))
-
-;; TODO: This can be PUT instead of being built-in.
-(defn swagger-ui []
-  (let [jarpath
-        (some
-         #(re-matches #".*swagger-ui.*" %)
-         (str/split (System/getProperty "java.class.path") #":"))
-        fl (io/file jarpath)
-        jar (java.util.jar.JarFile. fl)]
-    (doall
-     (for [je (enumeration-seq (.entries jar))
-           :let [nm (.getRealName je)
-                 [_ suffix] (re-matches #".*\.(.*)" nm)
-                 size (.getSize je)
-                 bytes (byte-array size)
-                 path (second
-                       (re-matches #"META-INF/resources/webjars/swagger-ui/[0-9.]+/(.*)"
-                                   nm))]
-           :when path
-           :let [uri (format "/_site/swagger-ui/%s" path)]
-           :when (pos? size)]
-       (do
-         (.readFully (java.io.DataInputStream. (.getInputStream jar je)) bytes)
-         [:crux.tx/put
-          {:crux.db/id uri
-           ::spin/methods #{:get :head :options}
-           ::spin/representations [{::spin/content-type (get util/mime-types suffix "application/octet-stream")
-                                    ::spin/last-modified (java.util.Date. (.getTime je))
-                                    ::spin/content-length size
-                                    ::spin/content-location uri
-                                    ::spin/bytes bytes}]}])))))
-
-
-(defn api-console []
-  [[:crux.tx/put
-    {:crux.db/id "/_site/api-console"
-     ::spin/methods #{:get :head :options}
-     ::spin/representations
-     [{::spin/content-type "text/html;charset=utf-8"
-       ::spin/bytes-generator ::api-console-generator}]}]])
-
-(defmethod ig/init-key ::module [_ {:keys [crux-node]}]
-  (println "Adding OpenAPI module")
-  (crux/submit-tx
-   crux-node
-   (concat
-    ;; This should be possible to upload
-    (swagger-ui)
-    ;; This needs an api-console-generator, so not sure it can be uploaded
-    (api-console))))
+       (if (zero? (count (::http/representations resource))) 201 204)
+       {::http/etag etag
+        ::http/last-modified last-modified}
+       request nil date nil))))

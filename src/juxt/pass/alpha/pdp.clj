@@ -5,14 +5,10 @@
    [clojure.set :as set]
    [clojure.walk :refer [postwalk-replace]]
    [clojure.tools.logging :as log]
-   [jsonista.core :as json]
-   [crux.api :as crux]
-   [integrant.core :as ig]
-   [juxt.pass.alpha :as pass]
-   [juxt.site.alpha.response :as response]
-   [juxt.site.alpha.entity :as entity]
-   [juxt.site.alpha.util :refer [hexdigest]]
-   [juxt.spin.alpha :as spin]))
+   [crux.api :as crux]))
+
+(alias 'pass (create-ns 'juxt.pass.alpha))
+(alias 'site (create-ns 'juxt.site.alpha))
 
 ;; PDP (Policy Decision Point)
 
@@ -34,7 +30,7 @@
 
         rules (map first
                    (crux/q db '{:find [rule]
-                                :where [[rule :type "Rule"]]}))
+                                :where [[rule ::site/type "Rule"]]}))
 
         _  (log/debugf "Rules to match are %s" (pr-str rules))
 
@@ -104,35 +100,3 @@
       (cond-> query
         ;;(assoc :in '[context])
         combined-limiting-clauses (update :where (comp vec concat) combined-limiting-clauses)))))
-
-(defmethod ig/init-key ::rules [_ {:keys [crux-node]}]
-  (println "Adding built-in users/rules")
-  (try
-    (crux/submit-tx
-     crux-node
-
-     (concat
-      ;; The webmaster user - in the future, the password will be provided when
-      ;; the Crux instance is provisioned.
-      (entity/user-entity "webmaster" "FunkyForest")
-
-      ;; A rule that allows the webmaster to do everything, at least during the
-      ;; bootstrap phase of a deployment. This can be deleted after the initial
-      ;; users/roles have been populated, if required.
-      [[:crux.tx/put
-        {:crux.db/id "/_site/pass/rules/webmaster"
-         :type "Rule"
-         ::pass/target '[[subject :juxt.pass.alpha/username "webmaster"]]
-         ::pass/effect ::pass/allow
-         ::pass/allow-methods #{:get :head :options}}]]
-
-      [[:crux.tx/put
-        {:crux.db/id "/_site/pass/rules/accessible-public-resources"
-         :type "Rule"
-         :description "PUBLIC resources are accessible to GET"
-         ::pass/target '[[request :request-method #{:get :head :options}]
-                         [resource ::pass/classification "PUBLIC"]]
-         ::pass/effect ::pass/allow}]]))
-
-    (catch Exception e
-      (prn e))))

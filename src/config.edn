@@ -6,27 +6,18 @@
 
    :crux/index-store
    {:kv-store {:crux/module crux.rocksdb/->kv-store
-               :db-dir "db/idxs"}}
+               :db-dir "db/v2/idxs"}}
 
    :crux/document-store
    {:kv-store {:crux/module crux.rocksdb/->kv-store
-               :db-dir "db/docs"}}
+               :db-dir "db/v2/docs"}}
 
    :crux/tx-log
    {:kv-store {:crux/module crux.rocksdb/->kv-store
-               :db-dir "db/txes"}}}
-
-  :juxt.apex.alpha.openapi/module
-  {:crux-node #ig/ref :juxt.site.alpha.db/crux-node}
+               :db-dir "db/v2/txes"}}}
 
   :juxt.site.alpha.selmer/cache
   {:cache? false}
-
-  :juxt.pass.alpha.authentication/resources
-  {:crux-node #ig/ref :juxt.site.alpha.db/crux-node}
-
-  :juxt.pass.alpha.pdp/rules
-  {:crux-node #ig/ref :juxt.site.alpha.db/crux-node}
 
   :juxt.site.alpha.server/server
   {:crux-node #ig/ref :juxt.site.alpha.db/crux-node

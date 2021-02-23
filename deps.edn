@@ -22,6 +22,11 @@
            :sha "754f872e392e877e6dc2b1d70eced67faeb8c90e"}
         {:local/root "../spin"}
 
+        juxt/pick
+        #_{:git/url "https://github.com/juxt/pick.git"
+           :sha "4b158f44d6fd74e287763e511417852cdc43ab65"}
+        {:local/root "../pick"}
+
         hiccup/hiccup {:mvn/version "2.0.0-alpha2"}
         metosin/jsonista {:mvn/version "0.2.7"}
 
@@ -30,6 +35,9 @@
         {:git/url "https://github.com/juxt/jinx.git"
          :sha "75faa460c37d068746f7e3985c555aeeacc9e383"}
         #_{:local/root "../jinx"}
+
+        ;; Ring for some utility code
+        ring/ring-core {:mvn/version "1.9.1"}
 
         ;; Security
         crypto-password/crypto-password {:mvn/version "0.2.1"}

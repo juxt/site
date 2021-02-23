@@ -62,7 +62,7 @@
 
 (prn access-token-data)
 
-(def put-openapi-response
+#_(def put-openapi-response
   (let [openapi (edn/read-string (slurp "openapi.edn"))
         openapi.json (json/generate-string openapi)]
     (with-status-message
@@ -91,8 +91,6 @@
 
 ;; Now we are ready to PUT a role that will the owners of this Crux Site
 ;; instance will belong to.
-
-;; TODO: Do a loop
 
 (doseq [{:keys [id name]}
         [{:id "owner" :name "Owners"}
