@@ -17,17 +17,17 @@
    [juxt.pick.alpha.ring :refer [pick]]
    [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha.function :as site.function]
-   [juxt.site.alpha :as site]
+   [juxt.spin.alpha :as spin]
    [juxt.site.alpha.home :as home]
    [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.util :refer [hexdigest]]
-   [juxt.spin.alpha.representation :as spin.representation]
    [juxt.spin.alpha.representation :refer [receive-representation]]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pick (create-ns 'juxt.pick.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
+(alias 'site (create-ns 'juxt.site.alpha))
 
 ;; This deviates from Spin, but we want to upgrade Spin accordingly in the near
 ;; future. When that is done, this version can be removed and the function in
