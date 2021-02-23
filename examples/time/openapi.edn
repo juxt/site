@@ -1,0 +1,114 @@
+{:openapi "3.0.2"
+ :info
+ {:version "1.0.0"
+  :title "JUXT Timesheets"
+  :description
+  "Timesheets, holidays and reports"
+  :contact
+  {:name "Malcolm Sparks"
+   :email "mal@juxt.pro"
+   :url "https://juxt.pro"}}
+ :servers [{:url "/apis/timesheets"}]
+
+ :paths
+ {"/bookings"
+  {:get
+   {:responses
+    {200 {:crux/query
+          {:find [e]
+           :where [[e :type t]]
+           :args [{t "WorkBooking"}]}
+
+          :content
+          {"application/json"
+           {:schema
+            {:type "array"
+             :items {"$ref" "#/components/schemas/IdentifiedWorkBooking"}}}
+
+           "text/html;charset=utf-8" {:title "WorkBooking"
+                                      :type "edn-table"}}}}}}
+
+  "/bookings/{id}"
+  {:get
+   {:parameters
+    [{:name "id"
+      :in "path"
+      :description "Work booking id"
+      :required true
+      :schema {:type "string"}}]
+
+    :responses
+    {200
+     {
+      :content
+      {"application/json" {:schema {"$ref" "#/components/schemas/WorkBooking"}}
+       "text/html;charset=utf-8" {:type "template"
+                                  :title "WorkBooking"}}}}}
+
+   :put
+   {:parameters
+    [{:name "id"
+      :in "path"
+      :required true
+      :schema {:type "string"}}]
+    :requestBody
+    {:required true
+     :content
+     {"application/json" {:schema {"$ref" "#/components/schemas/WorkBooking"}}}}
+    :responses
+    {200 {:description "Work booking successfully updated"
+          :content
+          {"text/plain;charset=utf-8" {}}}
+
+     201 {:description "Work booking successfully created"
+          :content
+          {"text/plain;charset=utf-8" {}}}}}}}
+
+ :components
+ {:schemas
+  {"Identified"
+   {"$id" "/schemas/Identified"
+    :type "object"
+    :description
+    "The unique identifier of the document in the database. This is maps
+    directly to the crux.db/id attribute."
+    :required ["id"]
+    :juxt.jinx.alpha/keyword-mappings {"id" "crux.db/id"}
+    :properties
+    {"id"
+     {:type "string"
+      :format "uri-reference"
+      }}}
+
+   "Typed"
+   {"$id" "/schemas/Typed"
+    :type "object"
+    :required ["type"]
+    :juxt.jinx.alpha/keyword-mappings {"type" "type"}
+    :properties
+    {"type"
+     {:type "string"
+      :minLength 1}}}
+
+   "WorkBooking"
+   {"$id" "/schemas/WorkBooking"
+    :allOf
+    [{"$ref" "#/components/schemas/Typed"}
+     {:type "object"
+
+      :juxt.jinx.alpha/keyword-mappings
+      {"title" "title"
+       "state" "state"}
+
+      :properties
+      {"type" {:const "WorkBooking"}
+       "title" {:type "string"
+                :minLength 1}
+       "state" {:type "string"
+                :minLength 1}}}]}
+
+   "IdentifiedWorkBooking"
+   {"$id" "/schemas/IdentifiedWorkBooking"
+    :allOf
+    [{"$ref" "#/components/schemas/Identified"}
+     {"$ref" "#/components/schemas/WorkBooking"}]}}}}
