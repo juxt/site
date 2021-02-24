@@ -35,7 +35,8 @@
         _  (log/debugf "Rules to match are %s" (pr-str rules))
 
         temp-id-map (reduce-kv
-                     (fn [acc k v] (assoc acc k (assoc v :crux.db/id (java.util.UUID/randomUUID))))
+                     ;; Preserve any existing crux.db/id - e.g. the resource will have one
+                     (fn [acc k v] (assoc acc k (merge {:crux.db/id (java.util.UUID/randomUUID)} v)))
                      {} request-context)
 
         ;; Speculatively put each entry of the request context into the
