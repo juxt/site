@@ -241,6 +241,8 @@
                                      ::http/content-length (count body)
                                      ::http/content-location uri
                                      ::http/body body}]}))))
+
+  ;; Add a Site API
   (let [f (io/file "src/juxt/site/alpha/openapi.edn")
         json (json/write-value-as-string (edn/read-string (slurp f)))
         openapi (json/read-value json)
@@ -253,6 +255,7 @@
         ::http/last-modified (java.util.Date. (.lastModified f))
         ::http/content-length (count bytes)
         ::http/body bytes}]
+      ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi openapi}))
 
   ;; Redirect from / to /index.html

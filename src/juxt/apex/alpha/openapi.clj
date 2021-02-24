@@ -377,6 +377,8 @@
            ::http/etag etag
            ::http/last-modified date)]
 
+         ::site/type "OpenAPI"
+
          ;; Resource state
          ::apex/openapi openapi}]])
      (crux/await-tx crux-node))

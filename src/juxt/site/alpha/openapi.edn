@@ -1,4 +1,5 @@
 {:openapi "3.0.2"
+
  :info
  {:version "1.0.0"
   :title "Site API"
@@ -230,6 +231,67 @@
 
      201 {:description "Rule successfully created"
           :content
+          {"text/plain;charset=utf-8" {}}}}}}
+
+  "/apis/"
+  {:get
+   {:description "Returns a list of all the APIs"
+
+    :responses
+    {200
+     {:crux/query
+      {:find [e]
+       :where [[e :juxt.site.alpha/type t]]
+       :args [{t "OpenAPI"}]}
+
+      :content
+      {"application/json"
+       {:schema {"type" "array"
+                 "items" {"$ref" "#/components/schemas/IdentifiedOpenAPI"}}}
+
+       "text/html;charset=utf-8"
+       {:title "Rules"
+        :type "edn-table"
+        :schema {"type" "array"
+                 "items" {"$ref" "#/components/schemas/IdentifiedOpenAPI"}}}}}}}}
+
+  "/apis/{id}"
+  {:parameters
+   [{:name "id"
+     :in "path"
+     :description "API id"
+     :required true
+     :schema {:type "string"}}]
+
+   :get
+   {:description "Returns a given rule",
+
+    :responses
+    {200
+     {:description "Single identified API"
+      :content
+      {"application/json"
+       {:schema {"$ref" "#/components/schemas/OpenAPI"}}
+
+       "text/html;charset=utf-8"
+       {:title "Rule"
+        :schema {"$ref" "#/components/schemas/OpenAPI"}}}}}}
+
+   :put
+   {:description "Upserts an API"
+    :requestBody
+    {:required true
+     :content
+     {"application/json"
+      {:schema {"$ref" "#/components/schemas/OpenAPI"}}}}
+
+    :responses
+    {200 {:description "API successfully updated"
+          :content
+          {"text/plain;charset=utf-8" {}}}
+
+     201 {:description "API successfully created"
+          :content
           {"text/plain;charset=utf-8" {}}}}}}}
 
  :components
@@ -352,5 +414,22 @@
     :allOf
     [{"$ref" "#/components/schemas/Identified"}
      {"$ref" "#/components/schemas/Rule"}]}
+
+   "OpenAPI"
+   {"$id" "/schemas/OpenAPI"
+    :allOf
+    [{"$ref" "#/components/schemas/Typed"}
+     {:type "object"
+      ;; TODO: Use the actual JSON API!!
+      :required ["openapi"]
+      :properties
+      {"openapi" {:type "string"}}}]}
+
+
+   "IdentifiedOpenAPI"
+   {"$id" "/schemas/IdentifiedOpenAPI"
+    :allOf
+    [{"$ref" "#/components/schemas/Identified"}
+     {"$ref" "#/components/schemas/OpenAPI"}]}
 
    }}}
