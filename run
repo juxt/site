@@ -1,0 +1,3 @@
+#!/bin/bash
+
+clojure -J-Djava.awt.headless=true -J-Xms256m -J-Xmx1200m -Mprod -m juxt.site.alpha.main
