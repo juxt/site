@@ -18,14 +18,14 @@
         tick/tick {:mvn/version "0.4.26-alpha"}
 
         juxt/spin
-        #_{:git/url "https://github.com/juxt/spin.git"
-           :sha "754f872e392e877e6dc2b1d70eced67faeb8c90e"}
-        {:local/root "../spin"}
+        {:git/url "https://github.com/juxt/spin.git"
+           :sha "b40b3ddc145afc7a6f78c12d376bc8f6f132adc6"}
+        #_{:local/root "../spin"}
 
         juxt/pick
-        #_{:git/url "https://github.com/juxt/pick.git"
-           :sha "4b158f44d6fd74e287763e511417852cdc43ab65"}
-        {:local/root "../pick"}
+        {:git/url "https://github.com/juxt/pick.git"
+           :sha "82837592666cbfc0aa110eeec458845af5c680aa"}
+        #_{:local/root "../pick"}
 
         hiccup/hiccup {:mvn/version "2.0.0-alpha2"}
         metosin/jsonista {:mvn/version "0.2.7"}
