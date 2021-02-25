@@ -33,4 +33,5 @@
    "js" "application/javascript"
    "map" "application/json"
    "css" "text/css"
-   "png" "image/png"})
+   "png" "image/png"
+   "adoc" "text/asciidoc"})
