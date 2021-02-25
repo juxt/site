@@ -116,6 +116,20 @@
                     [resource ::site/purpose ::site/post-login-credentials]]
     ::pass/effect ::pass/allow})
 
+  ;; We've got a login, we should have a logout too.
+  (put
+   {:crux.db/id "https://home.juxt.site/_site/logout"
+    ::http/methods #{:post}
+    ::http/acceptable "application/x-www-form-urlencoded"
+    ::site/purpose ::site/logout}
+
+   {:crux.db/id "https://home.juxt.site/_site/rules/those-logged-in-can-logout"
+    ::site/type "Rule"
+    ::site/description "The logout POST handler must be accessible by those logged in"
+    ::pass/target '[[subject ::pass/username]
+                    [resource ::site/purpose ::site/logout]]
+    ::pass/effect ::pass/allow})
+
   ;; After the webmaster has logged in, they may want to add new users. For
   ;; this, they need at least need access to the Swagger UI.
   (let [jarpath
