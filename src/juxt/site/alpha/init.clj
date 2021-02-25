@@ -9,15 +9,22 @@
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
    [juxt.site.alpha.util :as util])
-  (:import (java.io DataInputStream FileInputStream)))
+  (:import (java.io FileInputStream)))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn slurp-file-as-bytes [dir f]
-  (let [f (io/file dir f)]
-    (.readAllBytes (FileInputStream. f))))
+(defn file->representation [f]
+  (let [nm (.getName f)
+        [_ suffix] (re-matches #"[\p{Alnum}-]+\.([^\.]+).*" nm)
+        body (.readAllBytes (FileInputStream. f))
+        ct (get util/mime-types suffix)]
+    {::http/body body
+     ::http/content-type ct
+     ::http/content-length (count body)
+     ::http/last-modified (java.util.Date. (.lastModified f))
+     ::http/etag (str \" (util/hexdigest body) \")}))
 
 (defn put! [crux-node & ms]
   (->>
@@ -122,20 +129,14 @@
    {:crux.db/id "https://home.juxt.site/css/tailwind/styles.css"
     ::http/methods #{:get :head :option}
     ::http/representations
-    [(let [bytes (slurp-file-as-bytes dir "styles.css")]
-       {::http/content-type "text/css"
-        ::http/content-length (count bytes)
-        ::http/body bytes})
-     (let [bytes (slurp-file-as-bytes dir "styles.css.gz")]
-       {::http/content-type "text/css"
-        ::http/content-encoding "gzip"
-        ::http/content-length (count bytes)
-        ::http/body bytes})
-     (let [bytes (slurp-file-as-bytes dir "styles.css.br")]
-       {::http/content-type "text/css"
-        ::http/content-encoding "br"
-        ::http/content-length (count bytes)
-        ::http/body bytes})]
+    [(file->representation (io/file dir "styles.css"))
+     (assoc
+      (file->representation (io/file dir "styles.css.gz"))
+      ::http/content-encoding "gzip")
+     (assoc
+      (file->representation (io/file dir "styles.css.br"))
+      ::http/content-encoding "br")]
+
     ;; If we want to use these stylesheets with public resources, they'll need
     ;; to be PUBLIC too.
     ::pass/classification "PUBLIC"}))
@@ -180,7 +181,7 @@
   (let [res (io/resource "juxt/site/alpha/openapi.edn")
         json (json/write-value-as-string (edn/read-string (slurp res)))
         openapi (json/read-value json)
-        bytes (.getBytes json "UTF-8")]
+        body (.getBytes json "UTF-8")]
     (put!
      crux-node
      {:crux.db/id "https://home.juxt.site/_site/apis/site/openapi.json"
@@ -189,22 +190,22 @@
       [{::http/content-type "application/vnd.oai.openapi+json;version=3.0.2"
         ;; TODO: Get last modified from resource - check JDK javadocs
         ;;::http/last-modified (java.util.Date. (.lastModified f))
-        ::http/content-length (count bytes)
-        ::http/body bytes}]
+        ::http/content-length (count body)
+        ::http/body body}]
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi openapi})))
 
 (defn add-favicon! [crux-node favicon]
   (put!
    crux-node
-   (let [bytes (.readAllBytes (io/input-stream favicon))]
+   (let [body (.readAllBytes (io/input-stream favicon))]
      {:crux.db/id "https://home.juxt.site/favicon.ico"
       ::pass/classification "PUBLIC"
       ::http/methods #{:get :head :options}
       ::http/representations
       [{::http/content-type "image/x-icon"
-        ::http/content-length (count bytes)
-        ::http/body bytes}]})))
+        ::http/content-length (count body)
+        ::http/body body}]})))
 
 (defn add-webmaster-home-page! [crux-node]
   (put!
@@ -257,19 +258,17 @@
   ([crux-node webmaster-password]
    (init-db! crux-node webmaster-password {}))
   ([crux-node webmaster-password {:keys [style-dir favicon]}]
-
-   (println "Initializing Site Database")
    (create-webmaster! crux-node webmaster-password)
    (allow-public-access-to-public-resources! crux-node)
    (add-home-page! crux-node)
    (add-home-redirect! crux-node)
    (add-login! crux-node)
-   ;; The login form is styled with Tailwind CSS
    (add-tailwind-stylesheets! crux-node (or style-dir "style/target"))
    (add-swagger-ui! crux-node)
    (add-site-api! crux-node)
    (add-favicon! crux-node (io/resource "juxt/favicon.ico"))
-
+   (add-openid-token-endpoint! crux-node)
+   (add-webmaster-home-page! crux-node)
    #_(put
       crux-node
       {:crux.db/id "https://home.juxt.site/_site/pass/rules/users-can-post-their-own-home-pages"
@@ -278,6 +277,4 @@
                        [resource ::owner user]]
        ::pass/effect ::pass/allow})
 
-   ;; Authentication resources
-   (add-openid-token-endpoint! crux-node)
-   (add-webmaster-home-page! crux-node)))
+   ))
