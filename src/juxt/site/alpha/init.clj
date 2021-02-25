@@ -34,7 +34,7 @@
       [:crux.tx/put m]))
    (crux/await-tx crux-node)))
 
-(defn create-webmaster!
+(defn put-webmaster-user!
   "Create the webmaster."
   [crux-node pw]
   (when pw
@@ -42,8 +42,12 @@
      crux-node
      {:crux.db/id "https://home.juxt.site/_site/users/webmaster"
       ::http/methods #{:get :head :options}
-      ::http/representations []
-      ::pass/password-hash!! (password/encrypt pw)}
+      ::http/representations []}
+
+     {:crux.db/id "https://home.juxt.site/_site/users/webmaster/password"
+      ::http/methods #{:post}
+      ::pass/password-hash (password/encrypt pw)
+      ::pass/classification "RESTRICTED"}
 
      ;; Add rule that allows the webmaster to do everything, at least during the
      ;; bootstrap phase of a deployment. This can be deleted after the initial
@@ -68,7 +72,19 @@
                     [resource ::pass/classification "PUBLIC"]]
     ::pass/effect ::pass/allow}))
 
-(defn add-home-page! [crux-node]
+(defn restict-access-to-restricted-resources!
+  "Resources classified as RESTRICTED should never be accessed, unless another
+  policy explicitly authorizes access."
+  [crux-node]
+  (put!
+   crux-node
+   {:crux.db/id "https://home.juxt.site/_site/rules/restricted-resources"
+    ::site/type "Rule"
+    ::site/description "RESTICTED access is denied by default"
+    ::pass/target '[[resource ::pass/classification "RESTRICTED"]]
+    ::pass/effect ::pass/deny}))
+
+(defn put-home-page! [crux-node]
   (put!
    crux-node
    {:crux.db/id "https://home.juxt.site/index.html"
@@ -79,7 +95,7 @@
     ;; The login page must have a classification of PUBLIC to be accessible.
     ::pass/classification "PUBLIC"}))
 
-(defn add-home-redirect!
+(defn put-home-redirect!
   "Redirect from / to /index.html"
   [crux-node]
   (put!
@@ -87,7 +103,7 @@
    {:crux.db/id "https://home.juxt.site/"
     ::http/redirect "/index.html"}))
 
-(defn add-login! [crux-node]
+(defn put-login! [crux-node]
   (put!
    crux-node
    {:crux.db/id "https://home.juxt.site/_site/login"
@@ -123,7 +139,7 @@
                     [resource ::site/purpose ::site/logout]]
     ::pass/effect ::pass/allow}))
 
-(defn add-tailwind-stylesheets! [crux-node dir]
+(defn put-tailwind-stylesheets! [crux-node dir]
   (put!
    crux-node
    {:crux.db/id "https://home.juxt.site/css/tailwind/styles.css"
@@ -141,7 +157,7 @@
     ;; to be PUBLIC too.
     ::pass/classification "PUBLIC"}))
 
-(defn add-swagger-ui!
+(defn put-swagger-ui!
   "After the webmaster has logged in, they may want to add new users. For this,
   they need at least need access to the Swagger UI. These function requires that
   a webjar containing the Swagger UI is on the classpath."
@@ -175,7 +191,7 @@
                                      ::http/content-location uri
                                      ::http/body body}]})))))
 
-(defn add-site-api!
+(defn put-site-api!
   "Add the Site API"
   [crux-node]
   (let [res (io/resource "juxt/site/alpha/openapi.edn")
@@ -195,7 +211,7 @@
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi openapi})))
 
-(defn add-favicon! [crux-node favicon]
+(defn put-favicon! [crux-node favicon]
   (put!
    crux-node
    (let [body (.readAllBytes (io/input-stream favicon))]
@@ -207,7 +223,7 @@
         ::http/content-length (count body)
         ::http/body body}]})))
 
-(defn add-webmaster-home-page! [crux-node]
+(defn put-webmaster-home-page! [crux-node]
   (put!
    crux-node
    {:crux.db/id "https://home.juxt.site/~webmaster/"
@@ -217,7 +233,7 @@
     [{::http/content-type "text/html;charset=utf-8"
       ::site/body-generator :juxt.site.alpha.home/user-home-page}]}))
 
-(defn add-openid-token-endpoint! [crux-node]
+(defn put-openid-token-endpoint! [crux-node]
   (let [token-endpoint "https://home.juxt.site/_site/token"
          grant-types #{"client_credentials"}]
      (put!
@@ -258,17 +274,18 @@
   ([crux-node webmaster-password]
    (init-db! crux-node webmaster-password {}))
   ([crux-node webmaster-password {:keys [style-dir favicon]}]
-   (create-webmaster! crux-node webmaster-password)
+   (put-webmaster-user! crux-node webmaster-password)
    (allow-public-access-to-public-resources! crux-node)
-   (add-home-page! crux-node)
-   (add-home-redirect! crux-node)
-   (add-login! crux-node)
-   (add-tailwind-stylesheets! crux-node (or style-dir "style/target"))
-   (add-swagger-ui! crux-node)
-   (add-site-api! crux-node)
-   (add-favicon! crux-node (io/resource "juxt/favicon.ico"))
-   (add-openid-token-endpoint! crux-node)
-   (add-webmaster-home-page! crux-node)
+   (restict-access-to-restricted-resources! crux-node)
+   (put-home-page! crux-node)
+   (put-home-redirect! crux-node)
+   (put-login! crux-node)
+   (put-tailwind-stylesheets! crux-node (or style-dir "style/target"))
+   (put-swagger-ui! crux-node)
+   (put-site-api! crux-node)
+   (put-favicon! crux-node (io/resource "juxt/favicon.ico"))
+   (put-openid-token-endpoint! crux-node)
+   (put-webmaster-home-page! crux-node)
    #_(put
       crux-node
       {:crux.db/id "https://home.juxt.site/_site/pass/rules/users-can-post-their-own-home-pages"
@@ -276,5 +293,4 @@
        ::pass/target '[[subject ::pass/user user]
                        [resource ::owner user]]
        ::pass/effect ::pass/allow})
-
    ))
