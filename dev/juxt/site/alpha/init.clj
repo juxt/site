@@ -66,19 +66,6 @@
       ::site/body-generator :juxt.site.alpha.home/home-page}]
     ::pass/classification "PUBLIC"})
 
-  ;; The login form will require some additional PUBLIC resources
-  (apply
-   put
-   (for [f ["juxt-logo-on-white.svg" "juxt-logo-on-black.svg"]]
-     {:crux.db/id (str "https://home.juxt.site/" f)
-      ::http/methods #{:get :head :option}
-      ::http/representations
-      [(let [bytes (slurp-file-as-bytes (str "resources/" f))]
-         {::http/content-type "image/svg+xml"
-          ::http/content-length (count bytes)
-          ::http/body bytes})]
-      ::pass/classification "PUBLIC"}))
-
   ;; The login form is styled with Tailwind CSS
   (put
    {:crux.db/id "https://home.juxt.site/css/tailwind/styles.css"

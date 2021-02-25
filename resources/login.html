@@ -7,29 +7,29 @@
     <div class="max-w-xs w-full m-auto bg-black rounded p-4">
       <!-- header -->
       <header>
-        <img class="p-2 w-20" src="/juxt-logo-on-black.svg" />
+        <div class="text-gray-200">
+          <p>Welcome to Site</p>
+        </div>
       </header>
       <!-- form -->
       <form method="POST" action="/_site/login">
         <foreach expr="foo in bar">
-          <div class="container flex items-end">
-            <div class="p-2">
-              <label class="block mb-2 text-yellow-500" for="username">user</label>
-              <input name="user" class="w-12 p-2 mb-6 font-mono bg-gray-300 text-black border-b-2 border-yellow-500 outline-none focus:bg-white" type="text" name="username"/>
+          <div class="container">
+            <div>
+              <label class="block mb-2 text-gray-200" for="username">user</label>
+              <input name="user" class="w-full p-2 mb-6 font-mono bg-gray-300 text-black border-b-2 border-blue-500 outline-none focus:bg-white" type="text" name="username"/>
+            </div>
+            <div>
+              <label name="password" class="block mb-2 text-gray-200" for="password">password</label>
+              <input class="w-full p-2 mb-6 font-mono bg-gray-300 text-black border-b-2 border-blue-500 outline-none focus:bg-white" type="password" name="password" />
             </div>
             <div class="p-2">
-              <label name="password" class="block mb-2 text-yellow-500" for="password">password</label>
-              <input class="w-full p-2 mb-6 font-mono bg-gray-300 text-black border-b-2 border-yellow-500 outline-none focus:bg-white" type="password" name="password" />
-            </div>
-            <div class="p-2">
-              <input class="w-full bg-yellow-800 hover:bg-yellow-500 text-white hover:text-black font-bold py-2 px-4 mb-6 rounded" value="GO" type="submit"/>
+              <input class="w-full bg-blue-800 hover:bg-blue-500 text-white hover:text-black font-bold py-2 px-4 mb-6 rounded" value="GO" type="submit"/>
             </div>
           </div>
         </foreach>
       </form>
       <footer>
-        <a class="text-yellow-800 hover:text-yellow-700 text-sm float-left p-2" href="#">Instructions</a>
-        <a class="text-yellow-800 hover:text-yellow-700 text-sm float-right p-2" href="#">Forgot password</a>
       </footer>
     </div>
   </body>
