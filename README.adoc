@@ -1,6 +1,6 @@
 = Site
 
-Site is a project from https://juxt.pro[JUXT] to build a RESTful web-layer over
+Site is a project from https://juxt.pro[JUXT] to build a Resource Server out of
 our open-source https://opencrux.com[Crux] database.
 
 Site supports web content, and https://www.openapis.org/[OpenAPI]. You can use
@@ -12,12 +12,13 @@ System].
 
 CAUTION: This section describes functionality that may not yet be available.
 
-Site is a web and API server, built on the Crux database.
+Site is a Resource Server, built on the Crux database.
 
 You can put things into Site with (HTTP) PUT requests. When you do this, Site
-will put your thing (document, image, video, data…) into the database. You can
-get these later with a (HTTP) GET request with the same URI. In this way, Site
-behaves like a web server, with an immutable bitemporal content store.
+will put (the representation of) your thing (document, image, video, data…) into
+the database. You can get these later with a (HTTP) GET request with the same
+URI. In this way, Site behaves like a web server, with an immutable bitemporal
+content store.
 
 === APIs
 

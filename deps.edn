@@ -2,35 +2,33 @@
 
 {:paths ["src" "test"]
  :deps {org.clojure/clojure {:mvn/version "1.10.1"}
-        integrant/integrant {:mvn/version "0.7.0"}
+        org.clojure/tools.logging {:mvn/version "0.5.0-alpha"}
 
+        ;; Project skeleton - also see src/config.edn
+        integrant/integrant {:mvn/version "0.7.0"}
         juxt.edge/lib.app
         {:git/url "https://github.com/juxt/edge.git"
          :sha "5ea50fc777adbdf2129b541ad07a13dda1c273b8"
          :deps/root "lib/edge.app"}
 
-        org.clojure/tools.logging {:mvn/version "0.5.0-alpha"}
-
+        ;; Crux
         juxt/crux-core {:mvn/version "20.12-1.13.0-beta"}
         juxt/crux-rocksdb {:mvn/version "20.12-1.13.0-beta"}
         juxt/crux-http-server {:mvn/version "20.12-1.13.0-alpha"}
 
-        tick/tick {:mvn/version "0.4.26-alpha"}
-
+        ;; HTTP support functions
         juxt/spin
         {:git/url "https://github.com/juxt/spin.git"
            :sha "b40b3ddc145afc7a6f78c12d376bc8f6f132adc6"}
         #_{:local/root "../spin"}
 
+        ;; Content negotiation
         juxt/pick
         {:git/url "https://github.com/juxt/pick.git"
            :sha "82837592666cbfc0aa110eeec458845af5c680aa"}
         #_{:local/root "../pick"}
 
-        hiccup/hiccup {:mvn/version "2.0.0-alpha2"}
-        metosin/jsonista {:mvn/version "0.2.7"}
-
-        clj-yaml/clj-yaml {:mvn/version "0.4.0"}
+        ;; JSON Schema support functions
         jinx/jinx
         {:git/url "https://github.com/juxt/jinx.git"
          :sha "75faa460c37d068746f7e3985c555aeeacc9e383"}
@@ -39,18 +37,22 @@
         ;; Ring for some utility code
         ring/ring-core {:mvn/version "1.9.1"}
 
-        ;; Security
+        ;; Passwords
         crypto-password/crypto-password {:mvn/version "0.2.1"}
 
         ;; Swagger UI
         org.webjars/swagger-ui {:mvn/version "3.42.0"}
 
-        json-html/json-html {:mvn/version "0.4.0"
-                             ;;:exclusions [hiccups]
-                             }
-
+        ;; Support for Representations
+        clj-yaml/clj-yaml {:mvn/version "0.4.0"}
+        hiccup/hiccup {:mvn/version "2.0.0-alpha2"}
+        metosin/jsonista {:mvn/version "0.2.7"}
+        json-html/json-html {:mvn/version "0.4.0"}
         selmer/selmer {:mvn/version "1.12.33"}
-        comb/comb {:mvn/version "0.1.1"}}
+        comb/comb {:mvn/version "0.1.1"}
+
+        ;; Miscellaneous
+        tick/tick {:mvn/version "0.4.26-alpha"}}
 
  :aliases
  {:dev

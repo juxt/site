@@ -1,0 +1,18 @@
+= Namespaces ahead
+
+What are these?
+
+WARNING: Terrible puns and word-plays ahead.
+
+* site -- all the stuff that holds this project together. The main entrance to the rabbit hole.
+
+* apex -- anything to do with OpenAPI -- apex means APi EXecution.
+
+* dave -- anything to do with WebDav -- dave is 'DAV' plus 'Extensions' (an excuse to include the name 'Dave' in a project).
+
+* grab -- anything to do with GraphQL.
+
+* pass -- authentication, authorization -- as in, "You Shall Not Pass!!!" (Site
+  attempts to protect resources from Balrogs)
+
+* spin -- extras that are related to spin, as in, a spider 'spins' its web. Spin is a dependency library declared in deps.edn.
