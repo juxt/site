@@ -38,49 +38,53 @@
            [:link {:rel "stylesheet" :href "/css/tailwind/styles.css"}]]
 
           [:body
-           (if owner?
-             [:h1 {:class "text-xl"} "My page"]
-             [:h1 (str (:name owner) "'s" " page")])
+           [:div {:class "flex flex-col p-4"}
+            (if owner?
+              [:h1 {:class "text-xl"} "Console"]
+              [:h1 (str (:name owner) "'s" " page")])
 
-           (when-let [bookings
-                      (map first (crux/q db '{:find [(eql/project e [*])]
-                                              :where [[e ::site/type "WorkBooking"]]}))]
-             [:div
-              [:h2 (str prefix " timesheets")]
-              [:table {:style "border: 1px solid black; border-collapse: collapse"}
-               [:tbody
-                (for [booking bookings]
-                  [:tr
-                   [:td (:title booking)]
-                   [:td (:state booking)]])]]])
+            (when-let [bookings
+                       (seq (map first (crux/q db '{:find [(eql/project e [*])]
+                                                   :where [[e ::site/type "WorkBooking"]]})))]
+              [:div {:class "p-4"}
+               [:h2 (str prefix " timesheets")]
+               [:table {:style "border: 1px solid black; border-collapse: collapse"}
+                [:tbody
+                 (for [booking bookings]
+                   [:tr
+                    [:td (:title booking)]
+                    [:td (:state booking)]])]]])
 
-           (when-let [items
-                      (map first (crux/q db '{:find [(eql/project e [*])]
-                                              :where [[e ::site/type "OpenAPI"]]}))]
-             [:div
-              [:h2 "APIs"]
-              [:table {:style "border: 1px solid black; border-collapse: collapse"}
-               [:tbody
-                (for [item items
-                      :let [{:strs [info servers]} (::apex/openapi item)]]
-                  [:tr
-                   [:td
-                    (tw/link
-                     (format "https://home.juxt.site/_site/swagger-ui/index.html?url=%s"
-                             (tw/relativize (:crux.db/id item)))
-                     (get info "title"))]
-                   [:td (get info "description")]
-                   [:td (get info "version")]
-                   [:td (let [[_ tlc]
-                              (re-matches #"(.*)@juxt.pro" (get-in info ["contact" "email"]))]
-                          (cond->>
-                              (get-in info ["contact" "name"])
+            (when-let [items
+                       (seq (map first (crux/q db '{:find [(eql/project e [*])]
+                                                   :where [[e ::site/type "OpenAPI"]]})))]
+              [:div {:class "py-4"}
+               [:div {:class "py-2 text-xl"}
+                [:h2 "APIs"]]
+               [:div {:class "py-2"}
+                [:table {:style "border: 1px solid black; border-collapse: collapse"}
+                 [:tbody
+                  (for [item items
+                        :let [{:strs [info servers]} (::apex/openapi item)]]
+                    [:tr
+                     [:td
+                      (tw/link
+                       (format "https://home.juxt.site/_site/swagger-ui/index.html?url=%s"
+                               (tw/relativize (:crux.db/id item)))
+                       (get info "title"))]
+                     [:td (get info "description")]
+                     [:td (get info "version")]
+                     [:td (let [[_ tlc]
+                                (re-matches #"(.*)@juxt.pro" (get-in info ["contact" "email"]))]
+                            (cond->>
+                                (get-in info ["contact" "name"])
                               tlc (tw/link (format "/~%s/" tlc))))]
 
-                   [:td (get-in servers [0 "url"])]])]]])
+                     [:td (get-in servers [0 "url"])]])]]]])]
 
-           [:footer
-            [:form {:action "/_site/logout" :method "POST"} [:input {:type "submit" :value "Logout"}]]]
+           [:footer {:class "bg-gray-400 p-4"}
+            [:form {:action "/_site/logout" :method "POST"}
+             [:input {:class "px-4" :type "submit" :value "Logout"}]]]
            ]])))))
 
 (defn create-user-home-page [request crux-node subject]
@@ -159,15 +163,22 @@
   (hp/html5
 
    (if-let [username (::pass/username subject)]
-     (let [user (crux/entity db (::pass/user subject))]
-       (list
-        [:h2 "Welcome to site"]
-        [:div
-         [:p "You are logged in as " username]
+     (hp/html5
+      [:html
+       [:head
+        [:link {:rel "stylesheet" :href "/css/tailwind/styles.css"}]]
+       [:body
+        (let [user (crux/entity db (::pass/user subject))]
+          [:div {:class "bg-gray-100"}
+           [:h2 "Welcome to site"]
+           [:div {:class "flex flex-col"}
+            [:p "You are logged in as " username]
 
-         [:p "TODO: Show auth method, if cookie, then allow to logout"]
+            [:p "TODO: Show auth method, if cookie, then allow to logout"]
 
-         [:p [:a {:href (format "/~%s/" username)} "My page"]]]))
+            [:p [:a {:href (format "/~%s/" username)} "My page"]]]])
+        [:footer
+         [:form {:action "/_site/logout" :method "POST"} [:input {:type "submit" :value "Logout"}]]]]])
 
      ;; Otherwise let them login - this should be some static html or template
      ;; in the database
