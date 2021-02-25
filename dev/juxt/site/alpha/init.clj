@@ -11,7 +11,6 @@
    [juxt.site.alpha.util :as util])
   (:import (java.io DataInputStream FileInputStream)))
 
-(alias 'dave (create-ns 'juxt.dave.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
@@ -227,98 +226,4 @@
     [{::http/content-type "text/html;charset=utf-8"
       ::site/body-generator :juxt.site.alpha.home/user-home-page}]})
 
-  #_(put
-     {:crux.db/id "https://home.juxt.site/_site/api-console"
-      ::http/methods #{:get :head :options}
-      ::http/representations
-      [{::http/content-type "text/html;charset=utf-8"
-        ::site/bytes-generator ::api-console-generator}]})
-
   )
-
-
-#_[[:crux.tx/put
-    {:crux.db/id "/contacts/roger.edn"
-     :type "Contact"
-     :name "Roger Farringdon"
-     :email "roger@example.com"
-     :address "13 Pickets Way, Colchester"
-     :tel "01 232 7321"
-     ::http/methods #{:get :head :options :put}
-     ::http/acceptable "application/edn"
-     ::http/representations
-     [{::http/content-type "application/edn"
-       ::http/last-modified last-modified
-       ::site/bytes-generator ::contact}]}]
-
-   [:crux.tx/put
-    {:crux.db/id "/contacts/jeremy.edn"
-     :type "Contact"
-     :name "Jeremy Taylor"
-     :email "jdt@juxt.pro"
-     ::http/methods #{:get :head :options :put}
-     ::http/acceptable "application/edn"
-     ::http/representations
-     [{::http/content-type "application/edn"
-       ::http/last-modified last-modified
-       ::site/bytes-generator ::contact}]}]
-
-   [:crux.tx/put
-    {:crux.db/id "/contacts/malcoml.edn"
-     :type "Contact"
-     :name "Jeremy Taylor"
-     :email "jdt@juxt.pro"
-     ::http/methods #{:get :head :options :put}
-     ::http/acceptable "application/edn"
-     ::http/representations
-     [{::http/content-type "application/edn"
-       ::http/last-modified last-modified
-       ::site/bytes-generator ::contact}]}]
-
-   [:crux.tx/put
-    {:crux.db/id "/contacts/ben.edn"
-     :type "Contact"
-     :name "Ben Harvy"
-     :email "ben@example.com"
-     ::http/methods #{:get :head :options :put}
-     ::http/acceptable "application/edn"
-     ::http/representations
-     [{::http/content-type "application/edn"
-       ::http/last-modified last-modified
-       ::site/bytes-generator ::contact}]}]
-
-   [:crux.tx/put
-    {:crux.db/id "/contacts/tim.edn"
-     :type "Contact"
-     :name "Tim Greene"
-     :email "tim@example.com"
-     ::http/methods #{:get :head :options :put}
-     ::http/acceptable "application/edn"
-     ::http/representations
-     [{::http/content-type "application/edn"
-       ::http/last-modified last-modified
-       ::site/bytes-generator ::contact}]}]
-
-   [:crux.tx/put
-    {:crux.db/id "/contacts/chris.edn"
-     :type "Contact"
-     :name "Chris Roberts"
-     :email "ben@example.com"
-     ::http/methods #{:get :head :options :put}
-     ::http/acceptable "application/edn"
-     ::http/representations
-     [{::http/content-type "application/edn"
-       ::http/last-modified last-modified
-       ::site/bytes-generator ::contact}]}]
-
-   [:crux.tx/put
-    {:crux.db/id "/projects/internal.edn"
-     ::site/type "Project"
-     :name "Internal projects"}]
-
-   [:crux.tx/put
-    {:crux.db/id "/contacts/"
-     :description "A collection"
-     ::http/methods #{:get :head :options :propfind :mkcol}
-     ::http/options {"DAV" "1"}
-     ::dave/query '[[e :type "Contact"]]}]]
