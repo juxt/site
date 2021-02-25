@@ -138,6 +138,25 @@
         {:status 302
          :headers {"location" "/"}}})))))
 
+(defn logout-response
+  [resource date posted-representation db]
+
+  (->
+   (spin/response
+    302
+    {::http/content-type "text/plain"}
+    nil nil date (.getBytes (format "Logged out %s\r\n" access-token)))
+   (update :headers assoc
+           "cache-control" "no-store"
+           "location" "/")
+   (assoc :cookies {"access_token"
+                    {:value  ""
+                     :max-age 0
+                     :same-site :strict
+                     :http-only true
+                     :path "/"}})
+   (cookies-response)))
+
 (defn authenticate
   "Authenticate a request. Return a pass subject, with information about user,
   roles and other credentials. The resource can be used to determine the

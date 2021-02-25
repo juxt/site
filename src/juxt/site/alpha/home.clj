@@ -80,7 +80,7 @@
                    [:td (get-in servers [0 "url"])]])]]])
 
            [:footer
-            [:form {:action "/logout" :method "POST"} [:input {:type "submit" :value "Logout"}]]]
+            [:form {:action "/_site/logout" :method "POST"} [:input {:type "submit" :value "Logout"}]]]
            ]])))))
 
 (defn create-user-home-page [request crux-node subject]
@@ -171,4 +171,9 @@
 
      ;; Otherwise let them login - this should be some static html or template
      ;; in the database
-     (slurp "resources/login.html"))))
+     (throw
+      (ex-info
+       "You must login"
+       {::spin/response
+        {:status 302
+         :headers {"location" "/_site/login"}}})))))

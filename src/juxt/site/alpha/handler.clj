@@ -122,11 +122,19 @@
           :resource resource
           :body body})
 
-        (= "/_site/token" (:uri request))
+        (or
+         (= ::site/acquire-token (::site/purpose resource))
+            ;; deprecated
+         (= "/_site/token" (:uri request)))
         (authn/token-response resource date posted-representation subject)
 
-        (= (:uri request) "/_site/login")
+        (or (= ::site/login (::site/purpose resource))
+            ;; deprecated
+            (= (:uri request) "/_site/login"))
         (authn/login-response resource date posted-representation db)
+
+        (= ::site/logout (::site/purpose resource))
+        (authn/logout-response resource date posted-representation subject)
 
         (re-matches #"/~(\p{Alpha}[\p{Alnum}_-]*)/" (:uri request))
         (do
