@@ -177,8 +177,8 @@
 (defn add-site-api!
   "Add the Site API"
   [crux-node]
-  (let [f (io/file "src/juxt/site/alpha/openapi.edn")
-        json (json/write-value-as-string (edn/read-string (slurp f)))
+  (let [res (io/resource "juxt/site/alpha/openapi.edn")
+        json (json/write-value-as-string (edn/read-string (slurp res)))
         openapi (json/read-value json)
         bytes (.getBytes json "UTF-8")]
     (put!
@@ -187,7 +187,8 @@
       ::http/methods #{:get :head :options}
       ::http/representations
       [{::http/content-type "application/vnd.oai.openapi+json;version=3.0.2"
-        ::http/last-modified (java.util.Date. (.lastModified f))
+        ;; TODO: Get last modified from resource - check JDK javadocs
+        ;;::http/last-modified (java.util.Date. (.lastModified f))
         ::http/content-length (count bytes)
         ::http/body bytes}]
       ::site/type "OpenAPI"
