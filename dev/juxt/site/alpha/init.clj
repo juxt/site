@@ -29,21 +29,22 @@
   (println "Initializing Site Database")
 
   ;; Create the webmaster.
-  (put
-   {:crux.db/id "https://home.juxt.site/_site/users/webmaster"
-    ::http/methods #{:get :head :options}
-    ::http/representations []
-    ::pass/password-hash!! (password/encrypt webmaster-password)}
+  (when webmaster-password
+    (put
+     {:crux.db/id "https://home.juxt.site/_site/users/webmaster"
+      ::http/methods #{:get :head :options}
+      ::http/representations []
+      ::pass/password-hash!! (password/encrypt webmaster-password)}
 
-   ;; Add rule that allows the webmaster to do everything, at least during the
-   ;; bootstrap phase of a deployment. This can be deleted after the initial
-   ;; users/roles have been populated, if required.
-   {:crux.db/id "https://home.juxt.site/_site/rules/webmaster-allow-read-all"
-    :description "The webmaster has read access to everything"
-    ::site/type "Rule"
-    ::pass/target '[[subject :juxt.pass.alpha/username "webmaster"]]
-    ::pass/effect ::pass/allow
-    ::pass/allow-methods #{:get :head :options}})
+     ;; Add rule that allows the webmaster to do everything, at least during the
+     ;; bootstrap phase of a deployment. This can be deleted after the initial
+     ;; users/roles have been populated, if required.
+     {:crux.db/id "https://home.juxt.site/_site/rules/webmaster-allow-read-all"
+      :description "The webmaster has read access to everything"
+      ::site/type "Rule"
+      ::pass/target '[[subject :juxt.pass.alpha/username "webmaster"]]
+      ::pass/effect ::pass/allow
+      ::pass/allow-methods #{:get :head :options}}))
 
   ;; Resources classified as PUBLIC should be readable (but not writable). We'll
   ;; need at least one PUBLIC resource to provide a login page.
