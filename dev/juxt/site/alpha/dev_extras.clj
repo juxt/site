@@ -33,7 +33,7 @@
 (defn e [id]
   (crux/entity (db) id))
 
-(defn put [& ms]
+(defn put! [& ms]
   (->>
    (crux/submit-tx
     (crux-node)
@@ -41,7 +41,7 @@
       [:crux.tx/put m]))
    (crux/await-tx (crux-node))))
 
-(defn rm [id]
+(defn rm! [id]
   (->>
    (crux/submit-tx
     (crux-node)
