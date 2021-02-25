@@ -21,4 +21,4 @@
 
   :juxt.site.alpha.server/server
   {:crux-node #ig/ref :juxt.site.alpha.db/crux-node
-   :port 8082}}}
+   :port 2021}}}
