@@ -46,6 +46,7 @@
 
      {:crux.db/id "https://home.juxt.site/_site/users/webmaster/password"
       ::http/methods #{:post}
+      ::pass/user "https://home.juxt.site/_site/users/webmaster"
       ::pass/password-hash (password/encrypt pw)
       ::pass/classification "RESTRICTED"}
 
@@ -193,10 +194,8 @@
 
 (defn put-site-api!
   "Add the Site API"
-  [crux-node]
-  (let [res (io/resource "juxt/site/alpha/openapi.edn")
-        json (json/write-value-as-string (edn/read-string (slurp res)))
-        openapi (json/read-value json)
+  [crux-node json]
+  (let [openapi (json/read-value json)
         body (.getBytes json "UTF-8")]
     (put!
      crux-node
@@ -282,10 +281,20 @@
    (put-login! crux-node)
    (put-tailwind-stylesheets! crux-node (or style-dir "style/target"))
    (put-swagger-ui! crux-node)
-   (put-site-api! crux-node)
+
+   (put-site-api!
+    crux-node
+    (-> "juxt/site/alpha/openapi.edn"
+        io/resource
+        slurp
+        edn/read-string
+        json/write-value-as-string))
+
    (put-favicon! crux-node (io/resource "juxt/favicon.ico"))
    (put-openid-token-endpoint! crux-node)
    (put-webmaster-home-page! crux-node)
+
+
    #_(put
       crux-node
       {:crux.db/id "https://home.juxt.site/_site/pass/rules/users-can-post-their-own-home-pages"

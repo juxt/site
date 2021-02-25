@@ -55,17 +55,6 @@
     :responses
     {200
      {:description "Single identified role"
-
-      #_:juxt.site.alpha/state
-      #_{:users
-         (crux/q
-          {:find [user email]
-           :where [[(get-attr user :email) email]
-                   [user :type user-type]
-                   [user :roles this]]
-           :in [this]
-           :args [{user-type "User"}]})}
-
       :content
       {"application/json" {:schema {"$ref" "#/components/schemas/Role"}}
 
@@ -133,14 +122,7 @@
      {:description "Single identified user"
       :content
       {"application/json"
-       {:schema {"$ref" "#/components/schemas/User"}
-        :example
-        {"type" "User"
-         "name" "John Doe"
-         "email" "john@example.com"
-         "password" "DoReMi123"
-         "roles" ["/_site/pass/roles/admin"
-                  "/_site/pass/roles/manager"]}}
+       {:schema {"$ref" "#/components/schemas/User"}}
 
        "text/html;charset=utf-8"
        {:title "User"
@@ -157,20 +139,54 @@
        :example
        {"type" "User"
         "name" "John Doe"
-        "email" "john@example.com"
-        "password" "DoReMi123"
-        "roles" ["/_site/pass/roles/admin"
-                 "/_site/pass/roles/manager"]}}}}
+        "email" "john@example.com"}}}}
 
     :responses
-    {200 {:description "User successfully updated"
+    {201 {:description "User successfully created"
           :content
           {"text/plain;charset=utf-8" {}}}
 
-     201 {:description "User successfully created"
+     204 {:description "User successfully updated"
+          :content
+          {"text/plain;charset=utf-8" {}}}}}
+
+   :delete
+   {:description "Deletes a user"
+    :operationId "deleteUser"
+
+    :responses
+    {204 {:description "User successfully deleted"
           :content
           {"text/plain;charset=utf-8" {}}}}}}
 
+  "/users/{id}/password"
+  {:parameters
+   [{:name "id"
+     :in "path"
+     :description "User id"
+     :required true
+     :schema {:type "string"}}]
+
+   :put
+   {:description "Puts a new password"
+    :operationId "putPassword"
+    :requestBody
+    {:required true
+     :content
+     {"application/json"
+      {:schema {"$ref" "#/components/schemas/Password"}
+       :example
+       {"type" "Password"
+        "password" "TigerBuffalo42^&"}}}}
+
+    :responses
+    {200 {:description "Password successfully updated"
+          :content
+          {"text/plain;charset=utf-8" {}}}
+
+     201 {:description "Password successfully created"
+          :content
+          {"text/plain;charset=utf-8" {}}}}}}
 
   "/rules/"
   {:get
@@ -360,10 +376,8 @@
     [{"$ref" "#/components/schemas/Named"}
      {"$ref" "#/components/schemas/Typed"}
      {:type "object"
-      :required ["email" "password" "roles"]
-      :juxt.jinx.alpha/keyword-mappings {"email" "email"
-                                         "password" "juxt.pass.alpha/password-hash!!"
-                                         "roles" "roles"}
+      :required []
+      :juxt.jinx.alpha/keyword-mappings {"email" "email"}
       :properties
       {"type" {:const "User"}
        "email"
@@ -373,24 +387,28 @@
        {:type "string"
         :juxt.jinx.alpha/as "password"
         :description "The user's password, stored as a hash at rest, and only
-        transmitted in the clear when being set."}
-       "roles"
-       {:type "array"
-        :items
-        {:type "string"
-         :format "uri-reference"
-         ;;:juxt.jinx.alpha/as "uri"
-         :crux/reference? true}}
-       "org" {:type "string"
-              :format "uri-reference"
-              ;;:juxt.jinx.alpha/as "uri"
-              }}}]}
+        transmitted in the clear when being set."}}}]}
 
    "IdentifiedUser"
    {"$id" "/schemas/IdentifiedUser"
     :allOf
     [{"$ref" "#/components/schemas/Identified"}
      {"$ref" "#/components/schemas/User"}]}
+
+   "Password"
+   {"$id" "/schemas/Password"
+    :allOf
+    [{"$ref" "#/components/schemas/Typed"}
+     {:type "object"
+      :required []
+      :juxt.jinx.alpha/keyword-mappings {"password" "juxt.pass.alpha/password-hash"}
+      :properties
+      {"type" {:const "Password"}
+       "password"
+       {:type "string"
+        :juxt.jinx.alpha/as "password"
+        :description "The user's password, stored as a hash at rest, and only
+        transmitted in the clear when being set."}}}]}
 
    "Rule"
    {"$id" "/schemas/Rule"

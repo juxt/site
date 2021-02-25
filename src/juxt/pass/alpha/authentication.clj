@@ -95,7 +95,6 @@
   ;; Check grant_type of posted-representation
   (assert (= "application/x-www-form-urlencoded" (::http/content-type posted-representation)))
 
-
   (let [posted-body (String. (::http/body posted-representation))
         {:strs [user password]} (form-decode posted-body)
 
@@ -103,8 +102,7 @@
         _ (assert (re-matches #"[\p{Alnum}-_]+" user))
 
         uid (format "https://home.juxt.site/_site/users/%s" user)
-        pwid (format "https://home.juxt.site/_site/users/%s/password" user)
-        ]
+        pwid (format "https://home.juxt.site/_site/users/%s/password" user)]
 
     (or
      (when-let [e (crux/entity db uid)]
