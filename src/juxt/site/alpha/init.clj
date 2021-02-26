@@ -85,25 +85,6 @@
     ::pass/target '[[resource ::pass/classification "RESTRICTED"]]
     ::pass/effect ::pass/deny}))
 
-(defn put-home-page! [crux-node]
-  (put!
-   crux-node
-   {:crux.db/id "https://home.juxt.site/index.html"
-    ::http/methods #{:get :head :options}
-    ::http/representations
-    [{::http/content-type "text/html;charset=utf-8"
-      ::site/body-generator :juxt.site.alpha.home/home-page}]
-    ;; The login page must have a classification of PUBLIC to be accessible.
-    ::pass/classification "PUBLIC"}))
-
-(defn put-home-redirect!
-  "Redirect from / to /index.html"
-  [crux-node]
-  (put!
-   crux-node
-   {:crux.db/id "https://home.juxt.site/"
-    ::http/redirect "/index.html"}))
-
 (defn put-login! [crux-node]
   (put!
    crux-node
@@ -276,8 +257,6 @@
    (put-webmaster-user! crux-node webmaster-password)
    (allow-public-access-to-public-resources! crux-node)
    (restict-access-to-restricted-resources! crux-node)
-   (put-home-page! crux-node)
-   (put-home-redirect! crux-node)
    (put-login! crux-node)
    (put-tailwind-stylesheets! crux-node (or style-dir "style/target"))
    (put-swagger-ui! crux-node)

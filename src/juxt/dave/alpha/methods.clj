@@ -7,8 +7,7 @@
    [juxt.dave.alpha :as dave]
    [juxt.dave.alpha.xml :as xml]
    [juxt.spin.alpha :as spin]
-   [juxt.reap.alpha.encoders :refer [format-http-date]]
-   [juxt.site.alpha.payload :as payload]))
+   [juxt.reap.alpha.encoders :refer [format-http-date]]))
 
 (defn gen-response-body [request members db authorization subject]
   (let [baos (new java.io.ByteArrayOutputStream)
@@ -21,7 +20,8 @@
        (for [resource members
              :let [representation (first (::spin/representations resource))]
              :when representation
-             :let [body (payload/generate-representation-body request resource representation db authorization subject)]]
+             :let [body "TODO" ;; (payload/generate-representation-body request resource representation db authorization subject)
+                   ]]
          {:tag "response" :ns "DAV:"
           :children
           [{:tag "href" :ns "DAV:" :children [(:crux.db/id resource)]}

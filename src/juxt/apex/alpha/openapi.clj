@@ -18,7 +18,6 @@
    [juxt.jinx.alpha.vocabularies.transformation :refer [process-transformations]]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.site.alpha :as site]
-   [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.perf :refer [fast-get-in]]
    [juxt.site.alpha.util :as util]
    [juxt.spin.alpha :as spin]
@@ -140,7 +139,7 @@
                         (for [[media-type media-type-object]
                               (fast-get-in path-item-object ["get" "responses" "200" "content"])]
                           {::http/content-type media-type
-                           ::site/body-generator ::entity-bytes-generator})
+                           ::site/body-fn `entity-bytes-generator})
 
                         ;; TODO: Merge in any properties of a resource that is in
                         ;; Crux - e.g. if this resource is a collection, what type
@@ -184,10 +183,12 @@
                 )))
      {} input)))
 
+
+
 ;; By default we output the resource state, but there may be a better rendering
 ;; of collections, which can be inferred from the schema being an array and use
 ;; the items subschema.
-(defmethod generate-representation-body ::entity-bytes-generator [request resource representation db authorization subject]
+(defn entity-bytes-generator [{:keys [request resource representation db authorization subject]}]
 
   (log/trace "entity-bytes-generator")
 

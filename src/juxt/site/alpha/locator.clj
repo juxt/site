@@ -62,4 +62,4 @@
         (log/debug "Requiring resolve of" locator-fn)
         (let [f (requiring-resolve locator-fn)]
           (log/debugf "Calling locator-fn %s: %s" locator-fn description)
-          (f db request locator grps))))))
+          (f {:db db :request request :locator locator :grps grps}))))))

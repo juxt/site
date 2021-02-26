@@ -19,7 +19,6 @@
    [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha.function :as site.function]
    [juxt.spin.alpha :as spin]
-   [juxt.site.alpha.payload :refer [generate-representation-body]]
    [juxt.site.alpha.util :as util]
    [juxt.spin.alpha.representation :refer [receive-representation]]))
 
@@ -79,15 +78,23 @@
 (defn GET [request resource date selected-representation db authorization subject]
   #_(spin/evaluate-preconditions! request resource selected-representation date)
   (let [{::http/keys [body content charset]} selected-representation
-        {::site/keys [body-generator]} selected-representation
+        {::site/keys [body-fn]} selected-representation
         body (cond
                content (.getBytes content (or charset "utf-8"))
                body body
-               body-generator
-               (let [body (generate-representation-body
-                           request resource selected-representation db authorization subject)]
-                 (cond-> body
-                   (string? body) (.getBytes (or charset "UTF-8")))))]
+
+               body-fn
+               (let [f (requiring-resolve body-fn)]
+                 (log/debugf "Calling body-fn: %s" body-fn)
+                 (let [body (f {:request request
+                                :resource resource
+                                :selected-representation selected-representation
+                                :db db
+                                :authorization authorization
+                                :subject subject})]
+                   (cond-> body
+                     (string? body) (.getBytes (or charset "UTF-8"))))))]
+
     (spin/response
      200
      selected-representation
@@ -421,15 +428,18 @@
       (h req)
       (catch clojure.lang.ExceptionInfo e
         ;;          (tap> e)
-        (let [exdata (ex-data e)]
+        (let [exdata (ex-data e)
+              status (get-in exdata [::spin/request :status])]
 
-          (pprint (into {::spin/request req} (ex-data e)))
+          (when (or (nil? status) (>= status 500))
 
-          (prn e)
+            (pprint (into {::spin/request req} (ex-data e)))
 
-          (log/errorf
-           e "%s: %s" (.getMessage e)
-           (pr-str (into {::spin/request req} exdata)))
+            (prn e)
+
+            (log/errorf
+             e "%s: %s" (.getMessage e)
+             (pr-str (into {::spin/request req} exdata))))
 
           (or
            (::spin/response exdata)
