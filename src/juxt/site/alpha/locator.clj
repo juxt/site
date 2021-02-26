@@ -12,18 +12,20 @@
 (defn locate-with-locators [db request]
   (let [uri (util/uri request)]
     (when-let [locators
-               (seq (map first
-                     (crux/q
-                      db
-                      '{:find [(eql/project
-                                r [:crux.db/id
-                                   ::site/description ::site/locator-fn])]
-                        :where [[r ::site/type "ResourceLocator"]
-                                [r ::site/pattern p]
-                                [(re-matches p uri)]]
-                        :in [uri]} uri)))]
+               (seq (crux/q
+                     db
+                     '{:find [(eql/project
+                               r [:crux.db/id
+                                  ::site/description ::site/locator-fn])
+                              grps]
 
-      (log/debug "locators found: " (pr-str locators))
+                       :where [[r ::site/type "ResourceLocator"]
+                               [r ::site/pattern p]
+                               [(first grps) grp0]
+                               [(some? grp0)]
+                               [(re-matches p uri) grps]]
+
+                       :in [uri]} uri))]
 
       (when (> (count locators) 1)
         (throw
@@ -35,7 +37,7 @@
            {:status 500
             :body "Internal Error\r\n"}})))
 
-      (let [{::site/keys [locator-fn description] :as locator} (first locators)]
+      (let [[{::site/keys [locator-fn description] :as locator} grps] (first locators)]
         (when-not locator-fn
           (throw
            (ex-info
@@ -58,6 +60,6 @@
               :body "Internal Error\r\n"}})))
 
         (log/debug "Requiring resolve of" locator-fn)
-        (let [v (requiring-resolve locator-fn)]
+        (let [f (requiring-resolve locator-fn)]
           (log/debugf "Calling locator-fn %s: %s" locator-fn description)
-          (v db request locator))))))
+          (f db request locator grps))))))
