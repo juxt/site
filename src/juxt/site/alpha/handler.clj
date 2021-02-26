@@ -429,7 +429,7 @@
       (catch clojure.lang.ExceptionInfo e
         ;;          (tap> e)
         (let [exdata (ex-data e)
-              status (get-in exdata [::spin/request :status])]
+              status (get-in exdata [::spin/response :status])]
 
           (when (or (nil? status) (>= status 500))
 
