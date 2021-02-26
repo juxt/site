@@ -180,7 +180,7 @@
                      ::http/last-modified date)])]])
    (crux/await-tx crux-node)))
 
-(defn PUT [request resource date crux-node]
+(defn PUT [request resource date crux-node subject]
   (let [received-representation (receive-representation request resource date)]
     (assert received-representation)
 
@@ -200,7 +200,7 @@
          (.equalsIgnoreCase "application" type)
          (.equalsIgnoreCase "json" subtype))
         (openapi/put-json-representation
-         request resource received-representation date crux-node)
+         request resource received-representation date crux-node subject)
 
         (and
          (.equalsIgnoreCase "text" type)
@@ -337,7 +337,7 @@
 
         authorization (pdp/authorization db request-context)
 
-        _ (log/debugf "Result of authorization with resource-context %s is %s"
+        _ (log/debugf "Result of authorization with request-context %s is %s"
                       (pr-str request-context)
                       (pr-str authorization))
 
@@ -375,7 +375,7 @@
       (POST request resource date crux-node db subject)
 
       :put
-      (PUT request resource date crux-node)
+      (PUT request resource date crux-node subject)
 
       :delete
       (DELETE request resource date crux-node)

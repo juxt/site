@@ -27,6 +27,7 @@
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'apex (create-ns 'juxt.apex.alpha))
+(alias 'pass (create-ns 'juxt.pass.alpha))
 
 ;; TODO: Restrict where openapis can be PUT
 (defn locate-resource
@@ -348,7 +349,7 @@
      nil request nil date nil)))
 
 (defn put-json-representation
-  [request resource received-representation date crux-node]
+  [request resource received-representation date crux-node subject]
 
   (let [last-modified date
         etag (format "\"%s\"" (-> received-representation ::http/body util/hexdigest (subs 0 32)))
@@ -387,7 +388,29 @@
             (fn [acc k v]
               (assoc acc (cond-> k (string? k) keyword) v))
             {}))
-          id (str "https://home.juxt.site" (:uri request))]
+          id (str "https://home.juxt.site" (:uri request))
+          authorization (pdp/authorization (crux/db crux-node) {'subject subject
+                                                                'resource resource
+                                                                'request request ;; might change to 'action' at this point
+                                                                'environment {}
+                                                                'new-state instance})
+          _ (when-not (= (::pass/access authorization) ::pass/approved)
+              ;; Could add the `request`/`request-context` and submit-tx to a logging Crux instance
+              (log/debug "Unauthorized OpenAPI JSON instance" instance authorization)
+              (throw
+               (if (::pass/user subject)
+                 (ex-info
+                  "Forbidden"
+                  {::spin/response
+                   {:status 403
+                    :body "Forbidden\r\n"}})
+
+                 (ex-info
+                  "Unauthorized"
+                  {::spin/response
+                   {:status 401
+                    :headers {}
+                    :body "Unauthorized\r\n"}}))))]
 
       ;; Since this resource is 'managed' by the locate-resource in this ns, we
       ;; don't have to worry about http attributes - these will be provided by
