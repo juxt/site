@@ -41,6 +41,9 @@
       [:crux.tx/put m]))
    (crux/await-tx (crux-node))))
 
+(defn GET [id content-type]
+  (some #(when (= content-type (::http/content-type %)) %) (::http/representations (e id))))
+
 (defn rm! [id]
   (->>
    (crux/submit-tx
