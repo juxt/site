@@ -10,7 +10,6 @@
 (alias 'spin (create-ns 'juxt.spin.alpha))
 
 (defn locate-with-locators [db request]
-  (log/trace "Locate with locators")
   (let [uri (util/uri request)]
     (when-let [locators
                (seq (map first
@@ -24,7 +23,7 @@
                                 [(re-matches p uri)]]
                         :in [uri]} uri)))]
 
-      (log/trace "locators is" locators)
+      (log/debug "locators found: " (pr-str locators))
 
       (when (> (count locators) 1)
         (throw
@@ -37,7 +36,6 @@
             :body "Internal Error\r\n"}})))
 
       (let [{::site/keys [locator-fn description] :as locator} (first locators)]
-        (log/trace "description is" description)
         (when-not locator-fn
           (throw
            (ex-info
@@ -59,8 +57,7 @@
              {:status 500
               :body "Internal Error\r\n"}})))
 
-        (log/trace "Requiring resolve of" locator-fn)
-
+        (log/debug "Requiring resolve of" locator-fn)
         (let [v (requiring-resolve locator-fn)]
           (log/debugf "Calling locator-fn %s: %s" locator-fn description)
           (v db request locator))))))
