@@ -89,6 +89,14 @@
       nil nil date body)
      (update :headers assoc "Cache-Control" "no-store"))))
 
+(defn correct-password? [db uid password]
+  (when (crux/entity db uid)
+    (when-let [pwe (crux/entity db (format "%s/password" uid))]
+      (when-let [pwhash (::pass/password-hash pwe)]
+        (and
+         password ;; password could be nil
+         (password/check password pwhash))))))
+
 (defn login-response
   [resource date posted-representation db]
 
@@ -100,44 +108,37 @@
 
         ;; Sanitize the username.
         _ (assert (re-matches #"[\p{Alnum}-_]+" user))
-
-        uid (format "https://home.juxt.site/_site/users/%s" user)
-        pwid (format "https://home.juxt.site/_site/users/%s/password" user)]
+        uid (format "https://home.juxt.site/_site/users/%s" user)]
 
     (or
-     (when-let [e (crux/entity db uid)]
-       (when-let [pwe (crux/entity db pwid)]
-         (when-let [pwhash (::pass/password-hash pwe)]
-           (when (and
-                  password ;; password could be nil
-                  (password/check password pwhash))
-             (let [access-token (access-token)
-                   expires-in (get resource ::pass/expires-in 3600)
+     (when (correct-password? db uid password)
+       (let [access-token (access-token)
+             expires-in (get resource ::pass/expires-in 3600)
 
-                   session {"access_token" access-token
-                            "token_type" "login"
-                            "expires_in" expires-in}
+             session {"access_token" access-token
+                      "token_type" "login"
+                      "expires_in" expires-in}
 
-                   _ (put-session!
-                      access-token
-                      (merge session {::pass/user uid
-                                      ::pass/username user})
-                      (.plusSeconds (.toInstant date) expires-in))]
-               (->
-                (spin/response
-                 302
-                 {::http/content-type "text/plain"}
-                 nil nil date (.getBytes (format "Thanks! Your access token is %s\r\n" access-token)))
-                (update :headers assoc
-                        "cache-control" "no-store"
-                        "location" (format "/~%s/" user))
-                (assoc :cookies {"access_token"
-                                 {:value access-token
-                                  :max-age expires-in
-                                  :same-site :strict
-                                  :http-only true
-                                  :path "/"}})
-                (cookies-response)))))))
+             _ (put-session!
+                access-token
+                (merge session {::pass/user uid
+                                ::pass/username user})
+                (.plusSeconds (.toInstant date) expires-in))]
+         (->
+          (spin/response
+           302
+           {::http/content-type "text/plain"}
+           nil nil date (.getBytes (format "Thanks! Your access token is %s\r\n" access-token)))
+          (update :headers assoc
+                  "cache-control" "no-store"
+                  "location" (format "/~%s/" user))
+          (assoc :cookies {"access_token"
+                           {:value access-token
+                            :max-age expires-in
+                            :same-site :strict
+                            :http-only true
+                            :path "/"}})
+          (cookies-response))))
      ;; else not user
      (throw
       (ex-info
@@ -192,10 +193,9 @@
                     #"([^:]*):([^:]*)"
                     (String. (.decode (java.util.Base64/getDecoder) token68)))
                    uid (format "https://home.juxt.site/_site/users/%s" user)]
-               (when-let [e (crux/entity db uid)]
-                 (when (password/check password (::pass/password-hash!! e))
-                   {::pass/user uid
-                    ::pass/username user})))
+               (when (correct-password? db uid password)
+                 {::pass/user uid
+                  ::pass/username user}))
              (catch Exception e
                (log/error e)))
 
