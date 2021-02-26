@@ -15,12 +15,12 @@
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.pass.alpha.authentication :as authn]
    [juxt.pick.alpha.ring :refer [pick]]
+   [juxt.site.alpha.locator :as locator]
    [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha.function :as site.function]
    [juxt.spin.alpha :as spin]
-   [juxt.site.alpha.home :as home]
    [juxt.site.alpha.payload :refer [generate-representation-body]]
-   [juxt.site.alpha.util :refer [hexdigest]]
+   [juxt.site.alpha.util :as util]
    [juxt.spin.alpha.representation :refer [receive-representation]]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -52,25 +52,23 @@
     (cond-> selected-representation
       (not-empty vary) (assoc ::http/vary (str/join ", " vary)))))
 
-(defn uri
-  "Return the full URI of the request."
-  ;; At some point we should move to the Ring 2.0 namespace which has more
-  ;; precise naming.
-  [req]
-  (str "https://home.juxt.site" (:uri req)))
-
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
   in :default."
   [request db]
   (or
+   ;; We call OpenAPI location here, because a resource can be defined in
+   ;; OpenAPI, and exits in Crux, simultaneously.
    (openapi/locate-resource db request)
 
-   (when-let [e (crux/entity db (uri request))]
+   ;; Is it in Crux?
+   (when-let [e (crux/entity db (util/uri request))]
      (assoc e ::site/resource-provider ::crux))
 
-   (home/locate-resource db request)
+   ;; Is it found by any resource locators registered in the database?
+   (locator/locate-with-locators db request)
 
+   ;; Return a back-stop resource
    {::site/resource-provider ::default-empty-resource
     ::http/methods #{:get :head :options}}))
 
@@ -79,7 +77,6 @@
   (::http/representations resource))
 
 (defn GET [request resource date selected-representation db authorization subject]
-  (log/trace "GET")
   #_(spin/evaluate-preconditions! request resource selected-representation date)
   (let [{::http/keys [body content charset]} selected-representation
         {::site/keys [body-generator]} selected-representation
@@ -136,8 +133,8 @@
         (= ::site/logout (::site/purpose resource))
         (authn/logout-response resource date posted-representation subject)
 
-        (re-matches #"/~(\p{Alpha}[\p{Alnum}_-]*)/" (:uri request))
-        (do
+        #_(re-matches #"/~(\p{Alpha}[\p{Alnum}_-]*)/" (:uri request))
+        #_(do
           (home/create-user-home-page request crux-node subject)
           (throw
            (ex-info
@@ -158,7 +155,7 @@
   (format
    "\"%s\""
    (subs
-    (hexdigest
+    (util/hexdigest
      (cond
        (::http/body representation)
        (::http/body representation)
@@ -425,12 +422,15 @@
       (catch clojure.lang.ExceptionInfo e
         ;;          (tap> e)
         (let [exdata (ex-data e)]
-          (when-not (::spin/response exdata)
-            (pprint (into {::spin/request req} (ex-data e)))
-            (prn e)
-            (log/errorf
-             e "%s: %s" (.getMessage e)
-             (pr-str (into {::spin/request req} exdata))))
+
+          (pprint (into {::spin/request req} (ex-data e)))
+
+          (prn e)
+
+          (log/errorf
+           e "%s: %s" (.getMessage e)
+           (pr-str (into {::spin/request req} exdata)))
+
           (or
            (::spin/response exdata)
            {:status 500 :body "Internal Error\r\n"})))
