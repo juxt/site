@@ -1,3 +1,6 @@
+;; This source file is in EDN only for editing purposes. It should be
+;; transformed to JSON or YAML as soon as it is uploaded or otherwise put into
+;; Crux.
 {:openapi "3.0.2"
 
  :info
@@ -12,77 +15,7 @@
  :servers [{:url "/_site"}]
 
  :paths
- {"/roles/"
-  {:get
-   {:description "Returns all roles"
-    :operationId "findRoles"
-    :parameters
-    [{:name "limit"
-      :in "query"
-      :description "Maximum number of results to return"
-      :required false
-      :default 100
-      :schema {:type "integer"}}]
-    :responses
-    {200 {:crux/query
-          {:find [e]
-           :where [[e :juxt.site.alpha/type t]]
-           :args [{t "Role"}]
-           :limit {:in "query" :name "limit"}}
-
-          :content
-          {"application/json"
-           {:schema
-            {:type "array"
-             :items {"$ref" "#/components/schemas/IdentifiedRole"}}}
-
-           "text/html;charset=utf-8" {:title "Roles"
-                                      :type "edn-table"}}}}}}
-
-  "/roles/{id}"
-  {
-   :get
-   {:description "Returns a given role"
-    ;; NOTE: Path-object level parameters not yet supported!!
-    :parameters
-    [{:name "id"
-      :in "path"
-      :description "Role id"
-      :required true
-      :schema {:type "string"}}]
-    :operationId "findRoleById"
-
-    :responses
-    {200
-     {:description "Single identified role"
-      :content
-      {"application/json" {:schema {"$ref" "#/components/schemas/Role"}}
-
-       "text/html;charset=utf-8" {:title "Role"}}}}}
-
-   :put
-   {:description "Upserts a role"
-    :operationId "putRole"
-    :parameters
-    [{:name "id"
-      :in "path"
-      :description "Role id"
-      :required true
-      :schema {:type "string"}}]
-    :requestBody
-    {:required true
-     :content
-     {"application/json" {:schema {"$ref" "#/components/schemas/Role"}}}}
-    :responses
-    {200 {:description "Role successfully updated"
-          :content
-          {"text/plain;charset=utf-8" {}}}
-
-     201 {:description "Role successfully created"
-          :content
-          {"text/plain;charset=utf-8" {}}}}}}
-
-  "/users/"
+ {"/users/"
   {:get
    {:description "Returns a list of all the users you're allowed to view"
     :operationId "findUsers"
@@ -107,10 +40,8 @@
 
   "/users/{id}"
   {:parameters
-   [{:name "id"
-     :in "path"
+   [{:name "id" :in "path" :required true
      :description "User id"
-     :required true
      :schema {:type "string"}}]
 
    :get
@@ -136,19 +67,16 @@
      :content
      {"application/json"
       {:schema {"$ref" "#/components/schemas/User"}
-       :example
-       {"type" "User"
-        "name" "John Doe"
-        "email" "john@example.com"}}}}
+       :example {"type" "User"
+                 "name" "John Doe"
+                 "email" "john@example.com"}}}}
 
     :responses
     {201 {:description "User successfully created"
-          :content
-          {"text/plain;charset=utf-8" {}}}
+          :content {"text/plain;charset=utf-8" {}}}
 
      204 {:description "User successfully updated"
-          :content
-          {"text/plain;charset=utf-8" {}}}}}
+          :content {"text/plain;charset=utf-8" {}}}}}
 
    :delete
    {:description "Deletes a user"
@@ -156,15 +84,12 @@
 
     :responses
     {204 {:description "User successfully deleted"
-          :content
-          {"text/plain;charset=utf-8" {}}}}}}
+          :content {"text/plain;charset=utf-8" {}}}}}}
 
   "/users/{id}/password"
   {:parameters
-   [{:name "id"
-     :in "path"
+   [{:name "id" :in "path" :required true
      :description "User id"
-     :required true
      :schema {:type "string"}}]
 
    :put
@@ -175,16 +100,72 @@
      :content
      {"application/json"
       {:schema {"$ref" "#/components/schemas/Password"}
-       :example
-       {"type" "Password"
-        "password" "TigerBuffalo42^&"}}}}
+       :example {"type" "Password"
+                 "password" "TigerBuffalo42^&"}}}}
 
     :responses
     {200 {:description "Password successfully updated"
+          :content {"text/plain;charset=utf-8" {}}}
+     201 {:description "Password successfully created"
+          :content {"text/plain;charset=utf-8" {}}}}}}
+
+  "/roles/"
+  {:get
+   {:description "Returns all roles"
+    :operationId "findRoles"
+    :parameters
+    [{:name "limit" :in "query" :required false :default 100
+      :description "Maximum number of results to return"
+      :schema {:type "integer"}}]
+    :responses
+    {200 {:crux/query
+          {:find [e]
+           :where [[e :juxt.site.alpha/type t]]
+           :args [{t "Role"}]
+           :limit {:in "query" :name "limit"}}
+
+          :content
+          {"application/json"
+           {:schema
+            {:type "array"
+             :items {"$ref" "#/components/schemas/IdentifiedRole"}}}
+
+           "text/html;charset=utf-8" {:title "Roles"
+                                      :type "edn-table"}}}}}}
+
+  "/roles/{id}"
+  {:get
+   {:description "Returns a given role"
+    ;; NOTE: Path-object level parameters not yet supported!!
+    :parameters
+    [{:name "id" :in "path" :required true
+      :description "Role id"
+      :schema {:type "string"}}]
+    :operationId "findRoleById"
+
+    :responses
+    {200 {:description "Single identified role"
+          :content
+          {"application/json" {:schema {"$ref" "#/components/schemas/Role"}}
+
+           "text/html;charset=utf-8" {:title "Role"}}}}}
+
+   :put
+   {:description "Upserts a role"
+    :operationId "putRole"
+    :parameters
+    [{:name "id" :in "path" :required true
+      :description "Role id"
+      :schema {:type "string"}}]
+    :requestBody
+    {:required true
+     :content
+     {"application/json" {:schema {"$ref" "#/components/schemas/Role"}}}}
+    :responses
+    {200 {:description "Role successfully updated"
           :content
           {"text/plain;charset=utf-8" {}}}
-
-     201 {:description "Password successfully created"
+     201 {:description "Role successfully created"
           :content
           {"text/plain;charset=utf-8" {}}}}}}
 
@@ -203,7 +184,6 @@
       {"application/json"
        {:schema {"type" "array"
                  "items" {"$ref" "#/components/schemas/IdentifiedRule"}}}
-
        "text/html;charset=utf-8"
        {:title "Rules"
         :type "edn-table"
@@ -212,15 +192,12 @@
 
   "/rules/{id}"
   {:parameters
-   [{:name "id"
-     :in "path"
+   [{:name "id" :in "path" :required true
      :description "Rule id"
-     :required true
      :schema {:type "string"}}]
 
    :get
    {:description "Returns a given rule",
-
     :responses
     {200
      {:description "Single identified rule"
@@ -244,7 +221,6 @@
     {200 {:description "Rule successfully updated"
           :content
           {"text/plain;charset=utf-8" {}}}
-
      201 {:description "Rule successfully created"
           :content
           {"text/plain;charset=utf-8" {}}}}}}
@@ -252,7 +228,6 @@
   "/apis/"
   {:get
    {:description "Returns a list of all the APIs"
-
     :responses
     {200
      {:crux/query
@@ -273,15 +248,12 @@
 
   "/apis/{id}"
   {:parameters
-   [{:name "id"
-     :in "path"
+   [{:name "id" :in "path" :required true
      :description "API id"
-     :required true
      :schema {:type "string"}}]
 
    :get
-   {:description "Returns a given rule",
-
+   {:description "Returns a given OpenAPI description"
     :responses
     {200
      {:description "Single identified API"
@@ -294,7 +266,7 @@
         :schema {"$ref" "#/components/schemas/OpenAPI"}}}}}}
 
    :put
-   {:description "Upserts an API"
+   {:description "Upserts an OpenAPI"
     :requestBody
     {:required true
      :content
@@ -305,7 +277,6 @@
     {200 {:description "API successfully updated"
           :content
           {"text/plain;charset=utf-8" {}}}
-
      201 {:description "API successfully created"
           :content
           {"text/plain;charset=utf-8" {}}}}}}}
@@ -321,11 +292,7 @@
     :required ["id"]
     :juxt.jinx.alpha/keyword-mappings {"id" "crux.db/id"}
     :properties
-    {"id"
-     {:type "string"
-      :format "uri-reference"
-      ;;:juxt.jinx.alpha/as "uri"
-      }}}
+    {"id" {:type "string" :format "uri-reference"}}}
 
    "Named"
    {"$id" "/schemas/Named"
@@ -333,9 +300,7 @@
     :required ["name"]
     :juxt.jinx.alpha/keyword-mappings {"name" "name"}
     :properties
-    {"name"
-     {:type "string"
-      :minLength 1}}}
+    {"name" {:type "string" :minLength 1}}}
 
    "Typed"
    {"$id" "/schemas/Typed"
@@ -343,9 +308,7 @@
     :required ["type"]
     :juxt.jinx.alpha/keyword-mappings {"type" "juxt.site.alpha/type"}
     :properties
-    {"type"
-     {:type "string"
-      :minLength 1}}}
+    {"type" {:type "string" :minLength 1}}}
 
    "Role"
    {"$id" "/schemas/Role"
@@ -354,15 +317,10 @@
      {"$ref" "#/components/schemas/Typed"}
      {:properties
       {"type" {:const "Role"}
-       "description"
-       {:type "string"}
-       "roles"
-       {:type "array"
-        :items
-        {:type "string"
-         :format "uri-reference"
-         ;;:juxt.jinx.alpha/as "uri"
-         }}}}]}
+       "description" {:type "string"}
+       "roles" {:type "array"
+                :items {:type "string"
+                        :format "uri-reference"}}}}]}
 
    "IdentifiedRole"
    {"$id" "/schemas/IdentifiedRole"
@@ -380,14 +338,8 @@
       :juxt.jinx.alpha/keyword-mappings {"email" "email"}
       :properties
       {"type" {:const "User"}
-       "email"
-       {:type "string"
-        :format "email"}
-       "password"
-       {:type "string"
-        :juxt.jinx.alpha/as "password"
-        :description "The user's password, stored as a hash at rest, and only
-        transmitted in the clear when being set."}}}]}
+       "email" {:type "string"
+                :format "email"}}}]}
 
    "IdentifiedUser"
    {"$id" "/schemas/IdentifiedUser"
@@ -404,11 +356,9 @@
       :juxt.jinx.alpha/keyword-mappings {"password" "juxt.pass.alpha/password-hash"}
       :properties
       {"type" {:const "Password"}
-       "password"
-       {:type "string"
-        :juxt.jinx.alpha/as "password"
-        :description "The user's password, stored as a hash at rest, and only
-        transmitted in the clear when being set."}}}]}
+       "password" {:type "string"
+                   :juxt.jinx.alpha/as "password"
+                   :description "The user's password, stored as a hash at rest, and only transmitted in the clear when being set."}}}]}
 
    "Rule"
    {"$id" "/schemas/Rule"
@@ -438,16 +388,14 @@
     :allOf
     [{"$ref" "#/components/schemas/Typed"}
      {:type "object"
-      ;; TODO: Use the actual JSON API!!
+      ;; TODO: Use the actual JSON Schema for OpenAPI. Until this is done, there
+      ;; won't be any validation on bad OpenAPI definitions.
       :required ["openapi"]
       :properties
       {"openapi" {:type "string"}}}]}
-
 
    "IdentifiedOpenAPI"
    {"$id" "/schemas/IdentifiedOpenAPI"
     :allOf
     [{"$ref" "#/components/schemas/Identified"}
-     {"$ref" "#/components/schemas/OpenAPI"}]}
-
-   }}}
+     {"$ref" "#/components/schemas/OpenAPI"}]}}}}

@@ -203,16 +203,6 @@
         ::http/content-length (count body)
         ::http/body body}]})))
 
-(defn put-webmaster-home-page! [crux-node]
-  (put!
-   crux-node
-   {:crux.db/id "https://home.juxt.site/~webmaster/"
-    :juxt.site.alpha.home/owner "https://home.juxt.site/_site/users/webmaster"
-    ::http/methods #{:get :head :options}
-    ::http/representations
-    [{::http/content-type "text/html;charset=utf-8"
-      ::site/body-generator :juxt.site.alpha.home/user-home-page}]}))
-
 (defn put-openid-token-endpoint! [crux-node]
   (let [token-endpoint "https://home.juxt.site/_site/token"
          grant-types #{"client_credentials"}]
@@ -254,13 +244,18 @@
   ([crux-node webmaster-password]
    (init-db! crux-node webmaster-password {}))
   ([crux-node webmaster-password {:keys [style-dir favicon]}]
+
+   ;; Webmaster with access policy
    (put-webmaster-user! crux-node webmaster-password)
+
+   ;; Initial access policies
    (allow-public-access-to-public-resources! crux-node)
    (restict-access-to-restricted-resources! crux-node)
-   (put-login! crux-node)
-   (put-tailwind-stylesheets! crux-node (or style-dir "style/target"))
-   (put-swagger-ui! crux-node)
 
+   ;; Styling for built-in assets
+   (put-tailwind-stylesheets! crux-node (or style-dir "style/target"))
+
+   ;; Site API allows management of users
    (put-site-api!
     crux-node
     (-> "juxt/site/alpha/openapi.edn"
@@ -269,16 +264,12 @@
         edn/read-string
         json/write-value-as-string))
 
-   (put-favicon! crux-node (io/resource "juxt/favicon.ico"))
+   ;; Authentication
    (put-openid-token-endpoint! crux-node)
-   (put-webmaster-home-page! crux-node)
+   (put-login! crux-node)
+
+   (put-swagger-ui! crux-node)
 
 
-   #_(put
-      crux-node
-      {:crux.db/id "https://home.juxt.site/_site/pass/rules/users-can-post-their-own-home-pages"
-       ::site/type "Rule"
-       ::pass/target '[[subject ::pass/user user]
-                       [resource ::owner user]]
-       ::pass/effect ::pass/allow})
-   ))
+   ;; Branding
+   (put-favicon! crux-node (io/resource "juxt/favicon.ico"))))
