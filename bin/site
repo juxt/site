@@ -13,22 +13,76 @@
    [cheshire.core :as json]
    [clojure.pprint :refer [pprint]]
    [clojure.edn :as edn]
-   [io.aviso.ansi :as ansi]))
+   [io.aviso.ansi :as ansi]
+   [clojure.string :as str]))
 
 (def ^:dynamic *debug* nil)
 
-(defmacro with-status-message [msg & body]
-  `(do
-     (print (str ansi/yellow-font ~msg ansi/reset-font "..."))
-     (let [result# ~@body]
-       (println (str "[" ansi/bold-red-font "done" ansi/reset-font "]"))
-       (println "Response was:")
-       (pprint (select-keys result# [:status :headers]))
-       result#)))
+(defn error! [msg]
+  (println "ERROR:" msg)
+  (System/exit 1))
 
-(defn add-user [options]
-  (let [{:keys [token server user password role]}])
-  (pprint options))
+(def config
+  (case (System/getProperty "os.name")
+    "Linux" {:storage-dir
+             (let [dir (io/file (System/getProperty "user.home") ".local/share/site")]
+               (if (.exists dir) dir
+                   (if-not (.mkdirs dir)
+                     (error! (str "Failed to make directory: " dir))
+                     dir)))
+             :encrypted-password-dir
+             (let [dir (io/file
+                        (System/getProperty "user.home")
+                        ".password-store/site/webmaster.gpg")]
+               (if (.exists dir) dir (error! (str "Encrypted password directory not found: " dir))))}
+
+    (error! "Unsupported OS")))
+
+(defn get-password []
+  (let [{:keys [exit out]} (sh/sh "gpg" "-d" (str (:encrypted-password-dir config)))]
+    (when (zero? exit) out)))
+
+(defn get-token [opts]
+  (let [{:keys [server uid password]} (:options opts)]
+    (when-not server (error! "Server not specified"))
+    (when-not uid (error! "User id required"))
+
+    (let [{:keys [status body]}
+          (curl/post
+           (format "%s/_site/token" server)
+           {:headers {"content-type" "application/x-www-form-urlencoded"}
+            :basic-auth [uid (get-password)]
+            :body "grant_type=client_credentials"
+            :throw false})]
+      (cond
+        (= status 401)
+        (do
+          (println "Server response:" status body)
+          (println "Are your credentials valid?"))
+        ;; TODO: Store in correct Linux XDG location
+        :else (spit (io/file (:storage-dir config) ".site-access-token") body)))))
+
+(defn add-user [opts]
+  (let [{:keys [token server uid password name role]} (:options opts)]
+    (when-not server (error! "Server not specified"))
+    (when-not token (error! "Access token required, use the get-token sub-command"))
+    (let [{:keys [status body]}
+          (curl/put
+           (format "%s/_site/users/%s" server uid)
+           {:headers {"authorization" (format "Bearer %s" token)
+                      "content-type" "application/json"}
+            :body (json/generate-string
+                   {:type "User"
+                    :userid uid
+                    :name name})
+            :throw false})]
+      (cond
+        (= status 401)
+        (do
+          (println "Server response:" status body)
+          (println "Is your access-token valid?")
+          (println)
+          (println "To get a new access token, use the get-token sub-command"))))))
 
 (defn install-openapi [options]
   (prn options))
@@ -50,9 +104,15 @@
    ["-h" "--help" "Show this summary"]])
 
 (def commands
-  {"add-user"
+  {"get-token"
+   {:description "Get an access token"
+    :cli-options [["-u" "--uid USER" "Your user id"]]
+    :delegate get-token}
+
+   "add-user"
    {:description "Add a new user"
-    :cli-options [["-u" "--user USER" "The username of the user you are adding"]
+    :cli-options [["-n" "--name NAME" "The user's name"]
+                  ["-u" "--uid USER" "The user id of the user you are adding"]
                   ["-p" "--password PASSWORD" "A temporary password for the user"]
                   ["-r" "--role ROLE" "Roles that the user has"]]
     :delegate add-user}
