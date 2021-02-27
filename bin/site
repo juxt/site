@@ -26,34 +26,12 @@
        (pprint (select-keys result# [:status :headers]))
        result#)))
 
-#_(def discover-openid-configuration-response
-  (with-status-message
-    (format "Get OpenID configuration")
-    (curl/get
-     (url "/.well-known/openid-configuration")
-     {:headers {"accept" "application/json"}
-      :throw true
-      :debug CURL_DEBUG})))
+(defn add-user [options]
+  (let [{:keys [token server user password role]}])
+  (pprint options))
 
-#_(def put-time-openapi-response
-  (let [openapi-file (io/file "openapi.edn")
-        _ (assert (.exists openapi-file))
-        openapi (edn/read-string (slurp openapi-file))
-        openapi.json (json/generate-string openapi)]
-    (with-status-message
-      (format "PUT %s (%s)" (get-in openapi [:info :title]) (get-in openapi [:info :version]))
-      (curl/put
-       (url "/_site/apis/time/openapi.json")
-       {:headers {"content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
-        :body openapi.json
-        :throw true
-        }))))
-
-#_(assert (#{200 201} (:status put-time-openapi-response)))
-
-(defn deploy [options]
-  (prn options)
-  )
+(defn install-openapi [options]
+  (prn options))
 
 (defn debugf
   "Write a debug message to the console, but only if *debug* is true."
@@ -62,17 +40,31 @@
     (println "DEBUG:" (apply format args))))
 
 (def cli-options
-  [["-h" "--help" "Show this summary"]
+  [["-t" "--token TOKEN" "Your access token for authentication purposes"]
+
+   ["-s" "--server SERVER" "The address of the Site server you are managing"
+    :default "https://home.juxt.site"]
+
+   ["-d" "--debug" "Enable debug mode"]
    ["-v" "--verbose" "Verbose mode"]
-   ["-t" "--token TOKEN" "Access token"]
-   ["-d" "--debug" "Debug mode"]])
+   ["-h" "--help" "Show this summary"]])
 
 (def commands
-  {"deploy"
-   {:description "Deploy app"
-    :cli-options [["-h" "--host HOST" "Host"]]
-    :delegate deploy}
-   })
+  {"add-user"
+   {:description "Add a new user"
+    :cli-options [["-u" "--user USER" "The username of the user you are adding"]
+                  ["-p" "--password PASSWORD" "A temporary password for the user"]
+                  ["-r" "--role ROLE" "Roles that the user has"]]
+    :delegate add-user}
+
+   "install-api"
+   {:description "Install OpenAPI"
+    :cli-options [["-f" "--openapi FILE" "OpenAPI description file"]]
+    :delegate install-openapi}
+
+   "install-app"
+   {:description "Install app"
+    :cli-options []}})
 
 (let [{:keys [options arguments summary errors]}
       (parse-opts *command-line-args*  cli-options :in-order true)
@@ -87,13 +79,15 @@
           (println "This tool is to manage users, policies and apps in Site.")
           (println)
           (println summary)
+          (println)
+          (println "Subcommands:")
+          (println)
           (doseq [[command {:keys [description cli-options delegate]}] commands]
             (apply
              println
-             (remove nil? [command "\t" description
-                           (when-not delegate "(coming soon!)")]))
-            (println "\t" (:summary (parse-opts [] cli-options))))
-          (println)
+             (remove nil? [command (str "(" description (when-not delegate " - coming soon!") ")")]))
+            (println (:summary (parse-opts [] cli-options)))
+            (println))
           (println "To get an access token:")
           (println "$ curl -X POST https://home.juxt.site/_site/token --user <user>:<password> -d grant_type=client_credentials")))]
 
