@@ -392,7 +392,7 @@
           id (str "https://home.juxt.site" (:uri request))
           authorization (pdp/authorization (crux/db crux-node) {'subject subject
                                                                 'resource resource
-                                                                'request request ;; might change to 'action' at this point
+                                                                'request (dissoc request :body) ;; might change to 'action' at this point
                                                                 'environment {}
                                                                 'new-state instance})
           _ (when-not (= (::pass/access authorization) ::pass/approved)
