@@ -88,7 +88,7 @@
                  (log/debugf "Calling body-fn: %s" body-fn)
                  (let [body (f {:request request
                                 :resource resource
-                                :selected-representation selected-representation
+                                :representation selected-representation
                                 :db db
                                 :authorization authorization
                                 :subject subject})]
@@ -121,7 +121,7 @@
       (cond
         service-function
         (site.function/invoke-service-function
-         {::http/service-function service-function
+         {::site/service-function service-function
           :request request
           :resource resource
           :body body})

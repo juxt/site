@@ -1,4 +1,5 @@
-(ns juxt.site.alpha.function
-  (:require [juxt.site.alpha :as site]))
+(ns juxt.site.alpha.function)
+
+(alias 'site 'juxt.site.alpha)
 
 (defmulti invoke-service-function ::site/service-function)
