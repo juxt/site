@@ -62,10 +62,12 @@
         _ (log/debug "Rejected rules" (pr-str (filter (comp not ::pass/matched?) evaluated-rules)))
         _ (log/debug "Matched rules" (pr-str matched-rules))
 
-        allowed? (and
-                  (pos? (count matched-rules))
-                  ;; Rule combination algorithm is every?
-                  (every? #(= (::pass/effect %) ::pass/allow) matched-rules))]
+        allowed? (or
+                  (= :options (get-in request-context ['request :request-method]))
+                  (and
+                   (pos? (count matched-rules))
+                   ;; Rule combination algorithm is every?
+                   (every? #(= (::pass/effect %) ::pass/allow) matched-rules)))]
 
     (log/debugf "Allowed?: %s" allowed?)
     (if-not allowed?

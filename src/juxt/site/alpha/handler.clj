@@ -234,9 +234,11 @@
 
 (defn OPTIONS [_ resource allow-methods _ _]
   ;; TODO: Implement *
-  (->
-   (spin/options allow-methods)
-   (update :headers merge (::http/options resource))))
+   (->
+    (spin/options allow-methods)
+    (update :headers merge (::http/options resource))
+    (assoc-in [:headers "Access-Control-Allow-Origin"] "*")
+    (assoc-in [:headers "Access-Control-Allow-Headers"] "*")))
 
 (defn PROPFIND [request resource date crux-node authorization subject]
   (dave.methods/propfind request resource date crux-node authorization subject))
