@@ -36,9 +36,14 @@
    "png" "image/png"
    "adoc" "text/asciidoc"})
 
-(defn uri
-  "Return the full URI of the request."
-  ;; At some point we should move to the Ring 2.0 namespace which has more
-  ;; precise naming.
-  [req]
-  (str "https://home.juxt.site" (:uri req)))
+(defn check-freezable [m]
+  (postwalk
+   (fn [x]
+     (when (fn? x)
+       (throw (ex-info "Function!" {})))
+     (when (vector? x)
+       (when-let [[k v] x]
+         (when (fn? v)
+           (throw (ex-info "Function entry!" {:k k})))))
+     x)
+   m))

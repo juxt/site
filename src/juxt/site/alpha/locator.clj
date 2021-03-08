@@ -3,16 +3,15 @@
 (ns juxt.site.alpha.locator
   (:require
    [clojure.tools.logging :as log]
-   [crux.api :as crux]
-   [juxt.site.alpha.util :as util]))
+   [crux.api :as x]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'spin (create-ns 'juxt.spin.alpha))
 
 (defn locate-with-locators [db request]
-  (let [uri (util/uri request)]
+  (let [uri (::site/uri request)]
     (when-let [locators
-               (seq (crux/q
+               (seq (x/q
                      db
                      '{:find [(eql/project
                                r [:crux.db/id

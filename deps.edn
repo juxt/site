@@ -19,13 +19,13 @@
         ;; HTTP support functions
         juxt/spin
         {:git/url "https://github.com/juxt/spin.git"
-           :sha "b40b3ddc145afc7a6f78c12d376bc8f6f132adc6"}
+           :sha "faace930ed2ff05eea0d184eea4b62d00287b611"}
         #_{:local/root "../spin"}
 
         ;; Content negotiation
         juxt/pick
         {:git/url "https://github.com/juxt/pick.git"
-           :sha "82837592666cbfc0aa110eeec458845af5c680aa"}
+           :sha "e4b314cb9e94121fe8005c5628f7f33d28cdefd4"}
         #_{:local/root "../pick"}
 
         ;; JSON Schema support functions

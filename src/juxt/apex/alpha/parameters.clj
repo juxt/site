@@ -320,6 +320,6 @@
         path-param-defs (not-empty (filter #(= (get % "in") "path") param-defs))]
     (cond-> {}
       query-param-defs
-      (assoc :query (process-query-string (:query-string req) query-param-defs))
+      (assoc :query (process-query-string (:ring.request/query req) query-param-defs))
       path-param-defs
       (assoc :path (process-path-parameters (:path-params req) path-param-defs)))))

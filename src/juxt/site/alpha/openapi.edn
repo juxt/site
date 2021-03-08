@@ -8,10 +8,12 @@
   :title "Site API"
   :description
   "Managing Site APIs, users, roles, and policies."
+
   :contact
   {:name "Webmaster"
-   :email "webmaster@home.juxt.site"
-   :url "https://home.juxt.site"}}
+   :email "webmaster@<canonical-host>"
+   :url "<canonical-host>"}}
+
  :servers [{:url "/_site"}]
 
  :paths
@@ -169,6 +171,47 @@
           :content
           {"text/plain;charset=utf-8" {}}}}}}
 
+  "/roles/{id}/users/{user}"
+  {:get
+   {:description "Returns role mappings"
+    ;; NOTE: Path-object level parameters not yet supported!!
+    :parameters
+    [{:name "id" :in "path" :required true
+      :description "Role id"
+      :schema {:type "string"}}
+     {:name "user" :in "path" :required true
+      :description "Username"
+      :schema {:type "string"}}]
+    :operationId "findUserRoleMapping"
+
+    :responses
+    {200 {:description "User-role mapping"
+          :content
+          {"application/json" {:schema {"$ref" "#/components/schemas/UserRoleMapping"}}
+           "text/html;charset=utf-8" {:title "User Role Mapping"}}}}}
+
+   :put
+   {:description "Upserts a user-role mapping"
+    :operationId "putUserRoleMapping"
+    :parameters
+    [{:name "id" :in "path" :required true
+      :description "Role id"
+      :schema {:type "string"}}
+     {:name "user" :in "path" :required true
+      :description "Username"
+      :schema {:type "string"}}]
+    :requestBody
+    {:required true
+     :content
+     {"application/json" {:schema {"$ref" "#/components/schemas/UserRoleMapping"}}}}
+    :responses
+    {200 {:description "UserRoleMapping successfully updated"
+          :content
+          {"text/plain;charset=utf-8" {}}}
+     201 {:description "UserRoleMapping successfully created"
+          :content
+          {"text/plain;charset=utf-8" {}}}}}}
+
   "/rules/"
   {:get
    {:description "Returns a list of all the rule"
@@ -188,7 +231,15 @@
        {:title "Rules"
         :type "edn-table"
         :schema {"type" "array"
-                 "items" {"$ref" "#/components/schemas/IdentifiedRule"}}}}}}}}
+                 "items" {"$ref" "#/components/schemas/IdentifiedRule"}}}}}}}
+
+   :post
+   {:juxt.site.alpha/post-fn juxt.site.alpha.rules/post-rule
+    :requestBody
+    {:required true
+     :content
+     {"application/json"
+      {:schema {"$ref" "#/components/schemas/Rule"}}}}}}
 
   "/rules/{id}"
   {:parameters
@@ -317,10 +368,7 @@
      {"$ref" "#/components/schemas/Typed"}
      {:properties
       {"type" {:const "Role"}
-       "description" {:type "string"}
-       "roles" {:type "array"
-                :items {:type "string"
-                        :format "uri-reference"}}}}]}
+       "description" {:type "string"}}}]}
 
    "IdentifiedRole"
    {"$id" "/schemas/IdentifiedRole"
@@ -335,9 +383,11 @@
      {"$ref" "#/components/schemas/Typed"}
      {:type "object"
       :required []
-      :juxt.jinx.alpha/keyword-mappings {"email" "email"}
+      :juxt.jinx.alpha/keyword-mappings {"email" "email"
+                                         "username" "juxt.pass.alpha/username"}
       :properties
       {"type" {:const "User"}
+       "username" {:type "string" :minLength 1}
        "email" {:type "string"
                 :format "email"}}}]}
 
@@ -352,13 +402,37 @@
     :allOf
     [{"$ref" "#/components/schemas/Typed"}
      {:type "object"
-      :required []
-      :juxt.jinx.alpha/keyword-mappings {"password" "juxt.pass.alpha/password-hash"}
+      :required ["password" "user"]
+      :juxt.jinx.alpha/keyword-mappings
+      {"user" "juxt.pass.alpha/user"
+       "password" "juxt.pass.alpha/password-hash"}
       :properties
       {"type" {:const "Password"}
+       "user" {:type "string"
+               :format "uri-reference"}
        "password" {:type "string"
                    :juxt.jinx.alpha/as "password"
                    :description "The user's password, stored as a hash at rest, and only transmitted in the clear when being set."}}}]}
+
+   "UserRoleMapping"
+   {"$id" "/schemas/UserRoleMapping"
+    :allOf
+    [{"$ref" "#/components/schemas/Typed"}
+     {:type "object"
+      :required ["assignee" "role" "assigner"]
+      :juxt.jinx.alpha/keyword-mappings
+      {"assignee" "juxt.pass.alpha/assignee"
+       "role" "juxt.pass.alpha/role"
+       "assigner" "juxt.pass.alpha/assigner"
+       "businessJustification" "juxt.pass.alpha/business-justification"}
+      :properties
+      {"type" {:const "UserRoleMapping"}
+       "assignee" {:type "string" :format "uri-reference"}
+       "role" {:type "string" :format "uri-reference"}
+       "assigner" {:type "string" :format "uri-reference"}
+       "businessJustification"
+       {:type "string"
+        :description "The reason why the user has been assigned this role"}}}]}
 
    "Rule"
    {"$id" "/schemas/Rule"
@@ -366,10 +440,11 @@
     [{"$ref" "#/components/schemas/Typed"}
      {:type "object"
       :required ["target" "effect"]
-      :juxt.jinx.alpha/keyword-mappings {"description" "juxt.pass.alpha/description"
-                                         "target" "juxt.pass.alpha/target"
-                                         "effect" "juxt.pass.alpha/effect"
-                                         "limitingClauses" "juxt.pass.alpha/limiting-clauses"}
+      :juxt.jinx.alpha/keyword-mappings
+      {"description" "juxt.pass.alpha/description"
+       "target" "juxt.pass.alpha/target"
+       "effect" "juxt.pass.alpha/effect"
+       "limitingClauses" "juxt.pass.alpha/limiting-clauses"}
       :properties
       {"type" {:const "Rule"}
        "description" {:type "string"}

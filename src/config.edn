@@ -20,5 +20,5 @@
   {:cache? false}
 
   :juxt.site.alpha.server/server
-  {:crux-node #ig/ref :juxt.site.alpha.db/crux-node
-   :port 2021}}}
+  {:juxt.site.alpha/crux-node #ig/ref :juxt.site.alpha.db/crux-node
+   :just.site.alpha/port 2021}}}

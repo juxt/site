@@ -7,6 +7,7 @@
    [clojure.tools.logging :as log]
    [crux.api :as crux]))
 
+(alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
@@ -32,7 +33,7 @@
                    (crux/q db '{:find [rule]
                                 :where [[rule ::site/type "Rule"]]}))
 
-        _  (log/debugf "Rules to match are %s" (pr-str rules))
+        ;;_  (log/debugf "Rules to match are %s" (pr-str rules))
 
         temp-id-map (reduce-kv
                      ;; Preserve any existing crux.db/id - e.g. the resource will have one
@@ -55,17 +56,22 @@
                  (assoc rule ::pass/matched? (pos? (count match-results)))))))
          rules)
 
-        _ (log/debugf "Result of rule matching: %s" (pr-str evaluated-rules))
+        ;;_ (log/debugf "Result of rule matching: %s" (pr-str evaluated-rules))
 
         matched-rules (filter ::pass/matched? evaluated-rules)
 
-        _ (log/debug "Rejected rules" (pr-str (filter (comp not ::pass/matched?) evaluated-rules)))
+        ;;_ (log/debug "Rejected rules" (pr-str (filter (comp not ::pass/matched?) evaluated-rules)))
         _ (log/debug "Matched rules" (pr-str matched-rules))
 
         allowed? (and
                   (pos? (count matched-rules))
                   ;; Rule combination algorithm is every?
-                  (every? #(= (::pass/effect %) ::pass/allow) matched-rules))]
+                  (every? #(= (::pass/effect %) ::pass/allow) matched-rules))
+
+        max-content-length (->> matched-rules
+                                (filter #(= (::pass/effect %) ::pass/allow))
+                                (map #(get % ::http/max-content-length 0))
+                                (apply max 0))]
 
     (log/debugf "Allowed?: %s" allowed?)
     (if-not allowed?
@@ -73,20 +79,17 @@
       {:access ::pass/denied
        :matched-rules matched-rules}
 
-      #::pass
-      {:access ::pass/approved
-       :matched-rules matched-rules
-       :limiting-clauses
-       ;; Get all the query limits added by these rules
-       (->> matched-rules
-            (filter #(= (::pass/effect %) ::pass/allow))
-            (map ::pass/limiting-clauses)
-            (apply concat))
-       :allow-methods
-       (->> matched-rules
-            (filter #(= (::pass/effect %) ::pass/allow))
-            (map ::pass/allow-methods)
-            (apply set/union))})))
+      (cond->
+          #::pass
+          {:access ::pass/approved
+           :matched-rules matched-rules
+           :limiting-clauses
+           ;; Get all the query limits added by these rules
+           (->> matched-rules
+                (filter #(= (::pass/effect %) ::pass/allow))
+                (map ::pass/limiting-clauses)
+                (apply concat))}
+        (pos? max-content-length) (assoc ::http/max-content-length max-content-length)))))
 
 (defn ->authorized-query [query authorization]
   ;; Ensure they apply to ALL entities queried by a given Datalog

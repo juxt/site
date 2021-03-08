@@ -14,78 +14,496 @@
    [clojure.pprint :refer [pprint]]
    [clojure.edn :as edn]
    [io.aviso.ansi :as ansi]
-   [clojure.string :as str]))
+   [clojure.string :as str])
+  (:import
+   (java.nio.file Files)
+   (java.nio.file.attribute FileAttribute)))
 
 (def ^:dynamic *debug* nil)
 
-(defn error! [msg]
-  (println "ERROR:" msg)
-  (System/exit 1))
+(defn error! [& msg]
+  (apply println (apply str ansi/red-font "fail: " ansi/reset-font) msg))
+
+(defn error-and-exit! [exit & msg]
+  (apply error! msg)
+  (System/exit exit))
+
+(defn message! [& msg]
+  (apply println (apply str ansi/bold-green-font "site: " ansi/reset-font) msg))
+
+(def config-file
+  (case (System/getProperty "os.name")
+    "Linux" (io/file (System/getProperty "user.home") ".config/site/config.edn")
+    (error-and-exit! 1 "Unsupported OS")))
 
 (def config
-  (case (System/getProperty "os.name")
-    "Linux" {:storage-dir
-             (let [dir (io/file (System/getProperty "user.home") ".local/share/site")]
-               (if (.exists dir) dir
-                   (if-not (.mkdirs dir)
-                     (error! (str "Failed to make directory: " dir))
-                     dir)))
-             :encrypted-password-dir
-             (let [dir (io/file
-                        (System/getProperty "user.home")
-                        ".password-store/site/webmaster.gpg")]
-               (if (.exists dir) dir (error! (str "Encrypted password directory not found: " dir))))}
+  (merge
+   {:pass-password-dir "site"}
+   (when (.exists config-file)
+     (edn/read-string (slurp config-file)))))
 
-    (error! "Unsupported OS")))
+(defn get-password-from-pass [username]
+  (let [dir (io/file
+             (System/getProperty "user.home")
+             (str ".password-store/" (:pass-password-dir config)))
+        passfile (io/file dir (str username ".gpg"))]
+    (when (.exists passfile)
+      (do
+        (message! "Extracting password from " (str passfile))
+        (let [{:keys [exit out]} (sh/sh "gpg" "-d" (str passfile))]
+          (when (zero? exit) (str/trim out)))))))
 
-(defn get-password []
-  (let [{:keys [exit out]} (sh/sh "gpg" "-d" (str (:encrypted-password-dir config)))]
-    (when (zero? exit) out)))
+(defn get-password [username]
+  (or
+   (get-password-from-pass username)
+   ;; TODO: Try other strategies, like pinentry
+   ))
 
-(defn get-token [opts]
-  (let [{:keys [server uid password]} (:options opts)]
-    (when-not server (error! "Server not specified"))
-    (when-not uid (error! "User id required"))
+(defn local-token-file []
+  (let [dir (io/file (System/getProperty "user.home") ".local/share/site")]
+    (when-not (.exists dir)
+      (when-not (.mkdirs dir)
+        (error-and-exit! 1 (str "Failed to make directory: " dir))))
+    (io/file dir "access-token.json")))
 
-    (let [{:keys [status body]}
+(defn configure
+  "Set a configuration value"
+  [opts]
+  (let [[k v] (:arguments opts)]
+    (if (#{ ;; default site host (plus optional scheme)
+           "site-server"
+           ;; default username to use
+           "username"
+           ;; pass subdirectory to load passwords from, defaults to 'site'
+           "pass-password-dir"
+           ;; canonical host
+           "canonical-host"} k)
+
+      (case (System/getProperty "os.name")
+        "Linux" (let [dir (io/file (System/getProperty "user.home") ".config/site")]
+                  (assert v)
+                  (when-not (.exists dir)
+                    (when-not (.mkdirs dir)
+                      (error-and-exit! 1 (str "Failed to make directory: " dir))))
+                  (spit (io/file dir "config.edn") (with-out-str (pprint (assoc config (keyword k) v)))))
+        (error-and-exit! 1 "Unsupported OS"))
+
+      (if k
+        (error-and-exit! 1 (format "%s is not a configuration setting" key))
+        (do
+          (message! "Printing config")
+          (pprint config))))))
+
+(defn get-token
+  "Request a token"
+  [opts]
+  (let [{:keys [server username password]
+         :or {server (:site-server config)
+              username (:username config)}}
+        (:options opts)]
+    (when-not server (error-and-exit! 1 "Server not specified"))
+    (when-not username (error-and-exit! 1 "Username required"))
+
+    (let [{:keys [status headers body]}
           (curl/post
            (format "%s/_site/token" server)
            {:headers {"content-type" "application/x-www-form-urlencoded"}
-            :basic-auth [uid (get-password)]
+            :basic-auth [username (or (get-password username) (error-and-exit! 1 "Failed to get password"))]
             :body "grant_type=client_credentials"
-            :throw false})]
+            :throw false
+            :debug true})]
       (cond
         (= status 401)
         (do
-          (println "Server response:" status body)
-          (println "Are your credentials valid?"))
-        ;; TODO: Store in correct Linux XDG location
-        :else (spit (io/file (:storage-dir config) ".site-access-token") body)))))
+          (message! "Server response: " status " " body)
+          (message! (format "Are your credentials valid? request-id is %s" (get headers "site-request-id"))))
 
-(defn add-user [opts]
-  (let [{:keys [token server uid password name role]} (:options opts)]
-    (when-not server (error! "Server not specified"))
-    (when-not token (error! "Access token required, use the get-token sub-command"))
-    (let [{:keys [status body]}
+        (= status 200)
+        (let [f (local-token-file)
+              data (json/decode body)
+              expires (java.util.Date.
+                       (+ (.getTime (java.util.Date.))
+                          (* (get data "expires_in") 1000)))
+
+              data (-> data
+                       (assoc "username" username)
+                       (assoc "expires" (.format java.time.format.DateTimeFormatter/ISO_INSTANT (.toInstant expires))))]
+
+          (message! (str "Access token: " ansi/cyan-font (get data "access_token") ansi/reset-font))
+          (message! (format "Token expires in %s seconds" (get data "expires_in")))
+          (message! (format "Storing token in %s" f))
+          (spit f (json/encode data {:pretty true})))
+
+        :else
+        (do
+          (println "Server response:" status (str/trim body)))))))
+
+(defn load-token []
+  "Load token from local cache"
+  (let [f (local-token-file)
+        _ (when-not (.exists f)
+            (error-and-exit! 1 "Please request a token with the 'get-token' subcommand"))
+        {access-token "access_token" expires "expires" :as token}
+        (json/decode (slurp f))]
+
+    (if (.isBefore (java.time.Instant/parse expires) (java.time.Instant/now))
+      (error-and-exit! 1 "Access token has expired. Please request a new token with the 'get-token' subcommand")
+      token)))
+
+(defn check-token
+  "Check the validity of the locally cached token"
+  [_]
+  (let [token (json/decode (slurp (local-token-file)))
+        expires (get token "expires")]
+    (if (.isBefore (java.time.Instant/parse expires) (java.time.Instant/now))
+      (message! "Access token has expired")
+      (let [mins-left (.until (java.time.Instant/now)
+                              (java.time.Instant/parse expires)
+                              java.time.temporal.ChronoUnit/MINUTES)]
+        (message! (format "Access token is owned by %s%s%s: %s%s%s"
+                          ansi/yellow-font (get token "username") ansi/reset-font
+                          ansi/cyan-font (get token "access_token") ansi/reset-font))
+        (if (> mins-left 1)
+          (message! (format "Access token expires in %d minutes" mins-left))
+          (message! (format "Access token expires in %d seconds"
+                            (.until (java.time.Instant/now)
+                                    (java.time.Instant/parse expires)
+                                    java.time.temporal.ChronoUnit/SECONDS))))))))
+
+(defn clear-token
+  "Clear the token to end the session"
+  [_]
+  (if (.delete (local-token-file))
+    (message! "Token deleted")
+    (when (.exists (local-token-file))
+      (error! "Failed to delete token"))))
+
+(defn list-users
+  "List users"
+  [opts]
+  (let [{:keys [server]
+         :or {server (:site-server config)}}
+        (:options opts)]
+    (let [{access-token "access_token"} (load-token)
+          {:keys [status headers body]}
+          (curl/get
+           (format "%s/_site/users/" server)
+           {:headers {"authorization" (format "Bearer %s" access-token)
+                      "accept" "application/json"}
+            :throw false})]
+      (cond
+        (= (quot status 100) 2)
+        (println (json/encode (json/decode body) {:pretty true}))
+
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id"))))
+      )))
+
+(defn reset-password
+  "Reset a user's password"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [server canonical-host username password]
+         :or {server (:site-server config)
+              canonical-host (:canonical-host config)}}
+        (:options opts)]
+
+    (when-not server (error-and-exit! 1 "Server not specified"))
+    (when-not username (error-and-exit! 1 "User required"))
+    (when-not password (error-and-exit! 1 "Password required"))
+    (when-not canonical-host (error-and-exit! 1 "Canonical host required"))
+
+    (let [{:keys [status headers body]}
           (curl/put
-           (format "%s/_site/users/%s" server uid)
-           {:headers {"authorization" (format "Bearer %s" token)
+           (format "%s/_site/users/%s/password" server username)
+           {:headers {"authorization" (format "Bearer %s" access-token)
                       "content-type" "application/json"}
             :body (json/generate-string
-                   {:type "User"
-                    :userid uid
-                    :name name})
+                   {"type" "Password"
+                    "user" (format "https://%s/_site/users/%s" canonical-host username)
+                    "password" password})
+            :throw false})]
+      (cond
+        (= status 401)
+        (error! "Server response: " status " " (str/trim body))
+
+        (= (quot status 100) 2)
+        (message! "Password reset")
+
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
+(defn put-user
+  "Create or update a user"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [server username password name]
+         :or {server (:site-server config)}}
+        (:options opts)]
+    (when-not server (error-and-exit! 1 "Server not specified"))
+    (when-not username (error-and-exit! 1 "User required"))
+    (when-not name (error-and-exit! 1 "Name required"))
+
+    (let [{:keys [status headers body]}
+          (curl/put
+           (format "%s/_site/users/%s" server username)
+           {:headers {"authorization" (format "Bearer %s" access-token)
+                      "content-type" "application/json"}
+            :body (json/generate-string
+                   {"type" "User"
+                    "username" username
+                    "name" name})
             :throw false})]
       (cond
         (= status 401)
         (do
-          (println "Server response:" status body)
-          (println "Is your access-token valid?")
-          (println)
-          (println "To get a new access token, use the get-token sub-command"))))))
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Is your access-token valid?")
+          (message! "To get a new access token, use the get-token sub-command")
+          (message! "Request id: " (get headers "site-request-id")))
 
-(defn install-openapi [options]
-  (prn options))
+        (= status 201)
+        (message! "User created")
+
+        (= status 204)
+        (message! "User updated")
+
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id"))))
+
+      (when (and password (#{201 204} status)) (reset-password opts)))))
+
+(defn put-role
+  "Create or update a role"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [server role description]
+         :or {server (:site-server config)}}
+        (:options opts)]
+    (when-not server (error-and-exit! 1 "Server not specified"))
+    (when-not role (error-and-exit! 1 "User required"))
+
+    (let [{:keys [status headers body]}
+          (curl/put
+           (format "%s/_site/roles/%s" server role)
+           {:headers {"authorization" (format "Bearer %s" access-token)
+                      "content-type" "application/json"}
+            :body (json/generate-string
+                   (cond-> {"type" "Role"
+                            "name" role}
+                     description (assoc "description" description)))
+
+            :throw false})]
+      (cond
+        (= status 401)
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Is your access-token valid?")
+          (message! "To get a new access token, use the get-token sub-command")
+          (message! "Request id: " (get headers "site-request-id")))
+
+        (= status 201)
+        (message! "Role created")
+
+        (= status 204)
+        (message! "Role updated")
+
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
+(defn list-roles
+  "List roles"
+  [opts]
+  (let [{:keys [server]
+         :or {server (:site-server config)}}
+        (:options opts)]
+    (let [{access-token "access_token"} (load-token)
+          {:keys [status headers body]}
+          (curl/get
+           (format "%s/_site/roles/" server)
+           {:headers {"authorization" (format "Bearer %s" access-token)
+                      "accept" "application/json"}
+            :throw false})]
+      (cond
+        (= (quot status 100) 2)
+        (println (json/encode (json/decode body) {:pretty true}))
+
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
+(defn assign-role
+  "Assign a role to a user"
+  [opts]
+  (let [{access-token "access_token" assigner "username"} (load-token)
+        {:keys [server canonical-host username role justification]
+         :or {server (:site-server config)
+              canonical-host (:canonical-host config)}}
+        (:options opts)]
+    (when-not server (error-and-exit! 1 "Server not specified"))
+    (when-not username (error-and-exit! 1 "Username required"))
+    (when-not role (error-and-exit! 1 "Role required"))
+    (when-not justification (error-and-exit! 1 "Justification required"))
+
+    (let [{:keys [status headers body]}
+          (curl/put
+           (format "%s/_site/roles/%s/users/%s" server role username)
+           {:headers {"authorization" (format "Bearer %s" access-token)
+                      "content-type" "application/json"}
+            :body (json/generate-string
+                   (cond-> {"type" "UserRoleMapping"
+                            "assignee" (format "https://%s/_site/users/%s" canonical-host username)
+                            "assigner" (format "https://%s/_site/users/%s" canonical-host assigner)
+                            "role" (format "https://%s/_site/roles/%s" canonical-host role)}
+                     justification (assoc "businessJustification" justification)))
+            :throw false})]
+      (cond
+        (= status 401)
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Is your access-token valid?")
+          (message! "To get a new access token, use the get-token sub-command")
+          (message! "Request id: " (get headers "site-request-id")))
+
+        (= status 201)
+        (message! "Assignment created")
+
+        (= status 204)
+        (message! "Assignment updated")
+
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
+(defn post-rule
+  "Post a new rule"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [server target]
+         :or {server (:site-server config)}}
+        (:options opts)]
+    (when-not server (error-and-exit! 1 "Server not specified"))
+    (when-not target (error-and-exit! 1 "Target required"))
+
+    (let [{:keys [status headers body]}
+          (curl/post
+           (format "%s/_site/rules/" server)
+           {:headers {"authorization" (format "Bearer %s" access-token)
+                      "content-type" "application/json"}
+            :body (json/generate-string
+                   {"type" "Rule"
+                    "target" (pr-str (edn/read-string target))
+                    "effect" "juxt.pass.alpha/allow"})
+            :throw false})]
+      (cond
+        (= status 201)
+        (message! "Rule created " (get headers "location"))
+
+        (= status 204)
+        (message! "Rule updated")
+
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
+(defn install-api
+  "Upload and install an API"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [server openapi]
+         :or {server (:site-server config)}} (:options opts)
+
+        _ (when-not openapi (error-and-exit! 1 "openapi file not specified"))
+        _ (when-not (.exists (io/file openapi)) (error-and-exit! 1 "openapi file not found"))
+        _ (when-not (.isFile (io/file openapi)) (error-and-exit! 1 "openapi argument is not a file"))
+
+        {:keys [status headers body]}
+        (curl/put
+         (format "%s/_site/apis/test" server)
+         {:headers {"authorization" (format "Bearer %s" access-token)
+                    "content-type" "application/json"}
+          :body (json/generate-string
+                 (cond-> {"type" "OpenAPI"
+                          "openapi" (slurp (io/file openapi))}))
+          :throw false})]
+    (cond
+      (= status 204)
+      (message! "API installed")
+
+      :else
+      (do
+        (error! "Server response: " status " " (str/trim body))
+        (message! "Request id: " (get headers "site-request-id"))))))
+
+(defn load-assets [opts]
+  (println "Load assets")
+  ;; Send a load request to Site with instructions of where to load assets from
+  )
+
+(defn sh [& args]
+  (let [{:keys [exit out err]} (apply sh/sh args)]
+    (when (pos? exit)
+      (error! err))))
+
+(defn create-tmp-dir []
+  (let [tmpdir (Files/createTempDirectory
+                "site-" (into-array FileAttribute []))]
+    (message! "Created tmp dir: " tmpdir)
+    tmpdir))
+
+(defn content-type [filename]
+  (when-let [[_ suffix] (re-matches #"[^\.]+(\..*)" filename)]
+    (or
+     (get {".js" "application/json"
+           ;;".js.map" "application/json"
+           ;;".css.map" "application/json"
+           ".css" "text/css"
+           ".html" "text/html"
+           ".png" "image/png"} suffix)
+     ;;(error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix))
+     )))
+
+(defn install-swagger-ui [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [server] :or {server (:site-server config)}} (:options opts)
+        tmpdir #_(create-tmp-dir) (.toPath (io/file "/tmp/site-5699006776245501173"))
+        outfile (.resolve tmpdir "swagger-ui.zip")]
+    (message! "Downloading Swagger UI distribution: " outfile)
+    #_(sh "curl" "-o" (.toString outfile) "https://codeload.github.com/swagger-api/swagger-ui/zip/v3.44.1")
+    (message! "Extracting Swagger UI distribution: " outfile)
+    #_(sh "unzip" (.toString outfile) "-d" (.toString tmpdir))
+    (let [dir (.resolve tmpdir "swagger-ui-3.44.1")]
+      (doseq [f (file-seq (.toFile dir))
+              :when (.isFile f)]
+        (let [rel-path (.relativize tmpdir (.toPath f))]
+          (when (.startsWith rel-path "swagger-ui-3.44.1/dist/")
+            (let [url (format "%s/swagger-ui/%s" server (.toString rel-path))
+                  _ (message! "Uploading" (.toString rel-path) "to" url)
+                  content-type (content-type (last (str/split (.toString rel-path) #"/")))]
+              (when content-type
+                (let [{:keys [status headers body]}
+                      (curl/put
+                       url
+                       {:headers {"authorization" (format "Bearer %s" access-token)
+                                  "content-type" content-type}
+                        :body f
+                        :throw false})]
+                  (cond
+                    :else
+                    (do
+                      (error-and-exit! 1 (str "Server response: " status " " (str/trim body)))
+                      (message! "Request id: " (get headers "site-request-id")))))))))))))
 
 (defn debugf
   "Write a debug message to the console, but only if *debug* is true."
@@ -94,62 +512,113 @@
     (println "DEBUG:" (apply format args))))
 
 (def cli-options
-  [["-t" "--token TOKEN" "Your access token for authentication purposes"]
-
-   ["-s" "--server SERVER" "The address of the Site server you are managing"
-    :default "https://home.juxt.site"]
-
+  [["-s" "--server SERVER" "The address of the server you are managing"]
+   ["-c" "--canonical-host HOST" "The canonical host for the server"]
    ["-d" "--debug" "Enable debug mode"]
    ["-v" "--verbose" "Verbose mode"]
    ["-h" "--help" "Show this summary"]])
 
 (def commands
-  {"get-token"
-   {:description "Get an access token"
-    :cli-options [["-u" "--uid USER" "Your user id"]]
-    :delegate get-token}
+  [["configure"
+    {:description (:doc (meta #'configure))
+     :cli-options []
+     :delegate configure}]
 
-   "add-user"
-   {:description "Add a new user"
-    :cli-options [["-n" "--name NAME" "The user's name"]
-                  ["-u" "--uid USER" "The user id of the user you are adding"]
-                  ["-p" "--password PASSWORD" "A temporary password for the user"]
-                  ["-r" "--role ROLE" "Roles that the user has"]]
-    :delegate add-user}
+   ["get-token"
+    {:description (:doc (meta #'get-token))
+     :cli-options []
+     :delegate get-token}]
 
-   "install-api"
-   {:description "Install OpenAPI"
-    :cli-options [["-f" "--openapi FILE" "OpenAPI description file"]]
-    :delegate install-openapi}
+   ["check-token"
+    {:description (:doc (meta #'check-token))
+     :cli-options []
+     :delegate check-token}]
 
-   "install-app"
-   {:description "Install app"
-    :cli-options []}})
+   ["clear-token"
+    {:description (:doc (meta #'clear-token))
+     :cli-options []
+     :delegate clear-token}]
+
+   ["list-users"
+    {:description (:doc (meta #'list-users))
+     :cli-options []
+     :delegate list-users}]
+
+   ["put-user"
+    {:description (:doc (meta #'put-user))
+     :cli-options [["-n" "--name NAME" "The user's name"]
+                   ["-u" "--username USERNAME" "The username of the user you are creating/updating"]
+                   ["-p" "--password PASSWORD" "A temporary password for the user"]
+                   ]
+     :delegate put-user}]
+
+   ["reset-password"
+    {:description (:doc (meta #'reset-password))
+
+     :cli-options [["-u" "--username USERNAME" "The username of the user"]
+                   ["-p" "--password PASSWORD" "A temporary password for the user"]]
+     :delegate reset-password}]
+
+   ["put-role"
+    {:description (:doc (meta #'put-role))
+     :cli-options [["-r" "--role ROLE" "The role you are creating/updating"]
+                   ["-d" "--description DESCRIPTION" "An optional description"]]
+     :delegate put-role}]
+
+   ["list-roles"
+    {:description (:doc (meta #'list-roles))
+     :cli-options []
+     :delegate list-roles}]
+
+   ["assign-role"
+    {:description (:doc (meta #'assign-role))
+     :cli-options [["-u" "--username USERNAME" "The user receiving the role"]
+                   ["-r" "--role ROLE" "The role you are assigning"]
+                   ["-j" "--justification JUSTIFICATION" "The business justification"]]
+     :delegate assign-role}]
+
+   ["post-rule"
+    {:description (:doc (meta #'post-rule))
+     :cli-options [["-t" "--target FILE" "Datalog rule used for rule matching"]]
+     :delegate post-rule}]
+
+   ["install-api"
+    {:description (:doc (meta #'install-api))
+     :cli-options [["-f" "--openapi FILE" "OpenAPI description file"]]
+     :delegate install-api}]
+
+   ["load-assets"
+    {:description (:doc (meta #'load-assets))
+     :cli-options []
+     :delegate load-assets}]
+
+   ["install-swagger-ui"
+    {:description (:doc (meta #'install-swagger-ui))
+     :cli-options []
+     :delegate install-swagger-ui}]])
 
 (let [{:keys [options arguments summary errors]}
       (parse-opts *command-line-args*  cli-options :in-order true)
       command (first arguments)
-      {:keys [cli-options delegate]} (get commands (first arguments))
+      {:keys [cli-options delegate]} ((into {} commands) (first arguments))
 
       print-summary
       (fn []
         (do
-          (println "Site (Admin Tool)")
+          (println (str ansi/bold-green-font "site" ansi/reset-font " – RLWS IoT Cloud Edition"))
           (println)
           (println "This tool is to manage users, policies and apps in Site.")
           (println)
           (println summary)
           (println)
-          (println "Subcommands:")
+          (println (str ansi/white-font "Subcommands" ansi/reset-font))
           (println)
           (doseq [[command {:keys [description cli-options delegate]}] commands]
             (apply
              println
-             (remove nil? [command (str "(" description (when-not delegate " - coming soon!") ")")]))
+             (remove nil? [command (str ansi/yellow-font "(" description (when-not delegate " - coming soon!") ")" ansi/reset-font)]))
             (println (:summary (parse-opts [] cli-options)))
-            (println))
-          (println "To get an access token:")
-          (println "$ curl -X POST https://home.juxt.site/_site/token --user <user>:<password> -d grant_type=client_credentials")))]
+            (println))))]
 
   (cond
     (contains? options :help)
@@ -159,7 +628,7 @@
     (doseq [err errors]
       (println err))
 
-    (find commands command)
+    (find (into {} commands) command)
     (binding [*debug* (:debug options)]
       (if delegate
         (delegate
