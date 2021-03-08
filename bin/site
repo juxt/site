@@ -443,11 +443,6 @@
         (error! "Server response: " status " " (str/trim body))
         (message! "Request id: " (get headers "site-request-id"))))))
 
-(defn load-assets [opts]
-  (println "Load assets")
-  ;; Send a load request to Site with instructions of where to load assets from
-  )
-
 (defn sh [& args]
   (let [{:keys [exit out err]} (apply sh/sh args)]
     (when (pos? exit)
@@ -595,11 +590,6 @@
     {:description (:doc (meta #'install-api))
      :cli-options [["-f" "--openapi FILE" "OpenAPI description file"]]
      :delegate install-api}]
-
-   ["load-assets"
-    {:description (:doc (meta #'load-assets))
-     :cli-options []
-     :delegate load-assets}]
 
    ["install-swagger-ui"
     {:description (:doc (meta #'install-swagger-ui))
