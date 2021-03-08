@@ -101,6 +101,7 @@
          :or {server (:site-server config)
               username (:username config)}}
         (:options opts)]
+
     (when-not server (error-and-exit! 1 "Server not specified"))
     (when-not username (error-and-exit! 1 "Username required"))
 
@@ -212,10 +213,10 @@
 
     (when-not server (error-and-exit! 1 "Server not specified"))
     (when-not username (error-and-exit! 1 "User required"))
-    (when-not password (error-and-exit! 1 "Password required"))
     (when-not canonical-host (error-and-exit! 1 "Canonical host required"))
 
-    (let [{:keys [status headers body]}
+    (let [password (or password (get-password username))
+          {:keys [status headers body]}
           (curl/put
            (format "%s/_site/users/%s/password" server username)
            {:headers {"authorization" (format "Bearer %s" access-token)
@@ -277,7 +278,7 @@
           (error! "Server response: " status " " (str/trim body))
           (message! "Request id: " (get headers "site-request-id"))))
 
-      (when (and password (#{201 204} status)) (reset-password opts)))))
+      (when (#{201 204} status) (reset-password opts)))))
 
 (defn put-role
   "Create or update a role"
@@ -352,7 +353,6 @@
     (when-not server (error-and-exit! 1 "Server not specified"))
     (when-not username (error-and-exit! 1 "Username required"))
     (when-not role (error-and-exit! 1 "Role required"))
-    (when-not justification (error-and-exit! 1 "Justification required"))
 
     (let [{:keys [status headers body]}
           (curl/put
