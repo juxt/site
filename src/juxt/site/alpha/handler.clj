@@ -2,12 +2,10 @@
 
 (ns juxt.site.alpha.handler
   (:require
-   [clojure.edn :as edn]
    [clojure.pprint :refer [pprint]]
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [clojure.walk :as walk]
    [crux.api :as x]
    [crypto.password.bcrypt :as password]
    [juxt.apex.alpha.openapi :as openapi]

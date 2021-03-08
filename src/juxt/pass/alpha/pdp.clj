@@ -2,7 +2,6 @@
 
 (ns juxt.pass.alpha.pdp
   (:require
-   [clojure.set :as set]
    [clojure.walk :refer [postwalk-replace]]
    [clojure.tools.logging :as log]
    [crux.api :as crux]))
