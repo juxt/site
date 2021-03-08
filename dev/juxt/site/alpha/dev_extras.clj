@@ -80,8 +80,8 @@
         (sort-by str)))
   ([t]
    (->> (q '{:find [(eql/project e [*])]
-             :where [[e :crux.db/id]
-                     [e ::site/type t]]
+               :where [[e :crux.db/id]
+                       [e ::site/type t]]
              :in [t]} t)
         (map first)
         (sort-by str))))

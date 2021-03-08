@@ -27,7 +27,7 @@
   (System/exit exit))
 
 (defn message! [& msg]
-  (apply println (apply str ansi/bold-green-font "site: " ansi/reset-font) msg))
+  (apply println (apply str ansi/bold-green-font "site:" ansi/reset-font) msg))
 
 (def config-file
   (case (System/getProperty "os.name")
@@ -136,7 +136,7 @@
           (spit f (json/encode data {:pretty true}))
           (when curl
             (message! (format "Storing curl config in %s" curl))
-            (spit curl (format "-H \"Authorization: Bearer %s\"\n-H \"Accept: application/json\"" (get data "access_token")))))
+            (spit curl (format "-H \"Authorization: Bearer %s\"\n-H \"Accept: application/json,*.*;q=0.8\"\n" (get data "access_token")))))
 
         :else
         (do
@@ -493,15 +493,9 @@
                       (curl/put
                        url
                        {:headers {"authorization" (format "Bearer %s" access-token)
-                                  "content-type" content-type
-                                  ;;"content-length" (.length f)
-                                  }
+                                  "content-type" content-type}
                         :body f
-                        :debug true
-                        :throw false
-                        ;;:raw-args ["--data-binary"]
-                        })]
-                  (println "command was" command)
+                        :throw true})]
                   (cond
                     (= status 200)
                     (message! "OK")
