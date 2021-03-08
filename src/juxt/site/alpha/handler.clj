@@ -269,14 +269,10 @@
         cur-reps
         (when (#{:get :head} method) (current-representations res))
 
-        _ (log/trace "cur-reps is" (map (fn [x] (dissoc x ::http/body)) cur-reps))
-
         sel-rep
         (when (seq cur-reps)
           (negotiate-representation req cur-reps))
         req (assoc req ::site/selected-representation sel-rep)
-
-        _ (log/trace "sel-rep is" (dissoc sel-rep ::http/body))
 
         _ (when (and (#{:get :head} method) (empty? cur-reps))
             (throw
