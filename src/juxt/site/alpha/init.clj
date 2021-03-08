@@ -47,7 +47,7 @@
    ;; Add rule that allows the master user to do everything, at least during the
    ;; bootstrap phase of a deployment. This can be deleted after the initial
    ;; users/roles have been populated, if required.
-   {:crux.db/id (str "https://" canonical-host "/_site/rules/master-user-allow-read-all")
+   {:crux.db/id (str "https://" canonical-host "/_site/rules/master-user-allow-all")
     :description "The master user has access to everything"
     ::site/type "Rule"
     ::pass/target [['subject :juxt.pass.alpha/username master-user]]
