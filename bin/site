@@ -466,9 +466,6 @@
      ;;(error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix))
      )))
 
-;; TODO: Do a PUT that uses sh/sh directly
-;; curl --silent --show-error --location --dump-header /tmp/babashka.curl945197561096964744.headers --request PUT -H content-type: application/json -H content-length: 494129 -H authorization: Bearer 5Hm3qUTvEa8LAeoGySfT2EAZGJprFjCF -d @/tmp/site-3714869389947019533/swagger-ui-3.44.1/dist/swagger-ui.js --data-binary http://localhost:2021/swagger-ui/swagger-ui-3.44.1/dist/swagger-ui.js
-
 (defn install-swagger-ui [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [server] :or {server (:site-server config)}} (:options opts)
