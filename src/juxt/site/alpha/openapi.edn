@@ -444,13 +444,13 @@
       {"description" "juxt.pass.alpha/description"
        "target" "juxt.pass.alpha/target"
        "effect" "juxt.pass.alpha/effect"
-       "limitingClauses" "juxt.pass.alpha/limiting-clauses"}
+       "maxContentLength" "juxt.http.alpha/max-content-length"}
       :properties
       {"type" {:const "Rule"}
        "description" {:type "string"}
        "target" {:type "string" :juxt.jinx.alpha/as "edn"}
        "effect" {:type "string" :juxt.jinx.alpha/as "keyword"}
-       "limitingClauses" {:type "string" :juxt.jinx.alpha/as "edn"}}}]}
+       "maxContentLength" {:type "integer"}}}]}
 
    "IdentifiedRule"
    {"$id" "/schemas/IdentifiedRule"

@@ -43,7 +43,7 @@
 (defn negotiate-representation [request current-representations]
   ;; Negotiate the best representation, determining the vary
   ;; header.
-  (log/debug "current-representations" current-representations)
+  (log/debug "current-representations" (map (fn [rep] (dissoc rep ::http/body)) current-representations))
 
   (let [{selected-representation ::pick/representation
          vary ::pick/vary}
@@ -61,12 +61,44 @@
           {:ring.response/status 406
            :ring.response/body "Not Acceptable\r\n"}))))
 
-    (log/debug "result of negotiate-representation" selected-representation)
+    (log/debug "result of negotiate-representation" (dissoc selected-representation ::http/body))
 
     ;; Pin the vary header onto the selected representation's
     ;; metadata
     (cond-> selected-representation
       (not-empty vary) (assoc ::http/vary (str/join ", " vary)))))
+
+(defn etag [representation]
+  (format
+   "\"%s\""
+   (subs
+    (util/hexdigest
+     (cond
+       (::http/body representation)
+       (::http/body representation)
+       (::http/content representation)
+       (.getBytes (::http/content representation)
+                  (get representation ::http/charset "UTF-8")))) 0 32)))
+
+(defn put-static-representation
+  "PUT a new representation of the target resource. All other representations are
+  replaced."
+  [{::site/keys [uri received-representation start-date crux-node]}]
+  (->>
+   (x/submit-tx
+    crux-node
+    [[:crux.tx/put
+      {:crux.db/id uri
+       ::site/type "StaticRepresentation"
+       ::pass/classification "PUBLIC"
+       ::http/methods #{:get :head :options :put}
+       ::http/representations
+       [(assoc received-representation
+               ::http/etag (etag received-representation)
+               ::http/last-modified start-date)]}]])
+
+   (x/await-tx crux-node)))
+
 
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
@@ -79,7 +111,9 @@
 
    ;; Is it in Crux?
    (when-let [r (x/entity db uri)]
-     (assoc r ::site/resource-provider ::db))
+     (cond-> (assoc r ::site/resource-provider ::db)
+       (= (get r ::site/type) "StaticRepresentation")
+       (update-in [::site/request-locals] assoc ::site/put-fn put-static-representation)))
 
    ;; Is it found by any resource locators registered in the database?
    (locator/locate-with-locators db request)
@@ -88,9 +122,7 @@
    {::site/resource-provider ::default-empty-resource
     ::http/methods #{:get :head :options :put}
     ::site/request-locals
-    {::site/put-fn
-     (fn [req]
-       (throw (ex-info "TODO, put into database" req)))}}))
+    {::site/put-fn put-static-representation}}))
 
 (defn current-representations [resource]
   (::http/representations resource))
@@ -137,50 +169,16 @@
                       {:ring.response/status 404
                        :ring.response/body "Not Found\r\n"})))))))
 
-(defn etag [representation]
-  (format
-   "\"%s\""
-   (subs
-    (util/hexdigest
-     (cond
-       (::http/body representation)
-       (::http/body representation)
-       (::http/content representation)
-       (.getBytes (::http/content representation)
-                  (::http/charset representation)))) 0 32)))
-
-(defn put-static-representation
-  "PUT a new representation of the target resource. All other representations are
-  replaced."
-  [{::site/keys [resource uri received-representation start-date crux-node]}]
-  (->>
-   (x/submit-tx
-    crux-node
-    [[:crux.tx/put
-      (assoc resource
-             :crux.db/id uri
-             ::http/representations
-             [(assoc received-representation
-                     ::http/etag (etag received-representation)
-                     ::http/last-modified start-date)])]])
-   (x/await-tx crux-node)))
 
 (defn PUT [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
         req (assoc req ::site/received-representation rep)
-
-        {:juxt.reap.alpha.rfc7231/keys [type subtype parameter-map]}
-        (reap.decoders/content-type (::http/content-type rep))
-
         put-fn (get-in resource [::site/request-locals ::site/put-fn])]
 
     ;; TODO: evaluate preconditions (in tx fn)
     (cond
       (fn? put-fn) (put-fn req)
-      #_(and
-         (.equalsIgnoreCase "application" type)
-         (.equalsIgnoreCase "vnd.oai.openapi+json" subtype)
-         (#{"3.0.2"} (get parameter-map "version")))
+
       #_(put-openapi req)
 
       #_(and
@@ -255,7 +253,7 @@
 
   (let [res (locate-resource db uri req)
 
-        _ (log/trace "Resource is " res)
+        _ (log/trace "resource provider" (::site/resource-provider res))
 
         req (assoc req ::site/resource res)
 
@@ -271,10 +269,14 @@
         cur-reps
         (when (#{:get :head} method) (current-representations res))
 
+        _ (log/trace "cur-reps is" (map (fn [x] (dissoc x ::http/body)) cur-reps))
+
         sel-rep
         (when (seq cur-reps)
           (negotiate-representation req cur-reps))
         req (assoc req ::site/selected-representation sel-rep)
+
+        _ (log/trace "sel-rep is" (dissoc sel-rep ::http/body))
 
         _ (when (and (#{:get :head} method) (empty? cur-reps))
             (throw
@@ -297,7 +299,7 @@
         ;; ultimately returned (in the case of 2xx/3xx) or thrown (3xx/4xx/5xx)?
         request-context {'subject sub
                          ;; ::site/request-locals is used to avoid database involvement
-                         'resource (dissoc res ::site/request-locals)
+                         'resource (dissoc res ::site/request-locals ::http/representations)
                          'request (select-keys req [:ring.request/method])
                          'representation sel-rep
                          'environment {}}
@@ -308,15 +310,11 @@
                    ::pass/authorization authz
                    ::pass/request-context request-context)
 
-        _ (log/tracef "max content length: %s" (::http/max-content-length authz))
-
         ;; If the max-content-length has been modified, update that in the resource
         req (cond-> req
               (::http/max-content-length authz)
               (update ::site/resource
                       assoc ::http/max-content-length (::http/max-content-length authz)))
-
-
 
         _ (when-not (= (::pass/access authz) ::pass/approved)
             (let [status (if-not (::pass/user sub) 401 403)
@@ -381,10 +379,12 @@
               ::site/crux-node ::site/db
               ;; Also, this is the crux.db/id so don't repeat
               ::site/request-id)
+
       (update :ring.response/headers dissoc "set-cookie")
 
       ;; ::site/request-locals is used to avoid database involvement
       (update ::site/resource dissoc ::site/request-locals)
+      (update-in [::site/resource ::http/representations] (fn [reps] (mapv #(dissoc % ::http/body) reps)))
 
       (update ::site/received-representation dissoc ::http/body)
       (update :ring.request/headers
@@ -452,7 +452,7 @@
         (let [{:ring.response/keys [status] :as exdata} (ex-data e)]
           (when (or (nil? status) (>= status 500))
             (let [exdata (minimize-response exdata)]
-              (prn e)
+              (prn (.getMessage e))
               (pprint exdata)
               (log/errorf e "%s: %s" (.getMessage e) (pr-str exdata))))
           (respond

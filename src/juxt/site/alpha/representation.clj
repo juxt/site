@@ -28,7 +28,7 @@
                          :ring.response/body "Bad Request\r\n"})
               e))))]
 
-    (log/debug "content-length received is" content-length)
+    (log/tracef "content-length received for %s is %s" (::site/uri req) content-length)
 
     (when (nil? content-length)
       (throw
@@ -152,15 +152,17 @@
         (let [body (.readNBytes in content-length)
               content-type (:juxt.reap.alpha.rfc7231/content-type decoded-representation)]
 
-          (cond
-            (= (:juxt.reap.alpha.rfc7231/type content-type) "text")
-            (let [charset (get-in decoded-representation [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
-              (merge
-               decoded-representation
-               {::http/last-modified (format-http-date start-date)
-                ::http/charset charset
-                ::http/content (new String bytes (or charset "utf-8"))}))
-            :else
-            (merge decoded-representation
-                   {::http/last-modified (format-http-date start-date)
-                    ::http/body body})))))))
+          (merge
+           decoded-representation
+           {::http/content-length content-length
+            ::http/last-modified (format-http-date start-date)}
+
+           (if (= (:juxt.reap.alpha.rfc7231/type content-type) "text")
+             (let [charset
+                   (get-in decoded-representation
+                           [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
+               (merge
+                {::http/content (new String body (or charset "utf-8"))}
+                (when charset {::http/charset charset})))
+
+             {::http/body body})))))))
