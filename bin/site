@@ -95,7 +95,7 @@
 (defn get-token
   "Request a token"
   [opts]
-  (let [{:keys [server username password]
+  (let [{:keys [server username password curl]
          :or {server (:site-server config)
               username (:username config)}}
         (:options opts)]
@@ -128,10 +128,15 @@
                        (assoc "username" username)
                        (assoc "expires" (.format java.time.format.DateTimeFormatter/ISO_INSTANT (.toInstant expires))))]
 
-          (message! (str "Access token: " ansi/cyan-font (get data "access_token") ansi/reset-font))
+          (message! (format "Access token acquired for %s%s%s: %s%s%s"
+                            ansi/yellow-font username ansi/reset-font
+                            ansi/cyan-font (get data "access_token") ansi/reset-font))
           (message! (format "Token expires in %s seconds" (get data "expires_in")))
           (message! (format "Storing token in %s" f))
-          (spit f (json/encode data {:pretty true})))
+          (spit f (json/encode data {:pretty true}))
+          (when curl
+            (message! (format "Storing curl config in %s" curl))
+            (spit curl (format "-H \"Authorization: Bearer %s\"\n-H \"Accept: application/json\"" (get data "access_token")))))
 
         :else
         (do
@@ -526,7 +531,7 @@
 
    ["get-token"
     {:description (:doc (meta #'get-token))
-     :cli-options []
+     :cli-options [["-k" "--curl FILE" "Store creds in curl config file"]]
      :delegate get-token}]
 
    ["check-token"
