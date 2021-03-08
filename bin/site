@@ -463,13 +463,12 @@
   (when-let [[_ suffix] (re-matches #"[^\.]+(\..*)" filename)]
     (or
      (get {".js" "application/json"
-           ;;".js.map" "application/json"
-           ;;".css.map" "application/json"
+           ".js.map" "application/json"
+           ".css.map" "application/json"
            ".css" "text/css"
            ".html" "text/html"
            ".png" "image/png"} suffix)
-     ;;(error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix))
-     )))
+     (error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix)))))
 
 (defn install-swagger-ui [opts]
   (let [{access-token "access_token"} (load-token)
