@@ -456,7 +456,7 @@
 (defn create-tmp-dir []
   (let [tmpdir (Files/createTempDirectory
                 "site-" (into-array FileAttribute []))]
-    (message! "Created tmp dir: " tmpdir)
+    (message! "Created tmp dir: " (.toString tmpdir))
     tmpdir))
 
 (defn content-type [filename]
@@ -473,12 +473,12 @@
 (defn install-swagger-ui [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [server] :or {server (:site-server config)}} (:options opts)
-        tmpdir #_(create-tmp-dir) (.toPath (io/file "/tmp/site-3714869389947019533"))
+        tmpdir (create-tmp-dir)
         outfile (.resolve tmpdir "swagger-ui.zip")]
-    (message! "Downloading Swagger UI distribution: " outfile)
-    #_(sh "curl" "-o" (.toString outfile) "https://codeload.github.com/swagger-api/swagger-ui/zip/v3.44.1")
-    (message! "Extracting Swagger UI distribution: " outfile)
-    #_(sh "unzip" (.toString outfile) "-d" (.toString tmpdir))
+    (message! "Downloading Swagger UI distribution: " (.toString outfile))
+    (sh "curl" "-o" (.toString outfile) "https://codeload.github.com/swagger-api/swagger-ui/zip/v3.44.1")
+    (message! "Extracting Swagger UI distribution: " (.toString outfile))
+    (sh "unzip" (.toString outfile) "-d" (.toString tmpdir))
     (let [dir (.resolve tmpdir "swagger-ui-3.44.1")]
       (doseq [f (file-seq (.toFile dir))
               :when (.isFile f)]
@@ -495,13 +495,9 @@
                                   "content-type" content-type}
                         :body f
                         :throw true})]
-                  (cond
-                    (= status 200)
-                    (message! "OK")
-                    :else
-                    (do
-                      (error-and-exit! 1 (str "Server response: " status " " (str/trim body)))
-                      (message! "Request id: " (get headers "site-request-id")))))))))))))
+                  (when-not (= status 200)
+                    (error-and-exit! 1 (str "Server response: " status " " (str/trim body)))
+                    (message! "Request id: " (get headers "site-request-id"))))))))))))
 
 (defn debugf
   "Write a debug message to the console, but only if *debug* is true."
