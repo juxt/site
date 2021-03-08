@@ -605,7 +605,7 @@
       print-summary
       (fn []
         (do
-          (println (str ansi/bold-green-font "site" ansi/reset-font " – RLWS IoT Cloud Edition"))
+          (println (str ansi/bold-green-font "site" ansi/reset-font))
           (println)
           (println "This tool is to manage users, policies and apps in Site.")
           (println)

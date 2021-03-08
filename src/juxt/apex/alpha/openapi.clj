@@ -272,8 +272,7 @@
   ;; Do we have any OpenAPIs in the database?
   (or
    ;; The OpenAPI document
-   (when (and (re-matches #"https://home.juxt.site/_site/apis/\w+/openapi.json" uri)
-              (not (.endsWith uri "/")))
+   (when (re-matches (re-pattern (format "https://%s/_site/apis/\\w+/openapi.json" canonical-host)) uri)
      (or
       ;; It might exist
       (x/entity db uri)
