@@ -40,9 +40,6 @@
         ;; Passwords
         crypto-password/crypto-password {:mvn/version "0.2.1"}
 
-        ;; Swagger UI
-        org.webjars/swagger-ui {:mvn/version "3.42.0"}
-
         ;; Support for Representations
         clj-yaml/clj-yaml {:mvn/version "0.4.0"}
         hiccup/hiccup {:mvn/version "2.0.0-alpha2"}
