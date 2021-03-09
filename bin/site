@@ -110,7 +110,7 @@
             :basic-auth [username (or (get-password username) (error-and-exit! 1 "Failed to get password"))]
             :body "grant_type=client_credentials"
             :throw false
-            :debug true})]
+            :debug false})]
       (cond
         (= status 401)
         (do
