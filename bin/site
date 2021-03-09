@@ -520,7 +520,7 @@
 
    ["get-token"
     {:description (:doc (meta #'get-token))
-     :cli-options [["-k" "--curl FILE" "Store creds in curl config file"]]
+     :cli-options [["-K" "--curl FILE" "Store creds in curl config file"]]
      :delegate get-token}]
 
    ["check-token"
