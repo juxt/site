@@ -4,7 +4,7 @@
 
 (ns site
   (:require
-   [site.babashka.curl :as curl]
+   [babashka.curl :as curl]
    [clojure.tools.cli :refer [parse-opts summarize]]
    [clojure.java.io :as io]
    [clojure.java.shell :as sh]
