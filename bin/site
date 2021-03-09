@@ -83,7 +83,8 @@
                   (when-not (.exists dir)
                     (when-not (.mkdirs dir)
                       (error-and-exit! 1 (str "Failed to make directory: " dir))))
-                  (spit (io/file dir "config.edn") (with-out-str (pprint (assoc config (keyword k) v)))))
+                  (spit (io/file dir "config.edn") (with-out-str (pprint (assoc config (keyword k) v))))
+                  (message! (format "Set %s to '%s'" k v)))
         (error-and-exit! 1 "Unsupported OS"))
 
       (if k
