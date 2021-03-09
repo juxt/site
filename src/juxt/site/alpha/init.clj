@@ -96,17 +96,6 @@
       ::http/body body
       ::apex/openapi openapi})))
 
-(defn put-favicon! [crux-node favicon {::site/keys [canonical-host]}]
-  (put!
-   crux-node
-   (let [body (.readAllBytes (io/input-stream favicon))]
-     {:crux.db/id (str "https://" canonical-host "/favicon.ico")
-      ::pass/classification "PUBLIC"
-      ::http/methods #{:get :head :options}
-      ::http/content-type "image/x-icon"
-      ::http/content-length (count body)
-      ::http/body body})))
-
 (defn put-openid-token-endpoint! [crux-node {::site/keys [canonical-host]}]
   (let [token-endpoint (str "https://" canonical-host "/_site/token")
         grant-types #{"client_credentials"}]
