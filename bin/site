@@ -1,5 +1,5 @@
 #_( ;; Allow this script to be executed directly
-   "exec" "bb" "--classpath" "$(dirname $0)/patch:$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')" "$0" "$@"
+   "exec" "bb" "--classpath" "$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')" "$0" "$@"
    )
 
 (ns site
