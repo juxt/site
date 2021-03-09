@@ -133,7 +133,9 @@
   (or
    (::http/representations resource)
    ;; TODO: Add resource-representation links for content-negotiation
-   [(dissoc resource ::site/request-locals)]))
+   (when (::http/content-type resource)
+     [(dissoc resource ::site/request-locals)])
+   []))
 
 (defn GET [{::site/keys [selected-representation] :as req}]
   #_(spin/evaluate-preconditions! request resource selected-representation date)
