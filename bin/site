@@ -497,7 +497,9 @@
                         :throw true})]
                   (when-not (= status 200)
                     (error-and-exit! 1 (str "Server response: " status " " (str/trim body)))
-                    (message! "Request id: " (get headers "site-request-id"))))))))))))
+                    (message! "Request id: " (get headers "site-request-id"))))))))))
+    ;; TODO: Clean up tmp dir
+    ))
 
 (defn debugf
   "Write a debug message to the console, but only if *debug* is true."
