@@ -80,7 +80,7 @@
        (.getBytes (::http/content representation)
                   (get representation ::http/charset "UTF-8")))) 0 32)))
 
-(defn put-static-representation
+(defn put-static-resource
   "PUT a new representation of the target resource. All other representations are
   replaced."
   [{::site/keys [uri received-representation start-date crux-node]}]
@@ -91,7 +91,7 @@
       {:crux.db/id uri
        ::site/type "StaticRepresentation"
        ::pass/classification "PUBLIC"
-       ::http/methods #{:get :head :options :put}
+       ::http/methods #{:get :head :options :put :patch}
        ::http/representations
        [(assoc received-representation
                ::http/etag (etag received-representation)
@@ -99,6 +99,9 @@
 
    (x/await-tx crux-node)))
 
+(defn patch-static-resource
+  [{::site/keys [uri received-representation start-date crux-node] :as req}]
+  (throw (ex-info "TODO: patch" {:incoming received-representation})))
 
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
@@ -113,7 +116,10 @@
    (when-let [r (x/entity db uri)]
      (cond-> (assoc r ::site/resource-provider ::db)
        (= (get r ::site/type) "StaticRepresentation")
-       (update-in [::site/request-locals] assoc ::site/put-fn put-static-representation)))
+       (update-in [::site/request-locals]
+                  assoc
+                  ::site/put-fn put-static-resource
+                  ::site/patch-fn patch-static-resource)))
 
    ;; Is it found by any resource locators registered in the database?
    (locator/locate-with-locators db request)
@@ -122,7 +128,7 @@
    {::site/resource-provider ::default-empty-resource
     ::http/methods #{:get :head :options :put}
     ::site/request-locals
-    {::site/put-fn put-static-representation}}))
+    {::site/put-fn put-static-resource}}))
 
 (defn current-representations [resource]
   (::http/representations resource))
@@ -169,7 +175,6 @@
                       {:ring.response/status 404
                        :ring.response/body "Not Found\r\n"})))))))
 
-
 (defn PUT [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
         req (assoc req ::site/received-representation rep)
@@ -178,17 +183,24 @@
     ;; TODO: evaluate preconditions (in tx fn)
     (cond
       (fn? put-fn) (put-fn req)
-
-      #_(put-openapi req)
-
-      #_(and
-         (.equalsIgnoreCase "text" type)
-         (.equalsIgnoreCase "html" subtype))
-      #_(put-static-representation req)
-
       :else
       (throw
        (ex-info "Resource allows PUT but doesn't contain have a put-fn function"
+                (into req
+                      {:ring.response/status 500
+                       :ring.response/body "Internal Error\r\n"}))))))
+
+(defn PATCH [{::site/keys [resource] :as req}]
+  (let [rep (receive-representation req) _ (assert rep)
+        req (assoc req ::site/received-representation rep)
+        patch-fn (get-in resource [::site/request-locals ::site/patch-fn])]
+
+    ;; TODO: evaluate preconditions (in tx fn)
+    (cond
+      (fn? patch-fn) (patch-fn req)
+      :else
+      (throw
+       (ex-info "Resource allows PATCH but doesn't contain have a patch-fn function"
                 (into req
                       {:ring.response/status 500
                        :ring.response/body "Internal Error\r\n"}))))))
@@ -245,6 +257,7 @@
 
   (when-not (contains?
              #{:get :head :post :put :delete :options
+               :patch
                :mkcol :propfind} method)
     (throw
      (ex-info "Method not implemented"
@@ -338,6 +351,7 @@
       (:get :head) (GET req)
       :post (POST req)
       :put (PUT req)
+      :patch (PATCH req)
       :delete (DELETE req)
       :options (OPTIONS req)
       :propfind (PROPFIND req)
