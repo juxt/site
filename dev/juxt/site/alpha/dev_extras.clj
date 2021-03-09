@@ -36,7 +36,7 @@
              [(first x)
               (cond
                 (= ::http/content (first x)) (str (subs (second x) 0 80) "…")
-                :else ::exceeds-size-limit-for-printing)]
+                :else (format "(%d bytes)" (count (second x))))]
              x))
    (crux/entity (db) id)))
 
