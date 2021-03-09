@@ -157,7 +157,9 @@
            {::http/content-length content-length
             ::http/last-modified (format-http-date start-date)}
 
-           (if (= (:juxt.reap.alpha.rfc7231/type content-type) "text")
+           (if (and
+                (= (:juxt.reap.alpha.rfc7231/type content-type) "text")
+                (nil? (get decoded-representation ::http/content-encoding)))
              (let [charset
                    (get-in decoded-representation
                            [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]

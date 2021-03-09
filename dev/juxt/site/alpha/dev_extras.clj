@@ -3,6 +3,7 @@
 (ns juxt.site.alpha.dev-extras
   (:require
    [crux.api :as crux]
+   [clojure.walk :refer [postwalk]]
    [dev-extras :refer :all]
    [juxt.pass.alpha.authentication :as authn])
   (:import (java.util Date)))
@@ -27,7 +28,11 @@
   (crux/db (crux-node)))
 
 (defn e [id]
-  (crux/entity (db) id))
+  (postwalk
+   (fn [x] (if (and (vector? x) (#{::http/content ::http/body} (first x)))
+             [(first x) :CONTENT]
+             x))
+   (crux/entity (db) id)))
 
 (defn put! [& ms]
   (->>
@@ -74,7 +79,8 @@
 
 (defn ls
   ([]
-   (->> (q '{:find [e] :where [[e :crux.db/id]]})
+   (->> (q '{:find [e] :where [[e :crux.db/id]
+                               (not [e ::site/type "Request"])]})
         (map first)
         ;;(remove #(and (string? %) (re-seq #"_site/requests" %)))
         (sort-by str)))
@@ -96,24 +102,6 @@
   (cond
     (string? s) (java.util.UUID/fromString s)
     (uuid? s) s))
-
-(defn uri [s]
-  (cond
-    (string? s) (java.net.URI. s)
-    (uri? s) s))
-
-(defn we
-  "Lookup a 'web entity'"
-  [u]
-  (e (uri u)))
-
-(defn wes
-  "List all web entities"
-  []
-  (sort
-   (for [[e m] (q '{:find [e (distinct m)] :where [[e ::http/methods m]]})
-         :let [ent (crux/entity (db) e)]]
-     [(str e) m (count (::http/representations ent))])))
 
 (defn reqs
   "Display up to 5 of the most recent web requests, most recent first."
