@@ -53,6 +53,12 @@
   (assert (= "application/x-www-form-urlencoded"
              (::http/content-type received-representation)))
 
+  (when-not subject
+    (throw
+     (ex-info "Unauthorized"
+              (into req {:ring.response/status 401
+                         :ring.response/body "Unauthorized\r\n"}))))
+
   (let [posted-body (slurp (::http/body received-representation))
 
         params (java.net.URLDecoder/decode
@@ -224,6 +230,6 @@
              (select-keys session [::pass/user ::pass/username]))
 
            (throw
-            (ex-info "Unauthorized"
+            (ex-info "Auth scheme unsupported"
                      (into req {:ring.response/status 401
                                 :ring.response/body "Unauthorized\r\n"})))))))))

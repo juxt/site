@@ -13,6 +13,7 @@
   (:import
    (java.util Date)))
 
+(alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
@@ -34,8 +35,7 @@
    {:crux.db/id (str "https://" canonical-host "/_site/users/" master-user)
     ::site/type "User"
     ::pass/username master-user
-    ::http/methods #{:get :head :options}
-    ::http/representations []}
+    ::http/methods #{:get :head :options}}
 
    {:crux.db/id (str "https://" canonical-host "/_site/users/" master-user "/password")
     ::site/type "Password"
@@ -89,13 +89,12 @@
      {:crux.db/id (str "https://" canonical-host "/_site/apis/site/openapi.json")
       ::site/type "OpenAPI"
       ::http/methods #{:get :head :options}
-      ::http/representations
-      [{::http/content-type "application/vnd.oai.openapi+json;version=3.0.2"
-        ;; TODO: Get last modified from resource - check JDK javadocs
-        ;;::http/last-modified (Date. (.lastModified f))
-        ::http/content-length (count body)
-        ::http/body body}]
-      :juxt.apex.alpha/openapi openapi})))
+      ::http/content-type "application/vnd.oai.openapi+json;version=3.0.2"
+      ;; TODO: Get last modified from resource - check JDK javadocs
+      ;;::http/last-modified (Date. (.lastModified f))
+      ::http/content-length (count body)
+      ::http/body body
+      ::apex/openapi openapi})))
 
 (defn put-favicon! [crux-node favicon {::site/keys [canonical-host]}]
   (put!
@@ -104,10 +103,9 @@
      {:crux.db/id (str "https://" canonical-host "/favicon.ico")
       ::pass/classification "PUBLIC"
       ::http/methods #{:get :head :options}
-      ::http/representations
-      [{::http/content-type "image/x-icon"
-        ::http/content-length (count body)
-        ::http/body body}]})))
+      ::http/content-type "image/x-icon"
+      ::http/content-length (count body)
+      ::http/body body})))
 
 (defn put-openid-token-endpoint! [crux-node {::site/keys [canonical-host]}]
   (let [token-endpoint (str "https://" canonical-host "/_site/token")
@@ -140,16 +138,13 @@
       (put!
        crux-node
        {:crux.db/id (str "https://" canonical-host "/.well-known/openid-configuration")
-
         ;; OpenID Connect Discovery documents are publically available
         ::pass/classification "PUBLIC"
-
         ::http/methods #{:get :head :options}
-        ::http/representations
-        [{::http/content-type "application/json"
-          ::http/last-modified (Date.)
-          ::http/etag (subs (util/hexdigest (.getBytes content)) 0 32)
-          ::http/content content}]}))))
+        ::http/content-type "application/json"
+        ::http/last-modified (Date.)
+        ::http/etag (subs (util/hexdigest (.getBytes content)) 0 32)
+        ::http/content content}))))
 
 (def host-parser (rfc7230.decoders/host {}))
 

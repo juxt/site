@@ -18,8 +18,6 @@
       {:tag "multistatus" :ns "DAV:"
        :children
        (for [resource members
-             :let [representation (first (::spin/representations resource))]
-             :when representation
              :let [body "TODO" ;; (payload/generate-representation-body request resource representation db authorization subject)
                    ]]
          {:tag "response" :ns "DAV:"
@@ -32,7 +30,7 @@
               [{:tag "resourcetype" :ns "DAV:"}
                {:tag "getcontentlength" :ns "DAV:" :children [(str (count body))]}
                {:tag "getetag" :ns "DAV:" :children ["\"1234\""]}
-               {:tag "getlastmodified" :ns "DAV:" :children [(some-> representation ::spin/last-modified format-http-date)]}]}]}]})})
+               {:tag "getlastmodified" :ns "DAV:" :children [(some-> resource ::spin/last-modified format-http-date)]}]}]}]})})
 
      baos
      {:format-pretty-print false

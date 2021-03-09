@@ -87,14 +87,14 @@
    (x/submit-tx
     crux-node
     [[:crux.tx/put
-      {:crux.db/id uri
-       ::site/type "StaticRepresentation"
-       ::pass/classification "PUBLIC"
-       ::http/methods #{:get :head :options :put :patch}
-       ::http/representations
-       [(assoc received-representation
-               ::http/etag (etag received-representation)
-               ::http/last-modified start-date)]}]])
+      (merge
+       {:crux.db/id uri
+        ::site/type "StaticRepresentation"
+        ::pass/classification "PUBLIC"
+        ::http/methods #{:get :head :options :put :patch}
+        ::http/etag (etag received-representation)
+        ::http/last-modified start-date}
+       received-representation)]])
 
    (x/await-tx crux-node)))
 
@@ -115,10 +115,10 @@
    (when-let [r (x/entity db uri)]
      (cond-> (assoc r ::site/resource-provider ::db)
        (= (get r ::site/type) "StaticRepresentation")
-       (update-in [::site/request-locals]
-                  assoc
-                  ::site/put-fn put-static-resource
-                  ::site/patch-fn patch-static-resource)))
+       (update ::site/request-locals
+               assoc
+               ::site/put-fn put-static-resource
+               ::site/patch-fn patch-static-resource)))
 
    ;; Is it found by any resource locators registered in the database?
    (locator/locate-with-locators db request)
@@ -130,7 +130,10 @@
     {::site/put-fn put-static-resource}}))
 
 (defn current-representations [resource]
-  (::http/representations resource))
+  (or
+   (::http/representations resource)
+   ;; TODO: Add resource-representation links for content-negotiation
+   [(dissoc resource ::site/request-locals)]))
 
 (defn GET [{::site/keys [selected-representation] :as req}]
   #_(spin/evaluate-preconditions! request resource selected-representation date)
@@ -236,9 +239,8 @@
               {:crux.db/id uri
                ::dave/resource-type :collection
                ::http/methods #{:get :head :options :propfind}
-               ::http/representations
-               [{::http/content-type "text/html;charset=utf-8"
-                 ::http/content "<h1>Index</h1>\r\n"}]
+               ::http/content-type "text/html;charset=utf-8"
+               ::http/content "<h1>Index</h1>\r\n"
                ::http/options {"DAV" "1"}}]])]
     (x/await-tx crux-node tx))
   {:ring.response/status 201
@@ -307,9 +309,9 @@
         ;; ultimately returned (in the case of 2xx/3xx) or thrown (3xx/4xx/5xx)?
         request-context {'subject sub
                          ;; ::site/request-locals is used to avoid database involvement
-                         'resource (dissoc res ::site/request-locals ::http/representations)
+                         'resource (dissoc res ::site/request-locals ::http/body ::http/content)
                          'request (select-keys req [:ring.request/method])
-                         'representation sel-rep
+                         'representation (dissoc res ::site/request-locals ::http/body ::http/content)
                          'environment {}}
 
         authz (pdp/authorization db request-context)
@@ -392,10 +394,9 @@
       (update :ring.response/headers dissoc "set-cookie")
 
       ;; ::site/request-locals is used to avoid database involvement
-      (update ::site/resource dissoc ::site/request-locals)
-      (update-in [::site/resource ::http/representations] (fn [reps] (mapv #(dissoc % ::http/body) reps)))
-
-      (update ::site/received-representation dissoc ::http/body)
+      (update ::site/resource dissoc ::site/request-locals ::http/body ::http/content)
+      (update ::site/selected-representation dissoc ::http/body ::http/content)
+      (update ::site/received-representation dissoc ::http/body ::http/content)
       (update :ring.request/headers
               (fn [headers]
                 (cond-> headers

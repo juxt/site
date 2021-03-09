@@ -29,7 +29,7 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 
 (defn put-openapi
-  [{::site/keys [crux-node uri resource
+  [{::site/keys [db crux-node uri resource
                  received-representation start-date] :as req}]
   (let [openapi (json/read-value
                  (java.io.ByteArrayInputStream.
@@ -43,24 +43,19 @@
      (x/submit-tx
       crux-node
       [[:crux.tx/put
-        {:crux.db/id uri
-
-         ;; Resource configuration
-         ::http/methods #{:get :head :put :options}
-         ::http/representations
-         [(assoc received-representation
-                 ::http/etag etag
-                 ::http/last-modified start-date)]
-
-         ::site/type "OpenAPI"
-
-         ;; Resource state
-         ::apex/openapi openapi}]])
+        (merge
+         {:crux.db/id uri
+          ::http/methods #{:get :head :put :options}
+          ::http/etag etag
+          ::http/last-modified start-date
+          ::site/type "OpenAPI"
+          ::apex/openapi openapi}
+         received-representation)]])
      (x/await-tx crux-node))
 
     (assoc req
            :ring.response/status
-           (if (zero? (count (::http/representations resource)))
+           (if (= (::site/resource-provider resource) ::openapi-empty-document-resource)
              201 204))))
 
 (defn- received-body->json

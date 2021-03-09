@@ -155,7 +155,7 @@
           (merge
            decoded-representation
            {::http/content-length content-length
-            ::http/last-modified (format-http-date start-date)}
+            ::http/last-modified start-date}
 
            (if (and
                 (= (:juxt.reap.alpha.rfc7231/type content-type) "text")
