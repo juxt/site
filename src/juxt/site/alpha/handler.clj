@@ -15,7 +15,6 @@
    [juxt.pass.alpha.authentication :as authn]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.pick.alpha.ring :refer [pick]]
-   [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
    [juxt.reap.alpha.regex :as re]
