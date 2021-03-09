@@ -29,8 +29,14 @@
 
 (defn e [id]
   (postwalk
-   (fn [x] (if (and (vector? x) (#{::http/content ::http/body} (first x)))
-             [(first x) :CONTENT]
+   (fn [x] (if (and (vector? x)
+                    (#{::http/content ::http/body} (first x))
+                    (> (count (second x)) 1024))
+
+             [(first x)
+              (cond
+                (= ::http/content (first x)) (str (subs (second x) 0 80) "…")
+                :else ::exceeds-size-limit-for-printing)]
              x))
    (crux/entity (db) id)))
 
