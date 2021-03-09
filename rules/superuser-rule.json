@@ -1,4 +1,0 @@
-{"type": "Rule",
- "target": "[[subject :juxt.pass.alpha/user user][mapping :juxt.site.alpha/type \"UserRoleMapping\"][mapping :juxt.pass.alpha/role \"https://localhost:2021/_site/roles/superuser\"][mapping :juxt.pass.alpha/assignee user]]",
- "effect": "juxt.pass.alpha/allow",
- "maxContentLength": 10000000}
