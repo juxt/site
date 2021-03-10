@@ -420,6 +420,49 @@
           (error! "Server response: " status " " (str/trim body))
           (message! "Request id: " (get headers "site-request-id")))))))
 
+(defn put-variant
+  "Associate a variant representation to a resource"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [server canonical-host resource variant]
+         :or {server (:site-server config)
+              canonical-host (:canonical-host config)}}
+        (:options opts)]
+    (when-not server (error-and-exit! 1 "Server not specified"))
+    (when-not resource (error-and-usage! "Resource required" opts))
+    (when-not variant (error-and-usage! "Variant required" opts))
+
+    ;; TODO: Should return a 404, not 405!!!
+
+    (let [{:keys [status headers body]}
+          (curl/post
+           (format "%s/_site/variants/" server)
+           {:headers {"authorization" (format "Bearer %s" access-token)
+                      "content-type" "application/json"}
+            :body (json/generate-string
+                   (cond-> {"type" "Variant"
+                            "resource" resource
+                            "variant" variant}))
+            :throw false})]
+      (cond
+        (= status 401)
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Is your access-token valid?")
+          (message! "To get a new access token, use the get-token sub-command")
+          (message! "Request id: " (get headers "site-request-id")))
+
+        (= status 201)
+        (message! "Variant created")
+
+        (= status 204)
+        (message! "Variant updated")
+
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
 (defn install-api
   "Upload and install an API"
   [opts]
@@ -427,9 +470,9 @@
         {:keys [server openapi]
          :or {server (:site-server config)}} (:options opts)
 
-        _ (when-not openapi (error-and-exit! 1 "openapi file not specified"))
-        _ (when-not (.exists (io/file openapi)) (error-and-exit! 1 "openapi file not found"))
-        _ (when-not (.isFile (io/file openapi)) (error-and-exit! 1 "openapi argument is not a file"))
+        _ (when-not openapi (error-and-usage! "OpenAPI file not specified" opts))
+        _ (when-not (.exists (io/file openapi)) (error-and-exit! 1 "OpenAPI file not found"))
+        _ (when-not (.isFile (io/file openapi)) (error-and-exit! 1 "OpenAPI argument is not a file"))
 
         {:keys [status headers body]}
         (curl/put
@@ -471,7 +514,9 @@
            ".png" "image/png"} suffix)
      (error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix)))))
 
-(defn install-swagger-ui [opts]
+(defn install-swagger-ui
+  "Install a distribution of Swagger UI"
+  [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [server] :or {server (:site-server config)}} (:options opts)
         tmpdir (create-tmp-dir)
@@ -580,6 +625,12 @@
                    ["-r" "--rule FILE" "Rule file"]]
      :delegate put-rule}]
 
+   ["put-variant"
+    {:description (:doc (meta #'put-variant))
+     :cli-options [["-r" "--resource URL" "Resource"]
+                   ["-v" "--variant URL" "Variant resource"]]
+     :delegate put-variant}]
+
    ["install-api"
     {:description (:doc (meta #'install-api))
      :cli-options [["-f" "--openapi FILE" "OpenAPI description file"]]
@@ -588,7 +639,9 @@
    ["install-swagger-ui"
     {:description (:doc (meta #'install-swagger-ui))
      :cli-options []
-     :delegate install-swagger-ui}]])
+     :delegate install-swagger-ui}]
+
+   ])
 
 (let [{:keys [options arguments summary errors]}
       (parse-opts *command-line-args*  cli-options :in-order true)
