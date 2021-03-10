@@ -519,6 +519,60 @@
            ".png" "image/png"} suffix)
      (error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix)))))
 
+(defn upload-file [url f content-type access-token]
+  (let [{:keys [status headers body]}
+        (curl/put
+         url
+         {:headers {"authorization" (format "Bearer %s" access-token)
+                    "content-type" content-type}
+          :body f
+          :throw true})]
+    (when-not (= status 200)
+      (error-and-exit! 1 (str "Server response: " status " " (str/trim body)))
+      (message! "Request id: " (get headers "site-request-id")))))
+
+(defn put-asset
+  "Upload an asset"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [server canonical-host file type path encoding language]
+         :or {server (:site-server config)
+              canonical-host (:canonical-host config)}}
+        (:options opts)]
+
+    (when-not server (error-and-exit! 1 "Server not specified"))
+    (when-not file (error-and-usage! "Asset file required" opts))
+    (when-not type (error-and-usage! "Content-type required" opts))
+    (when-not path (error-and-usage! "Path required" opts))
+
+    (let [{:keys [status headers body]}
+          (curl/put
+           (format "%s%s" server path)
+           {:headers (cond-> {"authorization" (format "Bearer %s" access-token)
+                              "content-type" type}
+                       encoding (assoc "content-encoding" encoding)
+                       language (assoc "content-language" language))
+            :body (io/file file)
+            :throw false})]
+      (cond
+        (= status 401)
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Is your access-token valid?")
+          (message! "To get a new access token, use the get-token sub-command")
+          (message! "Request id: " (get headers "site-request-id")))
+
+        (= status 201)
+        (message! (format "Asset created"))
+
+        (= status 204)
+        (message! (format "Asset updated"))
+
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
 (defn install-swagger-ui
   "Install a distribution of Swagger UI"
   [opts]
@@ -539,18 +593,7 @@
                   content-type (content-type (last (str/split (.toString rel-path) #"/")))]
               (when content-type
                 (message! "Uploading" (.toString rel-path) "to" url)
-                (let [{:keys [status headers body command]}
-                      (curl/put
-                       url
-                       {:headers {"authorization" (format "Bearer %s" access-token)
-                                  "content-type" content-type}
-                        :body f
-                        :throw true})]
-                  (when-not (= status 200)
-                    (error-and-exit! 1 (str "Server response: " status " " (str/trim body)))
-                    (message! "Request id: " (get headers "site-request-id"))))))))))
-    ;; TODO: Clean up tmp dir
-    ))
+                (upload-file url f content-type access-token)))))))))
 
 (defn debugf
   "Write a debug message to the console, but only if *debug* is true."
@@ -645,6 +688,15 @@
     {:description (:doc (meta #'install-swagger-ui))
      :cli-options []
      :delegate install-swagger-ui}]
+
+   ["put-asset"
+    {:description (:doc (meta #'put-asset))
+     :cli-options [["-f" "--file FILE" "The asset file"]
+                   ["-p" "--path PATH" "The destination path after the canonical host"]
+                   ["-t" "--type MIME_TYPE" "The content-type"]
+                   ["-e" "--encoding ENCODING" "The content-encoding (optional)"]
+                   ["-l" "--language LANGUAGE" "The content-language (optional)"]]
+     :delegate put-asset}]
 
    ])
 
