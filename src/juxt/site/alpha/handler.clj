@@ -108,29 +108,43 @@
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
   in :default."
-  [db uri request]
-  (or
-   ;; We call OpenAPI location here, because a resource can be defined in
-   ;; OpenAPI, and exits in Crux, simultaneously.
-   (openapi/locate-resource db uri request)
+  [{::site/keys [db uri canonical-host] :as req}]
+  (let [prefix (format "https://%s" canonical-host)]
+    (or
+     ;; We call OpenAPI location here, because a resource can be defined in
+     ;; OpenAPI, and exits in Crux, simultaneously.
+     (openapi/locate-resource db uri req)
 
-   ;; Is it in Crux?
-   (when-let [r (x/entity db uri)]
-     (cond-> (assoc r ::site/resource-provider ::db)
-       (= (get r ::site/type) "StaticRepresentation")
-       (update ::site/request-locals
-               assoc
-               ::site/put-fn put-static-resource
-               ::site/patch-fn patch-static-resource)))
+     ;; Is it in Crux?
+     (when-let [r (x/entity db uri)]
+       (cond-> (assoc r ::site/resource-provider ::db)
+         (= (get r ::site/type) "StaticRepresentation")
+         (update ::site/request-locals
+                 assoc
+                 ::site/put-fn put-static-resource
+                 ::site/patch-fn patch-static-resource)))
 
-   ;; Is it found by any resource locators registered in the database?
-   (locator/locate-with-locators db request)
+     ;; Is it found by any resource locators registered in the database?
+     (locator/locate-with-locators db req)
 
-   ;; Return a back-stop resource
-   {::site/resource-provider ::default-empty-resource
-    ::http/methods #{:get :head :options :put :post}
-    ::site/request-locals
-    {::site/put-fn put-static-resource}}))
+     ;; Is it a redirect?
+     (when-let [[r loc] (first
+                         (x/q db '{:find [r loc]
+                                   :where [[r ::site/resource uri]
+                                           [r ::site/location loc]
+                                           [r ::site/type "Redirect"]]}
+                              uri))]
+       {::site/uri uri
+        ::site/methods #{:get :head :options}
+        ::site/resource-provider r
+        ::http/redirect (cond-> loc (.startsWith loc prefix)
+                                (subs (count prefix)))})
+
+     ;; Return a back-stop resource
+     {::site/resource-provider ::default-empty-resource
+      ::http/methods #{:get :head :options :put :post}
+      ::site/request-locals
+      {::site/put-fn put-static-resource}})))
 
 (defn current-representations [{::site/keys [resource uri db]}]
   (or
@@ -320,20 +334,20 @@
               (merge req {:ring.response/status 501
                           :ring.response/body "Not Implemented\r\n"}))))
 
-  (let [res (locate-resource db uri req)
+  (let [res (locate-resource req)
 
         _ (log/debug "resource provider" (::site/resource-provider res))
 
         req (assoc req ::site/resource res)
 
-        _ (when-let [redirect (::http/redirect res)]
+        _ (when-let [location (::http/redirect res)]
             (throw
              (ex-info "Redirect"
                       (-> req
                           (assoc :ring.response/status
                                  (case method (:get :head) 302 307))
                           (update :ring.response/headers
-                                  assoc "location" redirect)))))
+                                  assoc "location" location)))))
 
         cur-reps
         (when (#{:get :head} method) (current-representations req))

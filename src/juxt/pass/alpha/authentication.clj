@@ -152,7 +152,7 @@
                     ::http/content-type "text/plain")
              (update :ring.response/headers assoc
                      "cache-control" "no-store"
-                     "location" (format "https://%s/~%s/" canonical-host username))
+                     "location" (format "/~%s/" canonical-host username))
              (assoc :cookies {"access_token"
                               {:value access-token
                                :max-age expires-in
