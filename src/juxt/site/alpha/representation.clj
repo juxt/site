@@ -28,8 +28,6 @@
                          :ring.response/body "Bad Request\r\n"})
               e))))]
 
-    (log/tracef "content-length received for %s is %s" (::site/uri req) content-length)
-
     (when (nil? content-length)
       (throw
        (ex-info

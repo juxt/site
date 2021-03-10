@@ -26,8 +26,6 @@
 (defonce sessions-by-access-token (atom {}))
 
 (defn put-session! [k session ^java.time.Instant expiry-instant]
-  (log/trace "put session, k" k)
-  (log/trace "put session, session" session)
   (swap! sessions-by-access-token
          assoc k (assoc session
                         ::expiry-instant expiry-instant)))

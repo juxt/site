@@ -17,8 +17,6 @@
         location
         (str uri (hash (select-keys request-instance [::pass/target ::pass/effect])))]
 
-    (log/trace "post-rule, instance" request-instance)
-
     (->> (x/submit-tx
           crux-node
           [[:crux.tx/put (merge {:crux.db/id location} request-instance)]])
