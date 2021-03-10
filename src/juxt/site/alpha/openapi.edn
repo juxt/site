@@ -292,7 +292,19 @@
     {201 {:description "Variant successfully created"
           :content
           {"text/plain;charset=utf-8" {}}}
-     204 {:description "Variant successfully update"}}}}
+     204 {:description "Variant successfully updated"}}}}
+
+  "/redirects/"
+  {:post
+   {:juxt.site.alpha/post-fn juxt.site.alpha.handler/post-redirect
+    :requestBody
+    {:required true
+     :content
+     {"application/json"
+      {:schema {"$ref" "#/components/schemas/Redirect"}}}}
+    :responses
+    {201 {:description "Redirect successfully created"}
+     204 {:description "Redirect successfully updated"}}}}
 
   "/apis/"
   {:get
@@ -490,6 +502,22 @@
        "resource" {:type "string"
                    :format "uri-reference"}
        "variant" {:type "string"
+                  :format "uri-reference"}}}]}
+
+   "Redirect"
+   {"$id" "/schemas/Redirect"
+    :allOf
+    [{"$ref" "#/components/schemas/Typed"}
+     {:type "object"
+      :required ["resource" "location"]
+      :juxt.jinx.alpha/keyword-mappings
+      {"resource" "juxt.site.alpha/resource"
+       "location" "juxt.site.alpha/location"}
+      :properties
+      {"type" {:const "Redirect"}
+       "resource" {:type "string"
+                   :format "uri-reference"}
+       "location" {:type "string"
                   :format "uri-reference"}}}]}
 
    "OpenAPI"

@@ -468,6 +468,47 @@
           (error! "Server response: " status " " (str/trim body))
           (message! "Request id: " (get headers "site-request-id")))))))
 
+(defn put-redirect
+  "Put a redirect"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [server canonical-host resource location]
+         :or {server (:site-server config)
+              canonical-host (:canonical-host config)}}
+        (:options opts)]
+    (when-not server (error-and-exit! 1 "Server not specified"))
+    (when-not resource (error-and-usage! "Resource required" opts))
+    (when-not location (error-and-usage! "Location required" opts))
+
+    (let [{:keys [status headers body]}
+          (curl/post
+           (format "%s/_site/redirects/" server)
+           {:headers {"authorization" (format "Bearer %s" access-token)
+                      "content-type" "application/json"}
+            :body (json/generate-string
+                   (cond-> {"type" "Redirect"
+                            "resource" resource
+                            "location" location}))
+            :throw false})]
+      (cond
+        (= status 401)
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Is your access-token valid?")
+          (message! "To get a new access token, use the get-token sub-command")
+          (message! "Request id: " (get headers "site-request-id")))
+
+        (= status 201)
+        (message! (format "Redirect created: %s" (get headers "location")))
+
+        (= status 204)
+        (message! (format "Redirect updated: %s" (get headers "location")))
+
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
 (defn install-api
   "Upload and install an API"
   [opts]
@@ -667,6 +708,12 @@
      :cli-options [["-r" "--resource URL" "Resource"]
                    ["-v" "--variant URL" "Variant resource"]]
      :delegate put-variant}]
+
+   ["put-redirect"
+    {:description (:doc (meta #'put-redirect))
+     :cli-options [["-r" "--resource URL" "Resource"]
+                   ["-l" "--location URL" "Location to redirect to"]]
+     :delegate put-redirect}]
 
    ["install-api"
     {:description (:doc (meta #'install-api))
