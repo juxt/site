@@ -26,6 +26,12 @@
   (apply error! msg)
   (System/exit exit))
 
+(defn error-and-usage! [msg opts]
+  (error! msg)
+  (println "Usage:")
+  (println (:summary opts))
+  (System/exit 1))
+
 (defn message! [& msg]
   (apply println (apply str ansi/bold-green-font "site:" ansi/reset-font) msg))
 
@@ -216,8 +222,9 @@
         (:options opts)]
 
     (when-not server (error-and-exit! 1 "Server not specified"))
-    (when-not username (error-and-exit! 1 "User required"))
     (when-not canonical-host (error-and-exit! 1 "Canonical host required"))
+    (when-not username (error-and-usage! "User required" opts))
+    (when-not password (error-and-usage! "Password required" opts))
 
     (let [password (or password (get-password username))
           {:keys [status headers body]}
@@ -251,7 +258,7 @@
         (:options opts)]
     (when-not server (error-and-exit! 1 "Server not specified"))
     (when-not username (error-and-exit! 1 "User required"))
-    (when-not name (error-and-exit! 1 "Name required"))
+    (when-not name (error-and-usage! "Name required" opts))
 
     (let [{:keys [status headers body]}
           (curl/put
@@ -292,7 +299,7 @@
          :or {server (:site-server config)}}
         (:options opts)]
     (when-not server (error-and-exit! 1 "Server not specified"))
-    (when-not role (error-and-exit! 1 "User required"))
+    (when-not role (error-and-usage! "Role required" opts))
 
     (let [{:keys [status headers body]}
           (curl/put
@@ -355,8 +362,8 @@
               canonical-host (:canonical-host config)}}
         (:options opts)]
     (when-not server (error-and-exit! 1 "Server not specified"))
-    (when-not username (error-and-exit! 1 "Username required"))
-    (when-not role (error-and-exit! 1 "Role required"))
+    (when-not username (error-and-usage! "Username required" opts))
+    (when-not role (error-and-usage! "Role required" opts))
 
     (let [{:keys [status headers body]}
           (curl/put
@@ -397,8 +404,8 @@
          :or {server (:site-server config)}}
         (:options opts)]
     (when-not server (error-and-exit! 1 "Server not specified"))
-    (when-not name (error-and-exit! 1 "Name not specified"))
-    (when-not rule (error-and-exit! 1 "Rule file required"))
+    (when-not name (error-and-usage! "Name required" opts))
+    (when-not rule (error-and-usage! "Rule required" opts))
     (when-not (.isFile (io/file rule)) (error-and-exit! 1 "Rule file must be a file"))
 
     (let [{:keys [status headers body]}
