@@ -209,8 +209,7 @@
         :else
         (do
           (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id"))))
-      )))
+          (message! "Request id: " (get headers "site-request-id")))))))
 
 (defn reset-password
   "Reset a user's password"
