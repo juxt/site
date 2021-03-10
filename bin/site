@@ -224,7 +224,6 @@
     (when-not server (error-and-exit! 1 "Server not specified"))
     (when-not canonical-host (error-and-exit! 1 "Canonical host required"))
     (when-not username (error-and-usage! "User required" opts))
-    (when-not password (error-and-usage! "Password required" opts))
 
     (let [password (or password (get-password username))
           {:keys [status headers body]}
