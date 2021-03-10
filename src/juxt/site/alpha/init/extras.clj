@@ -35,24 +35,7 @@
 (defn put-login! [crux-node {::site/keys [canonical-host]}]
   (put!
    crux-node
-   {:crux.db/id (str "https://" canonical-host "/_site/login")
-    ::http/methods #{:get :head :options :post}
-    ::http/content-type "text/html;charset=utf-8"
-    ::http/content (slurp (io/resource "juxt/pass/alpha/login.html"))
-    ;; The login page must have a classification of PUBLIC to be accessible.
-    ::pass/classification "PUBLIC"
-    ::http/acceptable "application/x-www-form-urlencoded"
-    ::site/purpose ::site/post-login-credentials
-    ::pass/expires-in (* 3600 24 30)}
 
-   ;; Along with a special rule to allow anyone to POST to it.
-   ;; TODO: Making the post handler PUBLIC should be OK
-   {:crux.db/id (str "https://" canonical-host "/_site/rules/anyone-can-post-login-credentials")
-    ::site/type "Rule"
-    ::site/description "The login POST handler must be accessible by all"
-    ::pass/target '[[request :ring.request/method #{:post}]
-                    [resource ::site/purpose ::site/post-login-credentials]]
-    ::pass/effect ::pass/allow}
 
    ;; We've got a login, we should have a logout too.
    {:crux.db/id (str "https://" canonical-host "/_site/logout")

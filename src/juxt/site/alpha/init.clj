@@ -135,6 +135,27 @@
         ::http/etag (subs (util/hexdigest (.getBytes content)) 0 32)
         ::http/content content}))))
 
+(defn put-login-endpoint! [crux-node {::site/keys [canonical-host]}]
+  ;; Allow anyone to login
+  (put!
+   crux-node
+   {:crux.db/id (str "https://" canonical-host "/_site/login")
+    ::http/methods #{:post}
+    ;;::http/content-type "text/html;charset=utf-8"
+    ;;::http/content (slurp (io/resource "juxt/pass/alpha/login.html"))
+    ;; The login page must have a classification of PUBLIC to be accessible.
+    ;;::pass/classification "PUBLIC"
+    ::http/acceptable "application/x-www-form-urlencoded"
+    ::site/purpose ::site/login
+    ::pass/expires-in (* 3600 24 30)}
+
+   {:crux.db/id (str "https://" canonical-host "/_site/rules/anyone-can-post-login-credentials")
+    ::site/type "Rule"
+    ::site/description "The login POST handler must be accessible by all"
+    ::pass/target '[[request :ring.request/method #{:post}]
+                    [resource ::site/purpose ::site/login]]
+    ::pass/effect ::pass/allow}))
+
 (def host-parser (rfc7230.decoders/host {}))
 
 (defn init-db!
@@ -149,7 +170,7 @@
         site-settings (x/entity db ::site/init-settings)
         opts (merge site-settings opts)]
 
-    (when site-settings ; existing database
+    (when site-settings                 ; existing database
 
       (when (and canonical-host
                  (not= canonical-host (::site/canonical-host site-settings)))
@@ -218,4 +239,5 @@
      opts)
 
     ;; Authentication
-    (put-openid-token-endpoint! crux-node opts)))
+    (put-openid-token-endpoint! crux-node opts)
+    (put-login-endpoint! crux-node opts)))

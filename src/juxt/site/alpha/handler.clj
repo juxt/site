@@ -135,7 +135,7 @@
    ;; declare multiple representations.
    (::http/representations resource)
 
-   ;; TODO: Add resource-representation links for content-negotiation
+   ;; See if there are variants
    (let [variants (x/q db '{:find [r]
                             :where [[v ::site/type "Variant"]
                                     [v ::site/resource uri]
@@ -152,7 +152,8 @@
    ;; Most resources have a content-type, which indicates there is only one
    ;; variant.
    (when (::http/content-type resource)
-     [(dissoc resource ::site/request-locals)])
+     [(-> resource
+          (dissoc ::site/request-locals))])
 
    ;; No representations. On a GET, this would yield a 404.
    []))
