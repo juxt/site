@@ -82,21 +82,24 @@
 (defn put-static-resource
   "PUT a new representation of the target resource. All other representations are
   replaced."
-  [{::site/keys [uri received-representation start-date crux-node]}]
-  (->>
-   (x/submit-tx
-    crux-node
-    [[:crux.tx/put
-      (merge
-       {:crux.db/id uri
-        ::site/type "StaticRepresentation"
-        ::pass/classification "PUBLIC"
-        ::http/methods #{:get :head :options :put :patch}
-        ::http/etag (etag received-representation)
-        ::http/last-modified start-date}
-       received-representation)]])
+  [{::site/keys [uri db received-representation start-date crux-node] :as req}]
+  (let [existing? (x/entity db uri)]
+    (->>
+     (x/submit-tx
+        crux-node
+        [[:crux.tx/put
+          (merge
+           {:crux.db/id uri
+            ::site/type "StaticRepresentation"
+            ::pass/classification "PUBLIC"
+            ::http/methods #{:get :head :options :put :patch}
+            ::http/etag (etag received-representation)
+            ::http/last-modified start-date}
+           received-representation)]])
 
-   (x/await-tx crux-node)))
+     (x/await-tx crux-node))
+
+    (into req {:ring.response/status (if existing? 204 201)})))
 
 (defn patch-static-resource
   [{::site/keys [uri received-representation start-date crux-node] :as req}]
