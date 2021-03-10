@@ -122,7 +122,7 @@
     (first users)))
 
 (defn login-response
-  [{::site/keys [received-representation db resource start-date] :as req}]
+  [{::site/keys [received-representation db resource start-date canonical-host] :as req}]
 
   ;; Check grant_type of posted-representation
   (assert (= "application/x-www-form-urlencoded"
@@ -152,7 +152,7 @@
                     ::http/content-type "text/plain")
              (update :ring.response/headers assoc
                      "cache-control" "no-store"
-                     "location" (format "/~%s/" user))
+                     "location" (format "https://%s/~%s/" canonical-host username))
              (assoc :cookies {"access_token"
                               {:value access-token
                                :max-age expires-in
