@@ -125,7 +125,7 @@
 
    ;; Return a back-stop resource
    {::site/resource-provider ::default-empty-resource
-    ::http/methods #{:get :head :options :put}
+    ::http/methods #{:get :head :options :put :post}
     ::site/request-locals
     {::site/put-fn put-static-resource}}))
 
