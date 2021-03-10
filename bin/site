@@ -257,7 +257,7 @@
          :or {server (:site-server config)}}
         (:options opts)]
     (when-not server (error-and-exit! 1 "Server not specified"))
-    (when-not username (error-and-exit! 1 "User required"))
+    (when-not username (error-and-usage! "Username required" opts))
     (when-not name (error-and-usage! "Name required" opts))
 
     (let [{:keys [status headers body]}
