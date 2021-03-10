@@ -144,8 +144,10 @@
                             } uri)]
      (when (pos? (count variants))
        (log/tracef "found %d extra variants for uri %s" (count variants) uri)
-       (cond-> (for [[v] variants]
-                 (x/entity db v))
+       (cond-> (for [[v] variants
+                     :let [rep (x/entity db v)]
+                     :when rep]
+                 (assoc rep ::http/content-location v))
          (::http/content-type resource)
          (conj resource))))
 
