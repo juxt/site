@@ -158,6 +158,21 @@
            :ring.response/status 200
            :ring.response/body body)))
 
+(defn post-variant [{::site/keys [crux-node db uri request-locals] :as req}]
+
+  (let [request-instance (get request-locals ::apex/request-instance)
+        location
+        (str uri (hash (select-keys request-instance [::site/resource ::site/variant])))
+        existing (x/entity db location)]
+
+    (->> (x/submit-tx
+          crux-node
+          [[:crux.tx/put (merge {:crux.db/id location} request-instance)]])
+         (x/await-tx crux-node))
+
+    (into req {:ring.response/status (if existing 204 201)
+               :ring.response/headers {"location" location}})))
+
 (defn POST [{::site/keys [resource request-id] :as req}]
   (let [rep (->
              (receive-representation req)
@@ -269,7 +284,7 @@
 
   (let [res (locate-resource db uri req)
 
-        _ (log/trace "resource provider" (::site/resource-provider res))
+        _ (log/debug "resource provider" (::site/resource-provider res))
 
         req (assoc req ::site/resource res)
 

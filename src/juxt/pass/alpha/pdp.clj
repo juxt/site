@@ -59,20 +59,21 @@
 
         matched-rules (filter ::pass/matched? evaluated-rules)
 
-        ;;_ (log/debug "Rejected rules" (pr-str (filter (comp not ::pass/matched?) evaluated-rules)))
-        _ (log/debug "Matched rules" (pr-str matched-rules))
 
         allowed? (and
                   (pos? (count matched-rules))
                   ;; Rule combination algorithm is every?
                   (every? #(= (::pass/effect %) ::pass/allow) matched-rules))
 
+        _ (if (and (pos? (count matched-rules)) (every? #(= (::pass/effect %) ::pass/allow) matched-rules))
+            (log/debugf "Allowed due to rule matches (%d): %s" (count matched-rules) (pr-str matched-rules))
+            (log/debugf "Disallowed, matched rule count is %d" (count matched-rules)))
+
         max-content-length (->> matched-rules
                                 (filter #(= (::pass/effect %) ::pass/allow))
                                 (map #(get % ::http/max-content-length 0))
                                 (apply max 0))]
 
-    (log/debugf "Allowed?: %s" allowed?)
     (if-not allowed?
       #::pass
       {:access ::pass/denied
