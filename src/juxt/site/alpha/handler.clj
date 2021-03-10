@@ -132,7 +132,8 @@
                          (x/q db '{:find [r loc]
                                    :where [[r ::site/resource uri]
                                            [r ::site/location loc]
-                                           [r ::site/type "Redirect"]]}
+                                           [r ::site/type "Redirect"]]
+                                   :in [uri]}
                               uri))]
        {::site/uri uri
         ::site/methods #{:get :head :options}
