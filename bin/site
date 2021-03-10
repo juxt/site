@@ -417,10 +417,10 @@
             :throw false})]
       (cond
         (= status 201)
-        (message! "Rule created")
+        (message! (format "Rule created: %s" (get headers "location")))
 
         (= status 204)
-        (message! "Rule updated")
+        (message! (format "Rule updated: %s" (get headers "location")))
 
         :else
         (do
@@ -460,10 +460,10 @@
           (message! "Request id: " (get headers "site-request-id")))
 
         (= status 201)
-        (message! "Variant created")
+        (message! (format "Variant created: %s" (get headers "location")))
 
         (= status 204)
-        (message! "Variant updated")
+        (message! (format "Variant updated: %s" (get headers "location")))
 
         :else
         (do
