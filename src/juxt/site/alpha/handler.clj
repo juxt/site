@@ -42,7 +42,7 @@
 (defn negotiate-representation [request current-representations]
   ;; Negotiate the best representation, determining the vary
   ;; header.
-  (log/debug "current-representations" (map (fn [rep] (dissoc rep ::http/body)) current-representations))
+  (log/debug "current-representations" (map (fn [rep] (dissoc rep ::http/body ::http/content)) current-representations))
 
   (let [{selected-representation ::pick/representation
          vary ::pick/vary}
@@ -60,7 +60,7 @@
           {:ring.response/status 406
            :ring.response/body "Not Acceptable\r\n"}))))
 
-    (log/debug "result of negotiate-representation" (dissoc selected-representation ::http/body))
+    (log/debug "result of negotiate-representation" (dissoc selected-representation ::http/body ::http/content))
 
     ;; Pin the vary header onto the selected representation's
     ;; metadata
@@ -129,12 +129,32 @@
     ::site/request-locals
     {::site/put-fn put-static-resource}}))
 
-(defn current-representations [resource]
+(defn current-representations [{::site/keys [resource uri db]}]
   (or
+   ;; This is not common in the Crux DB, but allows 'dynamic' resources to
+   ;; declare multiple representations.
    (::http/representations resource)
+
    ;; TODO: Add resource-representation links for content-negotiation
+   (let [variants (x/q db '{:find [r]
+                            :where [[v ::site/type "Variant"]
+                                    [v ::site/resource uri]
+                                    [v ::site/variant r]]
+                            :in [uri]
+                            } uri)]
+     (when (pos? (count variants))
+       (log/tracef "found %d extra variants for uri %s" (count variants) uri)
+       (cond-> (for [[v] variants]
+                 (x/entity db v))
+         (::http/content-type resource)
+         (conj resource))))
+
+   ;; Most resources have a content-type, which indicates there is only one
+   ;; variant.
    (when (::http/content-type resource)
      [(dissoc resource ::site/request-locals)])
+
+   ;; No representations. On a GET, this would yield a 404.
    []))
 
 (defn GET [{::site/keys [selected-representation] :as req}]
@@ -298,7 +318,7 @@
                                   assoc "location" redirect)))))
 
         cur-reps
-        (when (#{:get :head} method) (current-representations res))
+        (when (#{:get :head} method) (current-representations req))
 
         sel-rep
         (when (seq cur-reps)
