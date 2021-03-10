@@ -143,9 +143,11 @@
           [[:crux.tx/put (assoc instance :crux.db/id uri)]])
          (x/await-tx crux-node))
 
-    (-> req (assoc :ring.response/status (if-not exists? 201 204)
-                   ::http/etag etag
-                   ::http/last-modified last-modified))))
+    (-> req
+        (assoc :ring.response/status (if-not exists? 201 204)
+               ::http/etag etag
+               ::http/last-modified last-modified)
+        (update :ring.response/headers assoc "location" uri))))
 
 
 (defn path-entry->resource
