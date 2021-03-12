@@ -2,6 +2,7 @@
 
 (ns juxt.site.alpha.handler
   (:require
+   [clojure.walk :refer [postwalk]]
    [clojure.pprint :refer [pprint]]
    [clojure.set :as set]
    [clojure.string :as str]
@@ -14,13 +15,17 @@
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha.authentication :as authn]
    [juxt.pass.alpha.pdp :as pdp]
-   [juxt.pick.alpha.ring :refer [pick]]
+   [juxt.pick.alpha.core :refer [rate-representation]]
+   [juxt.pick.alpha.ring :refer [pick decode-maybe]]
+   [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
    [juxt.reap.alpha.regex :as re]
+   [juxt.reap.alpha.rfc7231 :as rfc7231]
+   [juxt.reap.alpha.rfc7232 :as rfc7232]
+   [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.locator :as locator]
-   [juxt.site.alpha.util :as util]
-   [juxt.site.alpha.representation :refer [receive-representation]]))
+   [juxt.site.alpha.util :as util]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -67,6 +72,162 @@
     (cond-> selected-representation
       (not-empty vary) (assoc ::http/vary (str/join ", " vary)))))
 
+(defn receive-representation
+  "Check and load the representation enclosed in the request message payload."
+  [{::site/keys [resource start-date] :as req}]
+
+  (let [content-length
+        (try
+          (some->
+           (get-in req [:ring.request/headers "content-length"])
+           (Long/parseLong))
+          (catch NumberFormatException e
+            (throw
+             (ex-info
+              "Bad content length"
+              (into req {:ring.response/status 400
+                         :ring.response/body "Bad Request\r\n"})
+              e))))]
+
+    (when (nil? content-length)
+      (throw
+       (ex-info
+        "No Content-Length header found"
+        (into req {:ring.response/status 411
+                   :ring.response/body "Length Required\r\n"}))))
+
+    ;; Spin protects resources from PUTs that are too large. If you need to
+    ;; exceed this limitation, explicitly declare ::spin/max-content-length in
+    ;; your resource.
+    (when-let [max-content-length (get resource ::http/max-content-length (Math/pow 2 16))]
+      (when (> content-length max-content-length)
+        (throw
+         (ex-info
+          "Payload too large"
+          (into req
+                {:ring.response/status 413
+                 :ring.response/body "Payload Too Large\r\n"})))))
+
+    (when-not (:ring.request/body req)
+      (throw
+       (ex-info
+        "No body in request"
+        (into req {:ring.response/status 400
+                   :ring.response/body "Bad Request\r\n"}))))
+
+    (let [decoded-representation
+          (decode-maybe
+
+           ;; See Section 3.1.1.5, RFC 7231 as to why content-type defaults
+           ;; to application/octet-stream
+           (cond-> {::http/content-type "application/octet-stream"}
+             (contains? (:ring.request/headers req) "content-type")
+             (assoc ::http/content-type (get-in req [:ring.request/headers "content-type"]))
+
+             (contains? (:ring.request/headers req) "content-encoding")
+             (assoc ::http/content-encoding (get-in req [:ring.request/headers "content-encoding"]))
+
+             (contains? (:ring.request/headers req) "content-language")
+             (assoc ::http/content-language (get-in req [:ring.request/headers "content-language"]))))]
+
+      (when-let [acceptable (::http/acceptable resource)]
+
+        (let [prefs (headers->decoded-preferences acceptable)
+              request-rep (rate-representation prefs decoded-representation)]
+
+          (when (or (get prefs "accept") (get prefs "accept-charset"))
+            (cond
+              (= (:juxt.pick.alpha/content-type-qvalue request-rep) 0.0)
+              (throw
+               (ex-info
+                "The content-type of the request payload is not supported by the resource"
+                (into req
+                      {:ring.response/status 415
+                       :ring.response/body "Unsupported Media Type\r\n"
+                       ::acceptable acceptable
+                       ::content-type (get request-rep "content-type")})))
+
+              (and
+               (= "text" (get-in request-rep [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/type]))
+               (get prefs "accept-charset")
+               (not (contains? (get-in request-rep [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map]) "charset")))
+              (throw
+               (ex-info
+                "The Content-Type header in the request is a text type and is required to specify its charset as a media-type parameter"
+                (into req {:ring.response/status 415
+                           :ring.response/body "Unsupported Media Type\r\n"
+                           ::acceptable acceptable
+                           ::content-type (get request-rep "content-type")})))
+
+              (= (:juxt.pick.alpha/charset-qvalue request-rep) 0.0)
+              (throw
+               (ex-info
+                "The charset of the Content-Type header in the request is not supported by the resource"
+                (into req {:ring.response/status 415
+                           :ring.response/body "Unsupported Media Type\r\n"
+                           ::acceptable acceptable
+                           ::content-type (get request-rep "content-type")})))))
+
+          (when (get prefs "accept-encoding")
+            (cond
+              (= (:juxt.pick.alpha/content-encoding-qvalue request-rep) 0.0)
+              (throw
+               (ex-info
+                "The content-encoding in the request is not supported by the resource"
+                (into req {:ring.response/status 409
+                           :ring.response/body "Conflict\r\n"
+                           ::acceptable acceptable
+                           ::content-encoding (get-in req [:ring.request/headers "content-encoding"] "identity")})))))
+
+          (when (get prefs "accept-language")
+            (cond
+              (not (contains? (:ring.response/headers req) "content-language"))
+              (throw
+               (ex-info
+                "Request must contain Content-Language header"
+                (into req {:ring.response/status 409
+                           :ring.response/body "Conflict\r\n"
+                           ::acceptable acceptable
+                           ::content-language (get-in req [:ring.request/headers "content-language"])})))
+
+              (= (:juxt.pick.alpha/content-language-qvalue request-rep) 0.0)
+              (throw
+               (ex-info
+                "The content-language in the request is not supported by the resource"
+                (into req {:ring.response/status 415
+                           :ring.response/body "Unsupported Media Type\r\n"
+                           ::acceptable acceptable
+                           ::content-language (get-in req [:ring.request/headers "content-language"])})))))))
+
+      (when (get-in req [:ring.request/headers "content-range"])
+        (throw
+         (ex-info
+          "Content-Range header not allowed on a PUT request"
+          (into req
+                {:ring.response/status 400
+                 :ring.response/body "Bad Request\r\n"}))))
+
+      (with-open [in (:ring.request/body req)]
+        (let [body (.readNBytes in content-length)
+              content-type (:juxt.reap.alpha.rfc7231/content-type decoded-representation)]
+
+          (merge
+           decoded-representation
+           {::http/content-length content-length
+            ::http/last-modified start-date}
+
+           (if (and
+                (= (:juxt.reap.alpha.rfc7231/type content-type) "text")
+                (nil? (get decoded-representation ::http/content-encoding)))
+             (let [charset
+                   (get-in decoded-representation
+                           [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
+               (merge
+                {::http/content (new String body (or charset "utf-8"))}
+                (when charset {::http/charset charset})))
+
+             {::http/body body})))))))
+
 (defn etag [representation]
   (format
    "\"%s\""
@@ -78,6 +239,170 @@
        (::http/content representation)
        (.getBytes (::http/content representation)
                   (get representation ::http/charset "UTF-8")))) 0 32)))
+
+;; TODO: Test for this: "The server generating a 304 response MUST generate any
+;; of the following header fields that would have been sent in a 200 (OK)
+;; response to the same request: Cache-Control, Content-Location, Date, ETag,
+;; Expires, and Vary."
+
+(defn evaluate-if-match!
+  "Evaluate an If-None-Match precondition header field in the context of a
+  resource. If the precondition is found to be false, an exception is thrown
+  with ex-data containing the proper response."
+  [{::site/keys [selected-representation] :as req}]
+  ;; (All quotes in this function's comments are from Section 3.2, RFC 7232,
+  ;; unless otherwise stated).
+  (let [header-field (reap/if-match (get-in req [:ring.request/headers "if-match"]))]
+    (cond
+      ;; "If the field-value is '*' …"
+      (and (map? header-field)
+           (::rfc7232/wildcard header-field)
+           (nil? selected-representation))
+      ;; "… the condition is false if the origin server does not have a current
+      ;; representation for the target resource."
+      (throw
+       (ex-info
+        "If-Match precondition failed"
+        {::message "No current representations for resource, so * doesn't match"
+         ::response {:status 412
+                     :body "Precondition Failed\r\n"}}))
+
+      (sequential? header-field)
+      (when-let [rep-etag (some-> (get selected-representation ::http/etag) reap/entity-tag)]
+        (when-not (seq
+                   (for [etag header-field
+                         ;; "An origin server MUST use the strong comparison function
+                         ;; when comparing entity-tags"
+                         :when (rfc7232/strong-compare-match? etag rep-etag)]
+                     etag))
+
+          ;; TODO: "unless it can be determined that the state-changing
+          ;; request has already succeeded (see Section 3.1)"
+          (throw
+           (ex-info
+            "No strong matches between if-match and current representations"
+            (into req {:ring.response/status 412
+                       :ring.response/body "Precondition Failed\r\n"}))))))))
+
+;; TODO: See Section 4.1, RFC 7232:
+;;
+(defn evaluate-if-none-match!
+  "Evaluate an If-None-Match precondition header field in the context of a
+  resource and, when applicable, the representation metadata of the selected
+  representation. If the precondition is found to be false, an exception is
+  thrown with ex-data containing the proper response."
+  [{::site/keys [selected-representation] :as req}]
+  ;; (All quotes in this function's comments are from Section 3.2, RFC 7232,
+  ;; unless otherwise stated).
+  (let [header-field (reap/if-none-match (get-in req [:ring.request/headers "if-none-match"]))]
+    (cond
+      (sequential? header-field)
+      (when-let [rep-etag (some-> (get selected-representation ::http/etag) reap/entity-tag)]
+        ;; "If the field-value is a list of entity-tags, the condition is false
+        ;; if one of the listed tags match the entity-tag of the selected
+        ;; representation."
+        (doseq [etag header-field]
+          ;; "A recipient MUST use the weak comparison function when comparing
+          ;; entity-tags …"
+          (when (rfc7232/weak-compare-match? etag rep-etag)
+            (throw
+             (ex-info
+              "If-None-Match precondition failed"
+              {::message "One of the etags in the if-none-match header matches the selected representation"
+               ::entity-tag etag
+               ::representation selected-representation
+               ::response
+               ;; "the origin server MUST respond with either a) the 304 (Not
+               ;; Modified) status code if the request method is GET or HEAD …"
+               (throw
+                (if (#{:get :head} (:ring.request/method req))
+                  (ex-info
+                   "Not modified"
+                   (into req {:ring.response/status 304
+                              :ring.response/body "Not Modified\r\n"}))
+                  ;; "… or 412 (Precondition Failed) status code for all other
+                  ;; request methods."
+                  (ex-info
+                   "Precondition failed"
+                   (into req {:ring.response/status 412
+                              :ring.response/body "Precondition Failed\r\n"}))))})))))
+
+      ;; "If-None-Match can also be used with a value of '*' …"
+      (and (map? header-field) (::rfc7232/wildcard header-field))
+      ;; "… the condition is false if the origin server has a current
+      ;; representation for the target resource."
+      (when selected-representation
+        (throw
+         (ex-info
+          "At least one representation already exists for this resource"
+          (into req
+                (if (#{:get :head} (:ring.request/method req))
+                  ;; "the origin server MUST respond with either a) the 304 (Not
+                  ;; Modified) status code if the request method is GET or HEAD
+                  ;; …"
+                  {:ring.response/status 304
+                   :ring.response/body "Not Modified\r\n"}
+                  ;; "… or 412 (Precondition Failed) status code for all other
+                  ;; request methods."
+                  {:ring.response/status 412
+                   :ring.response/body "Precondition Failed\r\n"}))))))))
+
+(defn evaluate-if-unmodified-since! [{::site/keys [selected-representation] :as req}]
+  (let [if-unmodified-since-date
+        (-> req
+            (get-in [:ring.request/headers "if-unmodified-since"])
+            reap/http-date
+            ::rfc7231/date)]
+    (when (.isAfter
+           (.toInstant (get selected-representation ::http/last-modified (java.util.Date.)))
+           (.toInstant if-unmodified-since-date))
+      (throw
+       (ex-info
+        "Precondition failed"
+        (into req {:ring.resposne/status 304
+                   :ring.response/body "Precondition Failed\r\n"}))))))
+
+(defn evaluate-if-modified-since! [{::site/keys [selected-representation] :as req}]
+  (let [if-modified-since-date
+        (-> req
+            (get-in [:ring.request/headers "if-modified-since"])
+            reap/http-date
+            ::rfc7231/date)]
+
+    (when-not (.isAfter
+               (.toInstant (get selected-representation ::http/last-modified (java.util.Date.)))
+               (.toInstant if-modified-since-date))
+      (throw
+       (ex-info
+        "Not modified"
+        (into req {:ring.resposne/status 304
+                   :ring.response/body "Not Modified\r\n"}))))))
+
+(defn evaluate-preconditions!
+  "Implementation of Section 6 of RFC 7232. Arguments are the (Ring) request, a
+  resource (map, typically with Spin namespaced entries, representation metadata
+  of the selected representation and the response message origination date."
+  [req]
+  ;; "… a server MUST ignore the conditional request header fields … when
+  ;; received with a request method that does not involve the selection or
+  ;; modification of a selected representation, such as CONNECT, OPTIONS, or
+  ;; TRACE." -- Section 5, RFC 7232
+  (when (not (#{:connect :options :trace} (:ring.request/method req)))
+    (if (get-in req [:ring.request/headers "if-match"])
+      ;; Step 1
+      (evaluate-if-match! req)
+      ;; Step 2
+      (when (get-in req [:ring.request/headers "if-unmodified-since"])
+        (evaluate-if-unmodified-since! req)))
+    ;; Step 3
+    (if (get-in req [:ring.request/headers "if-none-match"])
+      (evaluate-if-none-match! req)
+      ;; Step 4, else branch: if-none-match is not present
+      (when (#{:get :head} (:ring.request/method req))
+        (when (get-in req [:ring.request/headers "if-modified-since"])
+          (evaluate-if-modified-since! req))))
+    ;; (Step 5 is handled elsewhere)
+    ))
 
 (defn put-static-resource
   "PUT a new representation of the target resource. All other representations are
@@ -179,7 +504,7 @@
    []))
 
 (defn GET [{::site/keys [selected-representation] :as req}]
-  #_(spin/evaluate-preconditions! request resource selected-representation date)
+  (evaluate-preconditions! req)
 
   (let [{::http/keys [body content charset]} selected-representation
         {::site/keys [body-fn]} selected-representation
@@ -453,25 +778,28 @@
         (assoc-when-some "trailer" (::http/trailer rep))
         (assoc-when-some "transfer-encoding" (::http/transfer-encoding rep)))))
 
-(defn minimize-response [response]
-  (-> response
-      (dissoc :ring.response/body
-              :ring.request/body
-              ::site/crux-node ::site/db
-              ;; Also, this is the crux.db/id so don't repeat
-              ::site/request-id)
+(defn minimize-response [response walk-tree?]
+  (cond->
+      (-> response
+          (dissoc :ring.response/body
+                  :ring.request/body
+                  ::site/crux-node ::site/db
+                  ;; Also, this is the crux.db/id so don't repeat
+                  ::site/request-id)
 
-      (update :ring.response/headers dissoc "set-cookie")
+          (update :ring.response/headers dissoc "set-cookie")
 
-      ;; ::site/request-locals is used to avoid database involvement
-      (update ::site/resource dissoc ::site/request-locals ::http/body ::http/content)
-      (update ::site/selected-representation dissoc ::http/body ::http/content)
-      (update ::site/received-representation dissoc ::http/body ::http/content)
-      (update :ring.request/headers
-              (fn [headers]
-                (cond-> headers
-                  (contains? headers "authorization")
-                  (assoc "authorization" "REDACTED"))))))
+          ;; ::site/request-locals is used to avoid database involvement
+          (update ::site/resource dissoc ::site/request-locals ::http/body ::http/content)
+          (update ::site/selected-representation dissoc ::http/body ::http/content)
+          (update ::site/received-representation dissoc ::http/body ::http/content)
+          (update :ring.request/headers
+                  (fn [headers]
+                    (cond-> headers
+                      (contains? headers "authorization")
+                      (assoc "authorization" "REDACTED")))))
+    ;; TODO: Aggressive search to evict anything that isn't Nippy freezable
+    walk-tree? identity))
 
 ;; TODO: Split into logback logger, Crux logger and response finisher. This will
 ;; make it easier to disable one or both logging strategies.
@@ -490,12 +818,13 @@
                      (:ring.request/path req)
                      (:ring.request/protocol req)
                      (:ring.response/status response))
+
           (try
             (x/submit-tx
              crux-node
              [[:crux.tx/put
                (merge
-                (minimize-response response)
+                (minimize-response response (some? (::site/error response)))
 
                 (select-keys db [:crux.db/valid-time :crux.tx/tx-id])
 
@@ -530,8 +859,8 @@
       (respond (inner-handler req))
       (catch clojure.lang.ExceptionInfo e
         (let [{:ring.response/keys [status] :as exdata} (ex-data e)]
-          (when (or (nil? status) (>= status 500))
-            (let [exdata (minimize-response exdata)]
+          (when (>= status 500)
+            (let [exdata (minimize-response exdata true)]
               (prn (.getMessage e))
               (pprint exdata)
               (log/errorf e "%s: %s" (.getMessage e) (pr-str exdata))))
