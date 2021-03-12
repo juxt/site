@@ -333,14 +333,8 @@
                 :where (mapv (fn [clause]
                                (cond
                                  (and (vector? clause) (every? (comp not coll?) clause))
-                                 (mapv (fn [item txf] (txf item)) clause [symbol keyword symbol])
-
-                                 ;;(and (vector? clause) (list? (first clause)))
-                                 ;;(mapv (fn [item txf] (txf item)) clause [#(fn ) symbol])
-                                 ))
-
+                                 (mapv (fn [item txf] (txf item)) clause [symbol keyword symbol])))
                              v)
-
                 :limit v
                 :in (mapv symbol v)
                 :args [(reduce-kv (fn [acc k v] (assoc acc (keyword k) v)) {} (first v))]
