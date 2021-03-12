@@ -615,19 +615,22 @@
   "Install a distribution of Swagger UI"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [server] :or {server (:site-server config)}} (:options opts)
+        {:keys [server version] :or {server (:site-server config)
+                                     version "3.44.1"}} (:options opts)
         tmpdir (create-tmp-dir)
-        outfile (.resolve tmpdir "swagger-ui.zip")]
+        outfile (.resolve tmpdir "swagger-ui.zip")
+        ]
     (message! "Downloading Swagger UI distribution: " (.toString outfile))
-    (sh "curl" "-o" (.toString outfile) "https://codeload.github.com/swagger-api/swagger-ui/zip/v3.44.1")
+    (sh "curl" "-o" (.toString outfile) (format "https://codeload.github.com/swagger-api/swagger-ui/zip/v%s" version))
     (message! "Extracting Swagger UI distribution: " (.toString outfile))
     (sh "unzip" (.toString outfile) "-d" (.toString tmpdir))
-    (let [dir (.resolve tmpdir "swagger-ui-3.44.1")]
+    (let [dir (.resolve tmpdir (format "swagger-ui-%s" version))]
       (doseq [f (file-seq (.toFile dir))
               :when (.isFile f)]
-        (let [rel-path (.relativize tmpdir (.toPath f))]
-          (when (.startsWith rel-path "swagger-ui-3.44.1/dist/")
-            (let [path (format "/swagger-ui/%s" (.toString rel-path))
+        (let [rel-path (.relativize tmpdir (.toPath f))
+              prefix (format "swagger-ui-%s/dist/" version)]
+          (when (.startsWith rel-path prefix)
+            (let [path (format "/swagger-ui/%s" (subs (.toString rel-path) (count prefix)))
                   content-type (content-type (last (str/split (.toString rel-path) #"/")))]
               (when content-type
                 (upload-file* access-token server f content-type nil nil path)))))))))
@@ -730,7 +733,7 @@
 
    ["install-swagger-ui"
     {:description (:doc (meta #'install-swagger-ui))
-     :cli-options []
+     :cli-options [["-v" "--version VERSION" "Swagger UI version (optional)"]]
      :delegate install-swagger-ui}]
 
    ["put-asset"
