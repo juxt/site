@@ -48,6 +48,9 @@
         selmer/selmer {:mvn/version "1.12.33"}
         comb/comb {:mvn/version "0.1.1"}
 
+        ;; GraphQL dependencies
+        org.flatland/ordered {:mvn/version "1.5.9"}
+
         ;; Miscellaneous
         tick/tick {:mvn/version "0.4.26-alpha"}}
 
