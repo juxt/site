@@ -416,7 +416,10 @@
           (merge
            {:crux.db/id uri
             ::site/type "StaticRepresentation"
+
+            ;; Just for now, while we figure out how to set classifications
             ::pass/classification "PUBLIC"
+
             ::http/methods #{:get :head :options :put :patch}
             ::http/etag (etag received-representation)
             ::http/last-modified start-date}
