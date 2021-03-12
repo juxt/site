@@ -88,15 +88,26 @@
    (->> (q '{:find [e] :where [[e :crux.db/id]
                                (not [e ::site/type "Request"])]})
         (map first)
-        ;;(remove #(and (string? %) (re-seq #"_site/requests" %)))
         (sort-by str)))
-  ([t]
-   (->> (q '{:find [(eql/project e [*])]
-               :where [[e :crux.db/id]
-                       [e ::site/type t]]
-             :in [t]} t)
+  ([pat]
+   (->> (q '{:find [e]
+             :where [[e :crux.db/id]
+                     [(str e) id]
+                     [(re-seq pat id) match]
+                     [(some? match)]]
+             :in [pat]}
+           (re-pattern pat))
         (map first)
         (sort-by str))))
+
+(defn cat-type
+  [t]
+  (->> (q '{:find [(eql/project e [*])]
+            :where [[e :crux.db/id]
+                    [e ::site/type t]]
+            :in [t]} t)
+       (map first)
+       (sort-by str)))
 
 (defn rules []
   (sort-by
