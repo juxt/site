@@ -154,3 +154,6 @@
 (defn sessions []
   (authn/expire-sessions! (java.util.Date.))
   (deref authn/sessions-by-access-token))
+
+(defn clear-sessions []
+  (reset! authn/sessions-by-access-token {}))
