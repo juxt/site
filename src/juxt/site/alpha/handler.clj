@@ -942,7 +942,7 @@
               :headers :ring.request/headers
               :request-method :ring.request/method
               :uri :ring.request/path
-              :query :ring.request/query
+              :query-string :ring.request/query
               :protocol :ring.request/protocol
               :remote-addr :ring.request/remote-addr
               :scheme :ring.request/scheme
