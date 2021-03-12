@@ -361,7 +361,7 @@
         authorized-query (when crux-query
                            ;; This is just temporary, in future, fail if no
                            ;; authorization. We just need to make sure there's
-                           ;; an authorization for crux/admin
+                           ;; an authorization for the subject.
                            (if authorization
                              (pdp/->authorized-query crux-query authorization)
                              crux-query))
