@@ -104,7 +104,8 @@
   [opts]
   (let [{:keys [server username password curl]
          :or {server (:site-server config)
-              username (:username config)}}
+              username (:username config)
+              password (:password config)}}
         (:options opts)]
 
     (when-not server (error-and-exit! 1 "Server not specified"))
@@ -114,7 +115,7 @@
           (curl/post
            (format "%s/_site/token" server)
            {:headers {"content-type" "application/x-www-form-urlencoded"}
-            :basic-auth [username (or (get-password username) (error-and-exit! 1 "Failed to get password"))]
+            :basic-auth [username (or password (get-password username) (error-and-exit! 1 "Failed to get password"))]
             :body "grant_type=client_credentials"
             :throw false
             :debug false})]
