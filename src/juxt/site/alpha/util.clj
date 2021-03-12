@@ -18,16 +18,6 @@
      (let [digest (.digest hash)]
        (apply str (map #(format "%02x" (bit-and % 0xff)) digest))))))
 
-(defn- sanitize-map [m]
-  (->> m
-       (remove (fn [[k _]] (.endsWith (name k) "!!")))
-       (into {})))
-
-(defn sanitize [m]
-  (postwalk
-   (fn [x] (cond-> x (map? x) sanitize-map))
-   m))
-
 (def mime-types
   {"html" "text/html;charset=utf-8"
    "js" "application/javascript"

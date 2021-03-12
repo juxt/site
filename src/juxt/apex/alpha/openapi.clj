@@ -383,9 +383,7 @@
                          ;; subject
                          subject)]
             (x/entity db e))
-          (x/entity db uri))
-
-        resource-state (util/sanitize resource-state)]
+          (x/entity db uri))]
 
     ;; TODO: Might want to filter out the http metadata at some point
     (case (::http/content-type selected-representation)
