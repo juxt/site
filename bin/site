@@ -20,7 +20,7 @@
 (def ^:dynamic *debug* nil)
 
 (defn error! [& msg]
-  (apply println (apply str ansi/red-font "fail: " ansi/reset-font) msg))
+  (apply println (apply str ansi/red-font "fail:" ansi/reset-font) msg))
 
 (defn error-and-exit! [exit & msg]
   (apply error! msg)
@@ -143,7 +143,7 @@
           (spit f (json/encode data {:pretty true}))
           (when curl
             (message! (format "Storing curl config in %s" curl))
-            (spit curl (format "-H \"Authorization: Bearer %s\"\n-H \"Accept: application/json,*.*;q=0.8\"\n" (get data "access_token")))))
+            (spit curl (format "-H \"Authorization: Bearer %s\"\n-H \"Accept: application/json,*/*;q=0.8\"\n" (get data "access_token")))))
 
         :else
         (do
@@ -513,25 +513,32 @@
   "Upload and install an API"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [server openapi]
+        {:keys [server name openapi]
          :or {server (:site-server config)}} (:options opts)
 
-        _ (when-not openapi (error-and-usage! "OpenAPI file not specified" opts))
+        _ (when-not name (error-and-usage! "API name required" opts))
+        _ (when-not (re-matches #"[a-z]{2,}" name)
+            (error-and-usage! "Name must match pattern: [a-z]{2,}" opts))
+
+        _ (when-not openapi (error-and-usage! "OpenAPI file required" opts))
         _ (when-not (.exists (io/file openapi)) (error-and-exit! 1 "OpenAPI file not found"))
         _ (when-not (.isFile (io/file openapi)) (error-and-exit! 1 "OpenAPI argument is not a file"))
 
         {:keys [status headers body]}
         (curl/put
-         (format "%s/_site/apis/test" server)
+         (format "%s/_site/apis/%s/openapi.json" server name)
          {:headers {"authorization" (format "Bearer %s" access-token)
-                    "content-type" "application/json"}
+                    "content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
           :body (json/generate-string
                  (cond-> {"type" "OpenAPI"
                           "openapi" (slurp (io/file openapi))}))
-          :throw false})]
+          :throw true})]
     (cond
-      (= status 204)
+      (= status 201)
       (message! "API installed")
+
+      (= status 204)
+      (message! "API updated")
 
       :else
       (do
@@ -717,7 +724,8 @@
 
    ["install-api"
     {:description (:doc (meta #'install-api))
-     :cli-options [["-f" "--openapi FILE" "OpenAPI description file"]]
+     :cli-options [["-n" "--name NAME" "API name"]
+                   ["-f" "--openapi FILE" "OpenAPI description file"]]
      :delegate install-api}]
 
    ["install-swagger-ui"

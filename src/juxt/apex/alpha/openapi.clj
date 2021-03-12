@@ -45,7 +45,7 @@
       [[:crux.tx/put
         (merge
          {:crux.db/id uri
-          ::http/methods #{:get :head :put :options}
+          ::http/methods #{:get :head :options :put}
           ::http/etag etag
           ::http/last-modified start-date
           ::site/type "OpenAPI"
@@ -281,7 +281,8 @@
        ::site/description
        "Resource with no representations accepting a PUT of an OpenAPI JSON document."
        ::http/methods #{:get :head :options :put}
-       ::http/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.0.2"}}))
+       ::http/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.0.2"}
+       ::site/request-locals {::site/put-fn put-openapi}}))
 
    (let [openapis (x/q db '{:find [openapi-eid openapi]
                             :where [[openapi-eid ::apex/openapi openapi]]})]

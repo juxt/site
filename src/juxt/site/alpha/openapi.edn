@@ -351,7 +351,7 @@
     :requestBody
     {:required true
      :content
-     {"application/json"
+     {"application/vnd.oai.openapi+json;version=3.0.2"
       {:schema {"$ref" "#/components/schemas/OpenAPI"}}}}
 
     :responses
