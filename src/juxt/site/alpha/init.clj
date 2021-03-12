@@ -143,10 +143,6 @@
    crux-node
    {:crux.db/id (str "https://" canonical-host "/_site/login")
     ::http/methods #{:post}
-    ;;::http/content-type "text/html;charset=utf-8"
-    ;;::http/content (slurp (io/resource "juxt/pass/alpha/login.html"))
-    ;; The login page must have a classification of PUBLIC to be accessible.
-    ;;::pass/classification "PUBLIC"
     ::http/acceptable "application/x-www-form-urlencoded"
     ::site/purpose ::site/login
     ::pass/expires-in (* 3600 24 30)}
@@ -156,6 +152,22 @@
     ::site/description "The login POST handler must be accessible by all"
     ::pass/target '[[request :ring.request/method #{:post}]
                     [resource ::site/purpose ::site/login]]
+    ::pass/effect ::pass/allow}))
+
+(defn put-logout-endpoint! [crux-node {::site/keys [canonical-host]}]
+  ;; Allow anyone to login
+  (put!
+   crux-node
+   {:crux.db/id (str "https://" canonical-host "/_site/logout")
+    ::http/methods #{:post}
+    ::http/acceptable "application/x-www-form-urlencoded"
+    ::site/purpose ::site/logout}
+
+   {:crux.db/id (str "https://" canonical-host "/_site/rules/anyone-can-post-logout-credentials")
+    ::site/type "Rule"
+    ::site/description "The logout POST handler must be accessible by all"
+    ::pass/target '[[request :ring.request/method #{:post}]
+                    [resource ::site/purpose ::site/logout]]
     ::pass/effect ::pass/allow}))
 
 (def host-parser (rfc7230.decoders/host {}))
@@ -242,4 +254,5 @@
 
     ;; Authentication
     (put-openid-token-endpoint! crux-node opts)
-    (put-login-endpoint! crux-node opts)))
+    (put-login-endpoint! crux-node opts)
+    (put-logout-endpoint! crux-node opts)))

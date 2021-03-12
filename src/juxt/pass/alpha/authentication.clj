@@ -122,7 +122,9 @@
     (first users)))
 
 (defn login-response
-  [{::site/keys [received-representation db resource start-date canonical-host] :as req}]
+  [{::site/keys [received-representation db resource start-date canonical-host]
+    :ring.request/keys [query]
+    :as req}]
 
   ;; Check grant_type of posted-representation
   (assert (= "application/x-www-form-urlencoded"
@@ -152,20 +154,21 @@
                     ::http/content-type "text/plain")
              (update :ring.response/headers assoc
                      "cache-control" "no-store"
-                     "location" (format "/~%s/" canonical-host username))
+                     "location" query)
              (assoc :cookies {"access_token"
                               {:value access-token
                                :max-age expires-in
                                :same-site :strict
-                               :http-only true
+                               :http-only false
                                :path "/"}})
-             (cookies-response))))
+             (cookies-response)
+             ((fn [req] (assoc-in req [:ring.response/headers "set-cookie"] (get-in req [:headers "Set-Cookie"])))))))
      ;; else not user
      (throw
       (ex-info
        "Failed to login"
        (-> req
-           (assoc :ring.response/status 302)
+           (assoc :ring.response/status 302 :ring.response/body "Failed to login\r\n")
            (update :ring.response/headers assoc "location" "/")))))))
 
 (defn logout-response
@@ -181,9 +184,9 @@
                        {:value  ""
                         :max-age 0
                         :same-site :strict
-                        :http-only true
                         :path "/"}})
-      (cookies-response)))
+      (cookies-response)
+      ((fn [req] (assoc-in req [:ring.response/headers "set-cookie"] (get-in req [:headers "Set-Cookie"]))))))
 
 (defn authenticate
   "Authenticate a request. Return a pass subject, with information about user,
@@ -192,9 +195,12 @@
   authentication scheme(s) for accessing the resource."
   [{::site/keys [db] :as req}]
   ;; TODO: This might be where we also add the 'on-behalf-of' info
-  (let [access-token (some-> req cookies-request
+  (let [access-token (some-> req
+                             ((fn [req] (assoc req :headers (get req :ring.request/headers))))
+                             cookies-request
                              :cookies (get "access_token") :value)
         now (::site/start-date req)]
+
     (or
      ;; Cookie
      (when access-token
