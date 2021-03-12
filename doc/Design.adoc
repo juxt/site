@@ -1,0 +1,53 @@
+= The Design of Site
+Malcolm Sparks <mal@juxt.pro>
+
+== Introduction
+
+=== Notational conventions
+
+`::http` refers to the `juxt.http.alpha` namespace.
+
+`::site` refers to the `juxt.site.alpha` namespace.
+
+`::apex` refers to the `juxt.apex.alpha` namespace.
+
+`::pass` refers to the `juxt.pass.alpha` namespace.
+
+== Design Elements
+
+=== Requests
+
+Requests are Ring requests, expanded with information and context as it
+progresses through the processing stages.
+
+====
+[source,clojure]
+----
+{:ring.request/method :get
+ :ring.request/path "/index.html"
+ ::site.resource …
+ ::pass.authorization …}
+----
+====
+
+Rather than create a new 'context' map, a Ring request map is expanded. To avoid
+keyword collisions, the
+https://github.com/ring-clojure/ring/blob/2.0/SPEC-2.md[Ring 2.0 namespaced
+keywords] are used. The `::site.handler/wrap-ring-1-adapter` wrapper function
+adapts incoming and outgoing non-namespaced Ring request and response maps to
+their Ring 2.0 equivalents. This function acts as an adapter that may be removed
+when used with a Ring 2.0 compatible server.
+
+A benefit of using a single request map throughout the processing stages is that
+all information is centralised in this single map. This helps with error
+handling, since any error handler has all possible information about the request
+for diagnostic purposes.
+
+=== Exceptions
+
+Java exceptions are considered cheap enough to throw for any non-OK
+response. Clojure's `clojure.lang.ExceptionInfo` is thrown with the request map
+given as the `ex-data` argument.
+
+The alternative is to write and maintain convoluted and highly-nested
+if/then/else logic.
