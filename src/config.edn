@@ -2,19 +2,17 @@
 
 {:ig/system
  {:juxt.site.alpha.db/crux-node
-  {:crux.http-server/server {:port 3000}
-
-   :crux/index-store
+  {:crux/index-store
    {:kv-store {:crux/module crux.rocksdb/->kv-store
-               :db-dir "db/current/idxs"}}
+               :db-dir "db/home.juxt.site/idxs"}}
 
    :crux/document-store
    {:kv-store {:crux/module crux.rocksdb/->kv-store
-               :db-dir "db/current/docs"}}
+               :db-dir "db/home.juxt.site/docs"}}
 
    :crux/tx-log
    {:kv-store {:crux/module crux.rocksdb/->kv-store
-               :db-dir "db/current/txes"}}}
+               :db-dir "db/home.juxt.site/txes"}}}
 
   :juxt.site.alpha.selmer/cache
   {:cache? false}
