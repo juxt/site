@@ -94,9 +94,7 @@
       ;;::http/last-modified (Date. (.lastModified f))
       ::http/content-length (count body)
       ::http/body body
-      ::apex/openapi openapi
-      ;; Just for now, while we figure out how to set classifications
-      ::pass/classification "PUBLIC"})))
+      ::apex/openapi openapi})))
 
 (defn put-openid-token-endpoint! [crux-node {::site/keys [canonical-host]}]
   (let [token-endpoint (str "https://" canonical-host "/_site/token")

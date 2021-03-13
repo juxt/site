@@ -49,10 +49,7 @@
           ::http/etag etag
           ::http/last-modified start-date
           ::site/type "OpenAPI"
-          ::apex/openapi openapi
-          ;; Just for now, while we figure out how to set classifications
-          ::pass/classification "PUBLIC"
-          }
+          ::apex/openapi openapi}
          received-representation)]])
      (x/await-tx crux-node))
 
