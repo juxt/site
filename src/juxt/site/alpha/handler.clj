@@ -3,6 +3,7 @@
 (ns juxt.site.alpha.handler
   (:require
    [clojure.walk :refer [postwalk]]
+   [clojure.java.io :as io]
    [clojure.pprint :refer [pprint]]
    [clojure.set :as set]
    [clojure.string :as str]
@@ -915,26 +916,38 @@
   (fn [req]
     (let [db (x/db crux-node)
           {::site/keys [canonical-host]}
-          (x/entity db ::site/init-settings) _ (assert canonical-host)
-          req-id (new-request-id canonical-host)
+          (x/entity db ::site/init-settings)]
 
-          {::rfc7230/keys [host]}
-          (host-header-parser
-           (re/input (get-in req [:ring.request/headers "host"])))
-          _ (assert host)
-          host (get host-map host host)
-          uri (str "https://" host (:ring.request/path req))
-          req (into req {::site/start-date (java.util.Date.)
-                         ::site/request-id req-id
-                         ::site/uri uri
-                         ::site/host host
-                         ::site/crux-node crux-node
-                         ::site/db db
-                         ::site/canonical-host canonical-host})]
+      (if-not canonical-host
+        ;; TODO: Show a website in 'construction' page, circa 1995
+        {:ring.response/status 500
+         :ring.response/headers {"content-type" "image/gif"}
+         :ring.response/body (io/input-stream
+                              (io/resource
+                               (rand-nth
+                                ["juxt/site/alpha/construction.gif"
+                                 "juxt/site/alpha/construction2.gif"
+                                 "juxt/site/alpha/construction3.gif"])))}
 
-      ;; The Ring request map becomes the container for all state collected
-      ;; along the request processing pathway.
-      (h req))))
+        (let [req-id (new-request-id canonical-host)
+
+              {::rfc7230/keys [host]}
+              (host-header-parser
+               (re/input (get-in req [:ring.request/headers "host"])))
+              _ (assert host)
+              host (get host-map host host)
+              uri (str "https://" host (:ring.request/path req))
+              req (into req {::site/start-date (java.util.Date.)
+                             ::site/request-id req-id
+                             ::site/uri uri
+                             ::site/host host
+                             ::site/crux-node crux-node
+                             ::site/db db
+                             ::site/canonical-host canonical-host})]
+
+          ;; The Ring request map becomes the container for all state collected
+          ;; along the request processing pathway.
+          (h req))))))
 
 (defn wrap-ring-1-adapter
   "Given the presence of keywords from different origins, it helps that we
