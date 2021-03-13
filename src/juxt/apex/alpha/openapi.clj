@@ -273,7 +273,9 @@
    (when (re-matches (re-pattern (format "https://%s/_site/apis/\\w+/openapi.json" canonical-host)) uri)
      (or
       ;; It might exist
-      (x/entity db uri)
+      (some-> (x/entity db uri)
+              (assoc ::site/resource-provider ::openapi-document
+                     ::site/request-locals {::site/put-fn put-openapi}))
 
       ;; Or it might not
       ;; This last item (:put) might be granted by the PDP.
