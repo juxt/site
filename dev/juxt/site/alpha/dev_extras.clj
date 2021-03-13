@@ -130,6 +130,14 @@
             :order-by [[ended :desc]]
             :limit 5})))
 
+(defn count-reqs
+  "Count web requests"
+  []
+  (count
+       (q '{:find [e]
+            :where [[e ::site/type "Request"]]})))
+
+
 ;; TODO: Use a prefix search for performance
 (defn req
   "Display the most recent request."
