@@ -510,7 +510,7 @@
           (error! "Server response: " status " " (str/trim body))
           (message! "Request id: " (get headers "site-request-id")))))))
 
-(defn install-api
+(defn put-api
   "Upload and install an API"
   [opts]
   (let [{access-token "access_token"} (load-token)
@@ -612,7 +612,7 @@
 
     (upload-file* access-token server file type encoding language path)))
 
-(defn install-swagger-ui
+(defn put-swagger-ui
   "Install a distribution of Swagger UI"
   [opts]
   (let [{access-token "access_token"} (load-token)
@@ -726,16 +726,16 @@
                    ["-l" "--location URL" "Location to redirect to"]]
      :delegate put-redirect}]
 
-   ["install-api"
-    {:description (:doc (meta #'install-api))
+   ["put-api"
+    {:description (:doc (meta #'put-api))
      :cli-options [["-n" "--name NAME" "API name"]
                    ["-f" "--openapi FILE" "OpenAPI description file"]]
-     :delegate install-api}]
+     :delegate put-api}]
 
-   ["install-swagger-ui"
-    {:description (:doc (meta #'install-swagger-ui))
+   ["put-swagger-ui"
+    {:description (:doc (meta #'put-swagger-ui))
      :cli-options [["-v" "--version VERSION" "Swagger UI version (optional)"]]
-     :delegate install-swagger-ui}]
+     :delegate put-swagger-ui}]
 
    ["put-asset"
     {:description (:doc (meta #'put-asset))
