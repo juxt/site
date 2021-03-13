@@ -19,4 +19,4 @@
 
   :juxt.site.alpha.server/server
   {:juxt.site.alpha/crux-node #ig/ref :juxt.site.alpha.db/crux-node
-   :just.site.alpha/port 2021}}}
+   :juxt.site.alpha/port 2021}}}
