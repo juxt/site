@@ -701,12 +701,19 @@
 
         ;; Could the scope of this request context be expanded to be what is
         ;; ultimately returned (in the case of 2xx/3xx) or thrown (3xx/4xx/5xx)?
-        request-context {'subject sub
-                         ;; ::site/request-locals is used to avoid database involvement
-                         'resource (dissoc res ::site/request-locals ::http/body ::http/content)
-                         'request (select-keys req [:ring.request/method])
-                         'representation (dissoc res ::site/request-locals ::http/body ::http/content)
-                         'environment {}}
+        request-context
+        {'subject sub
+         ;; ::site/request-locals is used to avoid database involvement
+         'resource (dissoc res ::site/request-locals ::http/body ::http/content)
+         'request (select-keys
+                   req
+                   [:ring.request/headers :ring.request/method :ring.request/path
+                    :ring.request/query :ring.request/protocol :ring.request/remote-addr
+                    :ring.request/scheme :ring.request/server-name :ring.request/server-post
+                    :ring.request/ssl-client-cert])
+
+         'representation (dissoc res ::site/request-locals ::http/body ::http/content)
+         'environment {}}
 
         authz (pdp/authorization db request-context)
 
