@@ -1,6 +1,6 @@
 ;; Copyright © 2021, JUXT LTD.
 
-{:paths ["src" "test"]
+{:paths ["config" "src" "test"]
  :deps {org.clojure/clojure {:mvn/version "1.10.1"}
         org.clojure/tools.logging {:mvn/version "1.1.0"}
 
