@@ -160,15 +160,16 @@
   "Remove request data that is older than an hour."
   ([] (gc (* 1 60 60)))
   ([seconds]
-   (apply
-    evict!
-    (map first
-         (q '{:find [e]
-              :where [[e ::site/type "Request"]
-                      [e ::site/end-date ended]
-                      [(< ended checkpoint)]]
-              :in [checkpoint]}
-            (Date. (- (.getTime (Date.)) (* seconds 1000))))))))
+   (let [records (map first
+                      (q '{:find [e]
+                           :where [[e ::site/type "Request"]
+                                   [e ::site/end-date ended]
+                                   [(< ended checkpoint)]]
+                           :in [checkpoint]}
+                         (Date. (- (.getTime (Date.)) (* seconds 1000)))))]
+     (doseq [batch (partition-all 100 records)]
+       (println "Evicting" (count batch) "records")
+       (println (apply evict! batch))))))
 
 (defn sessions []
   (authn/expire-sessions! (java.util.Date.))
