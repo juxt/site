@@ -159,6 +159,12 @@
                               {:value access-token
                                :max-age expires-in
                                :same-site :strict
+                               ;; We should set http-only to true.  However,
+                               ;; this stops Swagger UI from make API
+                               ;; requests. TODO: The plan is to figure out how
+                               ;; to use the auth features in Swagger UI to
+                               ;; allow these requests, and then we can set
+                               ;; http-only to true.
                                :http-only false
                                :path "/"}})
              (cookies-response)
