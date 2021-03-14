@@ -70,8 +70,7 @@
         (error-and-exit! 1 (str "Failed to make directory: " dir))))
     (io/file dir "access-token.json")))
 
-;; TODO: Rename to set/config
-(defn configure
+(defn set-config
   "Set a configuration value"
   [opts]
   (let [[k v] (:arguments opts)]
@@ -92,11 +91,12 @@
                   (message! (format "Set %s to '%s'" k v)))
         (error-and-exit! 1 "Unsupported OS"))
 
-      (if k
-        (error-and-exit! 1 (format "%s is not a configuration setting" key))
-        (do
-          (message! "Printing config")
-          (pprint config))))))
+      (error-and-exit! 1 (format "%s is not a configuration setting" key)))))
+
+(defn show-config
+  "Show configuration"
+  [opts]
+  (pprint config))
 
 (defn get-token
   "Request a token"
@@ -649,10 +649,15 @@
    ["-h" "--help" "Show this summary"]])
 
 (def commands
-  [["configure"
-    {:description (:doc (meta #'configure))
+  [["set"
+    {:description (:doc (meta #'set-config))
      :cli-options []
-     :delegate configure}]
+     :delegate set-config}]
+
+   ["config"
+    {:description (:doc (meta #'show-config))
+     :cli-options []
+     :delegate show-config}]
 
    ["get-token"
     {:description (:doc (meta #'get-token))
@@ -757,8 +762,13 @@
         (do
           (println (str ansi/bold-green-font "site" ansi/reset-font))
           (println)
-          (println "This tool is to manage users, policies and apps in Site.")
+          (println "This is a resource management tool for Site.")
           (println)
+          (println (str ansi/white-font "Usage" ansi/reset-font))
+          (println)
+          (println "site <global-options> <subcommand> <subcommand-options>")
+          (println)
+          (println (str ansi/white-font "Global options" ansi/reset-font))
           (println summary)
           (println)
           (println (str ansi/white-font "Subcommands" ansi/reset-font))
@@ -767,7 +777,9 @@
             (apply
              println
              (remove nil? [command (str ansi/yellow-font "(" description (when-not delegate " - coming soon!") ")" ansi/reset-font)]))
-            (println (:summary (parse-opts [] cli-options)))
+            (when-let [summary (:summary (parse-opts [] cli-options))]
+              (when-not (str/blank? (str/trim summary))
+                (println summary)))
             (println))))]
 
   (cond
