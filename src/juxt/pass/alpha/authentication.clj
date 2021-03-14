@@ -155,8 +155,14 @@
              (update :ring.response/headers assoc
                      "cache-control" "no-store"
                      "location" query)
-             (assoc :cookies {"access_token"
-                              {:value access-token
+             (assoc :cookies {"site_session"
+                              {:value
+                               (json/write-value-as-string
+                                {"access_token" access-token
+                                 ;; The 'user' field tells user-agents where to
+                                 ;; find information about the user. It isn't
+                                 ;; otherwise used.
+                                 "user" user})
                                :max-age expires-in
                                :same-site :strict
                                ;; We should set http-only to true.  However,
@@ -186,7 +192,7 @@
       (update :ring.response/headers assoc
               "cache-control" "no-store"
               "location" "/")
-      (assoc :cookies {"access_token"
+      (assoc :cookies {"site_session"
                        {:value  ""
                         :max-age 0
                         :same-site :strict
@@ -201,10 +207,11 @@
   authentication scheme(s) for accessing the resource."
   [{::site/keys [db] :as req}]
   ;; TODO: This might be where we also add the 'on-behalf-of' info
-  (let [access-token (some-> req
-                             ((fn [req] (assoc req :headers (get req :ring.request/headers))))
-                             cookies-request
-                             :cookies (get "access_token") :value)
+  (let [{access-token "access_token"}
+        (some-> req
+                ((fn [req] (assoc req :headers (get req :ring.request/headers))))
+                cookies-request
+                :cookies (get "site_session") :value json/read-value)
         now (::site/start-date req)]
 
     (or
