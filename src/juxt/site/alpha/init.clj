@@ -88,7 +88,7 @@
      crux-node
      {:crux.db/id (str "https://" canonical-host "/_site/apis/site/openapi.json")
       ::site/type "OpenAPI"
-      ::http/methods #{:get :head :options}
+      ::http/methods #{:get :head :options :put}
       ::http/content-type "application/vnd.oai.openapi+json;version=3.0.2"
       ;; TODO: Get last modified from resource - check JDK javadocs
       ;;::http/last-modified (Date. (.lastModified f))
