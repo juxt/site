@@ -122,7 +122,7 @@
     (first users)))
 
 (defn login-response
-  [{::site/keys [received-representation db resource start-date canonical-host]
+  [{::site/keys [received-representation db resource start-date]
     :ring.request/keys [query]
     :as req}]
 

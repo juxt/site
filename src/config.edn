@@ -19,5 +19,4 @@
 
   :juxt.site.alpha.server/server
   {:juxt.site.alpha/crux-node #ig/ref :juxt.site.alpha.db/crux-node
-   :juxt.site.alpha/port 2021
-   :juxt.site.alpha/host-map {"localhost:2021" "home.juxt.site"}}}}
+   :juxt.site.alpha/port 2021}}}

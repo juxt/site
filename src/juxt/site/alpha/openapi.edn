@@ -10,9 +10,7 @@
   "Managing Site APIs, users, roles, and policies."
 
   :contact
-  {:name "Webmaster"
-   :email "webmaster@<canonical-host>"
-   :url "<canonical-host>"}}
+  {:name "Webmaster"}}
 
  :servers [{:url "/_site"}]
 

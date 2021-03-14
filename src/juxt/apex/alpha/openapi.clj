@@ -265,12 +265,12 @@
    ;; yet do this is due to path parameters (see below). If we were to put path
    ;; parameters at one level higher in the OpenAPI, and enforce that, then we
    ;; could make this change.
-   {::site/keys [canonical-host] :ring.request/keys [method] :as req}]
+   {::site/keys [base-uri] :as req}]
 
   ;; Do we have any OpenAPIs in the database?
   (or
    ;; The OpenAPI document
-   (when (re-matches (re-pattern (format "https://%s/_site/apis/\\w+/openapi.json" canonical-host)) uri)
+   (when (re-matches (re-pattern (format "%s/_site/apis/\\w+/openapi.json" base-uri)) uri)
      (or
       ;; It might exist
       (some-> (x/entity db uri)
@@ -295,8 +295,8 @@
                    (some
                     (fn [server]
                       (let [server-url (get server "url")
-                            server-url (cond->> server-url (.startsWith server-url "/")
-                                                (str "https://" canonical-host))]
+                            server-url (cond->> server-url
+                                         (.startsWith server-url "/") (str base-uri))]
 
                         (when (.startsWith uri server-url)
                           {:openapi-eid openapi-eid
@@ -426,15 +426,6 @@
                           :else
                           (pr-str (get row field)))])])]])
               [:p "No results"])
-
-            (= (get config "type") "template")
-            (binding [*custom-resource-path*
-                      (java.net.URL. "http://localhost:8082/apps/card/templates/")]
-              (selmer/render-file
-               (java.net.URL. "http://localhost:8082/apps/card/templates/kanban.html")
-               {}
-               :custom-resource-path
-               (java.net.URL. "http://localhost:8082/apps/card/templates/")))
 
             :else
             (let [fields (distinct (concat [:crux.db/id] (keys resource-state)))]

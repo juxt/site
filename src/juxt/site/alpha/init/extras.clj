@@ -32,20 +32,20 @@
      ::http/last-modified (Date. (.lastModified f))
      ::http/etag (str \" (util/hexdigest body) \")}))
 
-(defn put-login! [crux-node {::site/keys [canonical-host]}]
+(defn put-login! [crux-node {::site/keys [base-uri]}]
   (put!
    crux-node
 
 
    ;; We've got a login, we should have a logout too.
-   {:crux.db/id (str "https://" canonical-host "/_site/logout")
+   {:crux.db/id (str base-uri "/_site/logout")
     ::http/methods #{:post}
     ::http/acceptable "application/x-www-form-urlencoded"
     ::site/purpose ::site/logout}
 
    ;; This was intended to protect the name of the access token, but given this
    ;; is open source, it's not worth it.
-   #_{:crux.db/id (str "https://" canonical-host "/_site/rules/those-logged-in-can-logout")
+   #_{:crux.db/id (str base-uri "/_site/rules/those-logged-in-can-logout")
     ::site/type "Rule"
     ::site/description "The logout POST handler must be accessible by those logged in"
     ::pass/target '[[subject ::pass/username]

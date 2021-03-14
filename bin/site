@@ -70,18 +70,17 @@
         (error-and-exit! 1 (str "Failed to make directory: " dir))))
     (io/file dir "access-token.json")))
 
+;; TODO: Rename to set/config
 (defn configure
   "Set a configuration value"
   [opts]
   (let [[k v] (:arguments opts)]
-    (if (#{ ;; default site host (plus optional scheme)
-           "site-server"
-           ;; default username to use
+    (if (#{;; default username to use
            "username"
            ;; pass subdirectory to load passwords from, defaults to 'site'
            "pass-password-dir"
-           ;; canonical host
-           "canonical-host"} k)
+           ;; base-uri
+           "base-uri"} k)
 
       (case (System/getProperty "os.name")
         "Linux" (let [dir (io/file (System/getProperty "user.home") ".config/site")]
@@ -102,18 +101,18 @@
 (defn get-token
   "Request a token"
   [opts]
-  (let [{:keys [server username password curl]
-         :or {server (:site-server config)
+  (let [{:keys [base-uri username password curl]
+         :or {base-uri (:base-uri config)
               username (:username config)
               password (:password config)}}
         (:options opts)]
 
-    (when-not server (error-and-exit! 1 "Server not specified"))
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not username (error-and-exit! 1 "Username required"))
 
     (let [{:keys [status headers body]}
           (curl/post
-           (format "%s/_site/token" server)
+           (format "%s/_site/token" base-uri)
            {:headers {"content-type" "application/x-www-form-urlencoded"}
             :basic-auth [username (or password (get-password username) (error-and-exit! 1 "Failed to get password"))]
             :body "grant_type=client_credentials"
@@ -193,13 +192,13 @@
 (defn list-users
   "List users"
   [opts]
-  (let [{:keys [server]
-         :or {server (:site-server config)}}
+  (let [{:keys [base-uri]
+         :or {base-uri (:base-uri config)}}
         (:options opts)]
     (let [{access-token "access_token"} (load-token)
           {:keys [status headers body]}
           (curl/get
-           (format "%s/_site/users/" server)
+           (format "%s/_site/users/" base-uri)
            {:headers {"authorization" (format "Bearer %s" access-token)
                       "accept" "application/json"}
             :throw false})]
@@ -216,24 +215,22 @@
   "Reset a user's password"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [server canonical-host username password]
-         :or {server (:site-server config)
-              canonical-host (:canonical-host config)}}
+        {:keys [base-uri username password]
+         :or {base-uri (:base-uri config)}}
         (:options opts)]
 
-    (when-not server (error-and-exit! 1 "Server not specified"))
-    (when-not canonical-host (error-and-exit! 1 "Canonical host required"))
+    (when-not base-uri (error-and-exit! 1 "Base-URI required"))
     (when-not username (error-and-usage! "User required" opts))
 
     (let [password (or password (get-password username))
           {:keys [status headers body]}
           (curl/put
-           (format "%s/_site/users/%s/password" server username)
+           (format "%s/_site/users/%s/password" base-uri username)
            {:headers {"authorization" (format "Bearer %s" access-token)
                       "content-type" "application/json"}
             :body (json/generate-string
                    {"type" "Password"
-                    "user" (format "https://%s/_site/users/%s" canonical-host username)
+                    "user" (format "%s/_site/users/%s" base-uri username)
                     "password" password})
             :throw false})]
       (cond
@@ -241,7 +238,7 @@
         (error! "Server response: " status " " (str/trim body))
 
         (= (quot status 100) 2)
-        (message! "Password reset")
+        (message! "Password reset for" username)
 
         :else
         (do
@@ -252,16 +249,17 @@
   "Create or update a user"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [server username password name]
-         :or {server (:site-server config)}}
+        {:keys [base-uri username password name]
+         :or {base-uri (:base-uri config)}}
         (:options opts)]
-    (when-not server (error-and-exit! 1 "Server not specified"))
+
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not username (error-and-usage! "Username required" opts))
     (when-not name (error-and-usage! "Name required" opts))
 
     (let [{:keys [status headers body]}
           (curl/put
-           (format "%s/_site/users/%s" server username)
+           (format "%s/_site/users/%s" base-uri username)
            {:headers {"authorization" (format "Bearer %s" access-token)
                       "content-type" "application/json"}
             :body (json/generate-string
@@ -278,10 +276,10 @@
           (message! "Request id: " (get headers "site-request-id")))
 
         (= status 201)
-        (message! "User created")
+        (message! "User created:" (format "%s (Welcome %s!)" username name))
 
         (= status 204)
-        (message! "User updated")
+        (message! "User updated:" username)
 
         :else
         (do
@@ -294,15 +292,16 @@
   "Create or update a role"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [server role description]
-         :or {server (:site-server config)}}
+        {:keys [base-uri role description]
+         :or {base-uri (:base-uri config)}}
         (:options opts)]
-    (when-not server (error-and-exit! 1 "Server not specified"))
+
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not role (error-and-usage! "Role required" opts))
 
     (let [{:keys [status headers body]}
           (curl/put
-           (format "%s/_site/roles/%s" server role)
+           (format "%s/_site/roles/%s" base-uri role)
            {:headers {"authorization" (format "Bearer %s" access-token)
                       "content-type" "application/json"}
             :body (json/generate-string
@@ -320,10 +319,10 @@
           (message! "Request id: " (get headers "site-request-id")))
 
         (= status 201)
-        (message! "Role created")
+        (message! "Role created:" role)
 
         (= status 204)
-        (message! "Role updated")
+        (message! "Role updated:" role)
 
         :else
         (do
@@ -333,13 +332,13 @@
 (defn list-roles
   "List roles"
   [opts]
-  (let [{:keys [server]
-         :or {server (:site-server config)}}
+  (let [{:keys [base-uri]
+         :or {base-uri (:base-uri config)}}
         (:options opts)]
     (let [{access-token "access_token"} (load-token)
           {:keys [status headers body]}
           (curl/get
-           (format "%s/_site/roles/" server)
+           (format "%s/_site/roles/" base-uri)
            {:headers {"authorization" (format "Bearer %s" access-token)
                       "accept" "application/json"}
             :throw false})]
@@ -356,24 +355,23 @@
   "Assign a role to a user"
   [opts]
   (let [{access-token "access_token" assigner "username"} (load-token)
-        {:keys [server canonical-host username role justification]
-         :or {server (:site-server config)
-              canonical-host (:canonical-host config)}}
+        {:keys [base-uri username role justification]
+         :or {base-uri (:base-uri config)}}
         (:options opts)]
-    (when-not server (error-and-exit! 1 "Server not specified"))
+
     (when-not username (error-and-usage! "Username required" opts))
     (when-not role (error-and-usage! "Role required" opts))
 
     (let [{:keys [status headers body]}
           (curl/put
-           (format "%s/_site/roles/%s/users/%s" server role username)
+           (format "%s/_site/roles/%s/users/%s" base-uri role username)
            {:headers {"authorization" (format "Bearer %s" access-token)
                       "content-type" "application/json"}
             :body (json/generate-string
                    (cond-> {"type" "UserRoleMapping"
-                            "assignee" (format "https://%s/_site/users/%s" canonical-host username)
-                            "assigner" (format "https://%s/_site/users/%s" canonical-host assigner)
-                            "role" (format "https://%s/_site/roles/%s" canonical-host role)}
+                            "assignee" (format "%s/_site/users/%s" base-uri username)
+                            "assigner" (format "%s/_site/users/%s" base-uri assigner)
+                            "role" (format "%s/_site/roles/%s" base-uri role)}
                      justification (assoc "businessJustification" justification)))
             :throw false})]
       (cond
@@ -385,10 +383,10 @@
           (message! "Request id: " (get headers "site-request-id")))
 
         (= status 201)
-        (message! "Assignment created")
+        (message! "Assignment created:" username "assigned role of" role)
 
         (= status 204)
-        (message! "Assignment updated")
+        (message! "Assignment updated:" username "re-assigned role of" role)
 
         :else
         (do
@@ -399,20 +397,23 @@
   "Put a rule"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [server name rule]
-         :or {server (:site-server config)}}
+        {:keys [base-uri name rule]
+         :or {base-uri (:base-uri config)}}
         (:options opts)]
-    (when-not server (error-and-exit! 1 "Server not specified"))
+
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not name (error-and-usage! "Name required" opts))
     (when-not rule (error-and-usage! "Rule required" opts))
     (when-not (.isFile (io/file rule)) (error-and-exit! 1 "Rule file must be a file"))
 
     (let [{:keys [status headers body]}
           (curl/put
-           (format "%s/_site/rules/%s" server name)
+           (format "%s/_site/rules/%s" base-uri name)
            {:headers {"authorization" (format "Bearer %s" access-token)
                       "content-type" "application/json"}
-            :body (slurp (io/file rule))
+            :body (str/replace
+                   (slurp (io/file rule))
+                   "{{base-uri}}" base-uri)
             :throw false})]
       (cond
         (= status 201)
@@ -430,11 +431,11 @@
   "Associate a variant representation to a resource"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [server canonical-host resource variant]
-         :or {server (:site-server config)
-              canonical-host (:canonical-host config)}}
+        {:keys [base-uri resource variant]
+         :or {base-uri (:base-uri config)}}
         (:options opts)]
-    (when-not server (error-and-exit! 1 "Server not specified"))
+
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not resource (error-and-usage! "Resource required" opts))
     (when-not variant (error-and-usage! "Variant required" opts))
 
@@ -442,7 +443,7 @@
 
     (let [{:keys [status headers body]}
           (curl/post
-           (format "%s/_site/variants/" server)
+           (format "%s/_site/variants/" base-uri)
            {:headers {"authorization" (format "Bearer %s" access-token)
                       "content-type" "application/json"}
             :body (json/generate-string
@@ -473,23 +474,23 @@
   "Put a redirect"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [server canonical-host resource location]
-         :or {server (:site-server config)
-              canonical-host (:canonical-host config)}}
+        {:keys [base-uri resource location]
+         :or {base-uri (:base-uri config)}}
         (:options opts)]
-    (when-not server (error-and-exit! 1 "Server not specified"))
+
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not resource (error-and-usage! "Resource required" opts))
     (when-not location (error-and-usage! "Location required" opts))
 
     (let [{:keys [status headers body]}
           (curl/post
-           (format "%s/_site/redirects/" server)
+           (format "%s/_site/redirects/" base-uri)
            {:headers {"authorization" (format "Bearer %s" access-token)
                       "content-type" "application/json"}
             :body (json/generate-string
                    (cond-> {"type" "Redirect"
-                            "resource" resource
-                            "location" location}))
+                            "resource" (str base-uri resource)
+                            "location" (str base-uri location)}))
             :throw false})]
       (cond
         (= status 401)
@@ -514,8 +515,8 @@
   "Upload and install an API"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [server name openapi]
-         :or {server (:site-server config)}} (:options opts)
+        {:keys [base-uri name openapi]
+         :or {base-uri (:base-uri config)}} (:options opts)
 
         _ (when-not name (error-and-usage! "API name required" opts))
         _ (when-not (re-matches #"[a-z]{2,}" name)
@@ -527,7 +528,7 @@
 
         {:keys [status headers body]}
         (curl/put
-         (format "%s/_site/apis/%s/openapi.json" server name)
+         (format "%s/_site/apis/%s/openapi.json" base-uri name)
          {:headers {"authorization" (format "Bearer %s" access-token)
                     "content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
           :body (json/generate-string
@@ -568,10 +569,10 @@
            ".png" "image/png"} suffix)
      (error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix)))))
 
-(defn upload-file* [access-token server file type encoding language path]
+(defn upload-file* [access-token base-uri file type encoding language path]
   (let [{:keys [status headers body]}
         (curl/put
-         (format "%s%s" server path)
+         (str base-uri path)
          {:headers (cond-> {"authorization" (format "Bearer %s" access-token)
                             "content-type" type}
                      encoding (assoc "content-encoding" encoding)
@@ -601,26 +602,25 @@
   "Upload an asset"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [server canonical-host file type encoding language path]
-         :or {server (:site-server config)}}
+        {:keys [base-uri file type encoding language path]
+         :or {base-uri (:base-uri config)}}
         (:options opts)]
 
-    (when-not server (error-and-exit! 1 "Server not specified"))
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not file (error-and-usage! "Asset file required" opts))
     (when-not type (error-and-usage! "Content-type required" opts))
     (when-not path (error-and-usage! "Path required" opts))
 
-    (upload-file* access-token server file type encoding language path)))
+    (upload-file* access-token base-uri file type encoding language path)))
 
 (defn put-swagger-ui
   "Install a distribution of Swagger UI"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [server version] :or {server (:site-server config)
-                                     version "3.44.1"}} (:options opts)
+        {:keys [base-uri version] :or {base-uri (:base-uri config)
+                                       version "3.44.1"}} (:options opts)
         tmpdir (create-tmp-dir)
-        outfile (.resolve tmpdir "swagger-ui.zip")
-        ]
+        outfile (.resolve tmpdir "swagger-ui.zip")]
     (message! "Downloading Swagger UI distribution: " (.toString outfile))
     (sh "curl" "-o" (.toString outfile) (format "https://codeload.github.com/swagger-api/swagger-ui/zip/v%s" version))
     (message! "Extracting Swagger UI distribution: " (.toString outfile))
@@ -634,7 +634,7 @@
             (let [path (format "/swagger-ui/%s" (subs (.toString rel-path) (count prefix)))
                   content-type (content-type (last (str/split (.toString rel-path) #"/")))]
               (when content-type
-                (upload-file* access-token server f content-type nil nil path)))))))))
+                (upload-file* access-token base-uri f content-type nil nil path)))))))))
 
 (defn debugf
   "Write a debug message to the console, but only if *debug* is true."
@@ -643,8 +643,7 @@
     (println "DEBUG:" (apply format args))))
 
 (def cli-options
-  [["-s" "--server SERVER" "The address of the server you are managing"]
-   ["-c" "--canonical-host HOST" "The canonical host for the server"]
+  [["-s" "--base-uri BASE-URI" "The Base-URI of the server you are targetting"]
    ["-d" "--debug" "Enable debug mode"]
    ["-v" "--verbose" "Verbose mode"]
    ["-h" "--help" "Show this summary"]])
@@ -740,7 +739,7 @@
    ["put-asset"
     {:description (:doc (meta #'put-asset))
      :cli-options [["-f" "--file FILE" "The asset file"]
-                   ["-p" "--path PATH" "The destination path after the canonical host"]
+                   ["-p" "--path PATH" "The destination path after the base-uri"]
                    ["-t" "--type MIME_TYPE" "The content-type"]
                    ["-e" "--encoding ENCODING" "The content-encoding (optional)"]
                    ["-l" "--language LANGUAGE" "The content-language (optional)"]]

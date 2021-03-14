@@ -433,44 +433,43 @@
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
   in :default."
-  [{::site/keys [db uri canonical-host] :as req}]
-  (let [prefix (format "https://%s" canonical-host)]
-    (or
-     ;; We call OpenAPI location here, because a resource can be defined in
-     ;; OpenAPI, and exits in Crux, simultaneously.
-     (openapi/locate-resource db uri req)
+  [{::site/keys [db uri base-uri] :as req}]
+  (or
+   ;; We call OpenAPI location here, because a resource can be defined in
+   ;; OpenAPI, and exits in Crux, simultaneously.
+   (openapi/locate-resource db uri req)
 
-     ;; Is it in Crux?
-     (when-let [r (x/entity db uri)]
-       (cond-> (assoc r ::site/resource-provider ::db)
-         (= (get r ::site/type) "StaticRepresentation")
-         (update ::site/request-locals
-                 assoc
-                 ::site/put-fn put-static-resource
-                 ::site/patch-fn patch-static-resource)))
+   ;; Is it in Crux?
+   (when-let [r (x/entity db uri)]
+     (cond-> (assoc r ::site/resource-provider ::db)
+       (= (get r ::site/type) "StaticRepresentation")
+       (update ::site/request-locals
+               assoc
+               ::site/put-fn put-static-resource
+               ::site/patch-fn patch-static-resource)))
 
-     ;; Is it found by any resource locators registered in the database?
-     (locator/locate-with-locators db req)
+   ;; Is it found by any resource locators registered in the database?
+   (locator/locate-with-locators db req)
 
-     ;; Is it a redirect?
-     (when-let [[r loc] (first
-                         (x/q db '{:find [r loc]
-                                   :where [[r ::site/resource uri]
-                                           [r ::site/location loc]
-                                           [r ::site/type "Redirect"]]
-                                   :in [uri]}
-                              uri))]
-       {::site/uri uri
-        ::site/methods #{:get :head :options}
-        ::site/resource-provider r
-        ::http/redirect (cond-> loc (.startsWith loc prefix)
-                                (subs (count prefix)))})
+   ;; Is it a redirect?
+   (when-let [[r loc] (first
+                       (x/q db '{:find [r loc]
+                                 :where [[r ::site/resource uri]
+                                         [r ::site/location loc]
+                                         [r ::site/type "Redirect"]]
+                                 :in [uri]}
+                            uri))]
+     {::site/uri uri
+      ::site/methods #{:get :head :options}
+      ::site/resource-provider r
+      ::http/redirect (cond-> loc (.startsWith loc base-uri)
+                              (subs (count base-uri)))})
 
-     ;; Return a back-stop resource
-     {::site/resource-provider ::default-empty-resource
-      ::http/methods #{:get :head :options :put :post}
-      ::site/request-locals
-      {::site/put-fn put-static-resource}})))
+   ;; Return a back-stop resource
+   {::site/resource-provider ::default-empty-resource
+    ::http/methods #{:get :head :options :put :post}
+    ::site/request-locals
+    {::site/put-fn put-static-resource}}))
 
 (defn current-representations [{::site/keys [resource uri db]}]
   (or
@@ -811,7 +810,7 @@
 ;; TODO: Split into logback logger, Crux logger and response finisher. This will
 ;; make it easier to disable one or both logging strategies.
 (defn outer-handler
-  [{::site/keys [crux-node db request-id start-date host]
+  [{::site/keys [crux-node db request-id start-date base-uri]
     :ring.request/keys [method]
     :as req}]
 
@@ -853,8 +852,8 @@
               (update :ring.response/headers
                       assoc "site-request-id"
                       (cond-> request-id
-                        (.startsWith request-id (str "https://" host))
-                        (subs (count (str "https://" host)))))
+                        (.startsWith request-id base-uri)
+                        (subs (count base-uri))))
 
               selected-representation
               (update :ring.response/headers
@@ -896,29 +895,21 @@
     (catch Exception e
       (throw (ex-info "Illegal host format" {:host host} e)))))
 
-(defn new-request-id [canonical-host]
-  (str "https://" canonical-host "/_site/requests/"
+(defn new-request-id [base-uri]
+  (str base-uri "/_site/requests/"
        (subs (util/hexdigest
               (.getBytes (str (java.util.UUID/randomUUID)) "US-ASCII")) 0 24)))
 
-(defn wrap-initialize-state [h crux-node host-map]
-
-  ;; Validate host-map
-  (try
-    (doseq [[k v] host-map]
-      (assert-host k)
-      (assert-host v))
-    (catch Exception e
-      (throw (ex-info "Invalid host-map format" {::site/host-map host-map} e))))
+(defn wrap-initialize-state [h crux-node]
 
   (assert crux-node)
 
   (fn [req]
     (let [db (x/db crux-node)
-          {::site/keys [canonical-host]}
+          {::site/keys [base-uri]}
           (x/entity db ::site/init-settings)]
 
-      (if-not canonical-host
+      (if-not base-uri
         ;; TODO: Show a website in 'construction' page, circa 1995
         {:ring.response/status 500
          :ring.response/headers {"content-type" "image/gif"}
@@ -929,21 +920,20 @@
                                  "juxt/site/alpha/construction2.gif"
                                  "juxt/site/alpha/construction3.gif"])))}
 
-        (let [req-id (new-request-id canonical-host)
+        (let [req-id (new-request-id base-uri)
 
               {::rfc7230/keys [host]}
               (host-header-parser
                (re/input (get-in req [:ring.request/headers "host"])))
               _ (assert host)
-              host (get host-map host host)
-              uri (str "https://" host (:ring.request/path req))
+              uri (str (name (:ring.request/scheme req)) "://" host (:ring.request/path req))
               req (into req {::site/start-date (java.util.Date.)
                              ::site/request-id req-id
                              ::site/uri uri
                              ::site/host host
                              ::site/crux-node crux-node
                              ::site/db db
-                             ::site/canonical-host canonical-host})]
+                             ::site/base-uri base-uri})]
 
           ;; The Ring request map becomes the container for all state collected
           ;; along the request processing pathway.
@@ -983,7 +973,7 @@
                             :ring.response/headers :headers
                             :ring.response/body :body})))))
 
-(defn make-handler [crux-node host-map]
+(defn make-handler [crux-node]
   (-> #'outer-handler
-      (wrap-initialize-state crux-node host-map)
+      (wrap-initialize-state crux-node)
       (wrap-ring-1-adapter)))

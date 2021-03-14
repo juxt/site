@@ -7,9 +7,10 @@
    [crux.api :as x]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
-   [juxt.site.alpha.util :as util]
+   [juxt.reap.alpha.combinators :as p]
    [juxt.reap.alpha.regex :as re]
-   [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders])
+   [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
+   [juxt.site.alpha.util :as util])
   (:import
    (java.util Date)))
 
@@ -28,26 +29,26 @@
 
 (defn put-master-user!
   "Create the master user."
-  [crux-node {::site/keys [canonical-host master-user master-password]}]
+  [crux-node {::site/keys [base-uri master-user master-password]}]
   (assert master-password)
   (put!
    crux-node
-   {:crux.db/id (str "https://" canonical-host "/_site/users/" master-user)
+   {:crux.db/id (str base-uri "/_site/users/" master-user)
     ::site/type "User"
     ::pass/username master-user
     ::http/methods #{:get :head :options}}
 
-   {:crux.db/id (str "https://" canonical-host "/_site/users/" master-user "/password")
+   {:crux.db/id (str base-uri "/_site/users/" master-user "/password")
     ::site/type "Password"
     ::http/methods #{:post}
-    ::pass/user (str "https://" canonical-host "/_site/users/" master-user)
+    ::pass/user (str base-uri "/_site/users/" master-user)
     ::pass/password-hash (password/encrypt master-password)
     ::pass/classification "RESTRICTED"}
 
    ;; Add rule that allows the master user to do everything, at least during the
    ;; bootstrap phase of a deployment. This can be deleted after the initial
    ;; users/roles have been populated, if required.
-   {:crux.db/id (str "https://" canonical-host "/_site/rules/master-user-allow-all")
+   {:crux.db/id (str base-uri "/_site/rules/master-user-allow-all")
     :description "The master user has access to everything"
     ::site/type "Rule"
     ::pass/target [['subject :juxt.pass.alpha/username master-user]]
@@ -57,10 +58,10 @@
 (defn allow-public-access-to-public-resources!
   "Resources classified as PUBLIC should be readable (but not writable). For
   example, a login page needs to be a PUBLIC resource."
-  [crux-node {::site/keys [canonical-host]}]
+  [crux-node {::site/keys [base-uri]}]
   (put!
    crux-node
-   {:crux.db/id (str "https://" canonical-host "/_site/rules/public-resources")
+   {:crux.db/id (str base-uri "/_site/rules/public-resources")
     ::site/type "Rule"
     ::site/description "PUBLIC resources are accessible to GET"
     ::pass/target '[[request :ring.request/method #{:get :head :options}]
@@ -70,10 +71,10 @@
 (defn restict-access-to-restricted-resources!
   "Resources classified as RESTRICTED should never be accessed, unless another
   policy explicitly authorizes access."
-  [crux-node {::site/keys [canonical-host]}]
+  [crux-node {::site/keys [base-uri]}]
   (put!
    crux-node
-   {:crux.db/id (str "https://" canonical-host "/_site/rules/restricted-resources")
+   {:crux.db/id (str base-uri "/_site/rules/restricted-resources")
     ::site/type "Rule"
     ::site/description "RESTRICTED access is denied by default"
     ::pass/target '[[resource ::pass/classification "RESTRICTED"]]
@@ -81,12 +82,12 @@
 
 (defn put-site-api!
   "Add the Site API"
-  [crux-node json {::site/keys [canonical-host]}]
+  [crux-node json {::site/keys [base-uri]}]
   (let [openapi (json/read-value json)
         body (.getBytes json "UTF-8")]
     (put!
      crux-node
-     {:crux.db/id (str "https://" canonical-host "/_site/apis/site/openapi.json")
+     {:crux.db/id (str base-uri "/_site/apis/site/openapi.json")
       ::site/type "OpenAPI"
       ::http/methods #{:get :head :options :put}
       ::http/content-type "application/vnd.oai.openapi+json;version=3.0.2"
@@ -96,8 +97,8 @@
       ::http/body body
       ::apex/openapi openapi})))
 
-(defn put-openid-token-endpoint! [crux-node {::site/keys [canonical-host]}]
-  (let [token-endpoint (str "https://" canonical-host "/_site/token")
+(defn put-openid-token-endpoint! [crux-node {::site/keys [base-uri]}]
+  (let [token-endpoint (str base-uri "/_site/token")
         grant-types #{"client_credentials"}]
     (put!
      crux-node
@@ -107,7 +108,7 @@
       ::site/purpose ::site/acquire-token
       ::pass/expires-in (* 60 60 1)}
 
-     {:crux.db/id (str "https://" canonical-host "/_site/rules/anyone-can-ask-for-a-token")
+     {:crux.db/id (str base-uri "/_site/rules/anyone-can-ask-for-a-token")
       ::site/type "Rule"
       ::site/description "The token_endpoint must be accessible"
       ::pass/target '[[request :ring.request/method #{:post}]
@@ -126,7 +127,7 @@
            "\r\n")]
       (put!
        crux-node
-       {:crux.db/id (str "https://" canonical-host "/.well-known/openid-configuration")
+       {:crux.db/id (str base-uri "/.well-known/openid-configuration")
         ;; OpenID Connect Discovery documents are publically available
         ::pass/classification "PUBLIC"
         ::http/methods #{:get :head :options}
@@ -135,33 +136,33 @@
         ::http/etag (subs (util/hexdigest (.getBytes content)) 0 32)
         ::http/content content}))))
 
-(defn put-login-endpoint! [crux-node {::site/keys [canonical-host]}]
+(defn put-login-endpoint! [crux-node {::site/keys [base-uri]}]
   ;; Allow anyone to login
   (put!
    crux-node
-   {:crux.db/id (str "https://" canonical-host "/_site/login")
+   {:crux.db/id (str base-uri "/_site/login")
     ::http/methods #{:post}
     ::http/acceptable "application/x-www-form-urlencoded"
     ::site/purpose ::site/login
     ::pass/expires-in (* 3600 24 30)}
 
-   {:crux.db/id (str "https://" canonical-host "/_site/rules/anyone-can-post-login-credentials")
+   {:crux.db/id (str base-uri "/_site/rules/anyone-can-post-login-credentials")
     ::site/type "Rule"
     ::site/description "The login POST handler must be accessible by all"
     ::pass/target '[[request :ring.request/method #{:post}]
                     [resource ::site/purpose ::site/login]]
     ::pass/effect ::pass/allow}))
 
-(defn put-logout-endpoint! [crux-node {::site/keys [canonical-host]}]
+(defn put-logout-endpoint! [crux-node {::site/keys [base-uri]}]
   ;; Allow anyone to login
   (put!
    crux-node
-   {:crux.db/id (str "https://" canonical-host "/_site/logout")
+   {:crux.db/id (str base-uri "/_site/logout")
     ::http/methods #{:post}
     ::http/acceptable "application/x-www-form-urlencoded"
     ::site/purpose ::site/logout}
 
-   {:crux.db/id (str "https://" canonical-host "/_site/rules/anyone-can-post-logout-credentials")
+   {:crux.db/id (str base-uri "/_site/rules/anyone-can-post-logout-credentials")
     ::site/type "Rule"
     ::site/description "The logout POST handler must be accessible by all"
     ::pass/target '[[request :ring.request/method #{:post}]
@@ -170,10 +171,17 @@
 
 (def host-parser (rfc7230.decoders/host {}))
 
+(def base-uri-parser
+  (p/complete
+   (p/into {}
+    (p/sequence-group
+     (p/pattern-parser #"(?<scheme>https?)://" {:group {:juxt.reap.alpha.rfc7230/scheme "scheme"}})
+     host-parser))))
+
 (defn init-db!
   "Initialize the database. You usually call this as part of setting up a new Site
   instance. It's safe to call multiple times. No data is deleted."
-  [crux-node {::site/keys [canonical-host
+  [crux-node {::site/keys [base-uri
                            master-user
                            master-password]
               :as opts}]
@@ -184,13 +192,13 @@
 
     (when site-settings                 ; existing database
 
-      (when (and canonical-host
-                 (not= canonical-host (::site/canonical-host site-settings)))
+      (when (and base-uri
+                 (not= base-uri (::site/base-uri site-settings)))
         (throw
          (ex-info
-          "Canonical host is immutable once configured"
-          {:existing-canonical-host (::site/canonical-host site-settings)
-           :requested-canonical-host canonical-host})))
+          "Base URI is immutable once configured"
+          {:existing-base-uri (::site/base-uri site-settings)
+           :requested-base-uri base-uri})))
 
       (when master-user
         (throw
@@ -203,16 +211,16 @@
 
     (when-not site-settings             ; new database
 
-      (when-not canonical-host
+      (when-not base-uri
         (throw
          (ex-info
-          (format "Must provide a value for %s when initializing a new site database" ::site/canonical-host)
+          (format "Must provide a value for %s when initializing a new site database" ::site/base-uri)
           {})))
 
       (try
-        (host-parser (re/input canonical-host))
+        (base-uri-parser (re/input base-uri))
         (catch Exception e
-          (throw (ex-info "Canonical host must be a hostname" {::site/canonical-host canonical-host} e))))
+          (throw (ex-info "The base-uri option host must be of the form <scheme>://<host>" {::site/base-uri base-uri} e))))
 
       (when-not master-password
         (throw
