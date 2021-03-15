@@ -74,7 +74,7 @@
 
         access-token (access-token)
 
-        expires-in (get resource ::pass/expires-in 3600)
+        expires-in (get resource ::pass/expires-in (* 24 3600))
 
         session {"access_token" access-token
                  "expires_in" expires-in
