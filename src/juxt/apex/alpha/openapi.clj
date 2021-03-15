@@ -227,6 +227,14 @@
                 ;; can use a 'proper' function right?
                 ::site/body-fn `entity-bytes-generator})
 
+             ;; TODO: The allowed origins ought to be specified in the top-level
+             ;; of the openapi document, or under the security section. This is
+             ;; just for testing.
+             ::site/access-control-allow-origins
+             {"http://localhost:8000"
+              {::site/access-control-allow-methods #{:get}
+               ::site/access-control-allow-headers #{"authorization"}}}
+
              ;; TODO: Merge in any properties of a resource that is in
              ;; Crux - e.g. if this resource is a collection, what type
              ;; of collection is it? Some properties that can be used in

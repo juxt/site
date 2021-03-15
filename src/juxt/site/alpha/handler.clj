@@ -35,14 +35,15 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'rfc7230 (create-ns 'juxt.reap.alpha.rfc7230))
 
-(defn allow-header
-  "Return the Allow response header value, given a set of method keywords."
-  [methods]
+(defn join-keywords
+  "Join method keywords into a single comma-separated string. Used for the Allow
+  response header value, and others."
+  [methods upper-case?]
   (->>
    methods
    seq
    distinct
-   (map (comp str/upper-case name))
+   (map (comp (if upper-case? str/upper-case identity) name))
    (str/join ", ")))
 
 (defn negotiate-representation [request current-representations]
@@ -502,7 +503,7 @@
    ;; No representations. On a GET, this would yield a 404.
    []))
 
-(defn GET [{::site/keys [selected-representation] :as req}]
+(defn GET [{::site/keys [selected-representation resource] :as req}]
   (evaluate-preconditions! req)
 
   (let [{::http/keys [body content charset]} selected-representation
@@ -516,12 +517,24 @@
                  (log/debugf "Calling body-fn: %s" body-fn)
                  (let [body (f req)]
                    (cond-> body
-                     (string? body) (.getBytes (or charset "UTF-8"))))))]
+                     (string? body) (.getBytes (or charset "UTF-8"))))))
 
-    ;; TODO: Fix this!
-    (assoc req
-           :ring.response/status 200
-           :ring.response/body body)))
+        request-origin (get-in req [:ring.request/headers "origin"])
+        {::site/keys [access-control-allow-origins]} resource
+        allow-origin
+        (when request-origin
+          (or
+           (when (contains? access-control-allow-origins request-origin)
+             request-origin)
+           (when (contains? access-control-allow-origins "*")
+             "*")))]
+
+    (cond-> (assoc req
+                   :ring.response/status 200
+                   :ring.response/body body)
+
+      allow-origin
+      (assoc-in [:ring.response/headers "access-control-allow-origin"] allow-origin))))
 
 (defn post-variant [{::site/keys [crux-node db uri request-locals] :as req}]
 
@@ -612,16 +625,39 @@
 
 (defn OPTIONS [{::site/keys [resource allowed-methods] :as req}]
   ;; TODO: Implement *
-  (-> req
-      (into {:ring.response/status 200})
-      (update :ring.response/headers
-              merge
-              (::http/options resource)
-              {"allow" (allow-header allowed-methods)
-               ;; TODO: Shouldn't this be a situation (a missing body) detected
-               ;; by middleware, which can set the content-length header
-               ;; accordingly?
-               "content-length" "0"})))
+  (let [{::site/keys [access-control-allow-origins]} resource
+        request-origin (get-in req [:ring.request/headers "origin"])
+        [resource-origin allow-origin]
+        (or
+         (when-let [ro (get access-control-allow-origins request-origin)]
+           [ro request-origin])
+         (when-let [ro (get access-control-allow-origins "*")]
+           [ro "*"]))
+
+        access-control-allow-methods
+        (get resource-origin ::site/access-control-allow-methods)
+        access-control-allow-headers
+        (get resource-origin ::site/access-control-allow-headers)]
+
+    (cond-> (into {:ring.response/status 200})
+
+      true (update :ring.response/headers
+                   merge
+                   (::http/options resource)
+                   {"allow" (join-keywords allowed-methods true)
+                    ;; TODO: Shouldn't this be a situation (a missing body) detected
+                    ;; by middleware, which can set the content-length header
+                    ;; accordingly?
+                    "content-length" "0"})
+
+      access-control-allow-methods
+      (update
+       :ring.response/headers
+       (fn [headers]
+         (cond-> headers
+           allow-origin (assoc "access-control-allow-origin" allow-origin)
+           access-control-allow-methods (assoc "access-control-allow-methods" (join-keywords access-control-allow-methods true))
+           access-control-allow-headers (assoc "access-control-allow-headers" (join-keywords access-control-allow-headers false))))))))
 
 (defn PROPFIND [req]
   (dave.methods/propfind req))
@@ -694,13 +730,11 @@
         ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
         ;; before checking any HTTP conditional header.".
 
-        sub (authn/authenticate req)
-        req (assoc req ::pass/subject sub)
+        sub (when-not (= method :options) (authn/authenticate req))
+        req (cond-> req sub (assoc ::pass/subject sub))
 
-        ;;_ (when subject (org.slf4j.MDC/put "user" (::pass/username subject)))
-
-        ;; Could the scope of this request context be expanded to be what is
-        ;; ultimately returned (in the case of 2xx/3xx) or thrown (3xx/4xx/5xx)?
+        ;; Does this request-context now need to be broken up into different
+        ;; 'entities' given that we now have a simple flat map?
         request-context
         {'subject sub
          ;; ::site/request-locals is used to avoid database involvement
@@ -715,19 +749,20 @@
          'representation (dissoc res ::site/request-locals ::http/body ::http/content)
          'environment {}}
 
-        authz (pdp/authorization db request-context)
+        authz (when (not= method :options)
+                (pdp/authorization db request-context))
 
-        req (assoc req
-                   ::pass/authorization authz
-                   ::pass/request-context request-context)
-
-        ;; If the max-content-length has been modified, update that in the resource
         req (cond-> req
+              true (assoc ::pass/request-context request-context)
+              authz (assoc ::pass/authorization authz)
+              ;; If the max-content-length has been modified, update that in the
+              ;; resource
               (::http/max-content-length authz)
               (update ::site/resource
                       assoc ::http/max-content-length (::http/max-content-length authz)))
 
-        _ (when-not (= (::pass/access authz) ::pass/approved)
+        _ (when (and (not= method :options)
+                     (not= (::pass/access authz) ::pass/approved))
             (let [status (if-not (::pass/user sub) 401 403)
                   msg (case status 401  "Unauthorized" 403 "Forbidden")]
               (throw
@@ -736,6 +771,11 @@
                               {:ring.response/status status
                                :ring.response/body (str msg "\r\n")})))))
 
+        ;; TODO: We're keep this in for now. A resource specified the maximum
+        ;; allowed methods. Authorization may minimise this set, on the basis
+        ;; that OPTIONS and other responses such as 405 should not indicate
+        ;; methods are allowed when they're not going to (due to authorization
+        ;; limitations).
         allowed-methods (set (::http/methods res))
         req (assoc req ::site/allowed-methods allowed-methods)]
 
@@ -746,7 +786,7 @@
           "Method not allowed"
           (into req
                 {:ring.response/status 405
-                 :ring.response/headers {"allow" (allow-header allowed-methods)}
+                 :ring.response/headers {"allow" (join-keywords allowed-methods true)}
                  :ring.response/body "Method Not Allowed\r\n"})))))
 
     (case method

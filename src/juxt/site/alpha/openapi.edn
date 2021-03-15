@@ -14,6 +14,8 @@
 
  :servers [{:url "/_site"}]
 
+ :security {"developers" []}
+
  :paths
  {"/users/"
   {:get
@@ -516,7 +518,7 @@
        "resource" {:type "string"
                    :format "uri-reference"}
        "location" {:type "string"
-                  :format "uri-reference"}}}]}
+                   :format "uri-reference"}}}]}
 
    "OpenAPI"
    {"$id" "/schemas/OpenAPI"
@@ -527,10 +529,23 @@
       ;; won't be any validation on bad OpenAPI definitions.
       :required ["openapi"]
       :properties
-      {"openapi" {:type "string"}}}]}
+      {"type" {:const "OpenAPI"}
+       "openapi" {:type "object"}}}]}
 
    "IdentifiedOpenAPI"
    {"$id" "/schemas/IdentifiedOpenAPI"
     :allOf
     [{"$ref" "#/components/schemas/Identified"}
-     {"$ref" "#/components/schemas/OpenAPI"}]}}}}
+     {"$ref" "#/components/schemas/OpenAPI"}]}}
+
+  :securitySchemes
+  {"developers" ; Allow developers to develop against this API
+   {"type" "http"
+    "scheme" "bearer"
+    ;; Belongs in database
+    #_"x-juxt-site-access-control-allow-origins"
+    #_{"http://localhost:8000"
+     {"access-control-allow-methods" [:get]
+      "access-control-allow-headers" ["authorization"]}}}}
+
+  }}
