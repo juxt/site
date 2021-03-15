@@ -532,8 +532,8 @@
          {:headers {"authorization" (format "Bearer %s" access-token)
                     "content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
           :body (json/generate-string
-                 (cond-> {"type" "OpenAPI"
-                          "openapi" (slurp (io/file openapi))}))
+                 {"type" "OpenAPI"
+                  "openapi" (edn/read-string (slurp (io/file openapi)))})
           :throw true})]
     (cond
       (= status 201)

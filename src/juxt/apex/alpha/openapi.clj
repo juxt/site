@@ -31,14 +31,18 @@
 (defn put-openapi
   [{::site/keys [db crux-node uri resource
                  received-representation start-date] :as req}]
-  (let [openapi (json/read-value
-                 (java.io.ByteArrayInputStream.
-                  (::http/body received-representation)))
+
+  (let [body (json/read-value
+              (java.io.ByteArrayInputStream.
+               (::http/body received-representation)))
+
+        openapi (get body "openapi")
 
         etag (format "\"%s\""
                      (subs
                       (util/hexdigest
                        (.getBytes (pr-str openapi) "UTF-8")) 0 32))]
+
     (->>
      (x/submit-tx
       crux-node
@@ -49,8 +53,9 @@
           ::http/etag etag
           ::http/last-modified start-date
           ::site/type "OpenAPI"
-          ::apex/openapi openapi}
-         received-representation)]])
+          ::apex/openapi openapi
+          ::http/body (json/write-value-as-string openapi)
+          ::http/content-type "application/json"})]])
      (x/await-tx crux-node))
 
     (assoc req
