@@ -29,31 +29,32 @@
 
 (defn put-master-user!
   "Create the master user."
-  [crux-node {::site/keys [base-uri master-user master-password]}]
+  [crux-node {::site/keys [base-uri master-username master-password]}]
   (assert master-password)
-  (put!
-   crux-node
-   {:crux.db/id (str base-uri "/_site/users/" master-user)
-    ::site/type "User"
-    ::pass/username master-user
-    ::http/methods #{:get :head :options}}
+  (let [user (str base-uri "/_site/users/" master-username)]
+    (put!
+     crux-node
+     {:crux.db/id user
+      ::site/type "User"
+      ::pass/username master-username
+      ::http/methods #{:get :head :options}}
 
-   {:crux.db/id (str base-uri "/_site/users/" master-user "/password")
-    ::site/type "Password"
-    ::http/methods #{:post}
-    ::pass/user (str base-uri "/_site/users/" master-user)
-    ::pass/password-hash (password/encrypt master-password)
-    ::pass/classification "RESTRICTED"}
+     {:crux.db/id (str user "/password")
+      ::site/type "Password"
+      ::http/methods #{:post}
+      ::pass/user user
+      ::pass/password-hash (password/encrypt master-password)
+      ::pass/classification "RESTRICTED"}
 
-   ;; Add rule that allows the master user to do everything, at least during the
-   ;; bootstrap phase of a deployment. This can be deleted after the initial
-   ;; users/roles have been populated, if required.
-   {:crux.db/id (str base-uri "/_site/rules/master-user-allow-all")
-    :description "The master user has access to everything"
-    ::site/type "Rule"
-    ::pass/target [['subject :juxt.pass.alpha/username master-user]]
-    ::pass/effect ::pass/allow
-    ::http/max-content-length (Math/pow 2 40)}))
+     ;; Add rule that allows the master user to do everything, at least during the
+     ;; bootstrap phase of a deployment. This can be deleted after the initial
+     ;; users/roles have been populated, if required.
+     {:crux.db/id (str base-uri "/_site/rules/master-user-allow-all")
+      :description "The master user has access to everything"
+      ::site/type "Rule"
+      ::pass/target [['subject :juxt.pass.alpha/username master-username]]
+      ::pass/effect ::pass/allow
+      ::http/max-content-length (Math/pow 2 40)})))
 
 (defn allow-public-access-to-public-resources!
   "Resources classified as PUBLIC should be readable (but not writable). For
@@ -182,7 +183,7 @@
   "Initialize the database. You usually call this as part of setting up a new Site
   instance. It's safe to call multiple times. No data is deleted."
   [crux-node {::site/keys [base-uri
-                           master-user
+                           master-username
                            master-password]
               :as opts}]
 
@@ -200,12 +201,12 @@
           {:existing-base-uri (::site/base-uri site-settings)
            :requested-base-uri base-uri})))
 
-      (when master-user
+      (when master-username
         (throw
          (ex-info
-          "Master user is immutable once configured"
-          {:existing-master-user (::site/master-user site-settings)
-           :requested-master-user master-user})))
+          "Master username is immutable once configured"
+          {:existing-master-username (::site/master-username site-settings)
+           :requested-master-username master-username})))
 
       (when master-password (put-master-user! crux-node opts)))
 
@@ -225,7 +226,7 @@
       (when-not master-password
         (throw
          (ex-info
-          (format "Must provide a value for %s (for user %s), when initializing a new site database" ::site/master-password master-user)
+          (format "Must provide a value for %s (for username %s), when initializing a new site database" ::site/master-password master-username)
           {})))
 
       (when-not (re-matches #"[\p{Punct}\p{Alnum}]{8,}" master-password)
@@ -238,11 +239,11 @@
        crux-node
        (merge
         {:crux.db/id ::site/init-settings
-         ::site/master-user "webmaster"}
+         ::site/master-username "webmaster"}
         (dissoc opts ::site/master-password)))
 
       (put-master-user!
-       crux-node (merge {::site/master-user (or master-user "webmaster")} opts)))
+       crux-node (merge {::site/master-user (or master-username "webmaster")} opts)))
 
     ;; Initial access policies
     (allow-public-access-to-public-resources! crux-node opts)
