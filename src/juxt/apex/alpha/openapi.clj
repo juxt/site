@@ -327,6 +327,8 @@
           paths))))))
 
 (defn ->query [input params]
+
+  ;; Replace input with values from params
   (let [input
         (postwalk
          (fn [x]
@@ -337,19 +339,33 @@
                      (get-in params [:query (get x "name") :param "default"]))
              x))
          input)]
+
+    ;; Perform manipulations required for each key
     (reduce
      (fn [acc [k v]]
        (assoc acc (keyword k)
               (case (keyword k)
                 :find (mapv symbol v)
-                :where (mapv (fn [clause]
-                               (cond
-                                 (and (vector? clause) (every? (comp not coll?) clause))
-                                 (mapv (fn [item txf] (txf item)) clause [symbol keyword symbol])))
-                             v)
+                :where (mapv
+                        ;; We're using some inline recursion to keep things lean-ish here
+                        ;; based on the assumption we can bump our stack _a little_ higher
+                        ;; and that our clauses will remain fairly simple
+                        (fn translate-clause [clause]
+                          (cond
+                            (and (vector? clause) (every? (comp not coll?) clause))
+                            (mapv (fn [item txf] (txf item)) clause [symbol keyword symbol])
+
+                            (and (vector? clause) (vector? (second clause)))
+                            (cons (symbol (first clause))
+                                  (map translate-clause (rest clause)))
+
+                            (and (vector? clause) (vector? (first clause)))
+                            [(seq (map symbol (first clause)))]))
+                        v)
+
                 :limit v
                 :in (mapv symbol v)
-                :args [(reduce-kv (fn [acc k v] (assoc acc (keyword k) v)) {} (first v))]
+                :args (mapv clojure.walk/keywordize-keys v)
                 )))
      {} input)))
 
