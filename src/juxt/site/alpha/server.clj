@@ -8,9 +8,8 @@
 
 (alias 'site (create-ns 'juxt.site.alpha))
 
-
-(defmethod ig/init-key ::server [_ {::site/keys [crux-node port]}]
-  (run-jetty (make-handler crux-node) {:port port :join? false}))
+(defmethod ig/init-key ::server [_ {::site/keys [crux-node port base-uri] :as opts}]
+  (run-jetty (make-handler opts) {:port port :join? false}))
 
 (defmethod ig/halt-key! ::server [_ s]
   (when s

@@ -938,14 +938,11 @@
        (subs (util/hexdigest
               (.getBytes (str (java.util.UUID/randomUUID)) "US-ASCII")) 0 24)))
 
-(defn wrap-initialize-state [h crux-node]
-
+(defn wrap-initialize-state [h {::site/keys [crux-node base-uri]}]
   (assert crux-node)
-
+  (assert base-uri)
   (fn [req]
-    (let [db (x/db crux-node)
-          {::site/keys [base-uri]}
-          (x/entity db ::site/init-settings)]
+    (let [db (x/db crux-node)]
 
       (if-not base-uri
         ;; TODO: Show a website in 'construction' page, circa 1995
@@ -1011,7 +1008,7 @@
                             :ring.response/headers :headers
                             :ring.response/body :body})))))
 
-(defn make-handler [crux-node]
+(defn make-handler [opts]
   (-> #'outer-handler
-      (wrap-initialize-state crux-node)
+      (wrap-initialize-state opts)
       (wrap-ring-1-adapter)))

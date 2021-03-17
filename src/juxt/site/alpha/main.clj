@@ -2,9 +2,10 @@
 
 (ns juxt.site.alpha.main
   (:require
+   [aero.core :as aero]
    [clojure.java.io :as io]
-   [integrant.core :as ig]
-   [clojure.tools.logging :as log]))
+   [clojure.tools.logging :as log]
+   [integrant.core :as ig]))
 
 (def system nil)
 
@@ -13,6 +14,11 @@
     [system-config]
     (locking lock
       (ig/load-namespaces system-config))))
+
+;; There will be integrant tags in our Aero configuration. We need to
+;; let Aero know about them using this defmethod.
+(defmethod aero/reader 'ig/ref [_ _ value]
+  (ig/ref value))
 
 (defn config
   "Read EDN config, with the given aero options. See Aero docs at
@@ -25,7 +31,7 @@
               (str "Please copy a configuration file to " (.getAbsolutePath config-file))
               {})))
     (log/debug "Loading configuration from" (.getAbsolutePath config-file))
-    (ig/read-string (slurp config-file))))
+    (aero/read-config config-file {:profile :prod})))
 
 (defn system-config
   "Construct a new system, configured with the given profile"
