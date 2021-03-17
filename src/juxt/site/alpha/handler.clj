@@ -949,7 +949,7 @@
 
       (if-not base-uri
         ;; TODO: Show a website in 'construction' page, circa 1995
-        {:ring.response/status 500
+        {:ring.response/status 200
          :ring.response/headers {"content-type" "image/gif"}
          :ring.response/body (io/input-stream
                               (io/resource
