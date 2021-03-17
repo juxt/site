@@ -5,7 +5,7 @@ Description=Site
 Type=simple
 Environment="DISPLAY=:0"
 Environment="MALLOC_ARENA_MAX=2"
-ExecStart=/home/site/site/bin/site -J-Djava.awt.headless=true -J-Dclojure.server.myrepl="{:port,50505,:accept,juxt.site.alpha.repl-server/repl,:address,\"localhost\"}" -J-Xms256m -J-Xmx1200m -Mprod -m juxt.site.alpha.main
+ExecStart=/home/mal/site/bin/site-server
 ExecReload=kill -HUP $MAINPID
 
 Restart=always
