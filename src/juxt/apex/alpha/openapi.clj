@@ -19,9 +19,7 @@
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha.perf :refer [fast-get-in]]
-   [juxt.site.alpha.util :as util]
-   [selmer.parser :as selmer]
-   [selmer.util :refer [*custom-resource-path*]]))
+   [juxt.site.alpha.util :as util]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'apex (create-ns 'juxt.apex.alpha))

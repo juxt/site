@@ -1,11 +1,16 @@
 ;; Copyright © 2021, JUXT LTD.
 
-(ns juxt.site.alpha.dev-extras
+(ns juxt.site.alpha.repl
   (:require
-   [crux.api :as crux]
+   [clojure.edn :as edn]
+   [clojure.java.io :as io]
+   [crux.api :as x]
    [clojure.walk :refer [postwalk]]
-   [dev-extras :refer :all]
-   [juxt.pass.alpha.authentication :as authn])
+   [jsonista.core :as json]
+   [io.aviso.ansi :as ansi]
+   [juxt.pass.alpha.authentication :as authn]
+   [juxt.site.alpha.main :refer [system config]]
+   [juxt.site.alpha.init :as init])
   (:import (java.util Date)))
 
 (alias 'dave (create-ns 'juxt.dave.alpha))
@@ -13,19 +18,18 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn config [] integrant.repl.state/config)
-
-(defn local-uri []
-  (format "http://localhost:%d" (get-in (config) [:juxt.site.alpha.server/server :port])))
-
-(defn grep [re coll]
-  (filter #(re-matches (re-pattern re) %) coll))
+(defn help []
+  (doseq [[_ v] (sort (ns-publics 'juxt.site.alpha.repl))
+          :let [m (meta v)]]
+    (println (format "%s %s: %s"
+                     (:name m) (:arglists m) (:doc m))))
+  :ok)
 
 (defn crux-node []
   (:juxt.site.alpha.db/crux-node system))
 
 (defn db []
-  (crux/db (crux-node)))
+  (x/db (crux-node)))
 
 (defn e [id]
   (postwalk
@@ -38,52 +42,56 @@
                 (= ::http/content (first x)) (str (subs (second x) 0 80) "…")
                 :else (format "(%d bytes)" (count (second x))))]
              x))
-   (crux/entity (db) id)))
+   (x/entity (db) id)))
 
 (defn put! [& ms]
   (->>
-   (crux/submit-tx
+   (x/submit-tx
     (crux-node)
     (for [m ms]
       [:crux.tx/put m]))
-   (crux/await-tx (crux-node))))
+   (x/await-tx (crux-node))))
 
 (defn GET [id content-type]
   (some #(when (= content-type (::http/content-type %)) %) (::http/representations (e id))))
 
+(defn grep [re coll]
+  (filter #(re-matches (re-pattern re) %) coll))
+
 (defn rm! [& ids]
   (->>
-   (crux/submit-tx
+   (x/submit-tx
     (crux-node)
     (for [id ids]
       [:crux.tx/delete id]))
-   (crux/await-tx (crux-node))))
+   (x/await-tx (crux-node))))
 
 (defn evict! [& ids]
   (->>
-   (crux/submit-tx
+   (x/submit-tx
     (crux-node)
     (for [id ids]
       [:crux.tx/evict id]))
-   (crux/await-tx (crux-node))))
+   (x/await-tx (crux-node))))
 
 (defn uuid []
   (str (java.util.UUID/randomUUID)))
 
 (defn q [query & args]
-  (apply crux/q (db) query args))
+  (apply x/q (db) query args))
 
 (defn t [t]
   (map
    first
-   (crux/q (db) '{:find [e] :where [[e ::site/type t]] :in [t]} t)))
+   (x/q (db) '{:find [e] :where [[e ::site/type t]] :in [t]} t)))
 
 (defn t* [t]
   (map
    first
-   (crux/q (db) '{:find [e] :where [[e :type t]] :in [t]} t)))
+   (x/q (db) '{:find [e] :where [[e :type t]] :in [t]} t)))
 
 (defn ls
+  "List Site resources"
   ([]
    (->> (q '{:find [e] :where [[e :crux.db/id]
                                (not [e ::site/type "Request"])]})
@@ -177,3 +185,86 @@
 
 (defn clear-sessions []
   (reset! authn/sessions-by-access-token {}))
+
+(defn superusers
+  ([] (superusers (config)))
+  ([{::site/keys [base-uri]}]
+   (map first
+        (x/q (db) '{:find [user]
+                    :where [[user ::site/type "User"]
+                            [mapping ::site/type "UserRoleMapping"]
+                            [mapping ::pass/assignee user]
+                            [mapping ::pass/role superuser]]
+                    :in [superuser]}
+             (str base-uri "/_site/roles/superuser")))))
+
+(defn status
+  ([] (status (config)))
+  ([opts]
+   (let [{::site/keys [base-uri]} opts
+         db (x/db (crux-node))]
+     (assert base-uri)
+     (println)
+
+     (if (x/entity db (str base-uri "/_site/apis/site/openapi.json"))
+       (println "[✔] " (ansi/green "Site API resources installed."))
+       (println
+        "[ ] "
+        (ansi/red "Site API not installed. ")
+        (ansi/yellow "Enter (put-site-api!) to fix this.")))
+
+     (if (x/entity db (str base-uri "/_site/token"))
+       (println "[✔] " (ansi/green "Authentication resources installed."))
+       (println
+        "[ ] "
+        (ansi/red "Authentication resources not installed. ")
+        (ansi/yellow "Enter (put-auth-resources!) to fix this.")))
+
+     (if (x/entity db (str base-uri "/_site/roles/superuser"))
+       (println "[✔] " (ansi/green "Role of superuser exists."))
+       (println
+        "[ ] "
+        (ansi/red "Role of superuser not yet created.")
+        (ansi/yellow "Enter (put-superuser-role!) to fix this.")))
+
+     (if (pos? (count (superusers opts)))
+       (println "[✔] " (ansi/green "At least one superuser exists."))
+       (println
+        "[ ] "
+        (ansi/red "No superusers exist.")
+        (ansi/yellow "Enter (put-superuser! <username> <password> <fullname>) to fix this.")))
+
+     (println)
+     :ok)))
+
+(defn put-site-api! []
+  (let [config (config)]
+    (init/put-site-api!
+     (crux-node)
+     (-> "juxt/site/alpha/openapi.edn"
+         io/resource
+         slurp
+         edn/read-string
+         json/write-value-as-string)
+     config)
+    (status config)))
+
+(defn put-auth-resources! []
+  (let [config (config)
+        crux-node (crux-node)]
+    (init/put-openid-token-endpoint! crux-node config)
+    (init/put-login-endpoint! crux-node config)
+    (init/put-logout-endpoint! crux-node config)
+    (status config)))
+
+(defn put-superuser-role! []
+  (let [config (config)
+        crux-node (crux-node)]
+    (init/put-superuser-role! crux-node config)
+    (status config)))
+
+(defn put-superuser! [username password fullname]
+  (let [config (config)
+        crux-node (crux-node)]
+    (init/put-superuser! crux-node username password fullname config)
+    (status config)))

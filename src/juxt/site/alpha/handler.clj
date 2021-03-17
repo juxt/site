@@ -2,9 +2,7 @@
 
 (ns juxt.site.alpha.handler
   (:require
-   [clojure.walk :refer [postwalk]]
    [clojure.java.io :as io]
-   [clojure.pprint :refer [pprint]]
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
@@ -907,8 +905,8 @@
         (let [{:ring.response/keys [status] :as exdata} (ex-data e)]
           (when (>= status 500)
             (let [exdata (minimize-response exdata true)]
-              (prn (.getMessage e))
-              (pprint exdata)
+              ;;(prn (.getMessage e))
+              ;;(pprint exdata)
               (log/errorf e "%s: %s" (.getMessage e) (pr-str exdata))))
           (respond
            (-> (into
@@ -919,7 +917,7 @@
                 exdata)))))
       (catch Throwable e
         (log/error e (.getMessage e))
-        (prn e)
+        ;;(prn e)
         (respond
          (into req
                {:ring.response/status 500

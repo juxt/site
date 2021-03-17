@@ -11,16 +11,16 @@ site set username webmaster
 site get-token
 
 # Add the superuser role
-site put-role -r superuser
+#site put-role -r superuser
 
 # Allow superusers to do anything
-site put-rule -n superuser -r rules/superuser-rule.json
+#site put-rule -n superuser -r rules/superuser-rule.json
 
 # Create a new user
-site put-user -u $user -n "$fullname"
+#site put-user -u $user -n "$fullname"
 
 # Assign the user to the superuser role
-site assign-role -u $user -r superuser
+#site assign-role -u $user -r superuser
 
 # Switch user
 site clear-token

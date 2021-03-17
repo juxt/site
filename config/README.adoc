@@ -1,3 +1,0 @@
-= Site Config
-
-Copy ../src/config.edn to here and configure it according to your local installation.

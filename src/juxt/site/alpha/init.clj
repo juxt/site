@@ -4,6 +4,7 @@
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
+   [clojure.tools.logging :as log]
    [crux.api :as x]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
@@ -27,34 +28,51 @@
       [:crux.tx/put m]))
    (x/await-tx crux-node)))
 
-(defn put-master-user!
-  "Create the master user."
-  [crux-node {::site/keys [base-uri master-username master-password]}]
-  (assert master-password)
-  (let [user (str base-uri "/_site/users/" master-username)]
+(defn put-superuser-role!
+  "Create the superuser role."
+  [crux-node {::site/keys [base-uri]}]
+  (log/info "Creating superuser role")
+  (let [role (str base-uri "/_site/roles/superuser")]
+    (put!
+     crux-node
+     {:crux.db/id role
+      ::site/type "Role"
+      :name "superuser"
+      :description "Superuser"}
+
+     ;; Add rule that allows superusers to do everything.
+     {:crux.db/id (str base-uri "/_site/rules/superuser-allow-all")
+      :description "Superusers can do everything"
+      ::site/type "Rule"
+      ::pass/target [['subject :juxt.pass.alpha/user 'user]
+                     ['mapping :juxt.site.alpha/type "UserRoleMapping"]
+                     ['mapping :juxt.pass.alpha/role role]
+                     ['mapping :juxt.pass.alpha/assignee 'user]]
+      ::pass/effect ::pass/allow
+      ::http/max-content-length (Math/pow 2 40)})))
+
+(defn put-superuser!
+  "Create a superuser."
+  [crux-node username password fullname {::site/keys [base-uri]}]
+  (let [user (str base-uri "/_site/users/" username)]
     (put!
      crux-node
      {:crux.db/id user
       ::site/type "User"
-      ::pass/username master-username
-      ::http/methods #{:get :head :options}}
+      ::pass/username username
+      :name fullname}
 
      {:crux.db/id (str user "/password")
       ::site/type "Password"
       ::http/methods #{:post}
       ::pass/user user
-      ::pass/password-hash (password/encrypt master-password)
+      ::pass/password-hash (password/encrypt password)
       ::pass/classification "RESTRICTED"}
 
-     ;; Add rule that allows the master user to do everything, at least during the
-     ;; bootstrap phase of a deployment. This can be deleted after the initial
-     ;; users/roles have been populated, if required.
-     {:crux.db/id (str base-uri "/_site/rules/master-user-allow-all")
-      :description "The master user has access to everything"
-      ::site/type "Rule"
-      ::pass/target [['subject :juxt.pass.alpha/username master-username]]
-      ::pass/effect ::pass/allow
-      ::http/max-content-length (Math/pow 2 40)})))
+     {:crux.db/id (format "%s/_site/roles/%s/users/%s" base-uri "superuser" username)
+      ::site/type "UserRoleMapping"
+      ::pass/assignee (format "%s/_site/users/%s" base-uri username)
+      ::pass/role (str base-uri "/_site/roles/superuser")})))
 
 (defn allow-public-access-to-public-resources!
   "Resources classified as PUBLIC should be readable (but not writable). For
@@ -84,6 +102,7 @@
 (defn put-site-api!
   "Add the Site API"
   [crux-node json {::site/keys [base-uri]}]
+  (log/info "Installing Site API")
   (let [openapi (json/read-value json)
         body (.getBytes json "UTF-8")]
     (put!
@@ -99,6 +118,7 @@
       ::apex/openapi openapi})))
 
 (defn put-openid-token-endpoint! [crux-node {::site/keys [base-uri]}]
+  (log/info "Installing OpenID Connect token endpoint")
   (let [token-endpoint (str base-uri "/_site/token")
         grant-types #{"client_credentials"}]
     (put!
@@ -138,6 +158,7 @@
         ::http/content content}))))
 
 (defn put-login-endpoint! [crux-node {::site/keys [base-uri]}]
+  (log/info "Installing login endpoint")
   ;; Allow anyone to login
   (put!
    crux-node
@@ -155,6 +176,7 @@
     ::pass/effect ::pass/allow}))
 
 (defn put-logout-endpoint! [crux-node {::site/keys [base-uri]}]
+  (log/info "Installing logout endpoint")
   ;; Allow anyone to login
   (put!
    crux-node
@@ -179,7 +201,7 @@
      (p/pattern-parser #"(?<scheme>https?)://" {:group {:juxt.reap.alpha.rfc7230/scheme "scheme"}})
      host-parser))))
 
-(defn init-db!
+#_(defn init-db!
   "Initialize the database. You usually call this as part of setting up a new Site
   instance. It's safe to call multiple times. No data is deleted."
   [crux-node {::site/keys [base-uri

@@ -6,8 +6,10 @@
    [crux.api :as crux]
    [juxt.dave.alpha :as dave]
    [juxt.dave.alpha.xml :as xml]
-   [juxt.spin.alpha :as spin]
+
    [juxt.reap.alpha.encoders :refer [format-http-date]]))
+
+(alias 'http (create-ns 'juxt.http.alpha))
 
 (defn gen-response-body [request members db authorization subject]
   (let [baos (new java.io.ByteArrayOutputStream)
@@ -30,7 +32,7 @@
               [{:tag "resourcetype" :ns "DAV:"}
                {:tag "getcontentlength" :ns "DAV:" :children [(str (count body))]}
                {:tag "getetag" :ns "DAV:" :children ["\"1234\""]}
-               {:tag "getlastmodified" :ns "DAV:" :children [(some-> resource ::spin/last-modified format-http-date)]}]}]}]})})
+               {:tag "getlastmodified" :ns "DAV:" :children [(some-> resource ::http/last-modified format-http-date)]}]}]}]})})
 
      baos
      {:format-pretty-print false

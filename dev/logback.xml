@@ -1,22 +1,20 @@
 <!-- Logback Configuration. See http://logback.qos.ch/ -->
 <!-- Adapted from https://github.com/stuartsierra/log.dev/blob/master/resources/logback.xml -->
 <!-- <configuration scan="true" scanPeriod="1 seconds"> -->
-<configuration scan="true" scanPeriod="1 seconds">
-
-  <property resource="log_dev_app.properties" />
+<configuration scan="true">
 
    <!-- Console (STDOUT) output. -->
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
 
     <!-- Only print log messages at level WARN or higher. -->
     <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-      <level>WARN</level>
+      <level>INFO</level>
     </filter>
 
     <!-- Default encoder is ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
     <encoder>
       <!-- two-line layout suitable for a terminal -->
-      <pattern>%date{HH:mm:ss.SSS} %highlight(%-5level) %logger [%thread]%n%msg%n</pattern>
+      <pattern>%date{HH:mm:ss.SSS} %-5level %logger %n%msg%n</pattern>
       <charset>UTF-8</charset>
     </encoder>
   </appender>
@@ -81,25 +79,20 @@
     </rollingPolicy>
   </appender>
 
-
-
   <!-- Root log level is "ALL", meaning all log levels are emitted. -->
   <root level="ALL">
 
-    <!-- Send all log messages to console (filtered to WARN) -->
+    <!-- Send all log messages to console (filtered to INFO) -->
     <appender-ref ref="CONSOLE" />
 
     <!-- Send all log messages to log/all.log -->
     <appender-ref ref="ALL_LOG_FILE" />
   </root>
 
-  <logger name="edge" level="DEBUG"/>
-  <logger name="juxt.kick" level="DEBUG"/>
-
-  <!-- Log messages from your application will be included in
-       log/all.log. In addition, we will send just messages from your
-       application to log/app.log -->
   <logger name="juxt" level="ALL">
+    <appender-ref ref="APP_LOG_FILE" />
+  </logger>
+  <logger name="crux" level="INFO">
     <appender-ref ref="APP_LOG_FILE" />
   </logger>
 
@@ -107,16 +100,6 @@
        'user' or 'dev', send those messages to log/app.log too. -->
   <logger name="user" level="ALL">
     <appender-ref ref="APP_LOG_FILE" />
-  </logger>
-  <logger name="dev" level="ALL">
-    <appender-ref ref="APP_LOG_FILE" />
-  </logger>
-
-  <!-- figwheel puts some useful warnings through as INFO rather than WARN
-       See: https://github.com/bhauman/figwheel-main/issues/130
-       -->
-  <logger name="figwheel.logg" level="INFO">
-    <appender-ref ref="CONSOLE" />
   </logger>
 
   <!-- Make java.util.logging more efficient at disabled levels.

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo "Site by JUXT. Copyright (c) 2021, JUXT LTD."
+
+cd $(dirname $0)/..; clojure -J-Djava.awt.headless=true -J-Dclojure.server.site="{:port,50505,:accept,juxt.site.alpha.repl-server/repl,:address,\"localhost\"}" -J-Xms256m -J-Xmx1200m -Mprod -m juxt.site.alpha.main

@@ -1,6 +1,10 @@
 ;; Copyright © 2021, JUXT LTD.
 
-{:ig/system
+{:juxt.site.alpha/base-uri "http://localhost:2021"
+ :juxt.site.alpha/master-username "webmaster"
+ :juxt.site.alpha.unix-pass/password-prefix "site/localhost/"
+
+ :ig/system
  {:juxt.site.alpha.db/crux-node
   {:crux/index-store
    {:kv-store {:crux/module crux.rocksdb/->kv-store
@@ -13,9 +17,6 @@
    :crux/tx-log
    {:kv-store {:crux/module crux.rocksdb/->kv-store
                :db-dir "db/txes"}}}
-
-  :juxt.site.alpha.selmer/cache
-  {:cache? false}
 
   :juxt.site.alpha.server/server
   {:juxt.site.alpha/crux-node #ig/ref :juxt.site.alpha.db/crux-node

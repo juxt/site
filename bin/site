@@ -1,5 +1,5 @@
 #_( ;; Allow this script to be executed directly
-   "exec" "bb" "--classpath" "$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')" "$0" "$@"
+   "exec" "bb" "--classpath" "$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')" "$0" "$(readlink -f $(dirname $0)/..)" "$@"
    )
 
 (ns site
@@ -19,6 +19,8 @@
 
 (def ^:dynamic *debug* nil)
 
+(def site-root-dir (io/file (first *command-line-args*)))
+
 (defn error! [& msg]
   (apply println (apply str ansi/red-font "fail:" ansi/reset-font) msg))
 
@@ -37,31 +39,29 @@
 
 (def config-file
   (case (System/getProperty "os.name")
-    "Linux" (io/file (System/getProperty "user.home") ".config/site/config.edn")
+    "Linux" (io/file (System/getProperty "user.home") ".config/site/config.json")
     (error-and-exit! 1 "Unsupported OS")))
 
 (def config
-  (merge
-   {:pass-password-dir "site"}
-   (when (.exists config-file)
-     (edn/read-string (slurp config-file)))))
+  (if (.exists config-file)
+    (json/decode (slurp config-file))
+    {}))
 
-(defn get-password-from-pass [username]
-  (let [dir (io/file
-             (System/getProperty "user.home")
-             (str ".password-store/" (:pass-password-dir config)))
-        passfile (io/file dir (str username ".gpg"))]
+(defn get-password-from-unix-pass [unix-pass-password-prefix username]
+  (let [passfile (io/file
+                  (System/getProperty "user.home")
+                  (str ".password-store/" unix-pass-password-prefix username ".gpg"))]
     (when (.exists passfile)
       (do
         (message! "Extracting password from " (str passfile))
         (let [{:keys [exit out]} (sh/sh "gpg" "-d" (str passfile))]
           (when (zero? exit) (str/trim out)))))))
 
-(defn get-password [username]
+(defn get-password [unix-pass-password-prefix username]
   (or
-   (get-password-from-pass username)
+   (get-password-from-unix-pass unix-pass-password-prefix username)
    ;; TODO: Try other strategies, like pinentry
-   ))
+   (error-and-exit! 1 "Failed to get password for" username)))
 
 (defn local-token-file []
   (let [dir (io/file (System/getProperty "user.home") ".local/share/site")]
@@ -87,7 +87,7 @@
                   (when-not (.exists dir)
                     (when-not (.mkdirs dir)
                       (error-and-exit! 1 (str "Failed to make directory: " dir))))
-                  (spit (io/file dir "config.edn") (with-out-str (pprint (assoc config (keyword k) v))))
+                  (spit (io/file dir "config.json") (json/encode (assoc config (keyword k) v) {:pretty true}))
                   (message! (format "Set %s to '%s'" k v)))
         (error-and-exit! 1 "Unsupported OS"))
 
@@ -148,6 +148,41 @@
         :else
         (do
           (println "Server response:" status (str/trim body)))))))
+
+(defn repl-command [{:keys [in out]} cmd]
+  (doto out (.write cmd) (.newLine) (.flush))
+  (.readLine in)
+  ;;(loop [] (when (.ready in) (cons (.readLine in) (recur))))
+  )
+
+(defn init-db
+  "Initialize a new Site instance"
+  [opts]
+  (message! "Initializing database")
+  ;; It's only possible to initialize the local instance, so the config will
+  ;; always be sourced directly from ../src/config.edn
+  (let [config (edn/read-string
+                {:readers {'ig/ref identity}}
+                (slurp (io/file site-root-dir "src/config.edn")))
+
+        {:juxt.site.alpha/keys [base-uri master-username]
+         :juxt.site.alpha.unix-pass/keys [password-prefix] :as opts}
+        config
+
+        master-password (get-password password-prefix master-username)
+
+        opts (-> opts
+                 (select-keys [:juxt.site.alpha/base-uri :juxt.site.alpha/master-username])
+                 (assoc :juxt.site.alpha/master-password master-password))]
+
+    (let [sock (java.net.Socket. "localhost" 50505)
+          repl {:in (io/reader (.getInputStream sock))
+                :out (io/writer (.getOutputStream sock))}]
+      (repl-command repl "(require 'juxt.site.alpha.init)")
+      (repl-command repl "(def crux-node (:juxt.site.alpha.db/crux-node juxt.site.alpha.main/system))")
+      (repl-command repl (format "(juxt.site.alpha.init/init-db! crux-node %s)" (pr-str opts)))
+;;      (.readLine (:in repl))
+      )))
 
 (defn load-token []
   "Load token from local cache"
@@ -750,10 +785,16 @@
                    ["-l" "--language LANGUAGE" "The content-language (optional)"]]
      :delegate put-asset}]
 
+   ["init-db"
+    {:description (:doc (meta #'init-db))
+     :cli-options []
+     :delegate init-db}
+    ]
+
    ])
 
 (let [{:keys [options arguments summary errors]}
-      (parse-opts *command-line-args*  cli-options :in-order true)
+      (parse-opts (next *command-line-args*)  cli-options :in-order true)
       command (first arguments)
       {:keys [cli-options delegate]} ((into {} commands) (first arguments))
 
