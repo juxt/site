@@ -925,6 +925,9 @@
       (finally
         (org.slf4j.MDC/clear)))))
 
+;; See https://portswigger.net/web-security/host-header and similar TODO: Have a
+;; 'whitelist' in the config to check against - but this would require a reboot,
+;; or some mechanism of freshening the whitelist without restart.
 (def host-header-parser (rfc7230.decoders/host {}))
 
 (defn assert-host [host]
@@ -938,41 +941,34 @@
        (subs (util/hexdigest
               (.getBytes (str (java.util.UUID/randomUUID)) "US-ASCII")) 0 24)))
 
-(defn wrap-initialize-state [h {::site/keys [crux-node base-uri]}]
+(defn wrap-initialize-state [h {::site/keys [crux-node base-uri uri-prefix]}]
   (assert crux-node)
   (assert base-uri)
   (fn [req]
-    (let [db (x/db crux-node)]
+    (let [db (x/db crux-node)
+          req-id (new-request-id base-uri)
+          uri-prefix (or uri-prefix
+                         (let [{::rfc7230/keys [host]}
+                               (host-header-parser
+                                (re/input
+                                 (or
+                                  (get-in req [:ring.request/headers "x-forwarded-host"])
+                                  (get-in req [:ring.request/headers "host"]))))]
+                           (str (or (get-in req [:ring.request/headers "x-forwarded-proto"])
+                                    (name (:ring.request/scheme req)))
+                                "://" host (:ring.request/path req))))
+          uri (str uri-prefix (:ring.request/path req))
 
-      (if-not base-uri
-        ;; TODO: Show a website in 'construction' page, circa 1995
-        {:ring.response/status 200
-         :ring.response/headers {"content-type" "image/gif"}
-         :ring.response/body (io/input-stream
-                              (io/resource
-                               (rand-nth
-                                ["juxt/site/alpha/construction.gif"
-                                 "juxt/site/alpha/construction2.gif"
-                                 "juxt/site/alpha/construction3.gif"])))}
+          req (into req {::site/start-date (java.util.Date.)
+                         ::site/request-id req-id
+                         ::site/uri uri
+                         ::site/crux-node crux-node
+                         ::site/db db
+                         ::site/base-uri base-uri})]
 
-        (let [req-id (new-request-id base-uri)
-
-              {::rfc7230/keys [host]}
-              (host-header-parser
-               (re/input (get-in req [:ring.request/headers "host"])))
-              _ (assert host)
-              uri (str (name (:ring.request/scheme req)) "://" host (:ring.request/path req))
-              req (into req {::site/start-date (java.util.Date.)
-                             ::site/request-id req-id
-                             ::site/uri uri
-                             ::site/host host
-                             ::site/crux-node crux-node
-                             ::site/db db
-                             ::site/base-uri base-uri})]
-
-          ;; The Ring request map becomes the container for all state collected
-          ;; along the request processing pathway.
-          (h req))))))
+      ;; The Ring request map becomes the container for all state collected
+      ;; along the request processing pathway.
+      (h req))))
 
 (defn wrap-ring-1-adapter
   "Given the presence of keywords from different origins, it helps that we
