@@ -970,6 +970,8 @@
       ;; along the request processing pathway.
       (h req))))
 
+
+
 (defn wrap-ring-1-adapter
   "Given the presence of keywords from different origins, it helps that we
   distinguish Ring keywords from application keywords. Ring 2.0 provides a good
@@ -1004,7 +1006,15 @@
                             :ring.response/headers :headers
                             :ring.response/body :body})))))
 
+(defn wrap-healthcheck
+  [h]
+  (fn [req]
+    (if (= "/_site/healthcheck" (:uri req))
+      {:status 200 :body "Site OK!\r\n"}
+      (h req))))
+
 (defn make-handler [opts]
   (-> #'outer-handler
       (wrap-initialize-state opts)
-      (wrap-ring-1-adapter)))
+      (wrap-ring-1-adapter)
+      (wrap-healthcheck)))
