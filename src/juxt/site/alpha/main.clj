@@ -42,7 +42,7 @@
     (ig/prep system-config)))
 
 (defn -main [& _]
-  (log/info "Starting production system")
+  (log/info "Starting system")
   (let [system-config (system-config)
         sys (ig/init system-config)]
     (log/infof "Configuration: %s" (pr-str system-config))
