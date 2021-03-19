@@ -183,6 +183,8 @@
 
     (when (.find matcher)
 
+      (log/trace "Got a match!" rel-request-path)
+
       (let [path-params
             (into
              {}
@@ -300,29 +302,25 @@
    (let [openapis (x/q db '{:find [openapi-eid openapi]
                             :where [[openapi-eid ::apex/openapi openapi]]})]
 
-     (when-let [{:keys [openapi-eid openapi rel-request-path]}
-                (some
-                 (fn [[openapi-eid openapi]]
-                   (some
-                    (fn [server]
-                      (let [server-url (get server "url")
-                            server-url (cond->> server-url
-                                         (.startsWith server-url "/") (str base-uri))]
 
-                        (when (.startsWith uri server-url)
-                          {:openapi-eid openapi-eid
-                           :openapi openapi
-                           :rel-request-path (subs uri (count server-url))})))
-                    (get openapi "servers")))
-                 ;; Iterate across all APIs in this server, looking for a match
-                 ;; TODO: authorization
-                 openapis)]
-
-       ;; Yes? Any of these paths match the request's URL?
-       (let [paths (get openapi "paths")]
-         (some
-          #(path-entry->resource req % openapi rel-request-path)
-          paths))))))
+     (some
+      (fn [[openapi-uri openapi]]
+        #_(log/tracef "Checking API: %s" openapi-uri)
+        (some
+         (fn [server]
+           #_(log/tracef "Checking server: %s" server)
+           (let [server-url (get server "url")
+                 server-url (cond->> server-url
+                              (.startsWith server-url "/") (str base-uri))]
+             (when (.startsWith uri server-url)
+               (let [paths (get openapi "paths")]
+                 (some
+                  #(path-entry->resource req % openapi (subs uri (count server-url)))
+                  paths)))))
+         ;; Iterate
+         (get openapi "servers")))
+      ;; Iterate across all APIs in this server, looking for a match
+      openapis))))
 
 (defn ->query [input params]
 
