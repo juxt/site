@@ -158,7 +158,7 @@
                       [(re-matches pat e)]]
               :in [pat]
               :limit 5}
-            (re-pattern (str "https://.*/_site/requests/" search ".*")))]
+            (re-pattern (str "https?://.*/_site/requests/" search ".*")))]
      (cond
        (= (count results) 1)  (ffirst results)
        (zero? (count results)) (throw (ex-info "Not found" {:search search}))
