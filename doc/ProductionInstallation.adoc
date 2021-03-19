@@ -1,0 +1,90 @@
+= Site Production Installation
+
+This guide explains the process of setting up a site-server on a remote host.
+
+We assume you have access to the host (we'll call it `host`) and that a user
+exists to run the site-server (we'll call it `site`).
+
+== Installation
+
+----
+$ ssh -A site@host
+----
+
+Clone the site repo
+
+----
+site$ git clone https://github.com/juxt/site
+----
+
+Logout and back in again
+
+----
+$ ssh site@host
+----
+
+== Configuration
+
+----
+site$ mkdir -p $HOME/.config/site
+site$ cp $HOME/site/doc/config.edn $HOME/.config/site/config.edn
+----
+
+Copy over the systemd script (and edit as appropriate)
+
+----
+site$ sudo cp $HOME/site/etc/systemd/site.service /etc/systemd/system/site.service
+----
+
+== Execution
+
+Start site
+
+----
+site$ sudo systemctl start site
+----
+
+Monitor initial start up for errors
+
+----
+site$ sudo journalctl -xefu site
+----
+
+Ensure site is started after a reboot of the host
+
+----
+site$ sudo systemctl enable site
+----
+
+== Bootstrap
+
+----
+site$ curl localhost 50505
+
+Site by JUXT. Copyright (c) 2021, JUXT LTD.
+
+[ ]  Site API not installed.  Enter (put-site-api!) to fix this.
+[ ]  Authentication resources not installed.  Enter (put-auth-resources!) to fix this.
+[ ]  Role of superuser not yet created. Enter (put-superuser-role!) to fix this.
+[ ]  No superusers exist. Enter (put-superuser! <username> <password> <fullname>) to fix this.
+
+juxt.site.alpha.repl=>
+----
+
+As prompted, create the various resources to populate the server. Now that you
+have a superuser account, you can continue to populate the server remotely.
+
+For example:
+
+----
+juxt.site.alpha.repl=> (put-superuser-role!)
+----
+
+
+== Setup
+
+The site tool is now ready to use. You can add resources using the site tool depending on what you need.
+
+----
+$ site get-token -u <superuser>
+----
