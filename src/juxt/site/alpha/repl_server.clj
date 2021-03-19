@@ -25,4 +25,4 @@
   (m/repl
    :init repl-init
    :read s/repl-read
-   :print (comp pprint pr-str)))
+   :prompt #(printf "site> ")))
