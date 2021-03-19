@@ -2,6 +2,8 @@
    "exec" "bb" "--classpath" "$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')" "$0" "$(readlink -f $(dirname $0)/..)" "$@"
    )
 
+;; Copyright © 2021, JUXT LTD.
+
 (ns site
   (:require
    [babashka.curl :as curl]
@@ -39,13 +41,15 @@
 
 (def config-file
   (case (System/getProperty "os.name")
-    "Linux" (io/file (System/getProperty "user.home") ".config/site/config.json")
+    "Linux" (io/file (System/getProperty "user.home") ".config/site/config.edn")
     (error-and-exit! 1 "Unsupported OS")))
 
+(assert (.exists config-file) (format "Config file does not exist: %s" (str config-file)))
+
 (def config
-  (if (.exists config-file)
-    (json/decode (slurp config-file))
-    {}))
+  (edn/read-string
+   {:readers {'ig/ref identity 'ref identity}}
+   (slurp config-file)))
 
 (defn get-password-from-unix-pass [unix-pass-password-prefix username]
   (let [passfile (io/file
@@ -70,29 +74,6 @@
         (error-and-exit! 1 (str "Failed to make directory: " dir))))
     (io/file dir "access-token.json")))
 
-(defn set-config
-  "Set a configuration value"
-  [opts]
-  (let [[k v] (:arguments opts)]
-    (if (#{;; default username to use
-           "username"
-           ;; pass subdirectory to load passwords from, defaults to 'site'
-           "pass-password-dir"
-           ;; base-uri
-           "base-uri"} k)
-
-      (case (System/getProperty "os.name")
-        "Linux" (let [dir (io/file (System/getProperty "user.home") ".config/site")]
-                  (assert v)
-                  (when-not (.exists dir)
-                    (when-not (.mkdirs dir)
-                      (error-and-exit! 1 (str "Failed to make directory: " dir))))
-                  (spit (io/file dir "config.json") (json/encode (assoc config (keyword k) v) {:pretty true}))
-                  (message! (format "Set %s to '%s'" k v)))
-        (error-and-exit! 1 "Unsupported OS"))
-
-      (error-and-exit! 1 (format "%s is not a configuration setting" key)))))
-
 (defn show-config
   "Show configuration"
   [opts]
@@ -101,20 +82,23 @@
 (defn get-token
   "Request a token"
   [opts]
-  (let [{:keys [base-uri username password curl]
-         :or {base-uri (:base-uri config)
-              username (:username config)
-              password (:password config)}}
+  (let [{:keys [base-uri username password password-prefix curl]
+         :or {base-uri (:juxt.site.alpha/base-uri config)
+              password-prefix (:juxt.site.alpha.unix-pass/password-prefix config)}}
         (:options opts)]
 
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not username (error-and-exit! 1 "Username required"))
 
+    (message! "Get token from" (format "%s/_site/token" base-uri))
+
     (let [{:keys [status headers body]}
           (curl/post
            (format "%s/_site/token" base-uri)
            {:headers {"content-type" "application/x-www-form-urlencoded"}
-            :basic-auth [username (or password (get-password username) (error-and-exit! 1 "Failed to get password"))]
+            :basic-auth [username (or password
+                                      (when password-prefix (get-password password-prefix username))
+                                      (error-and-exit! 1 "Failed to get password"))]
             :body "grant_type=client_credentials"
             :throw false
             :debug false})]
@@ -155,14 +139,17 @@
   ;;(loop [] (when (.ready in) (cons (.readLine in) (recur))))
   )
 
-(defn init-db
+;; Possibly this is better to do manually by the operator, now the REPL
+;; interface is nicer. This command is also one that only works locally, whereas
+;; the site tool is meant to be location transparent.
+#_(defn init-db
   "Initialize a new Site instance"
   [opts]
   (message! "Initializing database")
   ;; It's only possible to initialize the local instance, so the config will
   ;; always be sourced directly from ../src/config.edn
   (let [config (edn/read-string
-                {:readers {'ig/ref identity}}
+                {:readers {'ig/ref identity 'ref identity}}
                 (slurp (io/file site-root-dir "src/config.edn")))
 
         {:juxt.site.alpha/keys [base-uri master-username]
@@ -228,7 +215,7 @@
   "List users"
   [opts]
   (let [{:keys [base-uri]
-         :or {base-uri (:base-uri config)}}
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
     (let [{access-token "access_token"} (load-token)
           {:keys [status headers body]}
@@ -251,7 +238,7 @@
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri username password]
-         :or {base-uri (:base-uri config)}}
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
 
     (when-not base-uri (error-and-exit! 1 "Base-URI required"))
@@ -285,7 +272,7 @@
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri username password name]
-         :or {base-uri (:base-uri config)}}
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
 
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
@@ -328,7 +315,7 @@
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri role description]
-         :or {base-uri (:base-uri config)}}
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
 
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
@@ -368,7 +355,7 @@
   "List roles"
   [opts]
   (let [{:keys [base-uri]
-         :or {base-uri (:base-uri config)}}
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
     (let [{access-token "access_token"} (load-token)
           {:keys [status headers body]}
@@ -391,7 +378,7 @@
   [opts]
   (let [{access-token "access_token" assigner "username"} (load-token)
         {:keys [base-uri username role justification]
-         :or {base-uri (:base-uri config)}}
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
 
     (when-not username (error-and-usage! "Username required" opts))
@@ -433,7 +420,7 @@
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri name rule]
-         :or {base-uri (:base-uri config)}}
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
 
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
@@ -467,7 +454,7 @@
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri resource variant]
-         :or {base-uri (:base-uri config)}}
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
 
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
@@ -510,7 +497,7 @@
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri resource location]
-         :or {base-uri (:base-uri config)}}
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
 
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
@@ -551,7 +538,7 @@
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri name openapi]
-         :or {base-uri (:base-uri config)}} (:options opts)
+         :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)
 
         _ (when-not name (error-and-usage! "API name required" opts))
         _ (when-not (re-matches #"[a-z]{2,}" name)
@@ -605,6 +592,7 @@
      (error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix)))))
 
 (defn upload-file* [access-token base-uri file type encoding language path]
+  (message! "Uploading file to" (str base-uri path))
   (let [{:keys [status headers body]}
         (curl/put
          (str base-uri path)
@@ -638,7 +626,7 @@
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri file type encoding language path]
-         :or {base-uri (:base-uri config)}}
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
 
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
@@ -652,7 +640,7 @@
   "Install a distribution of Swagger UI"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [base-uri version] :or {base-uri (:base-uri config)
+        {:keys [base-uri version] :or {base-uri (:juxt.site.alpha/base-uri config)
                                        version "3.44.1"}} (:options opts)
         tmpdir (create-tmp-dir)
         outfile (.resolve tmpdir "swagger-ui.zip")]
@@ -684,19 +672,16 @@
    ["-h" "--help" "Show this summary"]])
 
 (def commands
-  [["set"
-    {:description (:doc (meta #'set-config))
-     :cli-options []
-     :delegate set-config}]
-
-   ["config"
+  [["config"
     {:description (:doc (meta #'show-config))
      :cli-options []
      :delegate show-config}]
 
    ["get-token"
     {:description (:doc (meta #'get-token))
-     :cli-options [["-K" "--curl FILE" "Store creds in curl config file"]]
+     :cli-options [["-u" "--username USERNAME" "Username"]
+                   ["-p" "--password PASSWORD" "Password"]
+                   ["-K" "--curl FILE" "Store creds in curl config file"]]
      :delegate get-token}]
 
    ["check-token"
@@ -785,7 +770,7 @@
                    ["-l" "--language LANGUAGE" "The content-language (optional)"]]
      :delegate put-asset}]
 
-   ["init-db"
+   #_["init-db"
     {:description (:doc (meta #'init-db))
      :cli-options []
      :delegate init-db}
