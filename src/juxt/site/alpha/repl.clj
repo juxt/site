@@ -268,3 +268,8 @@
         crux-node (crux-node)]
     (init/put-superuser! crux-node username password fullname config)
     (status config)))
+
+(defn allow-public-access-to-public-resources! []
+  (let [config (config)
+        crux-node (crux-node)]
+    (init/allow-public-access-to-public-resources! crux-node config)))

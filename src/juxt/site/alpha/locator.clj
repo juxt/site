@@ -6,19 +6,19 @@
    [crux.api :as x]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
-(alias 'spin (create-ns 'juxt.spin.alpha))
+(alias 'http (create-ns 'juxt.http.alpha))
+(alias 'pass (create-ns 'juxt.pass.alpha))
 
-(defn locate-with-locators [db request]
-  (let [uri (::site/uri request)]
+(defn locate-with-locators [db req]
+  (let [uri (::site/uri req)]
     (when-let [locators
                (seq (x/q
                      db
-                     '{:find [(eql/project
-                               r [:crux.db/id
-                                  ::site/description ::site/locator-fn])
+                     '{:find [r
                               grps]
 
-                       :where [[r ::site/type "ResourceLocator"]
+                       :where [(or [r ::site/type "ResourceLocator"]
+                                   [r ::site/type "AppRoutes"] )
                                [r ::site/pattern p]
                                [(first grps) grp0]
                                [(some? grp0)]
@@ -30,35 +30,41 @@
         (throw
          (ex-info
           "Multiple resource locators returned from query that match URI"
-          {::locators (map :crux.db/id locators)
-           ::uri uri
-           ::spin/response
-           {:status 500
-            :body "Internal Error\r\n"}})))
+          (into req
+                {::locators (map :crux.db/id locators)}))))
 
-      (let [[{::site/keys [locator-fn description] :as locator} grps] (first locators)]
-        (when-not locator-fn
-          (throw
-           (ex-info
-            "Resource locator must have a :juxt.site.alpha/locator attribute"
-            {::locator locator
-             ::uri uri
-             ::spin/response
-             {:status 500
-              :body "Internal Error\r\n"}})))
+      (let [[e grps] (first locators)
+            {typ ::site/type :as locator} (x/entity db e)]
+        (case typ
+          "ResourceLocator"
+          (let [{::site/keys [locator-fn description]} locator]
+            (when-not locator-fn
+              (throw
+               (ex-info
+                "Resource locator must have a :juxt.site.alpha/locator attribute"
+                (into req {::locator locator}))))
 
-        (when-not (symbol? locator-fn)
-          (throw
-           (ex-info
-            "Resource locator must be a symbol"
-            {::locator locator
-             ::locator-fn locator-fn
-             ::uri uri
-             ::spin/response
-             {:status 500
-              :body "Internal Error\r\n"}})))
+            (when-not (symbol? locator-fn)
+              (throw
+               (ex-info
+                "Resource locator must be a symbol"
+                (into req {::locator locator
+                           ::locator-fn locator-fn}))))
 
-        (log/debug "Requiring resolve of" locator-fn)
-        (let [f (requiring-resolve locator-fn)]
-          (log/debugf "Calling locator-fn %s: %s" locator-fn description)
-          (f {:db db :request request :locator locator :grps grps}))))))
+
+            (log/debug "Requiring resolve of" locator-fn)
+            (let [f (requiring-resolve locator-fn)]
+              (log/debugf "Calling locator-fn %s: %s" locator-fn description)
+              (f {:db db :request req :locator locator :grps grps})))
+
+          "AppRoutes" locator)))))
+
+(comment
+  (put!
+   {:crux.db/id "http://localhost:2021/ui/app.html"
+    ::site/type "AppRoutes"
+    ::site/pattern (re-pattern "http://localhost:2021/ui/.*")
+    ::pass/classification "PUBLIC"
+    ::http/methods #{:get :head :options}
+    ::http/content-type "text/html;charset=utf-8"
+    ::http/content "<h1>App</h1>"}))
