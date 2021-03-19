@@ -3,7 +3,8 @@
 (ns juxt.site.alpha.repl-server
   (:require
    [clojure.core.server :as s]
-   [clojure.main :as m]))
+   [clojure.main :as m]
+   [clojure.pprint :refer [pprint]]))
 
 (defn repl-init
   "Initialize repl in user namespace and make standard repl requires."
@@ -23,4 +24,5 @@
   []
   (m/repl
    :init repl-init
-   :read s/repl-read))
+   :read s/repl-read
+   :print (comp pprint pr-str)))
