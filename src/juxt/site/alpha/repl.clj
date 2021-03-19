@@ -224,17 +224,19 @@
        :sad-message "No superusers exist."
        :fix "Enter (put-superuser! <username> <password> <fullname>) to fix this."}])))
 
-(defn status [steps]
-  (println)
-  (doseq [{:keys [complete? happy-message sad-message fix]} steps]
-    (if complete?
-      (println "[✔] " (ansi/green happy-message))
-      (println
-       "[ ] "
-       (ansi/red sad-message)
-       (ansi/yellow fix))))
-  (println)
-  (if (every? :complete? steps) :ok :incomplete))
+(defn status
+  ([] (status (steps (config))))
+  ([steps]
+   (println)
+   (doseq [{:keys [complete? happy-message sad-message fix]} steps]
+     (if complete?
+       (println "[✔] " (ansi/green happy-message))
+       (println
+        "[ ] "
+        (ansi/red sad-message)
+        (ansi/yellow fix))))
+   (println)
+   (if (every? :complete? steps) :ok :incomplete)))
 
 (defn put-site-api! []
   (let [config (config)]
