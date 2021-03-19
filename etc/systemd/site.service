@@ -5,7 +5,7 @@ Description=Site
 Type=simple
 Environment="DISPLAY=:0"
 Environment="MALLOC_ARENA_MAX=2"
-ExecStart=/home/mal/site/bin/site-server
+ExecStart=/home/site/site/bin/site-server
 ExecReload=kill -HUP $MAINPID
 
 Restart=always
