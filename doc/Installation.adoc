@@ -88,3 +88,45 @@ The site tool is now ready to use. You can add resources using the site tool dep
 ----
 $ site get-token -u <superuser>
 ----
+
+Here are some examples of commands you could try:
+
+----
+$ site put-swagger-ui
+----
+
+To install some CSS and variants
+
+----
+$ site put-asset --file style/target/styles.css --type text/css --path /css/styles.css
+$ site put-asset --file style/target/styles.css.gz --type text/css --encoding gzip --path /css/styles.css.gz
+$ site put-variant -r https://home.juxt.site/css/styles.css -v https://home.juxt.site/css/styles.css.gz
+$ site put-asset --file style/target/styles.css.br --type text/css --encoding br --path /css/styles.css.br
+$ site put-variant -r https://home.juxt.site/css/styles.css -v https://home.juxt.site/css/styles.css.br
+----
+
+Login resources
+
+----
+$ site put-asset --file assets/favicon.ico --type image/x-icon --path /favicon.ico
+$ site put-asset --file assets/login.html --type 'text/html;charset=utf-8' --path /login.html
+$ site put-asset --file assets/live.js --type 'application/javascript' --path /js/live.js
+$ site put-asset --file assets/juxt-logo-on-black.svg --type 'image/svg+xml' --path /juxt-logo-on-black.svg
+$ site put-asset --file assets/juxt-logo-on-white.svg --type 'image/svg+xml' --path /juxt-logo-on-white.svg
+$ site put-rule -n login-form -r rules/login-form-rule.json
+----
+
+where `rules/login-form-rule.json` might be:
+
+[source,json]
+----
+{"type": "Rule",
+ "target": "[(or [request :ring.request/path \"/login.html\"] [request :ring.request/path \"/juxt-logo-on-black.svg\"] [request :ring.request/path \"/juxt-logo-on-white.svg\"] [request :ring.request/path \"/css/styles.css\"] [request :ring.request/path \"/favicon.ico\"])]",
+ "effect": "juxt.pass.alpha/allow"}
+----
+
+Add a redirect from / to a login page with a query parameters
+
+----
+site put-redirect -r / -l /login.html
+----
