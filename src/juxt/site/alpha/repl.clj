@@ -246,7 +246,7 @@
          edn/read-string
          json/write-value-as-string)
      config)
-    (status config)))
+    (status (steps config))))
 
 (defn put-auth-resources! []
   (let [config (config)
@@ -254,19 +254,19 @@
     (init/put-openid-token-endpoint! crux-node config)
     (init/put-login-endpoint! crux-node config)
     (init/put-logout-endpoint! crux-node config)
-    (status config)))
+    (status (steps config))))
 
 (defn put-superuser-role! []
   (let [config (config)
         crux-node (crux-node)]
     (init/put-superuser-role! crux-node config)
-    (status config)))
+    (status (steps config))))
 
 (defn put-superuser! [username password fullname]
   (let [config (config)
         crux-node (crux-node)]
     (init/put-superuser! crux-node username password fullname config)
-    (status config)))
+    (status (steps config))))
 
 (defn allow-public-access-to-public-resources! []
   (let [config (config)
