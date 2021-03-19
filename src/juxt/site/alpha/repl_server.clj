@@ -12,7 +12,10 @@
   (in-ns 'juxt.site.alpha.repl)
   (apply require clojure.main/repl-requires)
   (println "Site by JUXT. Copyright (c) 2021, JUXT LTD.")
-  (println))
+  (println)
+  (let [steps (juxt.site.alpha.repl/steps)]
+    (when-not (every? :complete? steps)
+      (juxt.site.alpha.repl/status steps))))
 
 (defn repl
   "REPL with predefined hooks for attachable socket server."
