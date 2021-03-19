@@ -32,7 +32,7 @@
         ;; JSON Schema support functions
         jinx/jinx
         {:git/url "https://github.com/juxt/jinx.git"
-         :sha "75faa460c37d068746f7e3985c555aeeacc9e383"}
+         :sha "68325edd1c4d5884d78e11f2a31d871a8512893d"}
         #_{:local/root "../jinx"}
 
         ;; Ring for some utility code
