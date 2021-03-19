@@ -202,40 +202,42 @@
   ([] (status (config)))
   ([opts]
    (let [{::site/keys [base-uri]} opts
-         db (x/db (crux-node))]
-     (assert base-uri)
-     (println)
+         _ (assert base-uri)
+         db (x/db (crux-node))
+         steps
+         [{:complete? (x/entity db (str base-uri "/_site/apis/site/openapi.json"))
+           :happy-message "Site API resources installed."
+           :sad-message "Site API not installed. "
+           :fix "Enter (put-site-api!) to fix this."}
 
-     (if (x/entity db (str base-uri "/_site/apis/site/openapi.json"))
-       (println "[✔] " (ansi/green "Site API resources installed."))
-       (println
-        "[ ] "
-        (ansi/red "Site API not installed. ")
-        (ansi/yellow "Enter (put-site-api!) to fix this.")))
+          {:complete? (x/entity db (str base-uri "/_site/token"))
+           :happy-message "Authentication resources installed."
+           :sad-message "Authentication resources not installed. "
+           :fix "Enter (put-auth-resources!) to fix this."}
 
-     (if (x/entity db (str base-uri "/_site/token"))
-       (println "[✔] " (ansi/green "Authentication resources installed."))
-       (println
-        "[ ] "
-        (ansi/red "Authentication resources not installed. ")
-        (ansi/yellow "Enter (put-auth-resources!) to fix this.")))
+          {:complete? (x/entity db (str base-uri "/_site/roles/superuser"))
+           :happy-message "Role of superuser exists."
+           :sad-message "Role of superuser not yet created."
+           :fix "Enter (put-superuser-role!) to fix this."}
 
-     (if (x/entity db (str base-uri "/_site/roles/superuser"))
-       (println "[✔] " (ansi/green "Role of superuser exists."))
-       (println
-        "[ ] "
-        (ansi/red "Role of superuser not yet created.")
-        (ansi/yellow "Enter (put-superuser-role!) to fix this.")))
+          {:complete? (pos? (count (superusers opts)))
+           :happy-message "At least one superuser exists."
+           :sad-message "No superusers exist."
+           :fix "Enter (put-superuser! <username> <password> <fullname>) to fix this."}]]
 
-     (if (pos? (count (superusers opts)))
-       (println "[✔] " (ansi/green "At least one superuser exists."))
-       (println
-        "[ ] "
-        (ansi/red "No superusers exist.")
-        (ansi/yellow "Enter (put-superuser! <username> <password> <fullname>) to fix this.")))
-
-     (println)
-     :ok)))
+     (if-not (every? :complete? steps)
+       (do
+         (println)
+         (doseq [{:keys [complete? happy-message sad-message fix]} steps]
+           (if complete?
+             (println "[✔] " (ansi/green happy-message))
+             (println
+              "[ ] "
+              (ansi/red sad-message)
+              (ansi/yellow fix))))
+         (println)
+         :incomplete)
+       :ok))))
 
 (defn put-site-api! []
   (let [config (config)]
