@@ -408,17 +408,20 @@
   "PUT a new representation of the target resource. All other representations are
   replaced."
   [{::site/keys [uri db received-representation start-date crux-node] :as req}]
-  (let [existing? (x/entity db uri)]
+  (let [existing? (x/entity db uri)
+        classification (get-in req [:ring.request/headers "site-classification"])]
     (->>
      (x/submit-tx
         crux-node
         [[:crux.tx/put
           (merge
-           {:crux.db/id uri
-            ::site/type "StaticRepresentation"
-            ::http/methods #{:get :head :options :put :patch}
-            ::http/etag (etag received-representation)
-            ::http/last-modified start-date}
+           (cond->
+               {:crux.db/id uri
+                ::site/type "StaticRepresentation"
+                ::http/methods #{:get :head :options :put :patch}
+                ::http/etag (etag received-representation)
+                ::http/last-modified start-date}
+             classification (assoc ::pass/classification classification))
            received-representation)]])
 
      (x/await-tx crux-node))

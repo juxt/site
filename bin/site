@@ -591,15 +591,18 @@
            ".png" "image/png"} suffix)
      (error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix)))))
 
-(defn upload-file* [access-token base-uri file type encoding language path]
+(defn upload-file* [access-token base-uri file type encoding language path opts]
   (message! "Uploading file to" (str base-uri path))
-  (let [{:keys [status headers body]}
+
+  (let [classification (get-in opts [:options :classification])
+        {:keys [status headers body]}
         (curl/put
          (str base-uri path)
          {:headers (cond-> {"authorization" (format "Bearer %s" access-token)
                             "content-type" type}
                      encoding (assoc "content-encoding" encoding)
-                     language (assoc "content-language" language))
+                     language (assoc "content-language" language)
+                     classification (assoc "site-classification" classification))
           :body (io/file file)
           :throw false})]
     (cond
@@ -634,7 +637,7 @@
     (when-not type (error-and-usage! "Content-type required" opts))
     (when-not path (error-and-usage! "Path required" opts))
 
-    (upload-file* access-token base-uri file type encoding language path)))
+    (upload-file* access-token base-uri file type encoding language path opts)))
 
 (defn put-swagger-ui
   "Install a distribution of Swagger UI"
@@ -657,7 +660,7 @@
             (let [path (format "/swagger-ui/%s" (subs (.toString rel-path) (count prefix)))
                   content-type (content-type (last (str/split (.toString rel-path) #"/")))]
               (when content-type
-                (upload-file* access-token base-uri f content-type nil nil path)))))))))
+                (upload-file* access-token base-uri f content-type nil nil path opts)))))))))
 
 (defn debugf
   "Write a debug message to the console, but only if *debug* is true."
@@ -767,7 +770,8 @@
                    ["-p" "--path PATH" "The destination path after the base-uri"]
                    ["-t" "--type MIME_TYPE" "The content-type"]
                    ["-e" "--encoding ENCODING" "The content-encoding (optional)"]
-                   ["-l" "--language LANGUAGE" "The content-language (optional)"]]
+                   ["-l" "--language LANGUAGE" "The content-language (optional)"]
+                   ["-c" "--classification CLASSIFICATION" "The classification (e.g PUBLIC, RESTRICTED) applied to resource"]]
      :delegate put-asset}]
 
    #_["init-db"
