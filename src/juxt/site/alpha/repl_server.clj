@@ -10,7 +10,8 @@
   []
   (require 'juxt.site.alpha.repl)
   (in-ns 'juxt.site.alpha.repl)
-  (apply require clojure.main/repl-requires))
+  (apply require clojure.main/repl-requires)
+  (println "Site by JUXT. Copyright (c) 2021, JUXT LTD."))
 
 (defn repl
   "REPL with predefined hooks for attachable socket server."
