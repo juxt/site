@@ -1,0 +1,35 @@
+<!-- Logback Configuration. See http://logback.qos.ch/ -->
+<!-- Adapted from https://github.com/stuartsierra/log.dev/blob/master/resources/logback.xml -->
+<!-- <configuration scan="true" scanPeriod="1 seconds"> -->
+<configuration>
+
+   <!-- Console (STDOUT) output. -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+
+    <!-- Only print log messages at level WARN or higher. -->
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>DEBUG</level>
+    </filter>
+
+    <!-- Default encoder is ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
+    <encoder>
+      <!-- two-line layout suitable for a terminal -->
+      <pattern>%date{ISO8601} %-5level %logger{25}: %msg [%X thread=%thread]%n</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <!-- Root log level is "ALL", meaning all log levels are emitted. -->
+  <root level="INFO">
+    <!-- Send all log messages to console (filtered to INFO) -->
+    <appender-ref ref="CONSOLE" />
+  </root>
+
+  <logger name="juxt" level="DEBUG"/>
+
+  <!-- Make java.util.logging more efficient at disabled levels.
+       See http://logback.qos.ch/manual/configuration.html#LevelChangePropagator -->
+  <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+    <resetJUL>true</resetJUL>
+  </contextListener>
+</configuration>
