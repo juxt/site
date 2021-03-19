@@ -1,4 +1,4 @@
-= Site Production Installation
+= Site Installation
 
 This guide explains the process of setting up a site-server on a remote host.
 
