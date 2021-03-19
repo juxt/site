@@ -956,7 +956,8 @@
                                   (get-in req [:ring.request/headers "host"]))))]
                            (str (or (get-in req [:ring.request/headers "x-forwarded-proto"])
                                     (name (:ring.request/scheme req)))
-                                "://" host (:ring.request/path req))))
+                                "://" host)))
+
           uri (str uri-prefix (:ring.request/path req))
 
           req (into req {::site/start-date (java.util.Date.)
@@ -969,8 +970,6 @@
       ;; The Ring request map becomes the container for all state collected
       ;; along the request processing pathway.
       (h req))))
-
-
 
 (defn wrap-ring-1-adapter
   "Given the presence of keywords from different origins, it helps that we
