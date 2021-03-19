@@ -13,6 +13,7 @@
   (in-ns 'juxt.site.alpha.repl)
   (apply require clojure.main/repl-requires)
   (println "Site by JUXT. Copyright (c) 2021, JUXT LTD.")
+  (println "Type :repl/quit to exit")
   (let [f (requiring-resolve 'juxt.site.alpha.repl/steps)
         steps (f)]
     (when-not (every? :complete? steps)
