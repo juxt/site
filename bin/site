@@ -548,6 +548,8 @@
         _ (when-not (.exists (io/file openapi)) (error-and-exit! 1 "OpenAPI file not found"))
         _ (when-not (.isFile (io/file openapi)) (error-and-exit! 1 "OpenAPI argument is not a file"))
 
+        openapi-doc (edn/read-string (slurp (io/file openapi)))
+
         {:keys [status headers body]}
         (curl/put
          (format "%s/_site/apis/%s/openapi.json" base-uri name)
@@ -555,14 +557,14 @@
                     "content-type" "application/vnd.oai.openapi+json;version=3.0.2"}
           :body (json/generate-string
                  {"type" "OpenAPI"
-                  "openapi" (edn/read-string (slurp (io/file openapi)))})
+                  "openapi" openapi-doc})
           :throw true})]
     (cond
-      (= status 201)
-      (message! "API installed")
-
-      (= status 204)
-      (message! "API updated")
+      (#{201 204} status)
+      (message! (format "API %s: %s (version %s)"
+                        (case status 201 "installed" 204 "updated")
+                        (get-in openapi-doc [:info :title])
+                        (get-in openapi-doc [:info :version])))
 
       :else
       (do
