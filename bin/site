@@ -585,7 +585,8 @@
 (defn content-type [filename]
   (when-let [[_ suffix] (re-matches #"[^\.]+(\..*)" filename)]
     (or
-     (get {".js" "application/json"
+     (get {".js" "application/javascript"
+           ".json" "application/json"
            ".js.map" "application/json"
            ".css.map" "application/json"
            ".css" "text/css"
