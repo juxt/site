@@ -628,6 +628,7 @@
   ;; TODO: Implement *
   (let [{::site/keys [access-control-allow-origins]} resource
         request-origin (get-in req [:ring.request/headers "origin"])
+
         [resource-origin allow-origin]
         (or
          (when-let [ro (get access-control-allow-origins request-origin)]
@@ -640,7 +641,7 @@
         access-control-allow-headers
         (get resource-origin ::site/access-control-allow-headers)]
 
-    (cond-> (into {:ring.response/status 200})
+    (cond-> (into req {:ring.response/status 200})
 
       true (update :ring.response/headers
                    merge
@@ -693,8 +694,8 @@
                :mkcol :propfind} method)
     (throw
      (ex-info "Method not implemented"
-              (merge req {:ring.response/status 501
-                          :ring.response/body "Not Implemented\r\n"}))))
+              (into req {:ring.response/status 501
+                         :ring.response/body "Not Implemented\r\n"}))))
 
   (let [res (locate-resource req)
 
