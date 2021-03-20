@@ -158,6 +158,7 @@
   if it matches the path"
   [{:ring.request/keys [method]}
    [path path-item-object] openapi rel-request-path]
+
   (let [path-params
         (->>
          (or
@@ -182,8 +183,6 @@
         matcher (re-matcher (re-pattern pattern) rel-request-path)]
 
     (when (.find matcher)
-
-      (log/trace "Got a match!" rel-request-path)
 
       (let [path-params
             (into
@@ -307,15 +306,16 @@
            (for [[openapi-uri openapi] openapis
                  server (get openapi "servers")
                  :let [server-url (get server "url")
-                       server-url (cond->> server-url (.startsWith server-url "/") (str base-uri))]
-                 :when (.startsWith uri server-url)
+                       abs-server-url (cond->> server-url
+                                    (or (.startsWith server-url "/")
+                                        (= server-url ""))
+                                    (str base-uri))]
+                 :when (.startsWith uri abs-server-url)
                  :let [paths (get openapi "paths")]
                  path paths
-                 :let [resource (path-entry->resource req path openapi (subs uri (count server-url)))]
-                 :when resource
-                 ]
-             resource
-             )]
+                 :let [resource (path-entry->resource req path openapi (subs uri (count abs-server-url)))]
+                 :when resource]
+             resource)]
        (case (count matches)
          0 nil
          1 (first matches)
