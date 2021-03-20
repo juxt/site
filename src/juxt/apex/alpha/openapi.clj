@@ -303,24 +303,23 @@
                             :where [[openapi-eid ::apex/openapi openapi]]})]
 
 
-     (some
-      (fn [[openapi-uri openapi]]
-        #_(log/tracef "Checking API: %s" openapi-uri)
-        (some
-         (fn [server]
-           #_(log/tracef "Checking server: %s" server)
-           (let [server-url (get server "url")
-                 server-url (cond->> server-url
-                              (.startsWith server-url "/") (str base-uri))]
-             (when (.startsWith uri server-url)
-               (let [paths (get openapi "paths")]
-                 (some
-                  #(path-entry->resource req % openapi (subs uri (count server-url)))
-                  paths)))))
-         ;; Iterate
-         (get openapi "servers")))
-      ;; Iterate across all APIs in this server, looking for a match
-      openapis))))
+     (let [matches
+           (for [[openapi-uri openapi] openapis
+                 server (get openapi "servers")
+                 :let [server-url (get server "url")
+                       server-url (cond->> server-url (.startsWith server-url "/") (str base-uri))]
+                 :when (.startsWith uri server-url)
+                 :let [paths (get openapi "paths")]
+                 path paths
+                 :let [resource (path-entry->resource req path openapi (subs uri (count server-url)))]
+                 :when resource
+                 ]
+             resource
+             )]
+       (case (count matches)
+         0 nil
+         1 (first matches)
+         (throw (ex-info "Multiple API matches" {::site/matches matches})))))))
 
 (defn ->query [input params]
 
