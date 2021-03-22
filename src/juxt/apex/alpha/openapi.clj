@@ -299,27 +299,26 @@
        ::site/request-locals {::site/put-fn put-openapi}}))
 
    (let [openapis (x/q db '{:find [openapi-eid openapi]
-                            :where [[openapi-eid ::apex/openapi openapi]]})]
+                            :where [[openapi-eid ::apex/openapi openapi]]})
+         matches
+         (for [[openapi-uri openapi] openapis
+               server (get openapi "servers")
+               :let [server-url (get server "url")
+                     abs-server-url (cond->> server-url
+                                      (or (.startsWith server-url "/")
+                                          (= server-url ""))
+                                      (str base-uri))]
+               :when (.startsWith uri abs-server-url)
+               :let [paths (get openapi "paths")]
+               path paths
+               :let [resource (path-entry->resource req path openapi (subs uri (count abs-server-url)))]
+               :when resource]
+           resource)]
 
-
-     (let [matches
-           (for [[openapi-uri openapi] openapis
-                 server (get openapi "servers")
-                 :let [server-url (get server "url")
-                       abs-server-url (cond->> server-url
-                                    (or (.startsWith server-url "/")
-                                        (= server-url ""))
-                                    (str base-uri))]
-                 :when (.startsWith uri abs-server-url)
-                 :let [paths (get openapi "paths")]
-                 path paths
-                 :let [resource (path-entry->resource req path openapi (subs uri (count abs-server-url)))]
-                 :when resource]
-             resource)]
-       (case (count matches)
-         0 nil
-         1 (first matches)
-         (throw (ex-info "Multiple API matches" {::site/matches matches})))))))
+     (case (count matches)
+       0 nil
+       1 (first matches)
+       (throw (ex-info "Multiple API matches" {::site/matches matches}))))))
 
 (defn ->query [input params]
 
