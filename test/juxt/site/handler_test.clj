@@ -2,11 +2,15 @@
 
 (ns juxt.site.handler-test
   (:require
+   [clojure.test :refer [deftest is are testing] :as t]
    [crux.api :as x]
-   [juxt.site.alpha.handler :as h]
-   [clojure.test :refer [deftest is are testing] :as t])
-  (:import crux.api.ICruxAPI))
+   [jsonista.core :as json]
+   [juxt.site.alpha.handler :as h])
+  (:import
+   (crux.api ICruxAPI)
+   (java.io ByteArrayInputStream)))
 
+(alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
@@ -21,32 +25,185 @@
     (binding [*crux-node* node]
       (f))))
 
-(defn with-site-data [f]
+(defn submit-and-await! [transactions]
   (->>
-   (x/submit-tx
-    *crux-node*
-    [[:crux.tx/put {:crux.db/id "https://example.com/index.html"
-                    ::http/content-type "text/html;charset=utf-8"
-                    ::http/etag "\"123\""}]])
-   (x/await-tx *crux-node*))
-  (f))
+   (x/submit-tx *crux-node* transactions)
+   (x/await-tx *crux-node*)))
+
+(defn make-handler [opts]
+  (-> h/inner-handler
+      (h/wrap-initialize-state opts)))
 
 (defn with-handler [f]
-  (binding [*handler* (h/make-handler *crux-node* {})]
+  (binding [*handler* (make-handler
+                       {::site/crux-node *crux-node*
+                        ::site/base-uri "https://example.org"
+                        ::site/uri-prefix "https://example.org"})]
     (f)))
 
 (defn with-db [f]
   (binding [*db* (x/db *crux-node*)]
     (f)))
 
-(t/use-fixtures :once with-crux with-site-data with-handler)
+(t/use-fixtures :once with-crux with-handler)
 
-(deftest fixture-test
-  (is (= 4 (+ 2 2)))
+(def access-all-areas
+  {:crux.db/id "https://example.org/access-rule"
+   ::site/description "A rule allowing access everything"
+   ::site/type "Rule"
+   ::pass/target '[[resource ::site/resource-provider :juxt.apex.alpha.openapi/openapi-path]]
+   ::pass/effect ::pass/allow})
 
-  (is (= :dummy (*handler* {:ring.request/method :get
-                           :ring.request/path "/index.html"})))
-  )
+(deftest put-test
+  (submit-and-await!
+   [[:crux.tx/put access-all-areas]
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
+      ::site/type "OpenAPI"
+      :juxt.apex.alpha/openapi
+      {"servers" [{"url" ""}]
+       "paths"
+       {"/things/foo"
+        {"put"
+         {"requestBody"
+          {"content"
+           {"application/json"
+            {"schema"
+             {"juxt.jinx.alpha/keyword-mappings"
+              {"name" "a/name"}
+              "properties"
+              {"name" {"type" "string"
+                       "minLength" 2}}}}}}}}}}}]])
+  (let [body (json/write-value-as-string {"name" "foo"})
+        _ (*handler*
+           {:ring.request/method :put
+            :ring.request/path "/things/foo"
+            :ring.request/body (ByteArrayInputStream. (.getBytes body))
+            :ring.request/headers
+            {"content-length" (str (count body))
+             "content-type" "application/json"}})
+        db (x/db *crux-node*)]
+
+    (is (= {:a/name "foo", :crux.db/id "https://example.org/things/foo"}
+           (x/entity db "https://example.org/things/foo")))))
+
+;; Evoke "Throwing Multiple API paths match"
+
+(deftest two-path-parameter-path-preferred-test
+  (submit-and-await!
+   [[:crux.tx/put access-all-areas]
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
+      ::site/type "OpenAPI"
+      :juxt.apex.alpha/openapi
+      {"servers" [{"url" ""}]
+       "paths"
+       {"/things/{a}"
+        {"parameters"
+         [{"name" "a" "in" "path" "required" "true"
+           "schema" {"type" "string" "pattern" "\\p{Alnum}+"}}]
+         "put"
+         {"operationId" "putA"
+          "requestBody"
+          {"content"
+           {"application/json"
+            {"schema"
+             {"properties"
+              {"name" {"type" "string" "minLength" 1}}}}}}}}
+
+        "/things/{a}/{b}"
+        {"parameters"
+         [{"name" "a" "in" "path" "required" "true"
+           "schema" {"type" "string" "pattern" "\\p{Alnum}+"}}
+          {"name" "b" "in" "path" "required" "true"
+           "schema" {"type" "string" "pattern" "\\p{Alnum}+"}}]
+         "put"
+         {"operationId" "putAB"
+          "requestBody"
+          {"content"
+           {"application/json"
+            {"schema"
+             {"properties"
+              {"name" {"type" "string" "minLength" 1}}}}}}}}}}}]])
+  (let [body (json/write-value-as-string {"name" "foo"})
+        r (*handler*
+           {:ring.request/method :put
+            ;; Matches both {a} and {b}
+            :ring.request/path "/things/foo/bar"
+            :ring.request/body (ByteArrayInputStream. (.getBytes body))
+            :ring.request/headers
+            {"content-length" (str (count body))
+             "content-type" "application/json"}})
+        db (x/db *crux-node*)]
+    (is (= "putAB"
+           (get-in r [::site/resource ::site/request-locals ::apex/operation "operationId"])))))
+
+
+((t/join-fixtures [with-crux with-handler])
+ (fn []
+   (submit-and-await!
+    [[:crux.tx/put access-all-areas]
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
+       ::site/type "OpenAPI"
+       :juxt.apex.alpha/openapi
+       {"servers" [{"url" ""}]
+        "paths"
+        {"/things/{a}"
+         {"parameters"
+          [{"name" "a" "in" "path" "required" "true"
+            "schema" {"type" "string" "pattern" "\\p{Alnum}+"}}]
+          "put"
+          {"operationId" "putA"
+           "requestBody"
+           {"content"
+            {"application/json"
+             {"schema"
+              {"properties"
+               {"name" {"type" "string" "minLength" 1}}}}}}}}
+
+         "/things/{a}/{b}"
+         {"parameters"
+          [{"name" "a" "in" "path" "required" "true"
+            "schema" {"type" "string" "pattern" "\\p{Alnum}+"}}
+           {"name" "b" "in" "path" "required" "true"
+            "schema" {"type" "string" "pattern" "\\p{Alnum}+"}}]
+          "put"
+          {"operationId" "putAB"
+           "requestBody"
+           {"content"
+            {"application/json"
+             {"schema"
+              {"properties"
+               {"name" {"type" "string" "minLength" 1}}}}}}}}}}}]])
+
+   (let [body (json/write-value-as-string {"name" "foo"})
+         r (*handler*
+            {:ring.request/method :put
+             ;; Matches both {a} and {b}
+             :ring.request/path "/things/foo/bar"
+             :ring.request/body (ByteArrayInputStream. (.getBytes body))
+             :ring.request/headers
+             {"content-length" (str (count body))
+              "content-type" "application/json"}})
+         db (x/db *crux-node*)]
+     r
+     )))
+
+
+
+
+;; First we need to 'fix' this error, and have a strategy for choosing the right
+;; path.
+
+;; Apparently path-level parameters are not yet supported - let's fix that
+;; first. Update: they ARE detected and parsed at the resource-locator stage,
+;; and put into :juxt.apex.alpha/openid-path-params. But what about later
+;; stages?
+
+;; Do some testing against various parameter forms, including url encoded
+;; strings (which should arguably be url decoded before being parsed/validated).
+
 
 #_(deftest get-with-if-none-match-test
     (let [{status1 :status
