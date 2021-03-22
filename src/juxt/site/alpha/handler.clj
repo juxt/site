@@ -861,6 +861,7 @@
   (let [respond
         (fn [{::site/keys [selected-representation body] :as response}]
 
+          (assert (:ring.request/method req))
           (log/infof "%-7s %s %s %d"
                      (str/upper-case (name (:ring.request/method req)))
                      (:ring.request/path req)
