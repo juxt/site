@@ -219,11 +219,12 @@
             {::site/resource-provider ::openapi-path
 
              ::site/request-locals
-             {::apex/openapi openapi  ; This is useful, because it is the base
-                                        ; document for any relative json pointers.
-              ::apex/operation operation-object
-              ::apex/openapi-path path
-              ::apex/openapi-path-params path-params}
+             {::apex/openapi openapi ; This is useful, because it is the base
+                                     ; document for any relative json pointers.
+              ::apex/operation operation-object}
+
+             ::apex/openapi-path path
+             ::apex/openapi-path-params path-params
 
              ::http/methods methods
 
@@ -282,7 +283,7 @@
   OpenAPI paths."
   [matches]
   (->> matches
-       (group-by #(count (get-in % [::site/request-locals ::apex/openapi-path-params])))
+       (group-by #(count (get-in % [::apex/openapi-path-params])))
        (sort-by first >) ; reverse sort
        first ; winner
        second ; value
