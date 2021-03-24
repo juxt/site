@@ -852,7 +852,11 @@
 
 ;; TODO: Split into logback logger, Crux logger and response finisher. This will
 ;; make it easier to disable one or both logging strategies.
+;; TODO: Add the inner-handler as a normal first argument such that this can be
+;; normal Ring middleware.
 (defn outer-handler
+  "Return a handler that constructs proper Ring responses, logs and error
+  handling where appropriate."
   [{::site/keys [crux-node db request-id start-date base-uri]
     :ring.request/keys [method]
     :as req}]
