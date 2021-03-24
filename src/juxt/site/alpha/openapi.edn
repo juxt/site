@@ -1,6 +1,6 @@
 ;; This source file is in EDN only for editing purposes. It should be
-;; transformed to JSON or YAML as soon as it is uploaded or otherwise put into
-;; Crux.
+;; transformed to JSON or YAML as soon as it is installed. It should be stored
+;; in a classpath accessible location, to reduce deployment constraints.
 {:openapi "3.0.2"
 
  :info
