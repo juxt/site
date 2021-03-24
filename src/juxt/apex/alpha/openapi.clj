@@ -152,7 +152,6 @@
                ::http/last-modified last-modified)
         (update :ring.response/headers assoc "location" uri))))
 
-
 (defn path-entry->resource
   "From an OpenAPI path-to-path-object entry, return the corresponding resource
   if it matches the path"
@@ -171,9 +170,21 @@
         pattern
         (str/replace
          path
-         #"\{(\p{Alpha}+)\}"
-         (fn [[_ group]]
-           (format "(?<%s>[\\p{Alnum}-_]+)" group)))
+         #"\{(\p{Alpha}+)\}" ; e.g. {id}
+         (fn replacer [[_ group]]
+           ;; Instead of using the regex of path parameter's schema, we use a
+           ;; very weak regex (\\p{Print}+). We are just locating the resource
+           ;; at this stage, if the regex were too strong and we reject the path
+           ;; then locate-resource would yield nil, and we might consequently
+           ;; end up creating a static resource (or whatever other resource
+           ;; locators are tried after this one). That might surprise the user
+           ;; so instead (prinicple of least surprise) we are more liberal in
+           ;; what we accept at this stage and leave validation against the path
+           ;; parameter to later (potentially yielding a 400). One trade-off is
+           ;; that it isn't possible to add multiple paths that differ only in
+           ;; schema - e.g. have one path selected on /foo/100 and another
+           ;; selected on /foo/bar.
+           (format "(?<%s>[\\p{Print}-_]+)" group)))
 
         ;; We have to terminate with a 'end of line' otherwise we
         ;; match too eagerly. So if we had /users and /users/{id},
@@ -207,14 +218,12 @@
             resource
             {::site/resource-provider ::openapi-path
 
-             ;; This is useful, because it is the base document for any
-             ;; relative json pointers.
-
              ::site/request-locals
-             {::apex/openapi openapi
+             {::apex/openapi openapi  ; This is useful, because it is the base
+                                        ; document for any relative json pointers.
               ::apex/operation operation-object
-              ::apex/openid-path path
-              ::apex/openid-path-params path-params}
+              ::apex/openapi-path path
+              ::apex/openapi-path-params path-params}
 
              ::http/methods methods
 
@@ -247,7 +256,7 @@
           post-fn (assoc-in
                    ;; Use ::site/request-locals to avoid database involvement
                    [::site/request-locals ::site/post-fn]
-                   (fn [req]
+                   (fn post-fn [req]
                      (log/debug "Calling post-fn" post-fn)
                      (let [f (requiring-resolve post-fn)]
                        (f (assoc-in
@@ -256,7 +265,7 @@
 
           (= method :put)
           (assoc-in [::site/request-locals ::site/put-fn]
-                    (fn [req]
+                    (fn put-fn [req]
                       (let [rep (::site/received-representation req)
                             {:juxt.reap.alpha.rfc7231/keys [type subtype parameter-map]}
                             (reap.decoders/content-type (::http/content-type rep))]
@@ -267,7 +276,18 @@
                              (.equalsIgnoreCase "json" subtype))
                             (put-json-representation req))))))))))
 
-;; TODO: Restrict where openapis can be PUT
+(defn max-path-params-count
+  "In the case of multiple matches, return a subsequence of matches that contain
+  the most path parameters. This can be used to select from multiple matching
+  OpenAPI paths."
+  [matches]
+  (->> matches
+       (group-by #(count (get-in % [::site/request-locals ::apex/openapi-path-params])))
+       (sort-by first >) ; reverse sort
+       first ; winner
+       second ; value
+       ))
+
 (defn locate-resource
   [db uri
    ;; We'd like to locate the resource based on nothing but the URI of the
@@ -282,6 +302,9 @@
   ;; Do we have any OpenAPIs in the database?
   (or
    ;; The OpenAPI document
+
+   ;; TODO: In future, we should relax the locations where APIs can live to make
+   ;; it easier to develop APIs with WebDav.
    (when (re-matches (re-pattern (format "%s/_site/apis/\\w+/openapi.json" base-uri)) uri)
      (or
       ;; It might exist
@@ -318,7 +341,17 @@
      (case (count matches)
        0 nil
        1 (first matches)
-       (throw (ex-info "Multiple API matches" {::site/matches matches}))))))
+
+       ;; Select one of the matches, and throw an error if this proves
+       ;; impossible.
+       (let [winners (max-path-params-count matches)]
+         (if (= 1 (count winners))
+           (first winners)
+           ;; TODO: In future, this 'selection algorithm' could be more
+           ;; sophisticated and make use of path-parameter schemas in order to
+           ;; distinguish between /foo/100 and /foo/bar.
+           (throw (ex-info "Throwing Multiple API paths match"
+                           (into req {::multiple-possible-resources matches})))))))))
 
 (defn ->query [input params]
 
