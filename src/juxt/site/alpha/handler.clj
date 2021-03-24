@@ -24,7 +24,8 @@
    [juxt.reap.alpha.rfc7232 :as rfc7232]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.locator :as locator]
-   [juxt.site.alpha.util :as util]))
+   [juxt.site.alpha.util :as util])
+  (:import (java.net URI URLDecoder)))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -963,7 +964,12 @@
                                     (name (:ring.request/scheme req)))
                                 "://" host)))
 
-          uri (str uri-prefix (:ring.request/path req))
+          uri (str uri-prefix (URLDecoder/decode (:ring.request/path req)))
+
+          ;; Normalize (remove dot-segments from the path). Note: there's a lot
+          ;; more to normalization that removing dot-segments. See Section 6.1
+          ;; of RFC 3986. (TODO)
+          uri (.toString (.normalize (URI. uri)))
 
           req (into req {::site/start-date (java.util.Date.)
                          ::site/request-id req-id
