@@ -32,7 +32,7 @@
 
 (defn make-handler [opts]
   (-> h/inner-handler
-      (h/wrap-initialize-state opts)))
+      (h/wrap-initialize-request opts)))
 
 (defn with-handler [f]
   (binding [*handler* (make-handler
@@ -139,6 +139,8 @@
            (get-in r [::site/resource ::site/request-locals ::apex/operation "operationId"])))))
 
 
+;; Continue with trying to post a project code of ABC/DEF (with Swagger) and ensure the / is
+;; preserved.
 ((t/join-fixtures [with-crux with-handler])
  (fn []
    (submit-and-await!

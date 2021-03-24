@@ -951,29 +951,59 @@
        (subs (util/hexdigest
               (.getBytes (str (java.util.UUID/randomUUID)) "US-ASCII")) 0 24)))
 
-(defn wrap-initialize-state [h {::site/keys [crux-node base-uri uri-prefix]}]
+(defn normalize-path
+  "Normalize path prior to constructing URL used for resource lookup. This is to
+  avoid two equivalent URLs pointing to two different Crux entities."
+  [path]
+  (cond
+    (str/blank? path) "/"
+    :else (-> path
+              ;; Normalize (remove dot-segments from the path, see Section 6.2.2.3 of
+              ;; RFC 3986)
+              ((fn [path] (.toString (.normalize (URI. path)))))
+              ;; TODO: Upcase any percent encodings: e.g. %2f -> %2F (as per Sections
+              ;; 2.1 and 6.2.2.1 of RFC 3986)
+
+              ;; TODO: Replace each space with '+'
+
+              ;; TODO: Decode any non-reserved (:/?#[]@!$&'()*+,;=) percent-encoded
+              ;; octets (see Section 6.2.2.2 of RFC 3986)
+              )))
+
+(defn http-scheme-normalize
+  "Return a scheme-based normalized host, as per Section 6.2.3 of RFC 3986."
+  [s scheme]
+  (case scheme
+    :http (if-let [[_ x] (re-matches #"(.*):80" s)] x s)
+    :https (if-let [[_ x] (re-matches #"(.*):443" s)] x s)))
+
+(defn wrap-initialize-request
+  "Initialize request context."
+  [h {::site/keys [crux-node base-uri uri-prefix]
+      }]
   (assert crux-node)
   (assert base-uri)
-  (fn [req]
+  (fn [{:ring.request/keys [scheme] :as req}]
     (let [db (x/db crux-node)
           req-id (new-request-id base-uri)
-          uri-prefix (or uri-prefix
-                         (let [{::rfc7230/keys [host]}
-                               (host-header-parser
-                                (re/input
-                                 (or
-                                  (get-in req [:ring.request/headers "x-forwarded-host"])
-                                  (get-in req [:ring.request/headers "host"]))))]
-                           (str (or (get-in req [:ring.request/headers "x-forwarded-proto"])
-                                    (name (:ring.request/scheme req)))
-                                "://" host)))
+          scheme+authority
+          (or uri-prefix
+              (->
+               (let [{::rfc7230/keys [host]}
+                     (host-header-parser
+                      (re/input
+                       (or
+                        (get-in req [:ring.request/headers "x-forwarded-host"])
+                        (get-in req [:ring.request/headers "host"]))))]
+                 (str (or (get-in req [:ring.request/headers "x-forwarded-proto"])
+                          (name scheme))
+                      "://" host))
+               (str/lower-case)         ; See Section 6.2.2.1 of RFC 3986
+               (http-scheme-normalize scheme)))
 
-          uri (str uri-prefix (URLDecoder/decode (:ring.request/path req)))
-
-          ;; Normalize (remove dot-segments from the path). Note: there's a lot
-          ;; more to normalization that removing dot-segments. See Section 6.1
-          ;; of RFC 3986. (TODO)
-          uri (.toString (.normalize (URI. uri)))
+          ;; The scheme+authority is already normalized (by transforming to
+          ;; lower-case). The path, however, needs to be normalized here.
+          uri (str scheme+authority (normalize-path (:ring.request/path req)))
 
           req (into req {::site/start-date (java.util.Date.)
                          ::site/request-id req-id
@@ -1029,6 +1059,6 @@
 
 (defn make-handler [opts]
   (-> #'outer-handler
-      (wrap-initialize-state opts)
+      (wrap-initialize-request opts)
       (wrap-ring-1-adapter)
       (wrap-healthcheck)))
