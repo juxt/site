@@ -3,6 +3,7 @@
 (ns juxt.site.handler-test
   (:require
    [clojure.test :refer [deftest is are testing] :as t]
+   [clojure.tools.logging :as log]
    [crux.api :as x]
    [jsonista.core :as json]
    [juxt.site.alpha.handler :as h])
@@ -143,6 +144,7 @@
 ;; preserved.
 ((t/join-fixtures [with-crux with-handler])
  (fn []
+   (log/trace "")
    (submit-and-await!
     [[:crux.tx/put access-all-areas]
      [:crux.tx/put
@@ -164,12 +166,13 @@
               {"properties"
                {"name" {"type" "string" "minLength" 1}}}}}}}}
 
-         "/things/{a}/{b}"
+         "/things/{a}/{n}"
          {"parameters"
           [{"name" "a" "in" "path" "required" "true"
-            "schema" {"type" "string" "pattern" "\\p{Alnum}+"}}
-           {"name" "b" "in" "path" "required" "true"
-            "schema" {"type" "string" "pattern" "\\p{Alnum}+"}}]
+            "schema" {"type" "string" "pattern" "\\p{Alpha}+"}
+            "x-juxt-site-inject-property" "juxt/a"}
+           {"name" "n" "in" "path" "required" "true"
+            "schema" {"type" "string"}}]
           "put"
           {"operationId" "putAB"
            "requestBody"
@@ -179,17 +182,19 @@
               {"properties"
                {"name" {"type" "string" "minLength" 1}}}}}}}}}}}]])
 
-   (let [body (json/write-value-as-string {"name" "foo"})
+   (let [path "/things/abc/123"
+         body (json/write-value-as-string {"name" "foo"})
          r (*handler*
             {:ring.request/method :put
              ;; Matches both {a} and {b}
-             :ring.request/path "/things/foo/bar"
+             :ring.request/path path
              :ring.request/body (ByteArrayInputStream. (.getBytes body))
              :ring.request/headers
              {"content-length" (str (count body))
               "content-type" "application/json"}})
          db (x/db *crux-node*)]
      r
+     (x/entity db (str "https://example.org" path))
      )))
 
 

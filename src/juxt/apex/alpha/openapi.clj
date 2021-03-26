@@ -2,16 +2,11 @@
 
 (ns juxt.apex.alpha.openapi
   (:require
-   [clojure.java.io :as io]
-   [clojure.pprint :refer [pprint]]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [clojure.walk :refer [postwalk]]
    [crux.api :as x]
-   [hiccup.page :as hp]
-   [json-html.core :refer [edn->html]]
    [jsonista.core :as json]
-   [juxt.apex.alpha.parameters :refer [extract-params-from-request]]
+   [juxt.apex.alpha.representation-generation :refer [entity-bytes-generator]]
    [juxt.jinx.alpha :as jinx]
    [juxt.jinx.alpha.api :as jinx.api]
    [juxt.jinx.alpha.vocabularies.keyword-mapping :refer [process-keyword-mappings]]
@@ -19,7 +14,8 @@
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha.perf :refer [fast-get-in]]
-   [juxt.site.alpha.util :as util]))
+   [juxt.site.alpha.util :as util])
+  (:import (java.net URLDecoder)))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -27,8 +23,7 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 
 (defn put-openapi
-  [{::site/keys [db crux-node uri resource
-                 received-representation start-date] :as req}]
+  [{::site/keys [crux-node uri resource received-representation start-date] :as req}]
 
   (let [body (json/read-value
               (java.io.ByteArrayInputStream.
@@ -102,6 +97,18 @@
 
   (let [instance (received-body->json req)
 
+        path-params (get-in req [::site/resource ::site/request-locals ::apex/openapi-path-params])
+
+        ;; Inject path parameter values into body, this is a feature, enabled by
+        ;; the x-juxt-site-inject-property OpenAPI extension keyword.
+        instance (reduce-kv
+                  (fn [acc _ v]
+                    (let [inject-property (get v :inject-property)]
+                      (cond-> acc
+                        inject-property
+                        (assoc (keyword inject-property) (:value v)))))
+                  instance path-params)
+
         authorization
         (pdp/authorization
          db
@@ -152,39 +159,53 @@
                ::http/last-modified last-modified)
         (update :ring.response/headers assoc "location" uri))))
 
+(defn- path-parameter-defs->map [path-param-defs]
+  (reduce
+   (fn [acc p]
+     (let [location (get p "in")]
+       (if (= location "path")
+         (if (contains? acc location)
+           ;; "The list MUST NOT include duplicated parameters" (OpenAPI 3.0.2)
+           ;; TODO: Throw a proper 500 with the request context
+           (throw (ex-info "OpenAPI error, the list of parameters cannot contain duplicates" {}))
+           (assoc acc (get p "name") p))
+         acc)))
+   {}
+   path-param-defs))
+
 (defn path-entry->resource
-  "From an OpenAPI path-to-path-object entry, return the corresponding resource
-  if it matches the path"
+  "From an OpenAPI path-to-path-object entry, return the corresponding resource if
+  it matches the path. Path matching also considers path-parameters."
   [{:ring.request/keys [method]}
    [path path-item-object] openapi rel-request-path]
 
-  (let [path-params
-        (->>
-         (or
-          ;; TODO: We could mandate path parameters at the
-          ;; path-object level, not the path-item-object
-          (get-in path-item-object [(name method) "parameters"])
+  (let [path-param-defs
+        (merge
+         ;; Path level
+         (path-parameter-defs->map
           (get-in path-item-object ["parameters"]))
-         (filter #(= (get % "in") "path")))
+         ;; Operation level. From OpenAPI Spec 3.0.2: "These parameters can be
+         ;; overridden at the operation level, but cannot be removed there."
+         (path-parameter-defs->map
+          (get-in path-item-object [(name method) "parameters"])))
 
         pattern
         (str/replace
          path
-         #"\{(\p{Alpha}+)\}" ; e.g. {id}
+         #"\{([^\}]+)\}"                ; e.g. {id}
          (fn replacer [[_ group]]
            ;; Instead of using the regex of path parameter's schema, we use a
-           ;; very weak regex (\\p{Print}+). We are just locating the resource
-           ;; at this stage, if the regex were too strong and we reject the path
-           ;; then locate-resource would yield nil, and we might consequently
-           ;; end up creating a static resource (or whatever other resource
-           ;; locators are tried after this one). That might surprise the user
-           ;; so instead (prinicple of least surprise) we are more liberal in
-           ;; what we accept at this stage and leave validation against the path
-           ;; parameter to later (potentially yielding a 400). One trade-off is
-           ;; that it isn't possible to add multiple paths that differ only in
-           ;; schema - e.g. have one path selected on /foo/100 and another
-           ;; selected on /foo/bar.
-           (format "(?<%s>[\\p{Print}-_]+)" group)))
+           ;; weak regex that includes anything except forward slashes, question
+           ;; marks, or hashes (as described in the Path Templating section of
+           ;; the OpenAPI Specification (version 3.0.2). We are just locating
+           ;; the resource in this step, if the regex were too strong and we
+           ;; reject the path then locate-resource would yield nil, and we might
+           ;; consequently end up creating a static resource (or whatever other
+           ;; resource locators are tried after this one). That might surprise
+           ;; the user so instead (prinicple of least surprise) we are more
+           ;; liberal in what we accept at this stage and leave validation
+           ;; against the path parameter to later (potentially yielding a 400).
+           (format "(?<%s>[^/#\\?]+)" group)))
 
         ;; We have to terminate with a 'end of line' otherwise we
         ;; match too eagerly. So if we had /users and /users/{id},
@@ -198,10 +219,30 @@
       (let [path-params
             (into
              {}
-             (for [param path-params
-                   :let [param-name (get param "name")]]
-               [param-name (.group matcher param-name)]))
+             (for [[param-name param-def] path-param-defs
+                   :let [schema (get param-def "schema")
+                         param-value
+                         (-> (.group matcher param-name)
+                             ;; This is the point we decode any encoded
+                             ;; forward-slashes, question-marks or hashes (or
+                             ;; indeed any other encoded 'reserved' character --
+                             ;; see RFC 3986). Such characters will have had to
+                             ;; have been percent-encoded to have been
+                             ;; 'tunnelled' through to this point.
+                             URLDecoder/decode)
+                         validation
+                         (jinx.api/validate schema param-value)
+                         inject-property
+                         (get param-def "x-juxt-site-inject-property")]]
+
+               [param-name (cond-> {:value param-value ::jinx/valid? (::jinx/valid? validation)}
+                             (not (::jinx/valid? validation))
+                             (assoc :validation validation)
+                             inject-property
+                             (assoc :inject-property inject-property))]))
+
             operation-object (get path-item-object (name method))
+
             acceptable (str/join ", " (map first (get-in operation-object ["requestBody" "content"])))
 
             methods (set
@@ -219,12 +260,13 @@
             {::site/resource-provider ::openapi-path
 
              ::site/request-locals
-             {::apex/openapi openapi ; This is useful, because it is the base
-                                     ; document for any relative json pointers.
-              ::apex/operation operation-object}
+             {::apex/openapi openapi  ; This is useful, because it is the base
+                                        ; document for any relative json pointers.
+              ::apex/operation operation-object
+              ::apex/openapi-path-params path-params
+              }
 
              ::apex/openapi-path path
-             ::apex/openapi-path-params path-params
 
              ::http/methods methods
 
@@ -277,13 +319,13 @@
                              (.equalsIgnoreCase "json" subtype))
                             (put-json-representation req))))))))))
 
-(defn max-path-params-count
+#_(defn max-path-params-count
   "In the case of multiple matches, return a subsequence of matches that contain
   the most path parameters. This can be used to select from multiple matching
   OpenAPI paths."
   [matches]
   (->> matches
-       (group-by #(count (get-in % [::apex/openapi-path-params])))
+       (group-by #(count (get-in % [::site/request-locals ::apex/openapi-path-params])))
        (sort-by first >) ; reverse sort
        first ; winner
        second ; value
@@ -339,183 +381,36 @@
                :when resource]
            resource)]
 
-     (case (count matches)
-       0 nil
-       1 (first matches)
+     (when (pos? (count matches))
+       ;; This was the last chance we could return to allow another resource
+       ;; locator a turn. Now we're committed to either one of the resources or
+       ;; throwing a 400 to report a kind of 'near-miss' with getting the URI
+       ;; right.
 
-       ;; Select one of the matches, and throw an error if this proves
-       ;; impossible.
-       (let [winners (max-path-params-count matches)]
-         (if (= 1 (count winners))
-           (first winners)
-           ;; TODO: In future, this 'selection algorithm' could be more
-           ;; sophisticated and make use of path-parameter schemas in order to
-           ;; distinguish between /foo/100 and /foo/bar.
-           (throw (ex-info "Throwing Multiple API paths match"
-                           (into req {::multiple-possible-resources matches})))))))))
+       (if (= (count matches) 1)        ; this is the most common case
+         (let [resource (first matches)]
+           (if (every? ::jinx/valid? (vals (get-in resource [::site/request-locals ::apex/openapi-path-params])))
+             resource
+             (throw
+              (ex-info
+               "One or more of the path-parameters in the request did not validate against the required schema"
+               (into req {::site/resource resource
+                          :ring.response/status 400
+                          :ring.response/body "Bad Request\r\n"})))))
 
-(defn ->query [input params]
-
-  ;; Replace input with values from params
-  (let [input
-        (postwalk
-         (fn [x]
-           (if (and (map? x)
-                    (contains? x "name")
-                    (= (get x "in") "query"))
-             (get-in params [:query (get x "name") :value]
-                     (get-in params [:query (get x "name") :param "default"]))
-             x))
-         input)]
-
-    ;; Perform manipulations required for each key
-    (reduce
-     (fn [acc [k v]]
-       (assoc acc (keyword k)
-              (case (keyword k)
-                :find (mapv symbol v)
-                :where (mapv
-                        ;; We're using some inline recursion to keep things lean-ish here
-                        ;; based on the assumption we can bump our stack _a little_ higher
-                        ;; and that our clauses will remain fairly simple
-                        (fn translate-clause [clause]
-                          (cond
-                            (and (vector? clause) (every? (comp not coll?) clause))
-                            (mapv (fn [item txf] (txf item)) clause [symbol keyword symbol])
-
-                            (and (vector? clause) (vector? (second clause)))
-                            (cons (symbol (first clause))
-                                  (map translate-clause (rest clause)))
-
-                            (and (vector? clause) (vector? (first clause)))
-                            [(seq (map symbol (first clause)))]))
-                        v)
-
-                :limit v
-                :in (mapv symbol v)
-                :args (mapv clojure.walk/keywordize-keys v)
-                )))
-     {} input)))
-
-;; By default we output the resource state, but there may be a better rendering
-;; of collections, which can be inferred from the schema being an array and use
-;; the items subschema.
-(defn entity-bytes-generator [{::site/keys [uri resource selected-representation db]
-                               ::pass/keys [authorization subject] :as req}]
-
-  (let [param-defs
-        (get-in resource [::site/request-locals ::apex/operation "parameters"])
-
-        in '[now subject]
-
-        query
-        (get-in resource [::site/request-locals ::apex/operation "responses" "200" "crux/query"])
-
-        crux-query
-        (when query (->query query (extract-params-from-request req param-defs)))
-
-        authorized-query (when crux-query
-                           ;; This is just temporary, in future, fail if no
-                           ;; authorization. We just need to make sure there's
-                           ;; an authorization for the subject.
-                           (if authorization
-                             (pdp/->authorized-query crux-query authorization)
-                             crux-query))
-
-        authorized-query (when authorized-query
-                           (assoc authorized-query :in in))
-
-        resource-state
-        (if authorized-query
-          (for [[e] (x/q db authorized-query
-                         ;; time now
-                         (java.util.Date.)
-                         ;; subject
-                         subject)]
-            (x/entity db e))
-          (x/entity db uri))]
-
-    ;; TODO: Might want to filter out the http metadata at some point
-    (case (::http/content-type selected-representation)
-      "application/json"
-      ;; TODO: Might want to filter out the http metadata at some point
-      (-> resource-state
-          (json/write-value-as-string (json/object-mapper {:pretty true}))
-          (str "\r\n")
-          (.getBytes "UTF-8"))
-
-      "text/html;charset=utf-8"
-      (let [config (get-in resource [::site/request-locals ::apex/operation "responses"
-                                     "200" "content"
-                                     (::http/content-type selected-representation)])]
-        (->
-         (hp/html5
-          [:h1 (get config "title" "No title")]
-
-          ;; Get :path-params = {"id" "owners"}
-
-          (cond
-            (= (get config "type") "edn-table")
-            (list
-             [:style
-              (slurp (io/resource "json.human.css"))]
-             (edn->html resource-state))
-
-            (= (get config "type") "table")
-            (if (seq resource-state)
-              (let [fields (distinct (concat [:crux.db/id]
-                                             (keys (first resource-state))))]
-                [:table {:style "border: 1px solid #888; border-collapse: collapse;"}
-                 [:thead
-                  [:tr
-                   (for [field fields]
-                     [:th {:style "border: 1px solid #888; padding: 4pt; text-align: left"}
-                      (pr-str field)])]]
-                 [:tbody
-                  (for [row resource-state]
-                    [:tr
-                     (for [field fields
-                           :let [val (get row field)]]
-                       [:td {:style "border: 1px solid #888; padding: 4pt; text-align: left"}
-                        (cond
-                          (uri? val)
-                          [:a {:href val} val]
-                          :else
-                          (pr-str (get row field)))])])]])
-              [:p "No results"])
-
-            :else
-            (let [fields (distinct (concat [:crux.db/id] (keys resource-state)))]
-              [:dl
-               (for [field fields
-                     :let [val (get resource-state field)]]
-                 (list
-                  [:dt
-                   (pr-str field)]
-                  [:dd
-                   (cond
-                     (uri? val)
-                     [:a {:href val} val]
-                     :else
-                     (pr-str (get resource-state field)))]))]))
-
-          [:h2 "Debug"]
-          [:h3 "Resource"]
-          [:pre (with-out-str (pprint resource))]
-          (when query
-            (list
-             [:h3 "Query"]
-             [:pre (with-out-str (pprint query))]))
-          (when crux-query
-            (list
-             [:h3 "Crux Query"]
-             [:pre (with-out-str (pprint (->query query (extract-params-from-request req param-defs))))]))
-
-          (when (seq param-defs)
-            (list
-             [:h3 "Parameters"]
-             [:pre (with-out-str (pprint (extract-params-from-request req param-defs)))]))
-
-          [:h3 "Resource state"]
-          [:pre (with-out-str (pprint resource-state))])
-         (.getBytes "UTF-8"))))))
+         ;; Select one of the matches, and throw an error if this proves
+         ;; impossible.
+         (let [resources
+               (filter
+                #(every? ::jinx/valid?
+                         (vals (get-in % [::site/request-locals
+                                          ::apex/openapi-path-params])))
+                matches)]
+           (if (= (count resources) 1)
+             (first resources)
+             ;; TODO: There is the information in each path-param's validation
+             ;; to construct a much more helpful error message.
+             (throw
+              (ex-info
+               "Throwing Multiple API paths match"
+               (into req {::multiple-matched-resources (map #(dissoc % ::site/request-locals) resources)}))))))))))
