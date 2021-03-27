@@ -2,7 +2,6 @@
 
 (ns juxt.site.alpha.handler
   (:require
-   [clojure.java.io :as io]
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
@@ -24,8 +23,7 @@
    [juxt.reap.alpha.rfc7232 :as rfc7232]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.locator :as locator]
-   [juxt.site.alpha.util :as util])
-  (:import (java.net URI URLDecoder)))
+   [juxt.site.alpha.util :as util]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
