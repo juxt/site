@@ -140,65 +140,179 @@
            (get-in r [::site/resource ::site/request-locals ::apex/operation "operationId"])))))
 
 
-;; Continue with trying to post a project code of ABC/DEF (with Swagger) and ensure the / is
-;; preserved.
+(deftest inject-path-parameter-with-forward-slash-test
+  ;; PUT a project code of ABC/DEF (with Swagger) and ensure the / is
+  ;; preserved. This test tests an edge case where we want a path parameter to contain a /.
+  ((t/join-fixtures [with-crux with-handler])
+   (fn []
+     (log/trace "")
+     (submit-and-await!
+      [[:crux.tx/put access-all-areas]
+       [:crux.tx/put
+        {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
+         ::site/type "OpenAPI"
+         :juxt.apex.alpha/openapi
+         {"servers" [{"url" ""}]
+          "paths"
+          {"/things/{a}"
+           {"parameters"
+            [{"name" "a" "in" "path" "required" "true"
+              "schema" {"type" "string" "pattern" "\\p{Alnum}+"}
+              "x-juxt-site-inject-property" "juxt/code"}]
+            "put"
+            {"operationId" "putA"
+             "requestBody"
+             {"content"
+              {"application/json"
+               {"schema"
+                {"properties"
+                 {"name" {"type" "string" "minLength" 1}}}}}}}}
+
+           "/things/{a}/{n}"
+           {"parameters"
+            [{"name" "a" "in" "path" "required" "true"
+              "schema" {"type" "string" "pattern" "\\p{Alpha}+"}}
+             {"name" "n" "in" "path" "required" "true"
+              "schema" {"type" "string"}}]
+            "put"
+            {"operationId" "putAB"
+             "requestBody"
+             {"content"
+              {"application/json"
+               {"schema"
+                {"properties"
+                 {"name" {"type" "string" "minLength" 1}}}}}}}}}}}]])
+
+     (let [path (str"/things/" (java.net.URLEncoder/encode "ABC/DEF"))
+           body (json/write-value-as-string {"name" "zip"})
+           r (*handler*
+              {:ring.request/method :put
+               :ring.request/path path
+               :ring.request/body (ByteArrayInputStream. (.getBytes body))
+               :ring.request/headers
+               {"content-length" (str (count body))
+                "content-type" "application/json"}})
+           db (x/db *crux-node*)]
+       (is (= "/things/{a}" (get-in r [::site/resource :juxt.apex.alpha/openapi-path])))
+       (is (= {:name "zip",
+               :juxt/code "ABC/DEF",
+               :crux.db/id "https://example.org/things/ABC%2FDEF"}
+              (x/entity db (str "https://example.org" path))))))))
+
+;; Turn into a test, this demonstrates path parameter injection
 ((t/join-fixtures [with-crux with-handler])
  (fn []
    (log/trace "")
    (submit-and-await!
     [[:crux.tx/put access-all-areas]
+     [:crux.tx/put {:crux.db/id "https://example.org/users/sue"
+                    ::site/type "User"
+                    ::site/description "Sue should receive an email on every alert"
+                    ::email "sue@example.org"
+                    ::email? true}]
+     [:crux.tx/put {:crux.db/id "https://example.org/users/brian"
+                    ::site/type "User"
+                    ::site/description "Brian doesn't want emails"
+                    ::email "brian@example.org"
+                    ::email? false}]
+     [:crux.tx/put {:crux.db/id "https://example.org/roles/service-manager"
+                    ::site/type "Role"
+                    ::site/description "A service manager"}]
+     [:crux.tx/put {:crux.db/id "https://example.org/users/sue-is-a-service-manager"
+                    ::site/type "UserRoleMapping"
+                    ::user "https://example.org/users/sue"
+                    ::role "https://example.org/roles/service-manager"}]
+     [:crux.tx/put {:crux.db/id "https://example.org/users/brian-is-a-service-manager"
+                    ::site/type "UserRoleMapping"
+                    ::user "https://example.org/users/brian"
+                    ::role "https://example.org/roles/service-manager"}]
+
      [:crux.tx/put
       {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
        ::site/type "OpenAPI"
        :juxt.apex.alpha/openapi
        {"servers" [{"url" ""}]
         "paths"
-        {"/things/{a}"
-         {"parameters"
-          [{"name" "a" "in" "path" "required" "true"
-            "schema" {"type" "string" "pattern" "\\p{Alnum}+"}}]
-          "put"
-          {"operationId" "putA"
-           "requestBody"
+        {"/alerts/{id}"
+         {"put"
+          {"requestBody"
            {"content"
             {"application/json"
              {"schema"
               {"properties"
-               {"name" {"type" "string" "minLength" 1}}}}}}}}
+               {"juxt.site.alpha/type" {"type" "string"}}}}}}}}}}}]])
 
-         "/things/{a}/{n}"
-         {"parameters"
-          [{"name" "a" "in" "path" "required" "true"
-            "schema" {"type" "string" "pattern" "\\p{Alpha}+"}
-            "x-juxt-site-inject-property" "juxt/a"}
-           {"name" "n" "in" "path" "required" "true"
-            "schema" {"type" "string"}}]
-          "put"
-          {"operationId" "putAB"
-           "requestBody"
-           {"content"
-            {"application/json"
-             {"schema"
-              {"properties"
-               {"name" {"type" "string" "minLength" 1}}}}}}}}}}}]])
+   (let [path "/alerts/123"
+         body (json/write-value-as-string {"id" "123"
+                                           "juxt.site.alpha/type" "Alert"
+                                           "state" "unprocessed"})]
 
-   (let [path "/things/abc/123"
-         body (json/write-value-as-string {"name" "foo"})
-         r (*handler*
-            {:ring.request/method :put
-             ;; Matches both {a} and {b}
-             :ring.request/path path
-             :ring.request/body (ByteArrayInputStream. (.getBytes body))
-             :ring.request/headers
-             {"content-length" (str (count body))
-              "content-type" "application/json"}})
-         db (x/db *crux-node*)]
-     r
-     (x/entity db (str "https://example.org" path))
-     )))
+     ;; Put the first alert
+     (log/trace "Logging alert!")
+     (*handler*
+      {:ring.request/method :put
+       :ring.request/path path
+       :ring.request/body (ByteArrayInputStream. (.getBytes body))
+       :ring.request/headers
+       {"content-length" (str (count body))
+        "content-type" "application/json"}})
+
+     (let [db (x/db *crux-node*)]
+       (doseq [[recipient alert]
+               (x/q db '{:find [(eql/project user [:crux.db/id ::email]) alert]
+                         :where [[alert ::site/type "Alert"]
+                                 [user ::site/type "User"]
+                                 [user ::email? true]
+                                 [mapping ::role "https://example.org/roles/service-manager"]
+                                 [mapping ::user user]
+                                 (not-join [user alert]
+                                           [mr ::site/type "MailRecord"]
+                                           [mr ::recipient user]
+                                           [mr ::about alert])]})]
+
+         ;; Send email to recipient (::email recipient)
+         (log/tracef "Send email to %s (id=%s)" (::email recipient) (:crux.db/id recipient))
+
+         (->>
+          (x/submit-tx
+           *crux-node*
+           [[:crux.tx/put {:crux.db/id "https://example.org/maillogs/123"
+                           ::site/type "MailRecord"
+                           ::recipient (:crux.db/id recipient)
+                           ::about alert}]])
+          (x/await-tx *crux-node*))))
+
+     ;; Put a repeat alert
+     (log/trace "Logging repeat alert!")
+     (*handler*
+        {:ring.request/method :put
+         :ring.request/path path
+         :ring.request/body (ByteArrayInputStream. (.getBytes body))
+         :ring.request/headers
+         {"content-length" (str (count body))
+          "content-type" "application/json"}})
 
 
+     (let [db (x/db *crux-node*)]
 
+       (x/q db '{:find [(eql/project mr [*])]
+                 :where [[mr ::site/type "MailRecord"]
+                         ]})
+
+       (doseq [[recipient alert]
+               (x/q db '{:find [(eql/project user [::email]) alert]
+                         :where [[alert ::site/type "Alert"]
+                                 [user ::site/type "User"]
+                                 [user ::email? true]
+                                 [mapping ::role "https://example.org/roles/service-manager"]
+                                 [mapping ::user user]
+                                 (not-join [user alert]
+                                           [mr ::site/type "MailRecord"]
+                                           [mr ::recipient user]
+                                           [mr ::about alert])]})]
+
+         ;; Send email to recipient (::email recipient)
+         (log/tracef "Send email to %s" (::email recipient)))))))
 
 ;; First we need to 'fix' this error, and have a strategy for choosing the right
 ;; path.
