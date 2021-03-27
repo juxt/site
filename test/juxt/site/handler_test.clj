@@ -52,12 +52,19 @@
   {:crux.db/id "https://example.org/access-rule"
    ::site/description "A rule allowing access everything"
    ::site/type "Rule"
+   ::pass/target '[]
+   ::pass/effect ::pass/allow})
+
+(def access-all-apis
+  {:crux.db/id "https://example.org/access-rule"
+   ::site/description "A rule allowing access everything"
+   ::site/type "Rule"
    ::pass/target '[[resource ::site/resource-provider :juxt.apex.alpha.openapi/openapi-path]]
    ::pass/effect ::pass/allow})
 
 (deftest put-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+   [[:crux.tx/put access-all-apis]
     [:crux.tx/put
      {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
@@ -92,7 +99,7 @@
 
 (deftest two-path-parameter-path-preferred-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+   [[:crux.tx/put access-all-apis]
     [:crux.tx/put
      {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
@@ -147,7 +154,7 @@
    (fn []
      (log/trace "")
      (submit-and-await!
-      [[:crux.tx/put access-all-areas]
+      [[:crux.tx/put access-all-apis]
        [:crux.tx/put
         {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
          ::site/type "OpenAPI"
@@ -199,12 +206,11 @@
                :crux.db/id "https://example.org/things/ABC%2FDEF"}
               (x/entity db (str "https://example.org" path))))))))
 
-;; Turn into a test, this demonstrates path parameter injection
-((t/join-fixtures [with-crux with-handler])
+#_((t/join-fixtures [with-crux with-handler])
  (fn []
    (log/trace "")
    (submit-and-await!
-    [[:crux.tx/put access-all-areas]
+    [[:crux.tx/put access-all-apis]
      [:crux.tx/put {:crux.db/id "https://example.org/users/sue"
                     ::site/type "User"
                     ::site/description "Sue should receive an email on every alert"
@@ -314,17 +320,34 @@
          ;; Send email to recipient (::email recipient)
          (log/tracef "Send email to %s" (::email recipient)))))))
 
-;; First we need to 'fix' this error, and have a strategy for choosing the right
-;; path.
 
-;; Apparently path-level parameters are not yet supported - let's fix that
-;; first. Update: they ARE detected and parsed at the resource-locator stage,
-;; and put into :juxt.apex.alpha/openid-path-params. But what about later
-;; stages?
+(deftest if-none-match-test
+  (submit-and-await!
+   [[:crux.tx/put access-all-apis]
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/test.png"
+      ::http/last-modified #inst "2020-03-01"
+      }]])
+  (*handler*
+   {:ring.request/method :put
+    :ring.request/path "/test.png"
+    }))
 
-;; Do some testing against various parameter forms, including url encoded
-;; strings (which should arguably be url decoded before being parsed/validated).
 
+((t/join-fixtures [with-crux with-handler])
+ (fn []
+   (submit-and-await!
+    [[:crux.tx/put access-all-areas]
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/test.png"
+       ::http/last-modified #inst "2020-03-01"
+       ::http/content-type "image/png"
+       ::http/methods #{:get :head :options}
+       }]])
+   (*handler*
+    {:ring.request/method :get
+     :ring.request/path "/test.png"
+     })))
 
 #_(deftest get-with-if-none-match-test
     (let [{status1 :status

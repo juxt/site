@@ -23,7 +23,8 @@
    [juxt.reap.alpha.rfc7232 :as rfc7232]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.locator :as locator]
-   [juxt.site.alpha.util :as util]))
+   [juxt.site.alpha.util :as util])
+  (:import (java.net URI)))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -850,87 +851,89 @@
 
 ;; TODO: Split into logback logger, Crux logger and response finisher. This will
 ;; make it easier to disable one or both logging strategies.
+(defn respond [{::site/keys [crux-node db request-id start-date base-uri]
+                :ring.request/keys [method] :as req}
+               {::site/keys [selected-representation body] :as response}]
+
+  (assert method)
+  (log/infof "%-7s %s %s %d"
+             (str/upper-case (name method))
+             (:ring.request/path req)
+             (:ring.request/protocol req)
+             (:ring.response/status response))
+
+  (try
+    (x/submit-tx
+     crux-node
+     [[:crux.tx/put
+       (merge
+        (minimize-response response (some? (::site/error response)))
+
+        (select-keys db [:crux.db/valid-time :crux.tx/tx-id])
+
+        (let [end-date (java.util.Date.)]
+          {:crux.db/id request-id
+           ::site/type "Request"
+           ::site/end-date end-date
+           ::site/duration-millis (- (.getTime end-date)
+                                     (.getTime start-date))}))]])
+    (catch Exception e
+      (log/error e "Failed to log request, recovering")))
+
+  (cond->
+      (update response
+              :ring.response/headers
+              assoc "date" (format-http-date start-date))
+
+    request-id
+    (update :ring.response/headers
+            assoc "site-request-id"
+            (cond-> request-id
+              (.startsWith request-id base-uri)
+              (subs (count base-uri))))
+
+    selected-representation
+    (update :ring.response/headers
+            representation-headers selected-representation body)
+
+    (= method :head) (dissoc :ring.response/body)))
+
 (defn outer-handler
   "Return a handler that constructs proper Ring responses, logs and error
   handling where appropriate."
   [h]
-  (fn [{::site/keys [crux-node db request-id start-date base-uri]
-        :ring.request/keys [method]
+  (fn [{::site/keys [request-id]
         :as req}]
 
     (org.slf4j.MDC/put "reqid" request-id)
 
-    (let [respond
-          (fn [{::site/keys [selected-representation body] :as response}]
-
-            (assert (:ring.request/method req))
-            (log/infof "%-7s %s %s %d"
-                       (str/upper-case (name (:ring.request/method req)))
-                       (:ring.request/path req)
-                       (:ring.request/protocol req)
-                       (:ring.response/status response))
-
-            (try
-              (x/submit-tx
-               crux-node
-               [[:crux.tx/put
-                 (merge
-                  (minimize-response response (some? (::site/error response)))
-
-                  (select-keys db [:crux.db/valid-time :crux.tx/tx-id])
-
-                  (let [end-date (java.util.Date.)]
-                    {:crux.db/id request-id
-                     ::site/type "Request"
-                     ::site/end-date end-date
-                     ::site/duration-millis (- (.getTime end-date)
-                                               (.getTime start-date))}))]])
-              (catch Exception e
-                (log/error e "Failed to log request, recovering")))
-
-            (cond->
-                (update response
-                        :ring.response/headers
-                        assoc "date" (format-http-date start-date))
-
-                request-id
-                (update :ring.response/headers
-                        assoc "site-request-id"
-                        (cond-> request-id
-                          (.startsWith request-id base-uri)
-                          (subs (count base-uri))))
-
-                selected-representation
-                (update :ring.response/headers
-                        representation-headers selected-representation body)
-
-                (= method :head) (dissoc :ring.response/body)))]
-
-      (try
-        (respond (h req))
-        (catch clojure.lang.ExceptionInfo e
-          (let [{:ring.response/keys [status] :as exdata} (ex-data e)]
-            (when (and status (>= status 500))
-              (let [exdata (minimize-response exdata true)]
-                ;;(prn (.getMessage e))
-                ;;(pprint exdata)
-                (log/errorf e "%s: %s" (.getMessage e) (pr-str exdata))))
-            (respond
-             (-> (into
-                  {:ring.response/status 500
-                   :ring.response/body "Internal Error\r\n"
-                   ::site/error (.getMessage e)
-                   ::site/error-stack-trace (.getStackTrace e)}
-                  exdata)))))
-        (catch Throwable e
-          (log/error e (.getMessage e))
-          ;;(prn e)
+    (try
+      (respond req (h req))
+      (catch clojure.lang.ExceptionInfo e
+        (let [{:ring.response/keys [status] :as exdata} (ex-data e)]
+          (when (and status (>= status 500))
+            (let [exdata (minimize-response exdata true)]
+              ;;(prn (.getMessage e))
+              ;;(pprint exdata)
+              (log/errorf e "%s: %s" (.getMessage e) (pr-str exdata))))
           (respond
-           (into req
-                 {:ring.response/status 500
-                  :ring.response/body "Internal Error\r\n"})))
-        (finally
-          (org.slf4j.MDC/clear))))))
+           req
+           (-> (into
+                {:ring.response/status 500
+                 :ring.response/body "Internal Error\r\n"
+                 ::site/error (.getMessage e)
+                 ::site/error-stack-trace (.getStackTrace e)}
+                exdata)))))
+      (catch Throwable e
+        (log/error e (.getMessage e))
+        ;;(prn e)
+        (respond
+         req
+         (into req
+               {:ring.response/status 500
+                :ring.response/body "Internal Error\r\n"})))
+      (finally
+        (org.slf4j.MDC/clear)))))
 
 ;; See https://portswigger.net/web-security/host-header and similar TODO: Have a
 ;; 'whitelist' in the config to check against - but this would require a reboot,
