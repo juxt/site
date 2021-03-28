@@ -337,30 +337,78 @@
           (*handler*
            {:ring.request/method :get
             :ring.request/headers
-            {"if-modified-since"
-             (format-http-date if-modified-since)}
+            (if if-modified-since
+              {"if-modified-since"
+               (format-http-date if-modified-since)}
+              {})
             :ring.request/path "/test.png"})))
+      nil 200
       #inst "2020-02-29" 200
       #inst "2020-03-01" 304
       #inst "2020-03-02" 304))
 
-;; 3.3: If-Modified-Since
+(deftest if-none-match-test
+  (submit-and-await!
+   [[:crux.tx/put access-all-areas]
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/test.png"
+      ::http/etag "\"abc\""
+      ::http/content-type "image/png"
+      ::http/methods #{:get :head :options}}]])
+  (are [if-none-match status]
+      (= status
+         (:ring.response/status
+          (*handler*
+           {:ring.request/method :get
+            :ring.request/headers
+            (if if-none-match {"if-none-match" if-none-match} {})
+            :ring.request/path "/test.png"})))
+      nil 200
+      "" 200
+      "def" 200
+      "abc" 200
+      "\"abc\"" 304))
+
+;; TODO: If-Match, If-Unmodified-Since
+
+;; 3.1: If-Match
 ((t/join-fixtures [with-crux with-handler])
  (fn []
    (submit-and-await!
     [[:crux.tx/put access-all-areas]
      [:crux.tx/put
       {:crux.db/id "https://example.org/test.png"
-       ::http/last-modified #inst "2020-03-01"
+       ::site/type "StaticRepresentation"
+       ::http/etag "\"abc\""
        ::http/content-type "image/png"
-       ::http/methods #{:get :head :options}
+       ::http/methods #{:put}
        }]])
-   (let [resp
-         (*handler*
-          {:ring.request/method :get
-           :ring.request/headers {"if-modified-since" (format-http-date #inst "2020-03-01")}
-           :ring.request/path "/test.png"})]
-     (= 304 (:ring.response/status resp)))))
+   (:ring.response/status
+    (let [body "Hello"]
+      (*handler*
+       {:ring.request/method :put
+        :ring.request/body (ByteArrayInputStream. (.getBytes body))
+        :ring.request/headers
+        {"content-length" (str (count body))
+         "content-type" "application/json"
+         "if-match" "\"def\""}
+        :ring.request/path "/test.png"})))))
+
+;; TODO:
+      ;; "The server generating a 304 response MUST generate any of the following
+      ;; header fields that would have been sent in a 200 (OK) response to the
+      ;; same request: Cache-Control, Content-Location, Date, ETag, Expires, and
+      ;; Vary." -- Section 4.1, RFC 7232
+
+;; TODO: Call eval-conditional-requests on put/post
+
+;; TODO: Try fix bug with DELETE (producing 415 not 204)
+
+;; TODO: Error representations
+
+;; TODO: eval-conditional-requests in a transaction function to avoid race-conditions
+
+;; TODO: Security headers - read latest OWASP and similar
 
 #_(deftest get-with-if-none-match-test
     (let [{status1 :status
