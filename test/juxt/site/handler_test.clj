@@ -32,7 +32,7 @@
    (x/await-tx *crux-node*)))
 
 (defn make-handler [opts]
-  (-> h/inner-handler
+  (-> h/handler
       (h/wrap-initialize-request opts)))
 
 (defn with-handler [f]

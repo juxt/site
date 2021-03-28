@@ -685,8 +685,8 @@
 (defmethod transform-value "inst" [_ instance]
   (java.util.Date/from (java.time.Instant/parse instance)))
 
-(defn inner-handler [{:ring.request/keys [method]
-                      ::site/keys [uri db] :as req}]
+(defn handler [{:ring.request/keys [method]
+                ::site/keys [uri db] :as req}]
 
   (when-not (contains?
              #{:get :head :post :put :delete :options
@@ -849,25 +849,23 @@
     ;; TODO: Aggressive search to evict anything that isn't Nippy freezable
     walk-tree? identity))
 
-;; TODO: Split into logback logger, Crux logger and response finisher. This will
-;; make it easier to disable one or both logging strategies.
-(defn respond [{::site/keys [crux-node db request-id start-date base-uri]
-                :ring.request/keys [method] :as req}
-               {::site/keys [selected-representation body] :as response}]
-
+(defn log-context! [{:ring.request/keys [method] :as ctx}]
   (assert method)
   (log/infof "%-7s %s %s %d"
              (str/upper-case (name method))
-             (:ring.request/path req)
-             (:ring.request/protocol req)
-             (:ring.response/status response))
+             (:ring.request/path ctx)
+             (:ring.request/protocol ctx)
+             (:ring.response/status ctx)))
 
+(defn store-context!
+  [{::site/keys [crux-node db request-id start-date] :as ctx}]
+  (assert crux-node)
   (try
     (x/submit-tx
      crux-node
      [[:crux.tx/put
        (merge
-        (minimize-response response (some? (::site/error response)))
+        (minimize-response ctx (some? (::site/error ctx)))
 
         (select-keys db [:crux.db/valid-time :crux.tx/tx-id])
 
@@ -878,10 +876,19 @@
            ::site/duration-millis (- (.getTime end-date)
                                      (.getTime start-date))}))]])
     (catch Exception e
-      (log/error e "Failed to log request, recovering")))
+      (log/error e "Failed to log request, recovering"))))
+
+;; TODO: Split into logback logger, Crux logger and response finisher. This will
+;; make it easier to disable one or both logging strategies.
+(defn respond [{::site/keys [selected-representation body start-date base-uri request-id]
+                :ring.request/keys [method]
+                :as ctx}]
+
+  (log-context! ctx)
+  (store-context! ctx)
 
   (cond->
-      (update response
+      (update ctx
               :ring.response/headers
               assoc "date" (format-http-date start-date))
 
@@ -898,17 +905,20 @@
 
     (= method :head) (dissoc :ring.response/body)))
 
-(defn outer-handler
+(defn wrap-responder [h]
+  (fn [req]
+    (respond (h req))))
+
+(defn wrap-error-handling
   "Return a handler that constructs proper Ring responses, logs and error
   handling where appropriate."
   [h]
-  (fn [{::site/keys [request-id]
-        :as req}]
+  (fn [{::site/keys [request-id] :as req}]
 
     (org.slf4j.MDC/put "reqid" request-id)
 
     (try
-      (respond req (h req))
+      (h req)
       (catch clojure.lang.ExceptionInfo e
         (let [{:ring.response/keys [status] :as exdata} (ex-data e)]
           (when (and status (>= status 500))
@@ -917,7 +927,6 @@
               ;;(pprint exdata)
               (log/errorf e "%s: %s" (.getMessage e) (pr-str exdata))))
           (respond
-           req
            (-> (into
                 {:ring.response/status 500
                  :ring.response/body "Internal Error\r\n"
@@ -926,9 +935,7 @@
                 exdata)))))
       (catch Throwable e
         (log/error e (.getMessage e))
-        ;;(prn e)
         (respond
-         req
          (into req
                {:ring.response/status 500
                 :ring.response/body "Internal Error\r\n"})))
@@ -1057,8 +1064,9 @@
       (h req))))
 
 (defn make-handler [opts]
-  (-> #'inner-handler
-      (outer-handler)
+  (-> #'handler
+      (wrap-responder)
+      (wrap-error-handling)
       (wrap-initialize-request opts)
       (wrap-ring-1-adapter)
       (wrap-healthcheck)))
