@@ -52,9 +52,6 @@
       [:crux.tx/put m]))
    (x/await-tx (crux-node))))
 
-(defn GET [id content-type]
-  (some #(when (= content-type (::http/content-type %)) %) (::http/representations (e id))))
-
 (defn grep [re coll]
   (filter #(re-matches (re-pattern re) %) coll))
 
