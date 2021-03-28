@@ -375,7 +375,7 @@
       (throw
        (ex-info
         "Not modified"
-        (into req {:ring.resposne/status 304
+        (into req {:ring.response/status 304
                    :ring.response/body "Not Modified\r\n"}))))))
 
 (defn evaluate-preconditions!
