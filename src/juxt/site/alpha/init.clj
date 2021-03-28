@@ -192,6 +192,19 @@
                     [resource ::site/purpose ::site/logout]]
     ::pass/effect ::pass/allow}))
 
+(defn put-site-txfns! [crux-node {::site/keys [base-uri]}]
+  (x/submit-tx
+   crux-node
+   [[:crux.tx/put
+     {:crux.db/id (str base-uri "/_site/tx_fns/put_if_match")
+      :crux.db/fn '(fn [ctx uri etag new-rep]
+                     (let [db (crux.api/db ctx)
+                           ent (crux.api/entity db uri)]
+                       (if (= etag (get ent ::http/etag))
+                         [[:crux.tx/put new-rep]]
+                         false)))
+      :http/content-type "application/clojure"}]]))
+
 (def host-parser (rfc7230.decoders/host {}))
 
 (def base-uri-parser

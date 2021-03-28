@@ -200,7 +200,13 @@
    (let [{::site/keys [base-uri]} opts
          _ (assert base-uri)
          db (x/db (crux-node))]
-     [{:complete? (x/entity db (str base-uri "/_site/apis/site/openapi.json"))
+     [{:complete? (and
+                   (x/entity db (str base-uri "/_site/tx_fns/put_if_match")))
+       :happy-message "Site transaction functions installed."
+       :sad-message "Site transaction functions not installed. "
+       :fix "Enter (put-site-txfns!) to fix this."}
+
+      {:complete? (x/entity db (str base-uri "/_site/apis/site/openapi.json"))
        :happy-message "Site API resources installed."
        :sad-message "Site API not installed. "
        :fix "Enter (put-site-api!) to fix this."}
@@ -270,3 +276,9 @@
   (let [config (config)
         crux-node (crux-node)]
     (init/allow-public-access-to-public-resources! crux-node config)))
+
+(defn put-site-txfns! []
+  (let [config (config)
+        crux-node (crux-node)]
+    (init/put-site-txfns! crux-node config)
+    (status)))
