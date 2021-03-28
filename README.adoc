@@ -44,7 +44,7 @@ https://github.com/babashka/babashka[Babashka] installed on your system.
 
 Clone the repo to a preferred location which we'll refer to as $SITE_HOME.
 
-== Start the server
+=== Start the server
 
 Start the Site server:
 
@@ -54,27 +54,7 @@ $ $SITE_HOME/bin/site-server
 
 NOTE: There is a systemd service script in `/etc/systemd`.
 
-=== Configure
-
-If you are configuring a server on a host, you should now set the base-uri.
-
-NOTE: If you're just testing Site locally, skip this step, the default of `http://localhost:2021` will suffice.
-
-----
-$ site set base-uri https://site.example.org
-----
-
-=== Initialize
-
-----
-$ site init-db
-----
-
-=== REPL access
-
-----
-$ telnet localhost 50505
-----
+See link:doc[] for more documentation.
 
 == Status
 
