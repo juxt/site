@@ -74,9 +74,6 @@
       [:crux.tx/evict id]))
    (x/await-tx (crux-node))))
 
-(defn uuid []
-  (str (java.util.UUID/randomUUID)))
-
 (defn q [query & args]
   (apply x/q (db) query args))
 
@@ -123,10 +120,12 @@
    (map first
         (q '{:find [(eql/project e [*])] :where [[e ::site/type "Rule"]]}))))
 
-(defn uuid [s]
-  (cond
-    (string? s) (java.util.UUID/fromString s)
-    (uuid? s) s))
+(defn uuid
+  ([] (str (java.util.UUID/randomUUID)))
+  ([s]
+   (cond
+     (string? s) (java.util.UUID/fromString s)
+     (uuid? s) s)))
 
 (defn reqs
   "Display up to 5 of the most recent web requests, most recent first."
