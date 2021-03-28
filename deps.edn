@@ -52,5 +52,11 @@
   {:extra-paths ["dev" "test"]
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]}
 
+  :test
+  {:extra-paths ["dev" "test"]
+   :extra-deps
+   {lambdaisland/kaocha {:mvn/version "1.0.829"}
+    lambdaisland/kaocha-junit-xml {:mvn/version "0.0.76"}}}
+
   :prod
   {:extra-paths ["prod"]}}}

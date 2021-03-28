@@ -1,0 +1,8 @@
+#kaocha/v1
+{:plugins [;;:kaocha.plugin.alpha/info
+           ]
+
+ :tests [{:id :test
+          :test-paths ["test"]}]
+
+ :reporter kaocha.report/documentation}
