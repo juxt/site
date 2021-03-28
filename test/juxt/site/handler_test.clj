@@ -6,6 +6,7 @@
    [clojure.tools.logging :as log]
    [crux.api :as x]
    [jsonista.core :as json]
+   [juxt.reap.alpha.encoders :refer [format-http-date]]
    [juxt.site.alpha.handler :as h])
   (:import
    (crux.api ICruxAPI)
@@ -33,6 +34,8 @@
 
 (defn make-handler [opts]
   (-> h/handler
+      (h/wrap-responder)
+      (h/wrap-error-handling)
       (h/wrap-initialize-request opts)))
 
 (defn with-handler [f]
@@ -320,20 +323,28 @@
          ;; Send email to recipient (::email recipient)
          (log/tracef "Send email to %s" (::email recipient)))))))
 
-
-(deftest if-none-match-test
+(deftest if-modified-since-test
   (submit-and-await!
-   [[:crux.tx/put access-all-apis]
+   [[:crux.tx/put access-all-areas]
     [:crux.tx/put
      {:crux.db/id "https://example.org/test.png"
       ::http/last-modified #inst "2020-03-01"
-      }]])
-  (*handler*
-   {:ring.request/method :put
-    :ring.request/path "/test.png"
-    }))
+      ::http/content-type "image/png"
+      ::http/methods #{:get}}]])
+  (are [if-modified-since status]
+      (= status
+         (:ring.response/status
+          (*handler*
+           {:ring.request/method :get
+            :ring.request/headers
+            {"if-modified-since"
+             (format-http-date if-modified-since)}
+            :ring.request/path "/test.png"})))
+      #inst "2020-02-29" 200
+      #inst "2020-03-01" 304
+      #inst "2020-03-02" 304))
 
-
+;; 3.3: If-Modified-Since
 ((t/join-fixtures [with-crux with-handler])
  (fn []
    (submit-and-await!
@@ -344,10 +355,12 @@
        ::http/content-type "image/png"
        ::http/methods #{:get :head :options}
        }]])
-   (*handler*
-    {:ring.request/method :get
-     :ring.request/path "/test.png"
-     })))
+   (let [resp
+         (*handler*
+          {:ring.request/method :get
+           :ring.request/headers {"if-modified-since" (format-http-date #inst "2020-03-01")}
+           :ring.request/path "/test.png"})]
+     (= 304 (:ring.response/status resp)))))
 
 #_(deftest get-with-if-none-match-test
     (let [{status1 :status
