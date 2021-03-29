@@ -926,7 +926,7 @@
       (h req)
       (catch clojure.lang.ExceptionInfo e
         (let [{:ring.response/keys [status] :as exdata} (ex-data e)]
-          (when (and status (>= status 500))
+          (when (and (integer? status) (>= status 500))
             (let [exdata (minimize-response exdata true)]
               ;;(prn (.getMessage e))
               ;;(pprint exdata)
