@@ -78,9 +78,7 @@
 
         session {"access_token" access-token
                  "expires_in" expires-in
-                 ;;"token_type" "example"
-                 ;;"example_parameter" "example_value"
-                 }
+                 "user" (::pass/user subject)}
 
         _ (put-session!
            access-token
