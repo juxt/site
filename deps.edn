@@ -45,7 +45,10 @@
         clj-yaml/clj-yaml {:mvn/version "0.4.0"}
         hiccup/hiccup {:mvn/version "2.0.0-alpha2"}
         metosin/jsonista {:mvn/version "0.2.7"}
-        json-html/json-html {:mvn/version "0.4.0"}}
+        json-html/json-html {:mvn/version "0.4.0"}
+
+        ;; AWS
+        amazonica/amazonica {:mvn/version "0.3.154"}}
 
  :aliases
  {:dev

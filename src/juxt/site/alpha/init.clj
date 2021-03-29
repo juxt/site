@@ -124,9 +124,13 @@
     (put!
      crux-node
      {:crux.db/id token-endpoint
-      ::http/methods #{:post}
+      ::http/methods #{:post :options}
       ::http/acceptable "application/x-www-form-urlencoded"
       ::site/purpose ::site/acquire-token
+      ::site/access-control-allow-origins
+      {"http://localhost:8000"
+       {::site/access-control-allow-methods #{:post}
+        ::site/access-control-allow-headers #{"authorization" "content-type"}}}
       ::pass/expires-in (* 60 60 1)}
 
      {:crux.db/id (str base-uri "/_site/rules/anyone-can-ask-for-a-token")

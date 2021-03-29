@@ -47,9 +47,13 @@
   [{::site/keys [received-representation resource start-date]
     ::pass/keys [subject] :as req}]
 
+  (log/tracef "received-representation is %s" (pr-str received-representation))
+
+  (log/debugf "content-type is %s" (pr-str (::http/content-type received-representation)))
+
   ;; Check grant_type of posted-representation
   (assert (.startsWith (::http/content-type received-representation)
-             "application/x-www-form-urlencoded"))
+                       "application/x-www-form-urlencoded"))
 
   (when-not subject
     (throw
