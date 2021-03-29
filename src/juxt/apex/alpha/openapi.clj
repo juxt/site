@@ -319,18 +319,6 @@
                              (.equalsIgnoreCase "json" subtype))
                             (put-json-representation req))))))))))
 
-#_(defn max-path-params-count
-  "In the case of multiple matches, return a subsequence of matches that contain
-  the most path parameters. This can be used to select from multiple matching
-  OpenAPI paths."
-  [matches]
-  (->> matches
-       (group-by #(count (get-in % [::site/request-locals ::apex/openapi-path-params])))
-       (sort-by first >) ; reverse sort
-       first ; winner
-       second ; value
-       ))
-
 (defn locate-resource
   [db uri
    ;; We'd like to locate the resource based on nothing but the URI of the
