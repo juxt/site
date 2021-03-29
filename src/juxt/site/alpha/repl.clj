@@ -200,8 +200,10 @@
    (let [{::site/keys [base-uri]} opts
          _ (assert base-uri)
          db (x/db (crux-node))]
-     [{:complete? (and
-                   (x/entity db (str base-uri "/_site/tx_fns/put_if_match")))
+     [;; Awaiting a fix to https://github.com/juxt/crux/issues/1480
+      #_{:complete? (and
+                   (x/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
+                   (x/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
        :happy-message "Site transaction functions installed."
        :sad-message "Site transaction functions not installed. "
        :fix "Enter (put-site-txfns!) to fix this."}

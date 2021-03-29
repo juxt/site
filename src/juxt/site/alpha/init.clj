@@ -192,17 +192,37 @@
                     [resource ::site/purpose ::site/logout]]
     ::pass/effect ::pass/allow}))
 
+;; Currently awaiting a fix to https://github.com/juxt/crux/issues/1480 because
+;; these can be used.
 (defn put-site-txfns! [crux-node {::site/keys [base-uri]}]
   (x/submit-tx
    crux-node
    [[:crux.tx/put
-     {:crux.db/id (str base-uri "/_site/tx_fns/put_if_match")
-      :crux.db/fn '(fn [ctx uri etag new-rep]
-                     (let [db (crux.api/db ctx)
-                           ent (crux.api/entity db uri)]
-                       (if (= etag (get ent ::http/etag))
-                         [[:crux.tx/put new-rep]]
-                         false)))
+     {:crux.db/id (str base-uri "/_site/tx_fns/put_if_match_wildcard")
+      ::site/description "Use this function for an If-Match header value of '*'"
+      :crux.db/fn
+      '(fn [ctx uri new-rep]
+         (let [db (crux.api/db ctx)]
+           (if (crux.api/entity db uri)
+             [[:crux.tx/put new-rep]]
+             false)))
+      :http/content-type "application/clojure"}]])
+
+  (x/submit-tx
+   crux-node
+   [[:crux.tx/put
+     {:crux.db/id (str base-uri "/_site/tx_fns/put_if_match_etags")
+      :crux.db/fn
+      '(fn [ctx uri header-field new-rep if-match?]
+         (let [db (crux.api/db ctx)
+               selected-representation (crux.api/entity db uri)
+               txes [[:crux.tx/put new-rep]]]
+           (if-let [rep-unparsed-etag (some-> (get selected-representation ::http/etag))]
+             (if (if-match? header-field rep-unparsed-etag)
+               txes ; success, we matched
+               false)
+             false)))
+
       :http/content-type "application/clojure"}]]))
 
 (def host-parser (rfc7230.decoders/host {}))

@@ -240,49 +240,50 @@
        (.getBytes (::http/content representation)
                   (get representation ::http/charset "UTF-8")))) 0 32)))
 
-;; TODO: Test for this: "The server generating a 304 response MUST generate any
-;; of the following header fields that would have been sent in a 200 (OK)
-;; response to the same request: Cache-Control, Content-Location, Date, ETag,
-;; Expires, and Vary."
-
 (defn evaluate-if-match!
   "Evaluate an If-None-Match precondition header field in the context of a
   resource. If the precondition is found to be false, an exception is thrown
   with ex-data containing the proper response."
-  [{::site/keys [selected-representation] :as req}]
+  [{::site/keys [current-representations] :as req}]
   ;; (All quotes in this function's comments are from Section 3.2, RFC 7232,
   ;; unless otherwise stated).
-  (let [header-field (reap/if-match (get-in req [:ring.request/headers "if-match"]))]
+  (when-let [header-field (reap/if-match (get-in req [:ring.request/headers "if-match"]))]
+    (log/tracef "evaluate-if-match! %s" header-field)
     (cond
       ;; "If the field-value is '*' …"
       (and (map? header-field)
            (::rfc7232/wildcard header-field)
-           (nil? selected-representation))
+           (empty? current-representations))
       ;; "… the condition is false if the origin server does not have a current
       ;; representation for the target resource."
       (throw
        (ex-info
         "If-Match precondition failed"
-        {::message "No current representations for resource, so * doesn't match"
-         ::response {:status 412
-                     :body "Precondition Failed\r\n"}}))
+        (into req
+              {:ring.response/status 412
+               :ring.response/body "Precondition Failed\r\n"})))
 
       (sequential? header-field)
-      (when-let [rep-etag (some-> (get selected-representation ::http/etag) reap/entity-tag)]
-        (when-not (seq
-                   (for [etag header-field
-                         ;; "An origin server MUST use the strong comparison function
-                         ;; when comparing entity-tags"
-                         :when (rfc7232/strong-compare-match? etag rep-etag)]
-                     etag))
+      (do
+        (log/tracef "evaluate-if-match! sequential? true, header-field: %s" header-field)
+        (let [matches (for [rep current-representations
+                            :let [rep-etag (some-> (get rep ::http/etag) reap/entity-tag)]
+                            etag header-field
+                            ;; "An origin server MUST use the strong comparison function
+                            ;; when comparing entity-tags"
+                            :let [_ (log/tracef "evaluate-if-match! - compare %s with %s" etag rep-etag)]
+                            :when (rfc7232/strong-compare-match? etag rep-etag)]
+                        etag)]
+          (log/tracef "matches: %d: %s" (count matches) matches)
+          (when-not (seq matches)
 
-          ;; TODO: "unless it can be determined that the state-changing
-          ;; request has already succeeded (see Section 3.1)"
-          (throw
-           (ex-info
-            "No strong matches between if-match and current representations"
-            (into req {:ring.response/status 412
-                       :ring.response/body "Precondition Failed\r\n"}))))))))
+              ;; TODO: "unless it can be determined that the state-changing
+              ;; request has already succeeded (see Section 3.1)"
+              (throw
+               (ex-info
+                "No strong matches between if-match and current representations"
+                (into req {:ring.response/status 412
+                           :ring.response/body "Precondition Failed\r\n"})))))))))
 
 ;; TODO: See Section 4.1, RFC 7232:
 ;;
@@ -306,26 +307,19 @@
           ;; entity-tags …"
           (when (rfc7232/weak-compare-match? etag rep-etag)
             (throw
-             (ex-info
-              "If-None-Match precondition failed"
-              {::message "One of the etags in the if-none-match header matches the selected representation"
-               ::entity-tag etag
-               ::representation selected-representation
-               ::response
-               ;; "the origin server MUST respond with either a) the 304 (Not
-               ;; Modified) status code if the request method is GET or HEAD …"
-               (throw
-                (if (#{:get :head} (:ring.request/method req))
-                  (ex-info
-                   "Not modified"
-                   (into req {:ring.response/status 304
-                              :ring.response/body "Not Modified\r\n"}))
-                  ;; "… or 412 (Precondition Failed) status code for all other
-                  ;; request methods."
-                  (ex-info
-                   "Precondition failed"
-                   (into req {:ring.response/status 412
-                              :ring.response/body "Precondition Failed\r\n"}))))})))))
+             (if (#{:get :head} (:ring.request/method req))
+               (ex-info
+                "Not modified"
+                (into req {:ring.response/status 304
+                           :ring.response/body "Not Modified\r\n"
+                           ::matching-entity-tag etag}))
+               ;; "… or 412 (Precondition Failed) status code for all other
+               ;; request methods."
+               (ex-info
+                "If-None-Match precondition failed"
+                (into req {:ring.response/status 412
+                           :ring.response/body "Precondition Failed\r\n"
+                           ::matching-entity-tag etag})))))))
 
       ;; "If-None-Match can also be used with a value of '*' …"
       (and (map? header-field) (::rfc7232/wildcard header-field))
@@ -407,30 +401,35 @@
 (defn put-static-resource
   "PUT a new representation of the target resource. All other representations are
   replaced."
-  [{::site/keys [uri db received-representation start-date crux-node] :as req}]
+  [{::site/keys [uri db received-representation start-date crux-node base-uri] :as req}]
   (let [existing? (x/entity db uri)
-        classification (get-in req [:ring.request/headers "site-classification"])]
-    (->>
-     (x/submit-tx
-        crux-node
-        [[:crux.tx/put
-          (merge
-           (cond->
-               {:crux.db/id uri
-                ::site/type "StaticRepresentation"
-                ::http/methods #{:get :head :options :put :patch}
-                ::http/etag (etag received-representation)
-                ::http/last-modified start-date}
-             classification (assoc ::pass/classification classification))
-           received-representation)]])
+        classification (get-in req [:ring.request/headers "site-classification"])
+        new-rep (merge
+                 (cond->
+                     {:crux.db/id uri
+                      ::site/type "StaticRepresentation"
+                      ::http/methods #{:get :head :options :put :patch}
+                      ::http/etag (etag received-representation)
+                      ::http/last-modified start-date}
+                     classification (assoc ::pass/classification classification))
+                 received-representation)]
 
-     (x/await-tx crux-node))
+    ;; Currently we cannot tell whether a submitted tx has been successful,
+    ;; see https://github.com/juxt/crux/issues/1480. As a workaround, we do
+    ;; the conditional checks here. In the future, we'll call into separate
+    ;; tx fns.
+    (evaluate-preconditions! req)
+
+    (->> (x/submit-tx
+          crux-node
+          [[:crux.tx/put new-rep]])
+         (x/await-tx crux-node))
 
     (into req {:ring.response/status (if existing? 204 201)})))
 
 (defn patch-static-resource
-  [{::site/keys [uri received-representation start-date crux-node] :as req}]
-  (throw (ex-info "TODO: patch" {:incoming received-representation})))
+  [{::site/keys [received-representation] :as req}]
+  (throw (ex-info "TODO: patch" (into req {::incoming received-representation}))))
 
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
@@ -487,7 +486,6 @@
                             :in [uri]
                             } uri)]
      (when (pos? (count variants))
-       (log/tracef "found %d extra variants for uri %s" (count variants) uri)
        (cond-> (for [[v] variants
                      :let [rep (x/entity db v)]
                      :when rep]
@@ -590,7 +588,7 @@
         req (assoc req ::site/received-representation rep)
         put-fn (get-in resource [::site/request-locals ::site/put-fn])]
 
-    ;; TODO: evaluate preconditions (in tx fn)
+    (log/tracef "PUT, put-fn is %s" put-fn)
     (cond
       (fn? put-fn) (put-fn req)
       :else
@@ -688,6 +686,9 @@
 (defn handler [{:ring.request/keys [method]
                 ::site/keys [uri db] :as req}]
 
+  ;; Step 1. 503 Unavailable (TODO)
+
+  ;; Step 2. Check method is implemented
   (when-not (contains?
              #{:get :head :post :put :delete :options
                :patch
@@ -697,12 +698,13 @@
               (into req {:ring.response/status 501
                          :ring.response/body "Not Implemented\r\n"}))))
 
-  (let [res (locate-resource req)
-
-        _ (log/debug "resource provider" (::site/resource-provider res))
-
+  (let [ ;; Step 3. Locate the resource
+        res (locate-resource req)
         req (assoc req ::site/resource res)
 
+        _ (log/debugf "Resource provider: %s" (::site/resource-provider res))
+
+        ;; Step 4. Redirect if necessary
         _ (when-let [location (::http/redirect res)]
             (throw
              (ex-info "Redirect"
@@ -712,29 +714,37 @@
                           (update :ring.response/headers
                                   assoc "location" location)))))
 
+        ;; Step 5 (GET/HEAD/PUT only). Determine the resource's current
+        ;; representations, or 404
         cur-reps
-        (when (#{:get :head} method) (current-representations req))
+        (when (#{:get :head :put} method)
+          (seq (current-representations req)))
 
+        ;; Step 6 (GET/HEAD only). Maybe throw a 404
+        _ (when (and (#{:get :head} method) (empty? cur-reps))
+            (throw
+             (ex-info "Not Found"
+                      (into req
+                            {:ring.response/status 404
+                             :ring.response/body "Not Found\r\n"}))))
+        req (assoc req ::site/current-representations cur-reps)
+
+        ;; Step 7. (GET/HEAD only). Select a representation
         sel-rep
         (when (seq cur-reps)
           (negotiate-representation req cur-reps))
         req (assoc req ::site/selected-representation sel-rep)
-
-        _ (when (and (#{:get :head} method) (empty? cur-reps))
-            (throw
-             (ex-info "Not Found"
-                      (merge req
-                             {:ring.response/status 404
-                              :ring.response/body "Not Found\r\n"}))))
 
         ;; Do authorization as late as possible (in order to have as much data
         ;; as possible to base the authorization decision on. However, note
         ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
         ;; before checking any HTTP conditional header.".
 
+        ;; Step 8. Authenticate
         sub (when-not (= method :options) (authn/authenticate req))
         req (cond-> req sub (assoc ::pass/subject sub))
 
+        ;; Step 9. Authorize
         ;; Does this request-context now need to be broken up into different
         ;; 'entities' given that we now have a simple flat map?
         request-context
@@ -747,13 +757,10 @@
                     :ring.request/query :ring.request/protocol :ring.request/remote-addr
                     :ring.request/scheme :ring.request/server-name :ring.request/server-post
                     :ring.request/ssl-client-cert])
-
          'representation (dissoc res ::site/request-locals ::http/body ::http/content)
          'environment {}}
-
         authz (when (not= method :options)
                 (pdp/authorization db request-context))
-
         req (cond-> req
               true (assoc ::pass/request-context request-context)
               authz (assoc ::pass/authorization authz)
@@ -762,7 +769,6 @@
               (::http/max-content-length authz)
               (update ::site/resource
                       assoc ::http/max-content-length (::http/max-content-length authz)))
-
         _ (when (and (not= method :options)
                      (not= (::pass/access authz) ::pass/approved))
             (let [status (if-not (::pass/user sub) 401 403)
@@ -773,14 +779,10 @@
                               {:ring.response/status status
                                :ring.response/body (str msg "\r\n")})))))
 
-        ;; TODO: We're keep this in for now. A resource specified the maximum
-        ;; allowed methods. Authorization may minimise this set, on the basis
-        ;; that OPTIONS and other responses such as 405 should not indicate
-        ;; methods are allowed when they're not going to (due to authorization
-        ;; limitations).
         allowed-methods (set (::http/methods res))
         req (assoc req ::site/allowed-methods allowed-methods)]
 
+    ;; Step 10. Check method allowed
     (when res
       (when-not (contains? allowed-methods method)
         (throw
@@ -791,6 +793,7 @@
                  :ring.response/headers {"allow" (join-keywords allowed-methods true)}
                  :ring.response/body "Method Not Allowed\r\n"})))))
 
+    ;; Step 11. Invoke method
     (case method
       (:get :head) (GET req)
       :post (POST req)
@@ -840,6 +843,8 @@
           ;; ::site/request-locals is used to avoid database involvement
           (update ::site/resource dissoc ::site/request-locals ::http/body ::http/content)
           (update ::site/selected-representation dissoc ::http/body ::http/content)
+          (update ::site/current-representations
+                  (fn [reps] (map #(dissoc % ::http/body ::http/content) reps)))
           (update ::site/received-representation dissoc ::http/body ::http/content)
           (update :ring.request/headers
                   (fn [headers]
@@ -847,7 +852,7 @@
                       (contains? headers "authorization")
                       (assoc "authorization" "REDACTED")))))
     ;; TODO: Aggressive search to evict anything that isn't Nippy freezable
-    walk-tree? identity))
+      walk-tree? identity))
 
 (defn log-context! [{:ring.request/keys [method] :as ctx}]
   (assert method)

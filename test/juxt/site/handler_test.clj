@@ -49,7 +49,7 @@
   (binding [*db* (x/db *crux-node*)]
     (f)))
 
-(t/use-fixtures :once with-crux with-handler)
+(t/use-fixtures :each with-crux with-handler)
 
 (def access-all-areas
   {:crux.db/id "https://example.org/access-rule"
@@ -369,10 +369,55 @@
       "abc" 200
       "\"abc\"" 304))
 
-;; TODO: If-Match, If-Unmodified-Since
+;; TODO: If-Unmodified-Since
 
 ;; 3.1: If-Match
-((t/join-fixtures [with-crux with-handler])
+(deftest if-match-wildcard-test
+  (submit-and-await!
+   [[:crux.tx/put access-all-areas]])
+  (is (= 412
+         (:ring.response/status
+          (let [body "Hello"]
+            (*handler*
+             {:ring.request/method :put
+              :ring.request/body (ByteArrayInputStream. (.getBytes body))
+              :ring.request/headers
+              {"content-length" (str (count body))
+               "content-type" "application/json"
+               "if-match" "*"}
+              :ring.request/path "/test.png"}))))))
+
+(defn if-match-run [if-match]
+  (submit-and-await!
+   [[:crux.tx/put access-all-areas]
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/test.png"
+      ::site/type "StaticRepresentation"
+      ::http/etag "\"abc\""
+      ::http/content-type "image/png"
+      ::http/methods #{:put}
+      }]])
+  (:ring.response/status
+   (let [body "Hello"]
+     (*handler*
+      {:ring.request/method :put
+       :ring.request/body (ByteArrayInputStream. (.getBytes body))
+       :ring.request/headers
+       {"content-length" (str (count body))
+        "content-type" "image/png"
+        "if-match" if-match}
+       :ring.request/path "/test.png"}))))
+
+(deftest if-match-1-test
+  (is (= 204 (if-match-run "\"abc\""))))
+
+(deftest if-match-2-test
+  (is (= 204 (if-match-run "\"abc\", \"def\""))))
+
+(deftest if-match-3-test
+  (is (= 412 (if-match-run "\"def\", \"ghi\""))))
+
+#_((t/join-fixtures [with-crux with-handler])
  (fn []
    (submit-and-await!
     [[:crux.tx/put access-all-areas]
@@ -382,7 +427,19 @@
        ::http/etag "\"abc\""
        ::http/content-type "image/png"
        ::http/methods #{:put}
-       }]])
+       }]
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/_site/tx_fns/put_if_match_etags"
+       :crux.db/fn
+       '(fn [ctx ;; uri ;;header-field new-rep if-match?
+             ]
+          (let [db (crux.api/db ctx)
+                existing-representation (crux.api/entity db uri)]
+            (juxt.site.alpha.handler/evaluate-preconditions! req)
+            [[:crux.tx/put new-rep]]))
+
+       :http/content-type "application/clojure"}]])
+
    (:ring.response/status
     (let [body "Hello"]
       (*handler*
@@ -390,8 +447,9 @@
         :ring.request/body (ByteArrayInputStream. (.getBytes body))
         :ring.request/headers
         {"content-length" (str (count body))
-         "content-type" "application/json"
-         "if-match" "\"def\""}
+         "content-type" "image/png"
+         "if-match" "\"ac\",\"def\""
+         }
         :ring.request/path "/test.png"})))))
 
 ;; TODO:
