@@ -559,16 +559,17 @@
     (cond
       (fn? post-fn) (post-fn req)
 
-      :else (case (::site/purpose resource)
-              ::site/acquire-token (authn/token-response req)
-              ::site/login (authn/login-response req)
-              ::site/logout (authn/logout-response req)
-              (throw
-               (ex-info
-                "POST not handled, returning 404"
-                (into req
-                      {:ring.response/status 404
-                       :ring.response/body "Not Found\r\n"})))))))
+      :else
+      (case (::site/purpose resource)
+        ::site/acquire-token (authn/token-response req)
+        ::site/login (authn/login-response req)
+        ::site/logout (authn/logout-response req)
+        (throw
+         (ex-info
+          "Resource allows POST but doesn't contain have a post-fn function"
+          (into req
+                {:ring.response/status 500
+                 :ring.response/body "Internal Error\r\n"})))))))
 
 (defn PUT [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
