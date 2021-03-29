@@ -516,24 +516,11 @@
                  (log/debugf "Calling body-fn: %s" body-fn)
                  (let [body (f req)]
                    (cond-> body
-                     (string? body) (.getBytes (or charset "UTF-8"))))))
+                     (string? body) (.getBytes (or charset "UTF-8"))))))]
 
-        request-origin (get-in req [:ring.request/headers "origin"])
-        {::site/keys [access-control-allow-origins]} resource
-        allow-origin
-        (when request-origin
-          (or
-           (when (contains? access-control-allow-origins request-origin)
-             request-origin)
-           (when (contains? access-control-allow-origins "*")
-             "*")))]
-
-    (cond-> (assoc req
-                   :ring.response/status 200
-                   :ring.response/body body)
-
-      allow-origin
-      (assoc-in [:ring.response/headers "access-control-allow-origin"] allow-origin))))
+    (assoc req
+           :ring.response/status 200
+           :ring.response/body body)))
 
 (defn post-variant [{::site/keys [crux-node db uri request-locals] :as req}]
 
@@ -638,6 +625,8 @@
         (get resource-origin ::site/access-control-allow-methods)
         access-control-allow-headers
         (get resource-origin ::site/access-control-allow-headers)]
+
+    (log/trace "In OPTIONS")
 
     (cond-> (into req {:ring.response/status 200})
 
@@ -914,6 +903,22 @@
   (fn [req]
     (respond (h req))))
 
+(defn wrap-cors-headers [h]
+  (fn [ctx]
+    (let [{::site/keys [resource] :as ctx} (h ctx)
+          request-origin (get-in ctx [:ring.request/headers "origin"])
+          {::site/keys [access-control-allow-origins]} resource
+          allow-origin
+          (when request-origin
+            (or
+             (when (contains? access-control-allow-origins request-origin)
+               request-origin)
+             (when (contains? access-control-allow-origins "*")
+               "*")))]
+      (cond-> ctx
+        allow-origin
+        (assoc-in [:ring.response/headers "access-control-allow-origin"] allow-origin)))))
+
 (defn wrap-error-handling
   "Return a handler that constructs proper Ring responses, logs and error
   handling where appropriate."
@@ -1071,6 +1076,7 @@
 (defn make-handler [opts]
   (-> #'handler
       (wrap-responder)
+      (wrap-cors-headers)
       (wrap-error-handling)
       (wrap-initialize-request opts)
       (wrap-ring-1-adapter)
