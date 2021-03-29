@@ -48,8 +48,8 @@
     ::pass/keys [subject] :as req}]
 
   ;; Check grant_type of posted-representation
-  (assert (= "application/x-www-form-urlencoded"
-             (::http/content-type received-representation)))
+  (assert (.startsWith (::http/content-type received-representation)
+             "application/x-www-form-urlencoded"))
 
   (when-not subject
     (throw
@@ -125,8 +125,8 @@
     :as req}]
 
   ;; Check grant_type of posted-representation
-  (assert (= "application/x-www-form-urlencoded"
-             (::http/content-type received-representation)))
+  (assert (.startsWith (::http/content-type received-representation)
+             "application/x-www-form-urlencoded"))
 
   (let [posted-body (String. (::http/body received-representation))
         form (form-decode posted-body)
