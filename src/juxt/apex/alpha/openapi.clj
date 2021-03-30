@@ -134,7 +134,7 @@
                     (into {:ring.response/status status
                            :ring.response/body (str message "\r\n")}))))))
 
-        exists? (x/entity db uri)
+        already-exists? (x/entity db uri)
 
         last-modified start-date
         etag (format "\"%s\"" (-> received-representation
@@ -154,7 +154,7 @@
          (x/await-tx crux-node))
 
     (-> req
-        (assoc :ring.response/status (if-not exists? 201 204)
+        (assoc :ring.response/status (if-not already-exists? 201 204)
                ::http/etag etag
                ::http/last-modified last-modified)
         (update :ring.response/headers assoc "location" uri))))
