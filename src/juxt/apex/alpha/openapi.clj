@@ -284,7 +284,8 @@
              ::site/access-control-allow-origins
              {"http://localhost:8000"
               {::site/access-control-allow-methods #{:get}
-               ::site/access-control-allow-headers #{"authorization"}}}
+               ::site/access-control-allow-headers #{"authorization"}
+               ::site/access-control-allow-credentials true}}
 
              ;; TODO: Merge in any properties of a resource that is in
              ;; Crux - e.g. if this resource is a collection, what type

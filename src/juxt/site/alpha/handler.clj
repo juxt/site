@@ -625,7 +625,9 @@
         access-control-allow-methods
         (get resource-origin ::site/access-control-allow-methods)
         access-control-allow-headers
-        (get resource-origin ::site/access-control-allow-headers)]
+        (get resource-origin ::site/access-control-allow-headers)
+        access-control-allow-credentials
+        (get resource-origin ::site/access-control-allow-credentials)]
 
     (log/trace "In OPTIONS")
 
@@ -647,7 +649,8 @@
          (cond-> headers
            allow-origin (assoc "access-control-allow-origin" allow-origin)
            access-control-allow-methods (assoc "access-control-allow-methods" (join-keywords access-control-allow-methods true))
-           access-control-allow-headers (assoc "access-control-allow-headers" (join-keywords access-control-allow-headers false))))))))
+           access-control-allow-headers (assoc "access-control-allow-headers" (join-keywords access-control-allow-headers false))
+           access-control-allow-credentials (assoc "access-control-allow-credentials" access-control-allow-credentials)))))))
 
 (defn PROPFIND [req]
   (dave.methods/propfind req))
