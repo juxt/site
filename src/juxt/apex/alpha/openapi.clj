@@ -254,7 +254,7 @@
                           (contains? methods :get)
                           (conj :head)))))
 
-            post-fn (when (= method :post) (some-> (get operation-object "juxt.site.alpha/post-fn") symbol))
+            post-fn-sym (when (= method :post) (some-> (get operation-object "juxt.site.alpha/post-fn") symbol))
 
             resource
             {::site/resource-provider ::openapi-path
@@ -297,15 +297,26 @@
         (cond-> resource
           (seq acceptable) (assoc ::http/acceptable {"accept" acceptable})
 
-          post-fn (assoc-in
-                   ;; Use ::site/request-locals to avoid database involvement
-                   [::site/request-locals ::site/post-fn]
-                   (fn post-fn [req]
-                     (log/debug "Calling post-fn" post-fn)
-                     (let [f (requiring-resolve post-fn)]
-                       (f (assoc-in
-                           req [::site/request-locals ::apex/request-instance]
-                           (received-body->json req))))))
+          post-fn-sym
+          (assoc-in
+           ;; Use ::site/request-locals to avoid database involvement
+           [::site/request-locals ::site/post-fn]
+           (fn post-fn-proxy [req]
+             (log/debug "Calling post-fn" post-fn-sym)
+             (let [f (try
+                       (requiring-resolve post-fn-sym)
+                       (catch IllegalArgumentException _
+                         (throw
+                          (ex-info
+                           (str "Failed to find post-fn: " post-fn-sym)
+                           (into req
+                                 {:ring.response/status 500
+                                  :ring.response/body "Internal Error\r\n"})))))]
+               (f (assoc-in
+                   req [::site/request-locals ::apex/request-instance]
+                   ;; TODO: Only do this when the request body is
+                   ;; application/json
+                   (received-body->json req))))))
 
           (= method :put)
           (assoc-in [::site/request-locals ::site/put-fn]
