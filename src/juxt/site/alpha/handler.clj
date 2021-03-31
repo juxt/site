@@ -23,7 +23,9 @@
    [juxt.reap.alpha.rfc7232 :as rfc7232]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.locator :as locator]
-   [juxt.site.alpha.util :as util])
+   [juxt.site.alpha.util :as util]
+   [juxt.site.alpha.effects :as fx]
+   [juxt.site.alpha.rules :as rules])
   (:import (java.net URI)))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -677,7 +679,7 @@
   (java.util.Date/from (java.time.Instant/parse instance)))
 
 (defn handler [{:ring.request/keys [method]
-                ::site/keys [uri db] :as req}]
+                ::site/keys [uri db crux-node] :as req}]
 
   ;; Step 1. 503 Unavailable (TODO)
 
@@ -773,29 +775,71 @@
                                :ring.response/body (str msg "\r\n")})))))
 
         allowed-methods (set (::http/methods res))
-        req (assoc req ::site/allowed-methods allowed-methods)]
+        req (assoc req ::site/allowed-methods allowed-methods)
 
-    ;; Step 10. Check method allowed
-    (when res
-      (when-not (contains? allowed-methods method)
-        (throw
-         (ex-info
-          "Method not allowed"
-          (into req
-                {:ring.response/status 405
-                 :ring.response/headers {"allow" (join-keywords allowed-methods true)}
-                 :ring.response/body "Method Not Allowed\r\n"})))))
+        ;; Step 10. Check method allowed
+        _ (when res
+            (when-not (contains? allowed-methods method)
+              (throw
+               (ex-info
+                "Method not allowed"
+                (into req
+                      {:ring.response/status 405
+                       :ring.response/headers {"allow" (join-keywords allowed-methods true)}
+                       :ring.response/body "Method Not Allowed\r\n"})))))
 
-    ;; Step 11. Invoke method
-    (case method
-      (:get :head) (GET req)
-      :post (POST req)
-      :put (PUT req)
-      :patch (PATCH req)
-      :delete (DELETE req)
-      :options (OPTIONS req)
-      :propfind (PROPFIND req)
-      :mkcol (MKCOL req))))
+        ;; Step 11. Invoke method
+        req (case method
+              (:get :head) (GET req)
+              :post (POST req)
+              :put (PUT req)
+              :patch (PATCH req)
+              :delete (DELETE req)
+              :options (OPTIONS req)
+              :propfind (PROPFIND req)
+              :mkcol (MKCOL req))
+
+        ;; Refresh the db, now all steps after this are in terms of the 'new'
+        ;; db.
+        db (x/db crux-node)
+
+        ;; Site-specific step: Check for any observers and 'run' them TODO:
+        ;; Perhaps effects need to run against happy and sad paths - i.e. errors
+        ;; - this should really be in a 'finally' block.
+        effects
+        (map first
+             (x/q db '{:find [rule]
+                       :where [[rule ::site/type "Effect"]]}))
+        _ (log/tracef "Effects are %s" (pr-str effects))
+
+        request-context
+        {'subject sub
+         'request (select-keys
+                   req
+                   [:ring.request/headers :ring.request/method :ring.request/path
+                    :ring.request/query :ring.request/protocol :ring.request/remote-addr
+                    :ring.request/scheme :ring.request/server-name :ring.request/server-post
+                    :ring.request/ssl-client-cert
+                    ::site/uri])
+         'environment {}}
+
+        matched-effects (rules/eval-effects (x/db crux-node) effects request-context)
+        _ (log/tracef "Matched effects are %s" (pr-str matched-effects))
+
+        _ (doseq [eff matched-effects]
+            (log/tracef "Running effect: %s" (get-in eff [:effect ::site/effect]))
+            (try
+              (fx/run-effect! req eff)
+              (catch clojure.lang.ExceptionInfo e
+                ;; Recover from failed effect
+                (log/error e (format "Failure in effect: %s" (pr-str (ex-data e)))))))
+
+        ;; Step 12. Set security headers, including CORS
+        ;; TODO - but see wrap-cors-headers middleware
+        ]
+
+    ;; Return req
+    req))
 
 (defn representation-headers [acc rep body]
   (letfn [(assoc-when-some [m k v]
@@ -918,10 +962,22 @@
              (when (contains? access-control-allow-origins request-origin)
                request-origin)
              (when (contains? access-control-allow-origins "*")
-               "*")))]
+               "*")))
+          cors-headers (when allow-origin (get access-control-allow-origins allow-origin))
+          ]
       (cond-> ctx
         allow-origin
-        (assoc-in [:ring.response/headers "access-control-allow-origin"] allow-origin)))))
+        (assoc-in [:ring.response/headers "access-control-allow-origin"] allow-origin)
+        (contains? cors-headers ::site/access-control-allow-methods)
+        (assoc-in [:ring.response/headers "access-control-allow-methods"]
+                  (join-keywords (get cors-headers ::site/access-control-allow-methods) true))
+        (contains? cors-headers ::site/access-control-allow-headers)
+        (assoc-in [:ring.response/headers "access-control-allow-headers"]
+                  (join-keywords (get cors-headers ::site/access-control-allow-headers) false))
+        (contains? cors-headers ::site/access-control-allow-credentials)
+        (assoc-in [:ring.response/headers "access-control-allow-credentials"]
+                  (str (get cors-headers ::site/access-control-allow-credentials)))))))
+
 
 (defn wrap-error-handling
   "Return a handler that constructs proper Ring responses, logs and error

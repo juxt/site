@@ -4,7 +4,8 @@
   (:require
    [clojure.walk :refer [postwalk-replace]]
    [clojure.tools.logging :as log]
-   [crux.api :as crux]))
+   [crux.api :as crux]
+   [juxt.site.alpha.rules :as rules]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
@@ -34,31 +35,7 @@
 
         ;;_  (log/debugf "Rules to match are %s" (pr-str rules))
 
-        temp-id-map (reduce-kv
-                     ;; Preserve any existing crux.db/id - e.g. the resource will have one
-                     (fn [acc k v] (assoc acc k (merge {:crux.db/id (java.util.UUID/randomUUID)} v)))
-                     {} request-context)
-
-        ;; Speculatively put each entry of the request context into the
-        ;; database. This new database is only in scope for this authorization.
-        db (crux/with-tx db (mapv (fn [e] [:crux.tx/put e]) (vals temp-id-map)))
-
-        evaluated-rules
-        (keep
-         (fn [rule-id]
-           (let [rule (crux/entity db rule-id)]
-             (when-let [target (::pass/target rule)]
-               (let [q {:find ['success]
-                        :where (into '[[(identity true) success]] target)
-                        :in (vec (keys temp-id-map))}
-                     match-results (apply crux/q db q (map :crux.db/id (vals temp-id-map)))]
-                 (assoc rule ::pass/matched? (pos? (count match-results)))))))
-         rules)
-
-        ;;_ (log/debugf "Result of rule matching: %s" (pr-str evaluated-rules))
-
-        matched-rules (filter ::pass/matched? evaluated-rules)
-
+        matched-rules (rules/match-targets db rules request-context)
 
         allowed? (and
                   (pos? (count matched-rules))
@@ -89,7 +66,7 @@
                 (filter #(= (::pass/effect %) ::pass/allow))
                 (map ::pass/limiting-clauses)
                 (apply concat))}
-        (pos? max-content-length) (assoc ::http/max-content-length max-content-length)))))
+          (pos? max-content-length) (assoc ::http/max-content-length max-content-length)))))
 
 (defn ->authorized-query [query authorization]
   ;; Ensure they apply to ALL entities queried by a given Datalog

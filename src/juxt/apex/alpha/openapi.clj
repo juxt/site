@@ -156,7 +156,8 @@
     (-> req
         (assoc :ring.response/status (if-not already-exists? 201 204)
                ::http/etag etag
-               ::http/last-modified last-modified)
+               ::http/last-modified last-modified
+               ::apex/instance instance)
         (update :ring.response/headers assoc "location" uri))))
 
 (defn- path-parameter-defs->map [path-param-defs]

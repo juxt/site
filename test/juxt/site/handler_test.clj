@@ -7,15 +7,17 @@
    [crux.api :as x]
    [jsonista.core :as json]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
-   [juxt.site.alpha.handler :as h])
+   [juxt.site.alpha.handler :as h]
+   juxt.mail.alpha.mail)
   (:import
    (crux.api ICruxAPI)
    (java.io ByteArrayInputStream)))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
+(alias 'mail (create-ns 'juxt.mail.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
+(alias 'site (create-ns 'juxt.site.alpha))
 
 (def ^:dynamic *opts* {})
 (def ^:dynamic ^ICruxAPI *crux-node*)
@@ -60,7 +62,7 @@
 
 (def access-all-apis
   {:crux.db/id "https://example.org/access-rule"
-   ::site/description "A rule allowing access everything"
+   ::site/description "A rule allowing access to all APIs"
    ::site/type "Rule"
    ::pass/target '[[resource ::site/resource-provider :juxt.apex.alpha.openapi/openapi-path]]
    ::pass/effect ::pass/allow})
@@ -209,11 +211,12 @@
                :crux.db/id "https://example.org/things/ABC%2FDEF"}
               (x/entity db (str "https://example.org" path))))))))
 
-#_((t/join-fixtures [with-crux with-handler])
+((t/join-fixtures [with-crux with-handler])
  (fn []
-   (log/trace "")
+   (log/trace "TESTING")
    (submit-and-await!
     [[:crux.tx/put access-all-apis]
+
      [:crux.tx/put {:crux.db/id "https://example.org/users/sue"
                     ::site/type "User"
                     ::site/description "Sue should receive an email on every alert"
@@ -249,79 +252,63 @@
             {"application/json"
              {"schema"
               {"properties"
-               {"juxt.site.alpha/type" {"type" "string"}}}}}}}}}}}]])
+               {"juxt.site.alpha/type" {"type" "string"}}}}}}}}}}}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/templates/alert-notification.html"
+       ::http/content "<h1>Alert</h1><p>There has been an alert. See {{ :href }}</p>"}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/templates/alert-notification.txt"
+       ::http/content "There has been an alert. See {{ :href }}"}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/effects/alert-notification"
+       ::site/type "Effect"
+       ::site/query
+       '{:find [email alert asset-type customer]
+         :keys [juxt.mail.alpha/to href asset-type customer]
+         :where [[request :ring.request/method :put]
+                 [request ::site/uri alert]
+                 [alert ::site/type "Alert"]
+                 [alert :asset-type asset-type]
+                 [alert :customer customer]
+
+                 ;; All service managers
+                 ;; TODO: Limit to alerts that are 'owned' by the same
+                 ;; dealer as the service manager
+                 [user ::site/type "User"]
+                 [user ::email email]
+                 [mapping ::role "https://example.org/roles/service-manager"]
+                 [mapping ::user user]]}
+
+       ::site/effect ::mail/send-emails
+       ::mail/from "notifications@example.org"
+       ::mail/subject "{{:asset-type}} Alert!"
+       ::mail/html-template "https://example.org/templates/alert-notification.html"
+       ::mail/text-template "https://example.org/templates/alert-notification.txt"}]])
 
    (let [path "/alerts/123"
-         body (json/write-value-as-string {"id" "123"
-                                           "juxt.site.alpha/type" "Alert"
-                                           "state" "unprocessed"})]
+         body (json/write-value-as-string
+               {"id" "123"
+                "juxt.site.alpha/type" "Alert"
+                "state" "unprocessed"
+                "asset-type" "Heart Monitor"
+                "customer" "Mountain Ridge Hospital"})]
 
-     ;; Put the first alert
-     (log/trace "Logging alert!")
      (*handler*
       {:ring.request/method :put
        :ring.request/path path
        :ring.request/body (ByteArrayInputStream. (.getBytes body))
+       :ring.request/protocol "HTTP/1.1"
        :ring.request/headers
        {"content-length" (str (count body))
         "content-type" "application/json"}})
 
-     (let [db (x/db *crux-node*)]
-       (doseq [[recipient alert]
-               (x/q db '{:find [(eql/project user [:crux.db/id ::email]) alert]
-                         :where [[alert ::site/type "Alert"]
-                                 [user ::site/type "User"]
-                                 [user ::email? true]
-                                 [mapping ::role "https://example.org/roles/service-manager"]
-                                 [mapping ::user user]
-                                 (not-join [user alert]
-                                           [mr ::site/type "MailRecord"]
-                                           [mr ::recipient user]
-                                           [mr ::about alert])]})]
+     (x/entity (x/db *crux-node*) "https://example.org/alerts/123")
+     ;;(is (= "123" (:id (x/entity (x/db *crux-node*) "https://example.org/alerts/123"))))
 
-         ;; Send email to recipient (::email recipient)
-         (log/tracef "Send email to %s (id=%s)" (::email recipient) (:crux.db/id recipient))
-
-         (->>
-          (x/submit-tx
-           *crux-node*
-           [[:crux.tx/put {:crux.db/id "https://example.org/maillogs/123"
-                           ::site/type "MailRecord"
-                           ::recipient (:crux.db/id recipient)
-                           ::about alert}]])
-          (x/await-tx *crux-node*))))
-
-     ;; Put a repeat alert
-     (log/trace "Logging repeat alert!")
-     (*handler*
-        {:ring.request/method :put
-         :ring.request/path path
-         :ring.request/body (ByteArrayInputStream. (.getBytes body))
-         :ring.request/headers
-         {"content-length" (str (count body))
-          "content-type" "application/json"}})
-
-
-     (let [db (x/db *crux-node*)]
-
-       (x/q db '{:find [(eql/project mr [*])]
-                 :where [[mr ::site/type "MailRecord"]
-                         ]})
-
-       (doseq [[recipient alert]
-               (x/q db '{:find [(eql/project user [::email]) alert]
-                         :where [[alert ::site/type "Alert"]
-                                 [user ::site/type "User"]
-                                 [user ::email? true]
-                                 [mapping ::role "https://example.org/roles/service-manager"]
-                                 [mapping ::user user]
-                                 (not-join [user alert]
-                                           [mr ::site/type "MailRecord"]
-                                           [mr ::recipient user]
-                                           [mr ::about alert])]})]
-
-         ;; Send email to recipient (::email recipient)
-         (log/tracef "Send email to %s" (::email recipient)))))))
+     )))
 
 (deftest if-modified-since-test
   (submit-and-await!
@@ -467,47 +454,3 @@
 ;; TODO: eval-conditional-requests in a transaction function to avoid race-conditions
 
 ;; TODO: Security headers - read latest OWASP and similar
-
-#_(deftest get-with-if-none-match-test
-    (let [{status1 :status
-           {:strs [etag] :as headers1} :headers}
-          (demo/handler
-           {:uri "/en/index.html"
-            :request-method :get})
-          {status2 :status headers2 :headers}
-          (demo/handler
-           {:uri "/en/index.html"
-            :request-method :get
-            :headers {"if-none-match" etag}})]
-      (is (= 200 status1))
-      (is (= #{"date" "content-type" "etag" "last-modified" "content-language" "content-length"}
-             (set (keys headers1))))
-      (is (= 304 status2))
-      ;; "The server generating a 304 response MUST generate any of the following
-      ;; header fields that would have been sent in a 200 (OK) response to the
-      ;; same request: Cache-Control, Content-Location, Date, ETag, Expires, and
-      ;; Vary." -- Section 4.1, RFC 7232
-      (is (= #{"date" "etag"} (set (keys headers2)))))
-
-    ;; Check that content-location and vary are also generated, when they would be
-    ;; for a 200.
-    (let [{status1 :status
-           headers1 :headers}
-          (demo/handler
-           {:uri "/index.html"
-            :request-method :get})
-          {status2 :status
-           headers2 :headers}
-          (demo/handler
-           {:uri "/index.html"
-            :request-method :get
-            :headers {"if-none-match" "\"1465419893\""}})]
-
-      (is (= 200 status1))
-      (is (= #{"date" "etag" "vary" "content-location"
-               "content-type" "content-length" "last-modified" "content-language"}
-             (set (keys headers1))))
-      (is (= 304 status2))
-      (is (= #{"date" "etag" "vary" "content-location"} (set (keys headers2))))
-      ;; TODO: test for cache-control & expires
-      ))

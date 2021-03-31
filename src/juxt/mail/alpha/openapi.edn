@@ -1,0 +1,110 @@
+;; This source file is in EDN only for editing purposes. It should be
+;; transformed to JSON or YAML as soon as it is installed. It should be stored
+;; in a classpath accessible location, to reduce deployment constraints.
+{:openapi "3.0.2"
+
+ :info
+ {:version "1.0.0"
+  :title "Site Mail API"
+  :description
+  "Email, SMS, Slack and other communications with staff"
+
+  :contact
+  {:name "Webmaster"}}
+
+ :servers [{:url "/_site"}]
+
+ :paths
+ {"/email-templates/"
+  {:get
+   {:responses
+    {200
+     {:crux/query
+      {:find [e]
+       :where [[e :juxt.site.alpha/type t]]
+       :args [{t "EmailTemplate"}]}
+
+      :content
+      {"application/json"
+       {:schema {"type" "array"
+                 "items" {"$ref" "#/components/schemas/IdentifiedEmailTemplate"}}}}}}}}
+
+  "/email-templates/{id}"
+  {:parameters
+   [{:name "id" :in "path" :required true
+     :schema {:type "string"}}]
+
+   :get
+   {:responses
+    {200
+     {:content
+      {"application/json"
+       {:schema {"$ref" "#/components/schemas/EmailTemplate"}}}}}}
+
+   :put
+   {:requestBody
+    {:required true
+     :content
+     {"application/json"
+      {:schema {"$ref" "#/components/schemas/EmailTemplate"}}}}}}
+
+  "/notifications"
+  {:post
+   {:juxt.site.alpha/post-fn juxt.mail.alpha.mail/send-mail
+    :requestBody
+    {:required true
+     :content
+     {"application/json"
+      {:schema {"properties"
+                {"from" {"type" "string"}
+                 "template" {"type" "uri-reference"}
+                 "to" {"type" "string"}}
+                :juxt.jinx.alpha/keyword-mappings
+                {"from" "juxt.mail.alpha/from"
+                 "template" "juxt.mail.alpha/template"
+                 "to" "juxt.mail.alpha/to"}}
+       :example {"from" "alice@example.com"
+                 "template" "/_site/email-templates/welcome"
+                 "to" "bob@example.com"}}}}}}}
+
+ :components
+ {:schemas
+  {"Identified"
+   {"$id" "/schemas/Identified"
+    :type "object"
+    :description
+    "The unique identifier of the document in the database. This is maps
+    directly to the crux.db/id attribute."
+    :required ["id"]
+    :juxt.jinx.alpha/keyword-mappings {"id" "crux.db/id"}
+    :properties
+    {"id" {:type "string" :format "uri-reference"}}}
+
+   "Named"
+   {"$id" "/schemas/Named"
+    :type "object"
+    :required ["name"]
+    :juxt.jinx.alpha/keyword-mappings {"name" "name"}
+    :properties
+    {"name" {:type "string" :minLength 1}}}
+
+   "Typed"
+   {"$id" "/schemas/Typed"
+    :type "object"
+    :required ["type"]
+    :juxt.jinx.alpha/keyword-mappings {"type" "juxt.site.alpha/type"}
+    :properties
+    {"type" {:type "string" :minLength 1}}}
+
+   "EmailTemplate"
+   {"$id" "/schemas/EmailTemplate"
+    :allOf
+    [{"$ref" "#/components/schemas/Typed"}
+     {:properties
+      {"type" {:const "EmailTemplate"}
+       "body" {:type "string"}}}]}
+
+   "IdentifiedEmailTemplate"
+   {:allOf
+    [{"$ref" "#/components/schemas/Identified"}
+     {"$ref" "#/components/schemas/EmailTemplate"}]}}}}
