@@ -823,10 +823,11 @@
                     ::site/uri])
          'environment {}}
 
-        actions (rules/eval-triggers (x/db crux-node) triggers request-context)
-        _ (log/tracef "Triggered actions are %s" (pr-str actions))
 
-        _ (doseq [action actions]
+        #_#_actions (rules/eval-triggers (x/db crux-node) triggers request-context)
+        #_#__ (log/tracef "Triggered actions are %s" (pr-str actions))
+
+        #_#__ (doseq [action actions]
             (log/tracef "Running action: %s" (get-in action [:trigger ::site/action]))
             (try
               (triggers/run-action! req action)
