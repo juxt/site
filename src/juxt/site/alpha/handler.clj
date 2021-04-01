@@ -927,7 +927,7 @@
                 :as ctx}]
 
   (log-context! ctx)
-  #_(store-context! ctx)
+  (store-context! ctx)
 
   (cond->
       (update ctx
