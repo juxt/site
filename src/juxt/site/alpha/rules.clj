@@ -51,7 +51,7 @@
         ]
     (filter ::pass/matched? evaluated-rules)))
 
-(defn eval-effects [db effects request-context]
+(defn eval-triggers [db triggers request-context]
   (let [temp-id-map (reduce-kv
                      ;; Preserve any existing crux.db/id - e.g. the resource will have one
                      (fn [acc k v] (assoc acc k (merge {:crux.db/id (java.util.UUID/randomUUID)} v)))
@@ -61,12 +61,12 @@
         db (x/with-tx db (mapv (fn [e] [:crux.tx/put e]) (vals temp-id-map)))]
 
     (keep
-     (fn [effect-id]
-       (let [effect (x/entity db effect-id)
-             q (merge (::site/query effect)
+     (fn [trigger-id]
+       (let [trigger (x/entity db trigger-id)
+             q (merge (::site/query trigger)
                       {:in (vec (keys temp-id-map))})
-             results (apply x/q db q (map :crux.db/id (vals temp-id-map)))]
-         (when (seq results)
-           {:effect effect
-            :results results})))
-     effects)))
+             action-data (apply x/q db q (map :crux.db/id (vals temp-id-map)))]
+         (when (seq action-data)
+           {:trigger trigger
+            :action-data action-data})))
+     triggers)))

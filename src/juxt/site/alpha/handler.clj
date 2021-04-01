@@ -24,7 +24,7 @@
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.locator :as locator]
    [juxt.site.alpha.util :as util]
-   [juxt.site.alpha.effects :as fx]
+   [juxt.site.alpha.triggers :as triggers]
    [juxt.site.alpha.rules :as rules])
   (:import (java.net URI)))
 
@@ -806,11 +806,11 @@
         ;; Site-specific step: Check for any observers and 'run' them TODO:
         ;; Perhaps effects need to run against happy and sad paths - i.e. errors
         ;; - this should really be in a 'finally' block.
-        effects
+        triggers
         (map first
              (x/q db '{:find [rule]
-                       :where [[rule ::site/type "Effect"]]}))
-        _ (log/tracef "Effects are %s" (pr-str effects))
+                       :where [[rule ::site/type "Trigger"]]}))
+        _ (log/tracef "Triggers are %s" (pr-str triggers))
 
         request-context
         {'subject sub
@@ -823,16 +823,16 @@
                     ::site/uri])
          'environment {}}
 
-        matched-effects (rules/eval-effects (x/db crux-node) effects request-context)
-        _ (log/tracef "Matched effects are %s" (pr-str matched-effects))
+        actions (rules/eval-triggers (x/db crux-node) triggers request-context)
+        _ (log/tracef "Triggered actions are %s" (pr-str actions))
 
-        _ (doseq [eff matched-effects]
-            (log/tracef "Running effect: %s" (get-in eff [:effect ::site/effect]))
+        _ (doseq [action actions]
+            (log/tracef "Running action: %s" (get-in action [:trigger ::site/action]))
             (try
-              (fx/run-effect! req eff)
+              (triggers/run-action! req action)
               (catch clojure.lang.ExceptionInfo e
                 ;; Recover from failed effect
-                (log/error e (format "Failure in effect: %s" (pr-str (ex-data e)))))))
+                (log/error e (format "Failed to run action: %s" (pr-str (ex-data e)))))))
 
         ;; Step 12. Set security headers, including CORS
         ;; TODO - but see wrap-cors-headers middleware

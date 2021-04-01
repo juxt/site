@@ -4,7 +4,7 @@
   (:require
    [amazonica.aws.simpleemail :as ses]
    ;;   [amazonica.aws.pinpoint :as pp]
-   [juxt.site.alpha.effects :as fx]
+   [juxt.site.alpha.triggers :as triggers]
    [crux.api :as x]
    [clojure.tools.logging :as log]
    [clojure.string :as str]))
@@ -38,12 +38,12 @@
               :else  mtch))
       "<blank>"))))
 
-(defmethod fx/run-effect! ::mail/send-emails [{::site/keys [db crux-node]}
-                                              {:keys [effect results]}]
-  (let [{::mail/keys [html-template text-template from subject]} effect
+(defmethod triggers/run-action! ::mail/send-emails
+  [{::site/keys [db]} {:keys [trigger action-data]}]
+  (let [{::mail/keys [html-template text-template from subject]} trigger
         html-template (some-> (x/entity db html-template) ::http/content)
         text-template (some-> (x/entity db text-template) ::http/content)]
-    (doseq [{::mail/keys [to] :as data} results]
+    (doseq [{::mail/keys [to] :as data} action-data]
       (send-mail!
        from to
        (mail-merge subject data)
