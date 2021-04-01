@@ -15,17 +15,9 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'mail (create-ns 'juxt.mail.alpha))
 
-(defn get-valid-source-emails []
-  (set (filter #(re-seq #"@" %)(:identities (ses/list-identities)))))
-
-(get-valid-source-emails)
-
 (defn send-mail! [from to subject html-body text-body]
 
-  (log/tracef "Sending email to %s with subject %s, body %s" to subject html-body)
-
-  (when-not (contains? (get-valid-source-emails) from)
-    (throw (ex-info "Failed to send email" {:from from :to to})))
+  (log/debugf "Sending email to %s with subject %s, body %s" to subject html-body)
 
   (ses/send-email
    :destination {:to-addresses [to]}
@@ -57,34 +49,3 @@
        (mail-merge subject data)
        (mail-merge html-template data)
        (mail-merge text-template data)))))
-
-;; Make this a test
-#_(let [template "Alert on {{ :juxt.site.alpha/resource :title }} -- {{ :juxt.site.alpha/uri }}"
-        data {::site/resource {:title "Heart Monitor"}
-              ::site/uri "https://example.com/alerts/123"}]
-    (mail-merge template data))
-
-#_(let [db (x/db *crux-node*)]
-    (doseq [[recipient alert]
-            (x/q db '{:find [(eql/project user [:crux.db/id ::email]) alert]
-                      :where [[alert ::site/type "Alert"]
-                              [user ::site/type "User"]
-                              [user ::email? true]
-                              [mapping ::role "https://example.org/roles/service-manager"]
-                              [mapping ::user user]
-                              (not-join [user alert]
-                                        [mr ::site/type "MailRecord"]
-                                        [mr ::recipient user]
-                                        [mr ::about alert])]})]
-
-      ;; Send email to recipient (::email recipient)
-      (log/tracef "Send email to %s (id=%s)" (::email recipient) (:crux.db/id recipient))
-
-      (->>
-       (x/submit-tx
-        *crux-node*
-        [[:crux.tx/put {:crux.db/id "https://example.org/maillogs/123"
-                        ::site/type "MailRecord"
-                        ::recipient (:crux.db/id recipient)
-                        ::about alert}]])
-       (x/await-tx *crux-node*))))
