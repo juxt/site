@@ -2,7 +2,8 @@
 
 (ns juxt.site.alpha.rules
   (:require
-   [crux.api :as x]))
+   [crux.api :as x]
+   [clojure.tools.logging :as log]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -34,19 +35,23 @@
         db (x/with-tx db (mapv (fn [e] [:crux.tx/put e]) (vals temp-id-map)))
 
         evaluated-rules
-        (keep
-         (fn [rule-id]
-           (let [rule (x/entity db rule-id)]
-             ;; Arguably ::pass/target, ::pass/effect and ::pass/matched? should
-             ;; be re-namespaced.
-             (when-let [target (::pass/target rule)]
-               (let [q {:find ['success]
-                        :where (into '[[(identity true) success]] target)
-                        :in (vec (keys temp-id-map))}
-                     match-results (apply x/q db q (map :crux.db/id (vals temp-id-map)))]
-                 (assoc rule ::pass/matched? (pos? (count match-results)))))))
-         rules)
-
+        (try
+          (keep
+           (fn [rule-id]
+             (let [rule (x/entity db rule-id)]
+               ;; Arguably ::pass/target, ::pass/effect and ::pass/matched? should
+               ;; be re-namespaced.
+               (when-let [target (::pass/target rule)]
+                 (let [q {:find ['success]
+                          :where (into '[[(identity true) success]] target)
+                          :in (vec (keys temp-id-map))}
+                       match-results (apply x/q db q (map :crux.db/id (vals temp-id-map)))]
+                   (assoc rule ::pass/matched? (pos? (count match-results)))))))
+           rules)
+          (catch Exception e
+            (log/error e "Failed to evaluate rules")
+            ;; Return empty vector of rules to recover
+            []))
         ;;_ (log/debugf "Result of rule matching: %s" (pr-str evaluated-rules))
         ]
     (filter ::pass/matched? evaluated-rules)))
