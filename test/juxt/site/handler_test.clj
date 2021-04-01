@@ -260,7 +260,7 @@
       ::http/content "There has been an alert. See {{ :href }}"}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/effects/alert-notification"
+     {:crux.db/id "https://example.org/triggers/alert-notification"
       ::site/type "Trigger"
       ::site/query
       '{:find [email alert asset-type customer]
