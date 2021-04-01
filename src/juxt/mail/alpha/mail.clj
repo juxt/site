@@ -43,6 +43,8 @@
   (let [{::mail/keys [html-template text-template from subject]} trigger
         html-template (some-> (x/entity db html-template) ::http/content)
         text-template (some-> (x/entity db text-template) ::http/content)]
+    (assert html-template)
+    (assert text-template)
     (doseq [{::mail/keys [to] :as data} action-data]
       (send-mail!
        from to
