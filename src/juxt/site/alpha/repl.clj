@@ -84,11 +84,20 @@
    first
    (x/q (db) '{:find [e] :where [[e :type t]] :in [t]} t)))
 
+(defn types []
+  (->> (q '{:find [t]
+            :where [[_ ::site/type t]]})
+       (map first)
+       (sort)))
+
 (defn ls
   "List Site resources"
   ([]
-   (->> (q '{:find [e] :where [[e :crux.db/id]
-                               (not [e ::site/type "Request"])]})
+   (->> (q '{:find [e]
+             :where [[e :crux.db/id]
+                     [e ::site/type typ]]
+             :in [[typ ...]]}
+           (disj (set (types)) "Request"))
         (map first)
         (sort-by str)))
   ([pat]
