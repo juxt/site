@@ -823,17 +823,16 @@
                     ::site/uri])
          'environment {}}
 
-
-        actions (rules/eval-triggers (x/db crux-node) triggers request-context)
-        _ (log/tracef "Triggered actions are %s" (pr-str actions))
-
-        _ (doseq [action actions]
-            (log/tracef "Running action: %s" (get-in action [:trigger ::site/action]))
-            (try
-              (triggers/run-action! req action)
-              (catch clojure.lang.ExceptionInfo e
-                ;; Recover from failed effect
-                (log/error e (format "Failed to run action: %s" (pr-str (ex-data e)))))))
+        _ (try
+            (let [actions (rules/eval-triggers (x/db crux-node) triggers request-context)]
+              (log/tracef "Triggered actions are %s" (pr-str actions))
+              (doseq [action actions]
+                (log/tracef "Running action: %s" (get-in action [:trigger ::site/action]))
+                (triggers/run-action! req action)))
+            (catch clojure.lang.ExceptionInfo e
+              (log/error e (format "Failed to run trigger/action: %s" (pr-str (ex-data e)))))
+            (catch Exception e
+              (log/error e "Failed to run trigger/action")))
 
         ;; Step 12. Set security headers, including CORS
         ;; TODO - but see wrap-cors-headers middleware
