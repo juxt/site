@@ -449,6 +449,40 @@
           (error! "Server response: " status " " (str/trim body))
           (message! "Request id: " (get headers "site-request-id")))))))
 
+(defn put-trigger
+  "Put a trigger"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [base-uri name trigger]
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
+        (:options opts)]
+
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+    (when-not name (error-and-usage! "Name required" opts))
+    (when-not trigger (error-and-usage! "Trigger file required" opts))
+    (when-not (.isFile (io/file trigger)) (error-and-exit! 1 "Trigger file must be a file"))
+
+    (let [{:keys [status headers body]}
+          (curl/put
+           (format "%s/_site/triggers/%s" base-uri name)
+           {:headers {"authorization" (format "Bearer %s" access-token)
+                      "content-type" "application/json"}
+            :body (str/replace
+                   (slurp (io/file trigger))
+                   "{{base-uri}}" base-uri)
+            :throw false})]
+      (cond
+        (= status 201)
+        (message! (format "Trigger created: %s" (get headers "location")))
+
+        (= status 204)
+        (message! (format "Trigger updated: %s" (get headers "location")))
+
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
 (defn put-variant
   "Associate a variant representation to a resource"
   [opts]
@@ -743,6 +777,12 @@
      :cli-options [["-n" "--name NAME" "Rule name"]
                    ["-r" "--rule FILE" "Rule file"]]
      :delegate put-rule}]
+
+   ["put-trigger"
+    {:description (:doc (meta #'put-trigger))
+     :cli-options [["-n" "--name NAME" "Trigger name"]
+                   ["-t" "--trigger FILE" "Trigger file"]]
+     :delegate put-trigger}]
 
    ["put-variant"
     {:description (:doc (meta #'put-variant))

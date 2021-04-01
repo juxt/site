@@ -276,6 +276,62 @@
           :content
           {"text/plain;charset=utf-8" {}}}}}}
 
+  "/triggers/"
+  {:get
+   {:description "Returns a list of all the trigger"
+
+    :responses
+    {200
+     {:crux/query
+      {:find [e]
+       :where [[e :juxt.site.alpha/type t]]
+       :args [{t "Trigger"}]}
+
+      :content
+      {"application/json"
+       {:schema {"type" "array"
+                 "items" {"$ref" "#/components/schemas/IdentifiedTrigger"}}}
+       "text/html;charset=utf-8"
+       {:title "Triggers"
+        :type "edn-table"
+        :schema {"type" "array"
+                 "items" {"$ref" "#/components/schemas/IdentifiedTrigger"}}}}}}}}
+
+  "/triggers/{id}"
+  {:parameters
+   [{:name "id" :in "path" :required true
+     :description "Trigger id"
+     :schema {:type "string"}}]
+
+   :get
+   {:description "Returns a given trigger",
+    :responses
+    {200
+     {:description "Single identified trigger"
+      :content
+      {"application/json"
+       {:schema {"$ref" "#/components/schemas/Trigger"}}
+
+       "text/html;charset=utf-8"
+       {:title "Trigger"
+        :schema {"$ref" "#/components/schemas/Trigger"}}}}}}
+
+   :put
+   {:description "Upserts a trigger"
+    :requestBody
+    {:required true
+     :content
+     {"application/json"
+      {:schema {"$ref" "#/components/schemas/Trigger"}}}}
+
+    :responses
+    {200 {:description "Trigger successfully updated"
+          :content
+          {"text/plain;charset=utf-8" {}}}
+     201 {:description "Trigger successfully created"
+          :content
+          {"text/plain;charset=utf-8" {}}}}}}
+
   "/variants/"
   {:post
    {:juxt.site.alpha/post-fn juxt.site.alpha.handler/post-variant
@@ -487,6 +543,28 @@
     :allOf
     [{"$ref" "#/components/schemas/Identified"}
      {"$ref" "#/components/schemas/Rule"}]}
+
+   "Trigger"
+   {"$id" "/schemas/Trigger"
+    :allOf
+    [{"$ref" "#/components/schemas/Typed"}
+     {:type "object"
+      :required ["query" "action"]
+      :juxt.jinx.alpha/keyword-mappings
+      {"description" "juxt.site.alpha/description"
+       "query" "juxt.site.alpha/query"
+       "action" "juxt.site.alpha/action"}
+      :properties
+      {"type" {:const "Trigger"}
+       "description" {:type "string"}
+       "query" {:type "string" :juxt.jinx.alpha/as "edn"}
+       "action" {:type "string" :juxt.jinx.alpha/as "keyword"}}}]}
+
+   "IdentifiedTrigger"
+   {"$id" "/schemas/IdentifiedTrigger"
+    :allOf
+    [{"$ref" "#/components/schemas/Identified"}
+     {"$ref" "#/components/schemas/Trigger"}]}
 
    "Variant"
    {"$id" "/schemas/Variant"
