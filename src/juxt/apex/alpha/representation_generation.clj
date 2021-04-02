@@ -67,12 +67,12 @@
                                ::pass/keys [authorization subject] :as req}]
 
   (let [param-defs
-        (get-in resource [::site/request-locals ::apex/operation "parameters"])
+        (get-in resource [::apex/operation "parameters"])
 
         in '[now subject]
 
         query
-        (get-in resource [::site/request-locals ::apex/operation "responses" "200" "crux/query"])
+        (get-in resource [::apex/operation "responses" "200" "crux/query"])
 
         crux-query
         (when query (->query query (extract-params-from-request req param-defs)))
@@ -108,7 +108,7 @@
           (.getBytes "UTF-8"))
 
       "text/html;charset=utf-8"
-      (let [config (get-in resource [::site/request-locals ::apex/operation "responses"
+      (let [config (get-in resource [::apex/operation "responses"
                                      "200" "content"
                                      (::http/content-type selected-representation)])]
         (->

@@ -3,6 +3,7 @@
 (ns juxt.site.alpha.rules
   (:require
    [crux.api :as x]
+   [juxt.site.alpha.util :as util]
    [clojure.tools.logging :as log]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -10,11 +11,10 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn post-rule [{::site/keys [crux-node uri request-locals] :as req}]
+(defn post-rule
+  [{::site/keys [crux-node uri] ::apex/keys [request-instance] :as req}]
 
-  (let [request-instance (get request-locals ::apex/request-instance)
-
-        location
+  (let [location
         (str uri (hash (select-keys request-instance [::pass/target ::pass/effect])))]
 
     (->> (x/submit-tx
@@ -32,7 +32,11 @@
                      {} request-context)
         ;; Speculatively put each entry of the request context into the
         ;; database. This new database is only in scope for this authorization.
-        db (x/with-tx db (mapv (fn [e] [:crux.tx/put e]) (vals temp-id-map)))
+        db (x/with-tx db (->> temp-id-map
+                              vals
+                              (map util/->freezeable)
+                              ;; TODO: Use map rather than mapv?
+                              (mapv (fn [e] [:crux.tx/put e]))))
 
         evaluated-rules
         (try

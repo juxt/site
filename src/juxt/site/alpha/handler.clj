@@ -25,6 +25,7 @@
    [juxt.site.alpha.locator :as locator]
    [juxt.site.alpha.util :as util]
    [juxt.site.alpha.triggers :as triggers]
+   [taoensso.nippy.utils :refer [freezable?]]
    [juxt.site.alpha.rules :as rules])
   (:import (java.net URI)))
 
@@ -446,10 +447,8 @@
    (when-let [r (x/entity db uri)]
      (cond-> (assoc r ::site/resource-provider ::db)
        (= (get r ::site/type) "StaticRepresentation")
-       (update ::site/request-locals
-               assoc
-               ::site/put-fn put-static-resource
-               ::site/patch-fn patch-static-resource)))
+       (assoc ::site/put-fn put-static-resource
+              ::site/patch-fn patch-static-resource)))
 
    ;; Is it found by any resource locators registered in the database?
    (locator/locate-with-locators db req)
@@ -471,8 +470,7 @@
    ;; Return a back-stop resource
    {::site/resource-provider ::default-empty-resource
     ::http/methods #{:get :head :options :put :post}
-    ::site/request-locals
-    {::site/put-fn put-static-resource}}))
+    ::site/put-fn put-static-resource}))
 
 (defn current-representations [{::site/keys [resource uri db]}]
   (or
@@ -498,8 +496,7 @@
    ;; Most resources have a content-type, which indicates there is only one
    ;; variant.
    (when (::http/content-type resource)
-     [(-> resource
-          (dissoc ::site/request-locals))])
+     [resource])
 
    ;; No representations. On a GET, this would yield a 404.
    []))
@@ -524,10 +521,11 @@
            :ring.response/status 200
            :ring.response/body body)))
 
-(defn post-variant [{::site/keys [crux-node db uri request-locals] :as req}]
+(defn post-variant [{::site/keys [crux-node db uri]
+                     ::apex/keys [request-instance]
+                     :as req}]
 
-  (let [request-instance (get request-locals ::apex/request-instance)
-        location
+  (let [location
         (str uri (hash (select-keys request-instance [::site/resource ::site/variant])))
         existing (x/entity db location)]
 
@@ -539,9 +537,10 @@
     (into req {:ring.response/status (if existing 204 201)
                :ring.response/headers {"location" location}})))
 
-(defn post-redirect [{::site/keys [crux-node db uri request-locals] :as req}]
-  (let [request-instance (get request-locals ::apex/request-instance)
-        location (str uri (hash (select-keys request-instance [::site/resource ::site/location])))
+(defn post-redirect [{::site/keys [crux-node db uri]
+                      ::apex/keys [request-instance]
+                      :as req}]
+  (let [location (str uri (hash (select-keys request-instance [::site/resource ::site/location])))
         existing (x/entity db location)]
     (->> (x/submit-tx
           crux-node
@@ -556,7 +555,7 @@
              (receive-representation req)
              (assoc ::site/request request-id))
         req (assoc req ::site/received-representation rep)
-        post-fn (get-in resource [::site/request-locals ::site/post-fn])]
+        post-fn (::site/post-fn resource)]
 
     (cond
       (fn? post-fn) (post-fn req)
@@ -576,7 +575,7 @@
 (defn PUT [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
         req (assoc req ::site/received-representation rep)
-        put-fn (get-in resource [::site/request-locals ::site/put-fn])]
+        put-fn (::site/put-fn resource)]
 
     (log/tracef "PUT, put-fn is %s" put-fn)
     (cond
@@ -591,7 +590,7 @@
 (defn PATCH [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
         req (assoc req ::site/received-representation rep)
-        patch-fn (get-in resource [::site/request-locals ::site/patch-fn])]
+        patch-fn (::site/patch-fn resource)]
 
     ;; TODO: evaluate preconditions (in tx fn)
     (cond
@@ -744,15 +743,14 @@
         ;; 'entities' given that we now have a simple flat map?
         request-context
         {'subject sub
-         ;; ::site/request-locals is used to avoid database involvement
-         'resource (dissoc res ::site/request-locals ::http/body ::http/content)
+         'resource (dissoc res ::http/body ::http/content)
          'request (select-keys
                    req
                    [:ring.request/headers :ring.request/method :ring.request/path
                     :ring.request/query :ring.request/protocol :ring.request/remote-addr
                     :ring.request/scheme :ring.request/server-name :ring.request/server-post
                     :ring.request/ssl-client-cert])
-         'representation (dissoc res ::site/request-locals ::http/body ::http/content)
+         'representation (dissoc res ::http/body ::http/content)
          'environment {}}
         authz (when (not= method :options)
                 (pdp/authorization db request-context))
@@ -866,86 +864,88 @@
         (assoc-when-some "trailer" (::http/trailer rep))
         (assoc-when-some "transfer-encoding" (::http/transfer-encoding rep)))))
 
-(defn minimize-response [response walk-tree?]
-  (cond->
-      (-> response
-          (dissoc :ring.response/body
-                  :ring.request/body
-                  ::site/crux-node ::site/db
-                  ;; Also, this is the crux.db/id so don't repeat
-                  ::site/request-id)
+(defn redact [ctx]
+  (-> ctx
+      (update :ring.request/headers
+              (fn [headers]
+                (cond-> headers
+                  (contains? headers "authorization")
+                  (assoc "authorization" "(redacted)"))))))
 
-          (update :ring.response/headers dissoc "set-cookie")
+(defn ->serializable [{::site/keys [request-id db] :as ctx}]
+  (-> ctx
+      (into (select-keys db [:crux.db/valid-time :crux.tx/tx-id]))
+      (assoc :crux.db/id request-id ::site/type "Request")
+      redact
+      (util/deep-replace
+       (fn [form]
+         (cond-> form
+           (and (string? form) (>= (count form) 64))
+           (subs 0 64)
 
-          ;; ::site/request-locals is used to avoid database involvement
-          (update ::site/resource dissoc ::site/request-locals ::http/body ::http/content)
-          (update ::site/selected-representation dissoc ::http/body ::http/content)
-          (update ::site/current-representations
-                  (fn [reps] (map #(dissoc % ::http/body ::http/content) reps)))
-          (update ::site/received-representation dissoc ::http/body ::http/content)
-          (update :ring.request/headers
-                  (fn [headers]
-                    (cond-> headers
-                      (contains? headers "authorization")
-                      (assoc "authorization" "REDACTED")))))
-    ;; TODO: Aggressive search to evict anything that isn't Nippy freezable
-      walk-tree? identity))
+           (and (vector? form) (>= (count form) 64))
+           (subvec 0 64)
+
+           (and (list? form) (>= (count form) 64))
+           (#(take 64 %))
+
+           (not (freezable? form))
+           ((fn [form] (format "(unfreezable %s)" (type form)))))))))
 
 (defn log-context! [{:ring.request/keys [method] :as ctx}]
   (assert method)
-  (log/infof "%-7s %s %s %d"
-             (str/upper-case (name method))
-             (:ring.request/path ctx)
-             (:ring.request/protocol ctx)
-             (:ring.response/status ctx)))
+  (log/infof
+   "%-7s %s %s %d"
+   (str/upper-case (name method))
+   (:ring.request/path ctx)
+   (:ring.request/protocol ctx)
+   (:ring.response/status ctx)))
 
 (defn store-context!
-  [{::site/keys [crux-node db request-id start-date] :as ctx}]
+  [{::site/keys [crux-node] :as ctx}]
   (assert crux-node)
-  (try
-    (x/submit-tx
-     crux-node
-     [[:crux.tx/put
-       (merge
-        (minimize-response ctx (some? (::site/error ctx)))
-
-        (select-keys db [:crux.db/valid-time :crux.tx/tx-id])
-
-        (let [end-date (java.util.Date.)]
-          {:crux.db/id request-id
-           ::site/type "Request"
-           ::site/end-date end-date
-           ::site/duration-millis (- (.getTime end-date)
-                                     (.getTime start-date))}))]])
-    (catch Exception e
-      (log/error e "Failed to log request, recovering"))))
+  (let [blob (->serializable ctx)]
+    (try
+      (x/submit-tx
+       crux-node
+       [[:crux.tx/put blob]])
+      (catch Exception e
+        (log/error e "Failed to log request, recovering")))))
 
 ;; TODO: Split into logback logger, Crux logger and response finisher. This will
 ;; make it easier to disable one or both logging strategies.
-(defn respond [{::site/keys [selected-representation body start-date base-uri request-id]
+(defn respond [{::site/keys [selected-representation body start-date base-uri request-id uri]
                 :ring.request/keys [method]
                 :as ctx}]
 
-  (log-context! ctx)
-  (store-context! ctx)
+  (when-not start-date
+    (throw (ex-info "Start date not present" {})))
 
-  (cond->
-      (update ctx
-              :ring.response/headers
-              assoc "date" (format-http-date start-date))
+  (let [end-date (java.util.Date.)
+        ctx (assoc ctx ::site/end-date end-date
+                   ::site/duration-millis (- (.getTime end-date)
+                                             (.getTime start-date)))]
 
-    request-id
-    (update :ring.response/headers
-            assoc "site-request-id"
-            (cond-> request-id
-              (.startsWith request-id base-uri)
-              (subs (count base-uri))))
+    (log-context! ctx)
+    (store-context! ctx)
 
-    selected-representation
-    (update :ring.response/headers
-            representation-headers selected-representation body)
+    (cond->
+        (update ctx
+                :ring.response/headers
+                assoc "date" (format-http-date start-date))
 
-    (= method :head) (dissoc :ring.response/body)))
+        request-id
+        (update :ring.response/headers
+                assoc "site-request-id"
+                (cond-> request-id
+                  (.startsWith request-id base-uri)
+                  (subs (count base-uri))))
+
+        selected-representation
+        (update :ring.response/headers
+                representation-headers selected-representation body)
+
+        (= method :head) (dissoc :ring.response/body))))
 
 (defn wrap-responder [h]
   (fn [req]
@@ -992,7 +992,7 @@
       (catch clojure.lang.ExceptionInfo e
         (let [{:ring.response/keys [status] :as exdata} (ex-data e)]
           (when (and (integer? status) (>= status 500))
-            (let [exdata (minimize-response exdata true)]
+            (let [exdata (->serializable exdata)]
               ;;(prn (.getMessage e))
               ;;(pprint exdata)
               (log/errorf e "%s: %s" (.getMessage e) (pr-str exdata))))

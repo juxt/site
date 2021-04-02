@@ -59,13 +59,14 @@
 (defn- received-body->json
   "Return a JSON instance from the request. Throw a 400 error if the JSON is
   invalid."
-  [{::site/keys [resource received-representation] :as req}]
+  [{::site/keys [resource received-representation db] :as req}]
 
   (let [body (::http/body received-representation)
-        schema (get-in resource [::site/request-locals ::apex/operation "requestBody" "content"
+        schema (get-in resource [::apex/operation "requestBody" "content"
                                  "application/json" "schema"]) _ (assert schema)
         instance (json/read-value body) _ (assert instance)
-        openapi (get-in resource [::site/request-locals ::apex/openapi]) _ (assert openapi)
+        openapi-ref (get resource ::apex/openapi) _ (assert openapi-ref)
+        openapi (x/entity db openapi-ref) _ (assert openapi)
 
         validation
         (jinx.api/validate schema instance {:base-document openapi})
@@ -97,7 +98,7 @@
 
   (let [instance (received-body->json req)
 
-        path-params (get-in req [::site/resource ::site/request-locals ::apex/openapi-path-params])
+        path-params (get-in req [::site/resource ::apex/openapi-path-params])
 
         ;; Inject path parameter values into body, this is a feature, enabled by
         ;; the x-juxt-site-inject-property OpenAPI extension keyword.
@@ -113,7 +114,7 @@
         (pdp/authorization
          db
          {'subject subject
-          'resource (dissoc resource ::site/request-locals)
+          'resource resource
           ;; might change to 'action' at
           ;; this point
           'request (select-keys req [:ring.request/method])
@@ -178,7 +179,7 @@
   "From an OpenAPI path-to-path-object entry, return the corresponding resource if
   it matches the path. Path matching also considers path-parameters."
   [{:ring.request/keys [method]}
-   [path path-item-object] openapi rel-request-path]
+   [path path-item-object] openapi openapi-uri rel-request-path]
 
   (let [path-param-defs
         (merge
@@ -260,14 +261,14 @@
             resource
             {::site/resource-provider ::openapi-path
 
-             ::site/request-locals
-             {::apex/openapi openapi  ; This is useful, because it is the base
-                                        ; document for any relative json pointers.
-              ::apex/operation operation-object
-              ::apex/openapi-path-params path-params
-              }
+             ;; This is useful, because it is the base document for any relative
+             ;; json pointers.
+             ;; TODO: Search for instances of apex/openapi and ensure they do (x/entity)
+             ::apex/openapi openapi-uri
 
+             ::apex/operation operation-object
              ::apex/openapi-path path
+             ::apex/openapi-path-params path-params
 
              ::http/methods methods
 
@@ -299,9 +300,8 @@
           (seq acceptable) (assoc ::http/acceptable {"accept" acceptable})
 
           post-fn-sym
-          (assoc-in
-           ;; Use ::site/request-locals to avoid database involvement
-           [::site/request-locals ::site/post-fn]
+          (assoc
+           ::site/post-fn
            (fn post-fn-proxy [req]
              (log/debug "Calling post-fn" post-fn-sym)
              (let [f (try
@@ -313,24 +313,26 @@
                            (into req
                                  {:ring.response/status 500
                                   :ring.response/body "Internal Error\r\n"})))))]
-               (f (assoc-in
-                   req [::site/request-locals ::apex/request-instance]
+               (f (assoc
+                   req
+                   ::apex/request-instance
                    ;; TODO: Only do this when the request body is
                    ;; application/json
                    (received-body->json req))))))
 
           (= method :put)
-          (assoc-in [::site/request-locals ::site/put-fn]
-                    (fn put-fn [req]
-                      (let [rep (::site/received-representation req)
-                            {:juxt.reap.alpha.rfc7231/keys [type subtype parameter-map]}
-                            (reap.decoders/content-type (::http/content-type rep))]
-                        (case
-                            ;; TODO: Depending on requestBody
-                            (and
-                             (.equalsIgnoreCase "application" type)
-                             (.equalsIgnoreCase "json" subtype))
-                            (put-json-representation req))))))))))
+          (assoc
+           ::site/put-fn
+           (fn put-fn [req]
+             (let [rep (::site/received-representation req)
+                   {:juxt.reap.alpha.rfc7231/keys [type subtype parameter-map]}
+                   (reap.decoders/content-type (::http/content-type rep))]
+               (case
+                   ;; TODO: Depending on requestBody
+                   (and
+                    (.equalsIgnoreCase "application" type)
+                    (.equalsIgnoreCase "json" subtype))
+                   (put-json-representation req))))))))))
 
 (defn locate-resource
   [db uri
@@ -354,7 +356,7 @@
       ;; It might exist
       (some-> (x/entity db uri)
               (assoc ::site/resource-provider ::openapi-document
-                     ::site/request-locals {::site/put-fn put-openapi}))
+                     ::site/put-fn put-openapi))
 
       ;; Or it might not
       ;; This last item (:put) might be granted by the PDP.
@@ -363,22 +365,24 @@
        "Resource with no representations accepting a PUT of an OpenAPI JSON document."
        ::http/methods #{:get :head :options :put}
        ::http/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.0.2"}
-       ::site/request-locals {::site/put-fn put-openapi}}))
+       ::site/put-fn put-openapi}))
 
-   (let [openapis (x/q db '{:find [openapi-eid openapi]
-                            :where [[openapi-eid ::apex/openapi openapi]]})
+   (let [openapis (x/q db '{:find [openapi-uri openapi]
+                            :where [[openapi-uri ::apex/openapi openapi]]})
+         ;; TODO: unnecessary let binding above
          matches
          (for [[openapi-uri openapi] openapis
                server (get openapi "servers")
                :let [server-url (get server "url")
-                     abs-server-url (cond->> server-url
-                                      (or (.startsWith server-url "/")
-                                          (= server-url ""))
-                                      (str base-uri))]
+                     abs-server-url
+                     (cond->> server-url
+                       (or (.startsWith server-url "/")
+                           (= server-url ""))
+                       (str base-uri))]
                :when (.startsWith uri abs-server-url)
                :let [paths (get openapi "paths")]
                path paths
-               :let [resource (path-entry->resource req path openapi (subs uri (count abs-server-url)))]
+               :let [resource (path-entry->resource req path openapi openapi-uri (subs uri (count abs-server-url)))]
                :when resource]
            resource)]
 
@@ -390,7 +394,7 @@
 
        (if (= (count matches) 1)        ; this is the most common case
          (let [resource (first matches)]
-           (if (every? ::jinx/valid? (vals (get-in resource [::site/request-locals ::apex/openapi-path-params])))
+           (if (every? ::jinx/valid? (vals (::apex/openapi-path-params resource)))
              resource
              (throw
               (ex-info
@@ -404,8 +408,7 @@
          (let [resources
                (filter
                 #(every? ::jinx/valid?
-                         (vals (get-in % [::site/request-locals
-                                          ::apex/openapi-path-params])))
+                         (vals (get % ::apex/openapi-path-params)))
                 matches)]
            (if (= (count resources) 1)
              (first resources)
@@ -414,4 +417,4 @@
              (throw
               (ex-info
                "Throwing Multiple API paths match"
-               (into req {::multiple-matched-resources (map #(dissoc % ::site/request-locals) resources)}))))))))))
+               (into req {::multiple-matched-resources resources}))))))))))

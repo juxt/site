@@ -2,8 +2,9 @@
 
 (ns juxt.site.alpha.util
   (:require
-   [clojure.walk :refer [postwalk]])
-  )
+   [taoensso.nippy.utils :refer [freezable?]]))
+
+(alias 'site (create-ns 'juxt.site.alpha))
 
 (defn assoc-when-some [m k v]
   (cond-> m v (assoc k v)))
@@ -26,14 +27,40 @@
    "png" "image/png"
    "adoc" "text/asciidoc"})
 
-(defn check-freezable [m]
-  (postwalk
-   (fn [x]
-     (when (fn? x)
-       (throw (ex-info "Function!" {})))
-     (when (vector? x)
-       (when-let [[k v] x]
-         (when (fn? v)
-           (throw (ex-info "Function entry!" {:k k})))))
-     x)
-   m))
+(defn paths
+  "Given a nested structure, return the paths to each leaf."
+  [form]
+  (if (coll? form)
+    (for [[k v] (if (map? form) form (map vector (range) form))
+          w (paths v)]
+      (cons k (if (coll? w) w [w])))
+    (list form)))
+
+(comment
+  (for [path
+        (paths {:x {:y {:z [:a :b :c] :z2 [0 1 {:u {:v 1}}]}}
+                :p {:q {:r :s :t :u :y (fn [_] nil)}}})
+        :when (not (fn? (last path)))]
+    path))
+
+(defn deep-replace
+  "Apply f to x, where x is a map value, collection member or scalar, anywhere in
+  the form's structure. This is similar, but not identical to,
+  clojure.walk/postwalk."
+  [form f]
+  (cond
+    (map? form) (reduce-kv (fn [acc k v] (assoc acc k (deep-replace v f))) {} form)
+    (vector? form) (mapv (fn [i] (deep-replace i f)) form)
+    (coll? form) (map (fn [i] (deep-replace i f)) form)
+    :else (f form)))
+
+(comment
+  (deep-replace {:a :b :c [identity {:x [{:g [:a :b identity]}]}]} #(if (fn? %) :replaced %)))
+
+(defn ->freezeable [form]
+  (deep-replace
+   form
+   (fn [form]
+     (cond-> form
+       (not (freezable? form))
+       ((fn [_] ::site/unfreezable))))))
