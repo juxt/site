@@ -259,7 +259,7 @@
             post-fn-sym (when (= method :post) (some-> (get operation-object "juxt.site.alpha/post-fn") symbol))
 
             resource
-            {::site/resource-provider ::openapi-path
+            {::site/resource-provider ::apex/openapi-path
 
              ;; This is useful, because it is the base document for any relative
              ;; json pointers.

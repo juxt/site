@@ -64,7 +64,7 @@
   {:crux.db/id "https://example.org/access-rule"
    ::site/description "A rule allowing access to all APIs"
    ::site/type "Rule"
-   ::pass/target '[[resource ::site/resource-provider :juxt.apex.alpha.openapi/openapi-path]]
+   ::pass/target '[[resource ::site/resource-provider ::apex/openapi-path]]
    ::pass/effect ::pass/allow})
 
 (deftest put-test
