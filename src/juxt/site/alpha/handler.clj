@@ -877,6 +877,8 @@
       (into (select-keys db [:crux.db/valid-time :crux.tx/tx-id]))
       (assoc :crux.db/id request-id ::site/type "Request")
       redact
+      ;; Dissoc known unfreezables
+      (dissoc ::site/crux-node ::site/db :ring.request/body)
       (util/deep-replace
        (fn [form]
          (cond-> form
