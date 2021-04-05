@@ -113,7 +113,7 @@
 
 (defn cat-type
   [t]
-  (->> (q '{:find [(eql/project e [*])]
+  (->> (q '{:find [(eql/pull e [*])]
             :where [[e :crux.db/id]
                     [e ::site/type t]]
             :in [t]} t)
@@ -124,7 +124,7 @@
   (sort-by
    str
    (map first
-        (q '{:find [(eql/project e [*])] :where [[e ::site/type "Rule"]]}))))
+        (q '{:find [(eql/pull e [*])] :where [[e ::site/type "Rule"]]}))))
 
 (defn uuid
   ([] (str (java.util.UUID/randomUUID)))
@@ -137,7 +137,7 @@
   "Display up to 5 of the most recent web requests, most recent first."
   []
   (map first
-       (q '{:find [(eql/project e [*]) ended]
+       (q '{:find [(eql/pull e [*]) ended]
             :where [[e ::site/type "Request"]
                     [e ::site/end-date ended]]
             :order-by [[ended :desc]]
@@ -158,7 +158,7 @@
    (into (sorted-map) (first (reqs))))
   ([search]
    (let [results
-         (q '{:find [(eql/project e [*])]
+         (q '{:find [(eql/pull e [*])]
               :where [[e ::site/type "Request"]
                       [(re-matches pat e)]]
               :in [pat]
