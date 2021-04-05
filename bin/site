@@ -582,7 +582,9 @@
         _ (when-not (.exists (io/file openapi)) (error-and-exit! 1 "OpenAPI file not found"))
         _ (when-not (.isFile (io/file openapi)) (error-and-exit! 1 "OpenAPI argument is not a file"))
 
-        openapi-doc (edn/read-string (slurp (io/file openapi)))
+        openapi-doc (edn/read-string
+                     {:readers {'edn pr-str}}
+                     (slurp (io/file openapi)))
 
         {:keys [status headers body]}
         (curl/put

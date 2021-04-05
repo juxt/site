@@ -216,7 +216,9 @@
      ;; Cookie
      (when access-token
        (when-let [session (lookup-session access-token now)]
-         (select-keys session [::pass/user ::pass/username])))
+         (->
+          (select-keys session [::pass/user ::pass/username])
+          (assoc ::pass/auth-scheme "Session"))))
 
      ;; Authorization header
      (when-let [authorization-header
@@ -236,13 +238,18 @@
 
                (when (and password pwhash (password/check password pwhash))
                  {::pass/user user
-                  ::pass/username username}))
+                  ::pass/username username
+                  ::pass/auth-scheme "Basic"}))
              (catch Exception e
                (log/error e)))
 
            "bearer"
            (when-let [session (lookup-session token68 now)]
-             (select-keys session [::pass/user ::pass/username]))
+             (->
+              (select-keys session [::pass/user ::pass/username])
+              (assoc ::pass/auth-scheme "Bearer"
+                     ;;::pass/session-expiry (java.util.Date/from (::expiry-instant session))
+                     )))
 
            (throw
             (ex-info "Auth scheme unsupported"

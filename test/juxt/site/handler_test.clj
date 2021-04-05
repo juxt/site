@@ -167,6 +167,7 @@
        {"/things/{a}"
         {"parameters"
          [{"name" "a" "in" "path" "required" "true"
+           ;; TODO: Why doesn't this pattern allow a / ? It should!
            "schema" {"type" "string" "pattern" "\\p{Alnum}+"}
            "x-juxt-site-inject-property" "juxt/code"}]
          "put"

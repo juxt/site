@@ -17,17 +17,47 @@
  :security {"developers" []}
 
  :paths
- {"/users/"
+ {"/user"
   {:get
-   {:description "Returns a list of all the users you're allowed to view"
+   {:description "Return information about the currently logged in user"
+    :operationId "getUserDetails"
+    :responses
+    {200
+     {:juxt.site.alpha/query
+      #edn
+      {:find [id username fullname email (distinct role) auth-scheme]
+       :strs [id username fullname email roles auth-scheme]
+       :where [[:subject :juxt.pass.alpha/user user]
+               [:subject :juxt.pass.alpha/auth-scheme auth-scheme]
+               [user :crux.db/id id]
+               [user :juxt.pass.alpha/username username]
+               [user :name fullname]
+               [user :email email]
+               [mapping :juxt.site.alpha/type "UserRoleMapping"]
+               [mapping :juxt.pass.alpha/assignee user]
+               [mapping :juxt.pass.alpha/role role]]
+       :limit 1}
+      :juxt.site.alpha/singular-result? true
+
+      :content
+      {"application/json"
+       {:schema {"type" "object"}}}}}}}
+
+  "/users/"
+  {:get
+   {:description "Returns a list of all the users you're al:juxt.site.alpha/querylowed to view"
     :operationId "findUsers"
 
     :responses
     {200
-     {:crux/query
-      {:find [e]
-       :where [[e :juxt.site.alpha/type t]]
-       :args [{t "User"}]}
+     {:juxt.site.alpha/query
+      #edn
+      {:find [e username name]
+       :strs [id username name]
+       :where [[e :juxt.site.alpha/type "User"]
+               [e :juxt.pass.alpha/username username]
+               [e :name name]]
+       :order-by [[username :asc]]}
 
       :content
       {"application/json"
@@ -120,10 +150,10 @@
       :description "Maximum number of results to return"
       :schema {:type "integer"}}]
     :responses
-    {200 {:crux/query
+    {200 {:juxt.site.alpha/query
+          #edn
           {:find [e]
-           :where [[e :juxt.site.alpha/type t]]
-           :args [{t "Role"}]
+           :where [[e :juxt.site.alpha/type "Role"]]
            :limit {:in "query" :name "limit"}}
 
           :content
@@ -218,10 +248,10 @@
 
     :responses
     {200
-     {:crux/query
+     {:juxt.site.alpha/query
+      #edn
       {:find [e]
-       :where [[e :juxt.site.alpha/type t]]
-       :args [{t "Rule"}]}
+       :where [[e :juxt.site.alpha/type "Rule"]]}
 
       :content
       {"application/json"
@@ -282,10 +312,10 @@
 
     :responses
     {200
-     {:crux/query
+     {:juxt.site.alpha/query
+      #edn
       {:find [e]
-       :where [[e :juxt.site.alpha/type t]]
-       :args [{t "Trigger"}]}
+       :where [[e :juxt.site.alpha/type "Trigger"]]}
 
       :content
       {"application/json"
@@ -367,10 +397,10 @@
    {:description "Returns a list of all the APIs"
     :responses
     {200
-     {:crux/query
+     {:juxt.site.alpha/query
+      #edn
       {:find [e]
-       :where [[e :juxt.site.alpha/type t]]
-       :args [{t "OpenAPI"}]}
+       :where [[e :juxt.site.alpha/type "OpenAPI"]]}
 
       :content
       {"application/json"
@@ -617,13 +647,13 @@
      {"$ref" "#/components/schemas/OpenAPI"}]}}
 
   :securitySchemes
-  {"developers" ; Allow developers to develop against this API
+  {"developers"                   ; Allow developers to develop against this API
    {"type" "http"
     "scheme" "bearer"
     ;; Belongs in database
     #_"x-juxt-site-access-control-allow-origins"
     #_{"http://localhost:8000"
-     {"access-control-allow-methods" [:get]
-      "access-control-allow-headers" ["authorization"]}}}}
+       {"access-control-allow-methods" [:get]
+        "access-control-allow-headers" ["authorization"]}}}}
 
   }}

@@ -66,10 +66,12 @@
                                  "application/json" "schema"]) _ (assert schema)
         instance (json/read-value body) _ (assert instance)
         openapi-ref (get resource ::apex/openapi) _ (assert openapi-ref)
-        openapi (x/entity db openapi-ref) _ (assert openapi)
+        openapi-resource (x/entity db openapi-ref) _ (assert openapi-resource)
 
         validation
-        (jinx.api/validate schema instance {:base-document openapi})
+        (jinx.api/validate
+         schema instance
+         {:base-document (::apex/openapi openapi-resource)})
 
         _ (when-not (::jinx/valid? validation)
             (throw

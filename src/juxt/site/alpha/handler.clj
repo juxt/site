@@ -919,14 +919,11 @@
                 :ring.request/keys [method]
                 :as ctx}]
 
-  (when-not start-date
-    (throw (ex-info "Start date not present" {})))
-
   (let [end-date (java.util.Date.)
-        ctx (assoc ctx ::site/end-date end-date
+        ctx (assoc ctx
+                   ::site/end-date end-date
                    ::site/duration-millis (- (.getTime end-date)
                                              (.getTime start-date)))]
-
     (log-context! ctx)
     (store-context! ctx)
 
@@ -979,7 +976,6 @@
         (assoc-in [:ring.response/headers "access-control-allow-credentials"]
                   (str (get cors-headers ::site/access-control-allow-credentials)))))))
 
-
 (defn wrap-error-handling
   "Return a handler that constructs proper Ring responses, logs and error
   handling where appropriate."
@@ -992,18 +988,22 @@
       (h req)
       (catch clojure.lang.ExceptionInfo e
         (let [{:ring.response/keys [status] :as exdata} (ex-data e)]
-          (when (and (integer? status) (>= status 500))
+          ;; Don't log exceptions which are used to escape (e.g. 302, 401).
+          (when (or (not (integer? status)) (>= status 500))
             (let [exdata (->serializable exdata)]
-              ;;(prn (.getMessage e))
-              ;;(pprint exdata)
               (log/errorf e "%s: %s" (.getMessage e) (pr-str exdata))))
+
           (respond
-           (-> (into
+           (-> (merge
+                ;; If this is a Clojure exception, but not a Site exception,
+                ;; let's start with the ctx as a base.
+                (when-not (::site/start-date exdata) req)
                 {:ring.response/status 500
                  :ring.response/body "Internal Error\r\n"
                  ::site/error (.getMessage e)
                  ::site/error-stack-trace (.getStackTrace e)}
                 exdata)))))
+
       (catch Throwable e
         (log/error e (.getMessage e))
         (respond

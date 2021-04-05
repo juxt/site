@@ -255,11 +255,16 @@
   (let [config (config)]
     (init/put-site-api!
      (crux-node)
-     (-> "juxt/site/alpha/openapi.edn"
-         io/resource
-         slurp
-         edn/read-string
-         json/write-value-as-string)
+     (as-> "juxt/site/alpha/openapi.edn" %
+       (io/resource %)
+       (slurp %)
+       (edn/read-string
+        {:readers
+         ;; Forms marked as #edn need to be encoded into a string for transfer
+         ;; as JSON and then decoded back into EDN. This is to preserve
+         ;; necessary EDN features such as symbols.
+         {'edn pr-str}} %)
+       (json/write-value-as-string %))
      config)
     (status (steps config))))
 
