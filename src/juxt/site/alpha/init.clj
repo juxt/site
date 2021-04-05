@@ -116,7 +116,11 @@
       ;;::http/last-modified (Date. (.lastModified f))
       ::http/content-length (count body)
       ::http/body body
-      ::apex/openapi openapi})))
+      ::apex/openapi openapi
+      ;; Duplicated from openapi.clj - TODO: remove duplication
+      :title (get-in openapi ["info" "title"])
+      :version (get-in openapi ["info" "version"])
+      :description (get-in openapi ["info" "description"])})))
 
 (defn put-openid-token-endpoint! [crux-node {::site/keys [base-uri]}]
   (log/info "Installing OpenID Connect token endpoint")

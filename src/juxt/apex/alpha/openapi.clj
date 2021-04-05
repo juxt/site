@@ -48,7 +48,11 @@
           ::site/type "OpenAPI"
           ::apex/openapi openapi
           ::http/body (json/write-value-as-string openapi)
-          ::http/content-type "application/json"})]])
+          ::http/content-type "application/json"
+          :title (get-in openapi ["info" "title"])
+          :version (get-in openapi ["info" "version"])
+          :description (get-in openapi ["info" "description"])
+          })]])
      (x/await-tx crux-node))
 
     (assoc req

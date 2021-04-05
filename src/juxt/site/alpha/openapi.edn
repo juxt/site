@@ -52,11 +52,12 @@
     {200
      {:juxt.site.alpha/query
       #edn
-      {:find [e username name]
-       :strs [id username name]
+      {:find [e username name email]
+       :strs [id username name email]
        :where [[e :juxt.site.alpha/type "User"]
                [e :juxt.pass.alpha/username username]
-               [e :name name]]
+               [e :name name]
+               [e :email email]]
        :order-by [[username :asc]]}
 
       :content
@@ -399,9 +400,12 @@
     {200
      {:juxt.site.alpha/query
       #edn
-      {:find [e]
-       :where [[e :juxt.site.alpha/type "OpenAPI"]]}
-
+      {:find [e title version description]
+       :strs [id title version description]
+       :where [[e :juxt.site.alpha/type "OpenAPI"]
+               [e :title title]
+               [e :version version]
+               [e :description description]]}
       :content
       {"application/json"
        {:schema {"type" "array"
@@ -504,8 +508,7 @@
       :properties
       {"type" {:const "User"}
        "username" {:type "string" :minLength 1}
-       "email" {:type "string"
-                :format "email"}}}]}
+       "email" {:type "string" :format "email"}}}]}
 
    "IdentifiedUser"
    {"$id" "/schemas/IdentifiedUser"
