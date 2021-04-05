@@ -517,9 +517,8 @@
                    (cond-> body
                      (string? body) (.getBytes (or charset "UTF-8"))))))]
 
-    (assoc req
-           :ring.response/status 200
-           :ring.response/body body)))
+    (cond-> (assoc req :ring.response/status 200)
+      body (assoc :ring.response/body body))))
 
 (defn post-variant [{::site/keys [crux-node db uri]
                      ::apex/keys [request-instance]
