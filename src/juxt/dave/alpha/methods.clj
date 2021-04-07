@@ -44,7 +44,7 @@
          ;; See https://tools.ietf.org/html/rfc4918#section-9.1
         depth (get-in request [:headers "depth"] "infinity")
         doc (xml/->document (:body request))
-        members (map first (crux/q db {:find '[(eql/pull e [*])]
+        members (map first (crux/q db {:find '[(pull e [*])]
                                        :where (::dave/query resource)}))]
     {:status 207
      :headers {"content-type" "application/xml"}
