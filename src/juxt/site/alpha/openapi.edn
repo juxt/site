@@ -45,7 +45,7 @@
 
   "/users/"
   {:get
-   {:description "Returns a list of all the users you're al:juxt.site.alpha/querylowed to view"
+   {:description "Returns a list of all the users you're allowed to view"
     :operationId "findUsers"
 
     :responses
