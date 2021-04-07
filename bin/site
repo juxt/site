@@ -467,9 +467,11 @@
            (format "%s/_site/triggers/%s" base-uri name)
            {:headers {"authorization" (format "Bearer %s" access-token)
                       "content-type" "application/json"}
-            :body (str/replace
-                   (slurp (io/file trigger))
-                   "{{base-uri}}" base-uri)
+            :body (cond-> (slurp (io/file trigger))
+                    base-uri (str/replace "{{base-uri}}" base-uri)
+                    (re-matches #".*\.edn$" trigger)
+                    ((fn [x] (-> (edn/read-string {:readers {'juxt.site.alpha/as-str pr-str}} x)
+                                 (json/encode)))))
             :throw false})]
       (cond
         (= status 201)
