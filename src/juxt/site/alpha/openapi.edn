@@ -75,7 +75,8 @@
   {:parameters
    [{:name "id" :in "path" :required true
      :description "User id"
-     :schema {:type "string"}}]
+     :schema {:type "string"}
+     :x-juxt-site-inject-property "juxt.pass.alpha/username"}]
 
    :get
    {:description "Returns a given user",
@@ -502,12 +503,10 @@
     [{"$ref" "#/components/schemas/Named"}
      {"$ref" "#/components/schemas/Typed"}
      {:type "object"
-      :required []
-      :juxt.jinx.alpha/keyword-mappings {"email" "email"
-                                         "username" "juxt.pass.alpha/username"}
+      :required ["username" "email"]
+      :juxt.jinx.alpha/keyword-mappings {"email" "email"}
       :properties
       {"type" {:const "User"}
-       "username" {:type "string" :minLength 1}
        "email" {:type "string" :format "email"}}}]}
 
    "IdentifiedUser"

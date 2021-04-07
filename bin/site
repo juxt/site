@@ -271,13 +271,14 @@
   "Create or update a user"
   [opts]
   (let [{access-token "access_token"} (load-token)
-        {:keys [base-uri username password name]
+        {:keys [base-uri username password name email]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
 
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not username (error-and-usage! "Username required" opts))
     (when-not name (error-and-usage! "Name required" opts))
+    (when-not email (error-and-usage! "Email required" opts))
 
     (let [{:keys [status headers body]}
           (curl/put
@@ -286,8 +287,9 @@
                       "content-type" "application/json"}
             :body (json/generate-string
                    {"type" "User"
-                    "username" username
-                    "name" name})
+                    ;;"username" username
+                    "name" name
+                    "email" email})
             :throw false})]
       (cond
         (= status 401)
@@ -748,7 +750,7 @@
      :cli-options [["-n" "--name NAME" "The user's name"]
                    ["-u" "--username USERNAME" "The username of the user you are creating/updating"]
                    ["-p" "--password PASSWORD" "A temporary password for the user"]
-                   ]
+                   ["-e" "--email EMAIL" "The user's email"]]
      :delegate put-user}]
 
    ["reset-password"
