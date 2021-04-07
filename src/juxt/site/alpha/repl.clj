@@ -263,7 +263,7 @@
          ;; Forms marked as #edn need to be encoded into a string for transfer
          ;; as JSON and then decoded back into EDN. This is to preserve
          ;; necessary EDN features such as symbols.
-         {'edn pr-str}} %)
+         {'juxt.site.alpha/as-str pr-str}} %)
        (json/write-value-as-string %))
      config)
     (status (steps config))))

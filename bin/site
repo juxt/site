@@ -583,7 +583,7 @@
         _ (when-not (.isFile (io/file openapi)) (error-and-exit! 1 "OpenAPI argument is not a file"))
 
         openapi-doc (edn/read-string
-                     {:readers {'edn pr-str}}
+                     {:readers {'juxt.site.alpha/as-str pr-str}}
                      (slurp (io/file openapi)))
 
         {:keys [status headers body]}

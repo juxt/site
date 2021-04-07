@@ -24,7 +24,7 @@
     :responses
     {200
      {:juxt.site.alpha/query
-      #edn
+      #juxt.site.alpha/as-str
       {:find [id username fullname email (distinct role) auth-scheme]
        :strs [id username fullname email roles auth-scheme]
        :where [[:subject :juxt.pass.alpha/user user]
@@ -51,7 +51,7 @@
     :responses
     {200
      {:juxt.site.alpha/query
-      #edn
+      #juxt.site.alpha/as-str
       {:find [e username name email]
        :strs [id username name email]
        :where [[e :juxt.site.alpha/type "User"]
@@ -152,7 +152,7 @@
       :schema {:type "integer"}}]
     :responses
     {200 {:juxt.site.alpha/query
-          #edn
+          #juxt.site.alpha/as-str
           {:find [e]
            :where [[e :juxt.site.alpha/type "Role"]]
            :limit {:in "query" :name "limit"}}
@@ -250,7 +250,7 @@
     :responses
     {200
      {:juxt.site.alpha/query
-      #edn
+      #juxt.site.alpha/as-str
       {:find [e]
        :where [[e :juxt.site.alpha/type "Rule"]]}
 
@@ -314,7 +314,7 @@
     :responses
     {200
      {:juxt.site.alpha/query
-      #edn
+      #juxt.site.alpha/as-str
       {:find [e]
        :where [[e :juxt.site.alpha/type "Trigger"]]}
 
@@ -399,7 +399,7 @@
     :responses
     {200
      {:juxt.site.alpha/query
-      #edn
+      #juxt.site.alpha/as-str
       {:find [e title version description]
        :strs [id title version description]
        :where [[e :juxt.site.alpha/type "OpenAPI"]
