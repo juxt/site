@@ -503,7 +503,7 @@
     [{"$ref" "#/components/schemas/Named"}
      {"$ref" "#/components/schemas/Typed"}
      {:type "object"
-      :required ["username" "email"]
+      :required ["email"]
       :juxt.jinx.alpha/keyword-mappings {"email" "email"}
       :properties
       {"type" {:const "User"}
