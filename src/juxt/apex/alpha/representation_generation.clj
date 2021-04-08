@@ -25,11 +25,13 @@
   ;; Replace input with values from params
   (postwalk
    (fn [x]
-     (if (and (map? x) (contains? x "name")
-              (#{"query" "path"} (get x "in" "query")))
-       (let [kw (keyword (get x "in" "query"))]
-         (get-in params [kw (get x "name") :value]
-                 (get-in params [kw (get x "name") :param "default"])))
+     (if (and (map? x)
+              (contains? x :name)
+              (#{"query" "path"} (:in x "query")))
+       (let [kw (keyword (:in x "query"))]
+         (or
+          (get-in params [kw (:name x) :value])
+          (get-in params [kw (:name x) :param "default"])))
        x))
    input))
 
