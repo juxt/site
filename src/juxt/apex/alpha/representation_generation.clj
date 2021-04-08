@@ -31,6 +31,7 @@
        (let [kw (keyword (:in x "query"))]
          (or
           (get-in params [kw (:name x) :value])
+          (:default x)
           (get-in params [kw (:name x) :param "default"])))
        x))
    input))
