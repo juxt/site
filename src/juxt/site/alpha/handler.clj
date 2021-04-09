@@ -871,7 +871,7 @@
     (h req)))
 
 (defn handler []
-  (-> (fn [req] req)
+  (-> identity
       wrap-security-headers
       wrap-triggers
       wrap-refresh-db
