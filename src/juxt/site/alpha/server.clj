@@ -8,8 +8,14 @@
 
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defmethod ig/init-key ::server [_ {::site/keys [crux-node port base-uri] :as opts}]
-  (run-jetty (make-handler opts) {:port port :join? false}))
+(defmethod ig/init-key ::server [_ {::site/keys [crux-node port base-uri dynamic?] :as opts}]
+  (run-jetty
+   ;; Dynamic mode helps in development where performance is less critical than
+   ;; development speed. Dynamic mode allows functions to be re-evaled.
+   (if dynamic?
+     (fn [req] (let [h (#'make-handler opts)] (h req)))
+     (make-handler opts))
+   {:port port :join? false}))
 
 (defmethod ig/halt-key! ::server [_ s]
   (when s
