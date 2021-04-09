@@ -925,7 +925,7 @@
            (not (freezable? form))
            ((fn [form] (format "(unfreezable %s)" (type form)))))))))
 
-(defn log-context! [{:ring.request/keys [method] :as ctx}]
+(defn log-request! [{:ring.request/keys [method] :as ctx}]
   (assert method)
   (log/infof
    "%-7s %s %s %d"
@@ -934,7 +934,7 @@
    (:ring.request/protocol ctx)
    (:ring.response/status ctx)))
 
-(defn store-context!
+(defn store-request!
   [{::site/keys [crux-node] :as ctx}]
   (assert crux-node)
   (let [blob (->serializable ctx)]
@@ -954,9 +954,6 @@
                    ::site/end-date end-date
                    ::site/duration-millis (- (.getTime end-date)
                                              (.getTime start-date)))]
-    (log-context! ctx)
-    (store-context! ctx)
-
     (cond->
         (update ctx
                 :ring.response/headers
@@ -1157,6 +1154,14 @@
                             :ring.response/headers :headers
                             :ring.response/body :body})))))
 
+(defn wrap-store-request [h]
+  (fn [req]
+    (doto (h req) (store-request!))))
+
+(defn wrap-log-request [h]
+  (fn [req]
+    (doto (h req) (log-request!))))
+
 (defn wrap-healthcheck
   [h]
   (fn [req]
@@ -1164,12 +1169,32 @@
       {:status 200 :body "Site OK!\r\n"}
       (h req))))
 
-(defn make-pipeline [opts]
-  [wrap-healthcheck
+(defn make-pipeline
+  "Make a pipeline of Ring middleware. Note, that each Ring middleware designates
+  a processing stage. An interceptor chain (perhaps using Pedastal (pedastal.io)
+  or Sieppari (https://github.com/metosin/sieppari) could be used. This is
+  currently a synchronous chain but async could be supported in the future."
+  [opts]
+  [
+   ;; Optional, helpful for AWS ALB
+   wrap-healthcheck
+   ;; Switch Ring requests/responses to Ring 2 namespaced keywords
    wrap-ring-1-adapter
+
+   ;; Initialize the request by merging in some extra data
    #(wrap-initialize-request % opts)
+
+   ;; Logging
+   wrap-log-request
+
+   ;; Save request to database
+   wrap-store-request
+
+   ;; Error handling
    wrap-error-handling
+
    wrap-cors-headers
+
    wrap-responder
    wrap-method-not-implemented?
    wrap-locate-resource
