@@ -17,13 +17,13 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn start []
+(defn start [& [config-file-in]]
   (println "Site by JUXT. Copyright (c) 2021, JUXT LTD.")
   (println "Compiling code, please wait...")
   (log/info "Starting development system")
 
   (alter-var-root #'main/profile (constantly :dev))
-  (let [system-config (main/system-config)
+  (let [system-config (main/system-config config-file-in)
         sys (ig/init system-config)]
     (alter-var-root #'main/system (constantly sys)))
   (log/info "System started and ready...")

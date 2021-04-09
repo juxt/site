@@ -2,4 +2,15 @@
 
 echo "Site by JUXT. Copyright (c) 2021, JUXT LTD."
 
-cd $(dirname $0)/..; clojure -J-Djava.awt.headless=true -J-Dclojure.server.site="{:port,50505,:accept,juxt.site.alpha.repl-server/repl,:address,\"localhost\"}" -J-Dlogback.configurationFile=$HOME/.config/site/logback.xml -J-Xms256m -J-Xmx1200m -Mprod -m juxt.site.alpha.main
+original_pwd="$(pwd)"
+config="${1}"
+
+pushd $(dirname $0)/..
+
+if [[ -z "$config" ]] ; then
+  clojure -J-Djava.awt.headless=true -J-Dclojure.server.site="{:port,50505,:accept,juxt.site.alpha.repl-server/repl,:address,\"localhost\"}" -J-Dlogback.configurationFile=$HOME/.config/site/logback.xml -J-Xms256m -J-Xmx1200m -A:prod -M -m juxt.site.alpha.main;
+else
+  clojure -J-Djava.awt.headless=true -J-Dclojure.server.site="{:port,50505,:accept,juxt.site.alpha.repl-server/repl,:address,\"localhost\"}" -J-Dlogback.configurationFile=$HOME/.config/site/logback.xml -J-Xms256m -J-Xmx1200m -A:prod -M -m juxt.site.alpha.main "$original_pwd/$config";
+fi
+
+popd

@@ -13,11 +13,12 @@
 
 (def profile :prod)
 
-(let [lock (Object.)]
-  (defn- load-namespaces
-    [system-config]
-    (locking lock
-      (ig/load-namespaces system-config))))
+(defonce _
+  (let [lock (Object.)]
+    (defn- load-namespaces
+      [system-config]
+      (locking lock
+        (ig/load-namespaces system-config)))))
 
 ;; There will be integrant tags in our Aero configuration. We need to
 ;; let Aero know about them using this defmethod.
@@ -27,9 +28,10 @@
 (defn config
   "Read EDN config, with the given aero options. See Aero docs at
   https://github.com/juxt/aero for details."
-  []
+  [& [config-file-in]]
   (log/infof "Configuration profile: %s" (name profile))
-  (let [config-file (io/file (System/getProperty "user.home") ".config/site/config.edn")]
+  (let [config-file (io/file (or config-file-in
+                                 (str (System/getProperty "user.home") "/.config/site/config.edn")))]
     (when-not (.exists config-file)
       (log/error (str "Configuration file does not exist: " (.getAbsolutePath config-file)))
       (throw (ex-info
@@ -40,15 +42,15 @@
 
 (defn system-config
   "Construct a new system, configured with the given profile"
-  []
-  (let [config (config)
+  [config-file-in]
+  (let [config (config config-file-in)
         system-config (:ig/system config)]
     (load-namespaces system-config)
     (ig/prep system-config)))
 
-(defn -main [& _]
+(defn -main [& [config-file-in]]
   (log/info "Starting system")
-  (let [system-config (system-config)
+  (let [system-config (system-config config-file-in)
         sys (ig/init system-config)]
     (log/infof "Configuration: %s" (pr-str system-config))
 
