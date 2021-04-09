@@ -972,7 +972,7 @@
 
         (= method :head) (dissoc :ring.response/body))))
 
-(defn wrap-responder [h]
+(defn wrap-initialize-response [h]
   (fn [req]
     (respond (h req))))
 
@@ -1193,19 +1193,35 @@
    ;; Error handling
    wrap-error-handling
 
+   ;; Security
    wrap-cors-headers
    wrap-security-headers
 
-   wrap-responder
+   ;; Create initial response
+   wrap-initialize-response
+
+   ;; 501
    wrap-method-not-implemented?
+
+   ;; Locate resources
    wrap-locate-resource
    wrap-redirect
+
+   ;; Find representations and possibly do content negotiation
    wrap-find-current-representations
    wrap-negotiate-representation
+
+   ;; Authentication, authorization
    wrap-authenticate
    wrap-authorize
+
+   ;; 405
    wrap-method-not-allowed?
+
+   ;; Methods (GET, PUT, POST, etc.)
    wrap-invoke-method
+
+   ;; Custom middleware for Site
    wrap-refresh-db
    wrap-triggers
    ])
