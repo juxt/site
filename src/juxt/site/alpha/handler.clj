@@ -1180,7 +1180,7 @@
       (h req))))
 
 (defn make-handler [opts]
-  (-> (#'handler)
+  (-> (handler)
       (wrap-responder)
       (wrap-cors-headers)
       (wrap-error-handling)

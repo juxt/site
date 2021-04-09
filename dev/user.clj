@@ -22,6 +22,7 @@
   (println "Compiling code, please wait...")
   (log/info "Starting development system")
 
+  (alter-var-root #'main/profile (constantly :dev))
   (let [system-config (main/system-config)
         sys (ig/init system-config)]
     (alter-var-root #'main/system (constantly sys)))

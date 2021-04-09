@@ -11,6 +11,8 @@
 
 (def system nil)
 
+(def profile :prod)
+
 (let [lock (Object.)]
   (defn- load-namespaces
     [system-config]
@@ -26,6 +28,7 @@
   "Read EDN config, with the given aero options. See Aero docs at
   https://github.com/juxt/aero for details."
   []
+  (log/infof "Configuration profile: %s" (name profile))
   (let [config-file (io/file (System/getProperty "user.home") ".config/site/config.edn")]
     (when-not (.exists config-file)
       (log/error (str "Configuration file does not exist: " (.getAbsolutePath config-file)))
@@ -33,7 +36,7 @@
               (str "Please copy a configuration file to " (.getAbsolutePath config-file))
               {})))
     (log/debug "Loading configuration from" (.getAbsolutePath config-file))
-    (aero/read-config config-file {:profile :prod})))
+    (aero/read-config config-file {:profile profile})))
 
 (defn system-config
   "Construct a new system, configured with the given profile"
