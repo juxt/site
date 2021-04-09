@@ -870,21 +870,6 @@
 
     (h req)))
 
-(defn handler []
-  (-> identity
-      wrap-security-headers
-      wrap-triggers
-      wrap-refresh-db
-      wrap-invoke-method
-      wrap-method-not-allowed?
-      wrap-authorize
-      wrap-authenticate
-      wrap-negotiate-representation
-      wrap-find-current-representations
-      wrap-redirect
-      wrap-locate-resource
-      wrap-method-not-implemented?))
-
 (defn representation-headers [acc rep body]
   (letfn [(assoc-when-some [m k v]
             (cond-> m v (assoc k v)))]
@@ -1179,11 +1164,25 @@
       {:status 200 :body "Site OK!\r\n"}
       (h req))))
 
+(defn make-pipeline [opts]
+  [wrap-healthcheck
+   wrap-ring-1-adapter
+   #(wrap-initialize-request % opts)
+   wrap-error-handling
+   wrap-cors-headers
+   wrap-responder
+   wrap-method-not-implemented?
+   wrap-locate-resource
+   wrap-redirect
+   wrap-find-current-representations
+   wrap-negotiate-representation
+   wrap-authenticate
+   wrap-authorize
+   wrap-method-not-allowed?
+   wrap-invoke-method
+   wrap-refresh-db
+   wrap-triggers
+   wrap-security-headers])
+
 (defn make-handler [opts]
-  (-> (handler)
-      (wrap-responder)
-      (wrap-cors-headers)
-      (wrap-error-handling)
-      (wrap-initialize-request opts)
-      (wrap-ring-1-adapter)
-      (wrap-healthcheck)))
+  ((apply comp (make-pipeline opts)) identity))

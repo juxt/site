@@ -34,11 +34,14 @@
    (x/submit-tx *crux-node* transactions)
    (x/await-tx *crux-node*)))
 
+
 (defn make-handler [opts]
-  (-> (h/handler)
-      (h/wrap-responder)
-      (h/wrap-error-handling)
-      (h/wrap-initialize-request opts)))
+  ((apply comp
+          (remove
+           #{h/wrap-healthcheck
+             h/wrap-ring-1-adapter}
+           (h/make-pipeline opts)))
+   identity))
 
 (defn with-handler [f]
   (binding [*handler* (make-handler
