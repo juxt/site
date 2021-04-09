@@ -1171,13 +1171,14 @@
 
 (defn make-pipeline
   "Make a pipeline of Ring middleware. Note, that each Ring middleware designates
-  a processing stage. An interceptor chain (perhaps using Pedastal (pedastal.io)
+  a processing stage. An interceptor chain (perhaps using Pedestal (pedestal.io)
   or Sieppari (https://github.com/metosin/sieppari) could be used. This is
   currently a synchronous chain but async could be supported in the future."
   [opts]
   [
    ;; Optional, helpful for AWS ALB
    wrap-healthcheck
+
    ;; Switch Ring requests/responses to Ring 2 namespaced keywords
    wrap-ring-1-adapter
 
@@ -1223,8 +1224,8 @@
 
    ;; Custom middleware for Site
    wrap-refresh-db
-   wrap-triggers
-   ])
+   wrap-triggers])
+
 
 (defn make-handler [opts]
   ((apply comp (make-pipeline opts)) identity))
