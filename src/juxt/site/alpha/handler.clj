@@ -1194,6 +1194,7 @@
    wrap-error-handling
 
    wrap-cors-headers
+   wrap-security-headers
 
    wrap-responder
    wrap-method-not-implemented?
@@ -1207,7 +1208,7 @@
    wrap-invoke-method
    wrap-refresh-db
    wrap-triggers
-   wrap-security-headers])
+   ])
 
 (defn make-handler [opts]
   ((apply comp (make-pipeline opts)) identity))
