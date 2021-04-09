@@ -676,167 +676,214 @@
 (defmethod transform-value "inst" [_ instance]
   (java.util.Date/from (java.time.Instant/parse instance)))
 
-(defn handler [{:ring.request/keys [method]
-                ::site/keys [uri db crux-node] :as req}]
-
-  ;; Step 1. 503 Unavailable (TODO)
-
-  ;; Step 2. Check method is implemented
-  (when-not (contains?
+(defn wrap-method-not-implemented? [h]
+  (fn [{:ring.request/keys [method] :as req}]
+    (when-not (contains?
              #{:get :head :post :put :delete :options
                :patch
                :mkcol :propfind} method)
-    (throw
-     (ex-info "Method not implemented"
-              (into req {:ring.response/status 501
-                         :ring.response/body "Not Implemented\r\n"}))))
+      (throw
+       (ex-info "Method not implemented"
+                (into req {:ring.response/status 501
+                           :ring.response/body "Not Implemented\r\n"}))))
+    (h req)))
 
-  (let [ ;; Step 3. Locate the resource
-        res (locate-resource req)
-        req (assoc req ::site/resource res)
+(defn wrap-locate-resource [h]
+  (fn [req]
+    (let [res (locate-resource req)]
+      (log/debugf "Resource provider: %s" (::site/resource-provider res))
+      (h (assoc req ::site/resource res)))))
 
-        _ (log/debugf "Resource provider: %s" (::site/resource-provider res))
+(defn wrap-redirect [h]
+  (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
+    (when-let [location (::http/redirect resource)]
+      (throw
+       (ex-info "Redirect"
+                (-> req
+                    (assoc :ring.response/status
+                           (case method (:get :head) 302 307))
+                    (update :ring.response/headers
+                            assoc "location" location)))))
+    (h req)))
 
-        ;; Step 4. Redirect if necessary
-        _ (when-let [location (::http/redirect res)]
-            (throw
-             (ex-info "Redirect"
-                      (-> req
-                          (assoc :ring.response/status
-                                 (case method (:get :head) 302 307))
-                          (update :ring.response/headers
-                                  assoc "location" location)))))
+(defn wrap-find-current-representations
+  ;; Step 5 (GET/HEAD/PUT only). Determine the resource's current
+  ;; representations, or 404
+  ;; Step 6 (GET/HEAD only). Maybe throw a 404
+  [h]
+  (fn [{:ring.request/keys [method] :as req}]
+    (if (#{:get :head :put} method)
+      (let [cur-reps (seq (current-representations req))]
+        (when (and (#{:get :head} method) (empty? cur-reps))
+          (throw
+           (ex-info
+            "Not Found"
+            (into req
+                  {:ring.response/status 404
+                   :ring.response/body "Not Found\r\n"}))))
+        (h (assoc req ::site/current-representations cur-reps)))
+      (h req))))
 
-        ;; Step 5 (GET/HEAD/PUT only). Determine the resource's current
-        ;; representations, or 404
-        cur-reps
-        (when (#{:get :head :put} method)
-          (seq (current-representations req)))
+(defn wrap-negotiate-representation [h]
+  ;; Step 7. (GET/HEAD only). Select a representation
+  (fn [req]
+    (let [cur-reps (::site/current-representations req)]
+      (h (cond-> req
+           (seq cur-reps)
+           (assoc
+            ::site/selected-representation
+            (negotiate-representation req cur-reps)))))))
 
-        ;; Step 6 (GET/HEAD only). Maybe throw a 404
-        _ (when (and (#{:get :head} method) (empty? cur-reps))
-            (throw
-             (ex-info "Not Found"
-                      (into req
-                            {:ring.response/status 404
-                             :ring.response/body "Not Found\r\n"}))))
-        req (assoc req ::site/current-representations cur-reps)
+(defn wrap-authenticate [h]
+  ;; Step 8. Authenticate
+  (fn [{:ring.request/keys [method] :as req}]
+    (let [sub (when-not (= method :options) (authn/authenticate req))]
+      (h (cond-> req sub (assoc ::pass/subject sub))))))
 
-        ;; Step 7. (GET/HEAD only). Select a representation
-        sel-rep
-        (when (seq cur-reps)
-          (negotiate-representation req cur-reps))
-        req (assoc req ::site/selected-representation sel-rep)
+(defn wrap-authorize
+  ;; Step 9. Authorize
 
-        ;; Do authorization as late as possible (in order to have as much data
-        ;; as possible to base the authorization decision on. However, note
-        ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
-        ;; before checking any HTTP conditional header.".
+  ;; Do authorization as late as possible (in order to have as much data
+  ;; as possible to base the authorization decision on. However, note
+  ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
+  ;; before checking any HTTP conditional header.".
+  [h]
+  (fn [{:ring.request/keys [method] ::site/keys [db resource] ::pass/keys [subject] :as req}]
+    (let [request-context
+          {'subject subject
+           'resource (dissoc resource ::http/body ::http/content)
+           'request (select-keys
+                     req
+                     [:ring.request/headers :ring.request/method :ring.request/path
+                      :ring.request/query :ring.request/protocol :ring.request/remote-addr
+                      :ring.request/scheme :ring.request/server-name :ring.request/server-post
+                      :ring.request/ssl-client-cert])
+           'representation (dissoc resource ::http/body ::http/content)
+           'environment {}}
 
-        ;; Step 8. Authenticate
-        sub (when-not (= method :options) (authn/authenticate req))
-        req (cond-> req sub (assoc ::pass/subject sub))
+          authz (when (not= method :options)
+                  (pdp/authorization db request-context))
 
-        ;; Step 9. Authorize
-        ;; Does this request-context now need to be broken up into different
-        ;; 'entities' given that we now have a simple flat map?
-        request-context
-        {'subject sub
-         'resource (dissoc res ::http/body ::http/content)
-         'request (select-keys
-                   req
-                   [:ring.request/headers :ring.request/method :ring.request/path
-                    :ring.request/query :ring.request/protocol :ring.request/remote-addr
-                    :ring.request/scheme :ring.request/server-name :ring.request/server-post
-                    :ring.request/ssl-client-cert])
-         'representation (dissoc res ::http/body ::http/content)
-         'environment {}}
-        authz (when (not= method :options)
-                (pdp/authorization db request-context))
-        req (cond-> req
-              true (assoc ::pass/request-context request-context)
-              authz (assoc ::pass/authorization authz)
-              ;; If the max-content-length has been modified, update that in the
-              ;; resource
-              (::http/max-content-length authz)
-              (update ::site/resource
-                      assoc ::http/max-content-length (::http/max-content-length authz)))
-        _ (when (and (not= method :options)
-                     (not= (::pass/access authz) ::pass/approved))
-            (let [status (if-not (::pass/user sub) 401 403)
-                  msg (case status 401  "Unauthorized" 403 "Forbidden")]
-              (throw
-               (ex-info msg
-                        (into req
-                              {:ring.response/status status
-                               :ring.response/body (str msg "\r\n")})))))
+          req (cond-> req
+                true (assoc ::pass/request-context request-context)
+                authz (assoc ::pass/authorization authz)
+                ;; If the max-content-length has been modified, update that in the
+                ;; resource
+                (::http/max-content-length authz)
+                (update ::site/resource
+                        assoc ::http/max-content-length (::http/max-content-length authz)))]
 
-        allowed-methods (set (::http/methods res))
-        req (assoc req ::site/allowed-methods allowed-methods)
+      (when (and (not= method :options)
+                 (not= (::pass/access authz) ::pass/approved))
+        (let [status (if-not (::pass/user subject) 401 403)
+              msg (case status 401  "Unauthorized" 403 "Forbidden")]
+          (throw
+           (ex-info msg
+                    (into req
+                          {:ring.response/status status
+                           :ring.response/body (str msg "\r\n")})))))
+      (h req))))
 
-        ;; Step 10. Check method allowed
-        _ (when res
-            (when-not (contains? allowed-methods method)
-              (throw
-               (ex-info
-                "Method not allowed"
-                (into req
-                      {:ring.response/status 405
-                       :ring.response/headers {"allow" (join-keywords allowed-methods true)}
-                       :ring.response/body "Method Not Allowed\r\n"})))))
+(defn wrap-method-not-allowed? [h]
+  ;; Step 10. Check method allowed
+  (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
+    (if resource
+      (let [allowed-methods (set (::http/methods resource))]
+        (when-not (contains? allowed-methods method)
+          (throw
+           (ex-info
+            "Method not allowed"
+            (into req
+                  {:ring.response/status 405
+                   :ring.response/headers {"allow" (join-keywords allowed-methods true)}
+                   :ring.response/body "Method Not Allowed\r\n"}))))
+        (h (assoc req ::site/allowed-methods allowed-methods)))
+      (h req))))
 
-        ;; Step 11. Invoke method
-        req (case method
-              (:get :head) (GET req)
-              :post (POST req)
-              :put (PUT req)
-              :patch (PATCH req)
-              :delete (DELETE req)
-              :options (OPTIONS req)
-              :propfind (PROPFIND req)
-              :mkcol (MKCOL req))
+(defn wrap-invoke-method [h]
+  ;; Step 11. Invoke method
+  (fn [{:ring.request/keys [method] :as req}]
+    (h (case method
+         (:get :head) (GET req)
+         :post (POST req)
+         :put (PUT req)
+         :patch (PATCH req)
+         :delete (DELETE req)
+         :options (OPTIONS req)
+         :propfind (PROPFIND req)
+         :mkcol (MKCOL req)))))
 
-        ;; Refresh the db, now all steps after this are in terms of the 'new'
-        ;; db.
-        db (x/db crux-node)
+(defn wrap-refresh-db
+  ;; Refresh the db, now all steps after this are in terms of the 'new'
+  ;; db.
+  [h]
+  (fn [req]
+    (h (assoc req ::site/db (x/db (::site/crux-node req))))))
 
-        ;; Site-specific step: Check for any observers and 'run' them TODO:
-        ;; Perhaps effects need to run against happy and sad paths - i.e. errors
-        ;; - this should really be in a 'finally' block.
-        triggers
-        (map first
-             (x/q db '{:find [rule]
-                       :where [[rule ::site/type "Trigger"]]}))
-        _ (log/tracef "Triggers are %s" (pr-str triggers))
+(defn wrap-triggers [h]
+  ;; Site-specific step: Check for any observers and 'run' them TODO:
+  ;; Perhaps effects need to run against happy and sad paths - i.e. errors
+  ;; - this should really be in a 'finally' block.
+  (fn [{::site/keys [db crux-node] ::pass/keys [subject] :as req}]
+    (let [triggers
+          (map first
+               (x/q db '{:find [rule]
+                         :where [[rule ::site/type "Trigger"]]}))
+          _ (log/tracef "Triggers are %s" (pr-str triggers))
 
-        request-context
-        {'subject sub
-         'request (select-keys
-                   req
-                   [:ring.request/headers :ring.request/method :ring.request/path
-                    :ring.request/query :ring.request/protocol :ring.request/remote-addr
-                    :ring.request/scheme :ring.request/server-name :ring.request/server-post
-                    :ring.request/ssl-client-cert
-                    ::site/uri])
-         'environment {}}
+          request-context
+          {'subject subject
+           'request (select-keys
+                     req
+                     [:ring.request/headers :ring.request/method :ring.request/path
+                      :ring.request/query :ring.request/protocol :ring.request/remote-addr
+                      :ring.request/scheme :ring.request/server-name :ring.request/server-post
+                      :ring.request/ssl-client-cert
+                      ::site/uri])
+           'environment {}}]
 
-        _ (try
-            (let [actions (rules/eval-triggers (x/db crux-node) triggers request-context)]
-              (log/tracef "Triggered actions are %s" (pr-str actions))
-              (doseq [action actions]
-                (log/tracef "Running action: %s" (get-in action [:trigger ::site/action]))
-                (triggers/run-action! req action)))
-            (catch clojure.lang.ExceptionInfo e
-              (log/error e (format "Failed to run trigger/action: %s" (pr-str (ex-data e)))))
-            (catch Exception e
-              (log/error e "Failed to run trigger/action")))
+      (try
+        ;; TODO: Can we use the new refreshed db here to save another call to x/db?
+        (let [actions (rules/eval-triggers (x/db crux-node) triggers request-context)]
+          (log/tracef "Triggered actions are %s" (pr-str actions))
+          (doseq [action actions]
+            (log/tracef "Running action: %s" (get-in action [:trigger ::site/action]))
+            (triggers/run-action! req action)))
+        (catch clojure.lang.ExceptionInfo e
+          (log/error e (format "Failed to run trigger/action: %s" (pr-str (ex-data e)))))
+        (catch Exception e
+          (log/error e "Failed to run trigger/action")))
 
-        ;; Step 12. Set security headers, including CORS
-        ;; TODO - but see wrap-cors-headers middleware
-        ]
+      (h req))))
 
-    ;; Return req
-    req))
+(defn wrap-security-headers [h]
+  (fn [req]
+    ;; Step 12. Set security headers, including CORS
+    ;; TODO - but see wrap-cors-headers middleware
+
+    ;;        Strict-Transport-Security: max-age=31536000; includeSubdomains
+    ;;        X-Frame-Options: DENY
+    ;;        X-Content-Type-Options: nosniff
+    ;;        X-XSS-Protection: 1; mode=block
+    ;;        X-Download-Options: noopen
+    ;;        X-Permitted-Cross-Domain-Policies: none
+
+    (h req)))
+
+(defn handler []
+  (-> (fn [req] req)
+      wrap-security-headers
+      wrap-triggers
+      wrap-refresh-db
+      wrap-invoke-method
+      wrap-method-not-allowed?
+      wrap-authorize
+      wrap-authenticate
+      wrap-negotiate-representation
+      wrap-find-current-representations
+      wrap-redirect
+      wrap-locate-resource
+      wrap-method-not-implemented?))
 
 (defn representation-headers [acc rep body]
   (letfn [(assoc-when-some [m k v]
@@ -913,8 +960,6 @@
       (catch Exception e
         (log/error e "Failed to log request, recovering")))))
 
-;; TODO: Split into logback logger, Crux logger and response finisher. This will
-;; make it easier to disable one or both logging strategies.
 (defn respond [{::site/keys [selected-representation body start-date base-uri request-id uri]
                 :ring.request/keys [method]
                 :as ctx}]
@@ -1135,7 +1180,7 @@
       (h req))))
 
 (defn make-handler [opts]
-  (-> #'handler
+  (-> (#'handler)
       (wrap-responder)
       (wrap-cors-headers)
       (wrap-error-handling)
