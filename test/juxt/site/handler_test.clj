@@ -149,7 +149,7 @@
              "content-type" "application/json"}})
         db (x/db *crux-node*)]
     (is (= "putAB"
-           (get-in r [::site/resource ::site/request-locals ::apex/operation "operationId"])))))
+           (get-in r [::site/resource ::apex/operation "operationId"])))))
 
 
 (deftest inject-path-parameter-with-forward-slash-test
