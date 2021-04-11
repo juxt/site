@@ -1169,6 +1169,23 @@
       {:status 200 :body "Site OK!\r\n"}
       (h req))))
 
+(defn service-available? [req]
+  true)
+
+(defn wrap-service-unavailable?
+  ""
+  [h]
+  (fn [req]
+    (when-not (service-available? req)
+      (throw
+       (ex-info
+        "Service unavailable"
+        (-> req
+            (into {:ring.response/status 503
+                   :ring.response/body "Service Unavailable\r\n"})
+            (assoc-in [:ring.response/headers "retry-after"] "120")))))
+    (h req)))
+
 (defn make-pipeline
   "Make a pipeline of Ring middleware. Note, that each Ring middleware designates
   a processing stage. An interceptor chain (perhaps using Pedestal (pedestal.io)
@@ -1185,18 +1202,20 @@
    ;; Initialize the request by merging in some extra data
    #(wrap-initialize-request % opts)
 
+   wrap-service-unavailable?
+
    ;; Logging
    wrap-log-request
 
    ;; Save request to database
    wrap-store-request
 
-   ;; Error handling
-   wrap-error-handling
-
    ;; Security
    wrap-cors-headers
    wrap-security-headers
+
+   ;; Error handling
+   wrap-error-handling
 
    ;; Create initial response
    wrap-initialize-response
