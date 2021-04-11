@@ -895,16 +895,16 @@
         (assoc-when-some "trailer" (::http/trailer rep))
         (assoc-when-some "transfer-encoding" (::http/transfer-encoding rep)))))
 
-(defn redact [ctx]
-  (-> ctx
+(defn redact [req]
+  (-> req
       (update :ring.request/headers
               (fn [headers]
                 (cond-> headers
                   (contains? headers "authorization")
                   (assoc "authorization" "(redacted)"))))))
 
-(defn ->serializable [{::site/keys [request-id db] :as ctx}]
-  (-> ctx
+(defn ->serializable [{::site/keys [request-id db] :as req}]
+  (-> req
       (into (select-keys db [:crux.db/valid-time :crux.tx/tx-id]))
       (assoc :crux.db/id request-id ::site/type "Request")
       redact
@@ -925,19 +925,19 @@
            (not (freezable? form))
            ((fn [form] (format "(unfreezable %s)" (type form)))))))))
 
-(defn log-request! [{:ring.request/keys [method] :as ctx}]
+(defn log-request! [{:ring.request/keys [method] :as req}]
   (assert method)
   (log/infof
    "%-7s %s %s %d"
    (str/upper-case (name method))
-   (:ring.request/path ctx)
-   (:ring.request/protocol ctx)
-   (:ring.response/status ctx)))
+   (:ring.request/path req)
+   (:ring.request/protocol req)
+   (:ring.response/status req)))
 
 (defn store-request!
-  [{::site/keys [crux-node] :as ctx}]
+  [{::site/keys [crux-node] :as req}]
   (assert crux-node)
-  (let [blob (->serializable ctx)]
+  (let [blob (->serializable req)]
     (try
       (x/submit-tx
        crux-node
@@ -947,15 +947,15 @@
 
 (defn respond [{::site/keys [selected-representation body start-date base-uri request-id uri]
                 :ring.request/keys [method]
-                :as ctx}]
+                :as req}]
 
   (let [end-date (java.util.Date.)
-        ctx (assoc ctx
+        req (assoc req
                    ::site/end-date end-date
                    ::site/duration-millis (- (.getTime end-date)
                                              (.getTime start-date)))]
     (cond->
-        (update ctx
+        (update req
                 :ring.response/headers
                 assoc "date" (format-http-date start-date))
 
@@ -977,9 +977,9 @@
     (respond (h req))))
 
 (defn wrap-cors-headers [h]
-  (fn [ctx]
-    (let [{::site/keys [resource] :as ctx} (h ctx)
-          request-origin (get-in ctx [:ring.request/headers "origin"])
+  (fn [req]
+    (let [{::site/keys [resource] :as req} (h req)
+          request-origin (get-in req [:ring.request/headers "origin"])
           {::site/keys [access-control-allow-origins]} resource
           allow-origin
           (when request-origin
@@ -990,7 +990,7 @@
                "*")))
           cors-headers (when allow-origin (get access-control-allow-origins allow-origin))
           ]
-      (cond-> ctx
+      (cond-> req
         allow-origin
         (assoc-in [:ring.response/headers "access-control-allow-origin"] allow-origin)
         (contains? cors-headers ::site/access-control-allow-methods)
@@ -1023,7 +1023,7 @@
           (respond
            (-> (merge
                 ;; If this is a Clojure exception, but not a Site exception,
-                ;; let's start with the ctx as a base.
+                ;; let's start with the req as a base.
                 (when-not (::site/start-date exdata) req)
                 {:ring.response/status 500
                  :ring.response/body "Internal Error\r\n"
@@ -1083,7 +1083,7 @@
     :https (if-let [[_ x] (re-matches #"(.*):443" s)] x s)))
 
 (defn wrap-initialize-request
-  "Initialize request context."
+  "Initialize request state."
   [h {::site/keys [crux-node base-uri uri-prefix]}]
   (assert crux-node)
   (assert base-uri)
