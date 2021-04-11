@@ -1166,7 +1166,7 @@
   [h]
   (fn [req]
     (if (= "/_site/healthcheck" (:uri req))
-      {:status 200 :body "Site OK!\r\n"}
+      {:ring.response/status 200 :ring.response/body "Site OK!\r\n"}
       (h req))))
 
 (defn service-available? [req]
@@ -1193,32 +1193,23 @@
   currently a synchronous chain but async could be supported in the future."
   [opts]
   [
-   ;; Optional, helpful for AWS ALB
-   wrap-healthcheck
-
    ;; Switch Ring requests/responses to Ring 2 namespaced keywords
    wrap-ring-1-adapter
+
+   ;; Optional, helpful for AWS ALB
+   wrap-healthcheck
 
    ;; Initialize the request by merging in some extra data
    #(wrap-initialize-request % opts)
 
    wrap-service-unavailable?
 
-   ;; Logging
+   ;; Logging and store request
    wrap-log-request
-
-   ;; Save request to database
    wrap-store-request
-
-   ;; Security
-   wrap-cors-headers
-   wrap-security-headers
 
    ;; Error handling
    wrap-error-handling
-
-   ;; Create initial response
-   wrap-initialize-response
 
    ;; 501
    wrap-method-not-implemented?
@@ -1237,6 +1228,13 @@
 
    ;; 405
    wrap-method-not-allowed?
+
+   ;; Create initial response
+   wrap-initialize-response
+
+   ;; Security
+   wrap-cors-headers
+   wrap-security-headers
 
    ;; Methods (GET, PUT, POST, etc.)
    wrap-invoke-method
