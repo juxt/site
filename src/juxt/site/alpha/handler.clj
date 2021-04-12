@@ -1168,7 +1168,7 @@
 (defn wrap-healthcheck
   [h]
   (fn [req]
-    (if (= "/_site/healthcheck" (:uri req))
+    (if (= "/_site/healthcheck" (:ring.request/path req))
       {:ring.response/status 200 :ring.response/body "Site OK!\r\n"}
       (h req))))
 
