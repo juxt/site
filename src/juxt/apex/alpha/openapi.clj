@@ -123,7 +123,7 @@
           'resource resource
           ;; might change to 'action' at
           ;; this point
-          'request (select-keys req [:ring.request/method])
+          'request (select-keys req [:ring.request/method :ring.request/path])
           'environment {}
           'new-state instance})
 
