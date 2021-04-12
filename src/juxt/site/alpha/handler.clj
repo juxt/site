@@ -462,7 +462,7 @@
                                  :in [uri]}
                             uri))]
      {::site/uri uri
-      ::site/methods #{:get :head :options}
+      ::http/methods #{:get :head :options}
       ::site/resource-provider r
       ::http/redirect (cond-> loc (.startsWith loc base-uri)
                               (subs (count base-uri)))})
