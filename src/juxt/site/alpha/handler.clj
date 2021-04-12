@@ -679,13 +679,16 @@
 (defn wrap-method-not-implemented? [h]
   (fn [{:ring.request/keys [method] :as req}]
     (when-not (contains?
-             #{:get :head :post :put :delete :options
-               :patch
-               :mkcol :propfind} method)
+               #{:get :head :post :put :delete :options
+                 :patch
+                 :mkcol :propfind} method)
       (throw
-       (ex-info "Method not implemented"
-                (into req {:ring.response/status 501
-                           :ring.response/body "Not Implemented\r\n"}))))
+       (ex-info
+        "Method not implemented"
+        (into
+         req
+         {:ring.response/status 501
+          :ring.response/body "Not Implemented\r\n"}))))
     (h req)))
 
 (defn wrap-locate-resource [h]
