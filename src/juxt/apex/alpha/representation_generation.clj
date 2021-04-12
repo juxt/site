@@ -36,6 +36,14 @@
        x))
    input))
 
+(defn using-pull?
+  "Determine if a query is using pull-syntax"
+  [{:keys [find]}]
+  (some (fn [x]
+          (and (list? x)
+               (= 'pull (first x))))
+        find))
+
 ;; By default we output the resource state, but there may be a better rendering
 ;; of collections, which can be inferred from the schema being an array and use
 ;; the items subschema.
@@ -62,13 +70,17 @@
         singular-result? (get-in resource [::apex/operation "responses" "200" "juxt.site.alpha/singular-result?"] false)
         _ (log/tracef "singular-result? %s %s" singular-result? (type singular-result?))
 
-
         _ (log/debugf "Running query: %s" (pr-str query))
 
         resource-state
         (or
-         (when query (cond-> (x/q db query subject)
-                       singular-result? first))
+         (when query
+           (cond->> (x/q db query subject)
+             singular-result? first
+
+             (and (not singular-result?)
+                  (using-pull? query))
+             (apply concat)))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
          ;; filter out the http metadata?
