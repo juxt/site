@@ -64,7 +64,8 @@
         (throw
          (ex-info
           "Not Acceptable"
-           ;; TODO: Must add list of available representations
+          ;; TODO: Must add list of available representations
+          ;; TODO: Add to req with into
           {:ring.response/status 406
            :ring.response/body "Not Acceptable\r\n"}))))
 
@@ -710,9 +711,6 @@
     (h req)))
 
 (defn wrap-find-current-representations
-  ;; Step 5 (GET/HEAD/PUT only). Determine the resource's current
-  ;; representations, or 404
-  ;; Step 6 (GET/HEAD only). Maybe throw a 404
   [h]
   (fn [{:ring.request/keys [method] :as req}]
     (if (#{:get :head :put} method)
@@ -728,7 +726,6 @@
       (h req))))
 
 (defn wrap-negotiate-representation [h]
-  ;; Step 7. (GET/HEAD only). Select a representation
   (fn [req]
     (let [cur-reps (::site/current-representations req)]
       (h (cond-> req
@@ -738,14 +735,11 @@
             (negotiate-representation req cur-reps)))))))
 
 (defn wrap-authenticate [h]
-  ;; Step 8. Authenticate
   (fn [{:ring.request/keys [method] :as req}]
     (let [sub (when-not (= method :options) (authn/authenticate req))]
       (h (cond-> req sub (assoc ::pass/subject sub))))))
 
 (defn wrap-authorize
-  ;; Step 9. Authorize
-
   ;; Do authorization as late as possible (in order to have as much data
   ;; as possible to base the authorization decision on. However, note
   ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
@@ -788,7 +782,6 @@
       (h req))))
 
 (defn wrap-method-not-allowed? [h]
-  ;; Step 10. Check method allowed
   (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
     (if resource
       (let [allowed-methods (set (::http/methods resource))]
@@ -804,7 +797,6 @@
       (h req))))
 
 (defn wrap-invoke-method [h]
-  ;; Step 11. Invoke method
   (fn [{:ring.request/keys [method] :as req}]
     (h (case method
          (:get :head) (GET req)
@@ -861,9 +853,7 @@
 
 (defn wrap-security-headers [h]
   (fn [req]
-    ;; Step 12. Set security headers, including CORS
     ;; TODO - but see wrap-cors-headers middleware
-
     ;;        Strict-Transport-Security: max-age=31536000; includeSubdomains
     ;;        X-Frame-Options: DENY
     ;;        X-Content-Type-Options: nosniff
