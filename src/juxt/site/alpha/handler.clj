@@ -808,19 +808,16 @@
          :propfind (PROPFIND req)
          :mkcol (MKCOL req)))))
 
-(defn wrap-refresh-db
-  ;; Refresh the db, now all steps after this are in terms of the 'new'
-  ;; db.
-  [h]
-  (fn [req]
-    (h (assoc req ::site/db (x/db (::site/crux-node req))))))
-
 (defn wrap-triggers [h]
   ;; Site-specific step: Check for any observers and 'run' them TODO:
   ;; Perhaps effects need to run against happy and sad paths - i.e. errors
   ;; - this should really be in a 'finally' block.
-  (fn [{::site/keys [db crux-node] ::pass/keys [subject] :as req}]
-    (let [triggers
+  (fn [{::site/keys [crux-node] ::pass/keys [subject] :as req}]
+
+    (let [db (x/db crux-node) ; latest post-method db
+          result (h req)
+
+          triggers
           (map first
                (x/q db '{:find [rule]
                          :where [[rule ::site/type "Trigger"]]}))
@@ -849,7 +846,7 @@
         (catch Exception e
           (log/error e "Failed to run trigger/action")))
 
-      (h req))))
+      result)))
 
 (defn wrap-security-headers [h]
   (fn [req]
@@ -1222,19 +1219,20 @@
    ;; 405
    wrap-method-not-allowed?
 
-   ;; Create initial response
-   wrap-initialize-response
+   ;; Custom middleware for Site
+   wrap-triggers
 
    ;; Security
    wrap-cors-headers
    wrap-security-headers
 
+   ;; Create initial response
+   wrap-initialize-response
+
    ;; Methods (GET, PUT, POST, etc.)
    wrap-invoke-method
 
-   ;; Custom middleware for Site
-   wrap-refresh-db
-   wrap-triggers])
+   ])
 
 
 (defn make-handler [opts]
