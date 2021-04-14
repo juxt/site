@@ -603,13 +603,10 @@
                        :ring.response/body "Internal Error\r\n"}))))))
 
 (defn DELETE [{::site/keys [crux-node uri] :as req}]
-  (->>
-   (x/submit-tx crux-node [[:crux.tx/delete uri]])
-   (x/await-tx crux-node))
-
+  (x/submit-tx crux-node [[:crux.tx/delete uri]])
   (into req
-        {:ring.response/status 415
-         :ring.response/body "Unsupported Media Type\r\n"}))
+        {:ring.response/status 202
+         :ring.response/body "Accepted\r\n"}))
 
 (defn OPTIONS [{::site/keys [resource allowed-methods] :as req}]
   ;; TODO: Implement *
