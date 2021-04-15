@@ -414,40 +414,54 @@
 (deftest if-match-3-test
   (is (= 412 (if-match-run "\"def\", \"ghi\""))))
 
+(deftest redirect-test
+  (submit-and-await!
+    [[:crux.tx/put
+      {:crux.db/id "https://example.org/"
+       ::site/type "Redirect"
+       ::site/location "/test.html"}]])
+
+   (let [response (*handler*
+                   {:ring.request/method :get
+                    :ring.request/path "/"})]
+     (is (= 302 (:ring.response/status response)))
+     (is (= "/test.html" (get-in response [:ring.response/headers "location"])))))
+
+;; TODO: Test that 401 gets an error representation
+#_((t/join-fixtures [with-crux with-handler])
+   (fn []
+     (submit-and-await!
+      [ ;;[:crux.tx/put access-all-areas]
+       [:crux.tx/put
+        {:crux.db/id "https://example.org/sensitive-report.html"
+         ::http/content-type "text/html;charset=utf-8"
+         ::http/content "Latest sales figures"
+         ::http/methods #{:get :head :options}
+         }]])
+
+     (select-keys
+      (*handler*
+       {:ring.request/method :get
+        :ring.request/path "/sensitive-report.html"})
+      [:ring.response/status :ring.response/headers
+       ::site/selected-representation])))
+
 #_((t/join-fixtures [with-crux with-handler])
  (fn []
    (submit-and-await!
     [[:crux.tx/put access-all-areas]
      [:crux.tx/put
-      {:crux.db/id "https://example.org/test.png"
-       ::site/type "StaticRepresentation"
-       ::http/etag "\"abc\""
-       ::http/content-type "image/png"
-       ::http/methods #{:put}
-       }]
-     [:crux.tx/put
-      {:crux.db/id "https://example.org/_site/tx_fns/put_if_match_etags"
-       :crux.db/fn
-       '(fn [ctx ;; uri ;;header-field new-rep if-match?
-             ]
-          (let [db (crux.api/db ctx)
-                existing-representation (crux.api/entity db uri)]
-            (juxt.site.alpha.handler/evaluate-preconditions! req)
-            [[:crux.tx/put new-rep]]))
+      {:crux.db/id "https://example.org/report.html"
+       ::http/content-type "text/html;charset=utf-8"
+       ::http/content "Latest figures"
+       ::http/methods #{:get :head :options}
+       ::http/cache-directives #{:no-store}
+       }]])
 
-       :http/content-type "application/clojure"}]])
-
-   (:ring.response/status
-    (let [body "Hello"]
-      (*handler*
-       {:ring.request/method :put
-        :ring.request/body (ByteArrayInputStream. (.getBytes body))
-        :ring.request/headers
-        {"content-length" (str (count body))
-         "content-type" "image/png"
-         "if-match" "\"ac\",\"def\""
-         }
-        :ring.request/path "/test.png"})))))
+   (:ring.response/headers
+    (*handler*
+     {:ring.request/method :get
+      :ring.request/path "/report.html"}))))
 
 ;; TODO:
       ;; "The server generating a 304 response MUST generate any of the following

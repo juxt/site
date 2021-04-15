@@ -53,7 +53,9 @@
 
 (def config
   (edn/read-string
-   {:readers {'ig/ref identity 'ref identity}}
+   {:readers {'ig/ref identity
+              'ref identity
+              'profile #(get % :prod)}}
    (slurp config-file)))
 
 (defn get-password-from-unix-pass [unix-pass-password-prefix username]
@@ -565,10 +567,10 @@
           (message! "Request id: " (get headers "site-request-id")))
 
         (= status 201)
-        (message! (format "Redirect created: %s" (get headers "location")))
+        (message! (format "Redirect created"))
 
         (= status 204)
-        (message! (format "Redirect updated: %s" (get headers "location")))
+        (message! (format "Redirect updated"))
 
         :else
         (do

@@ -540,15 +540,14 @@
 (defn post-redirect [{::site/keys [crux-node db uri]
                       ::apex/keys [request-instance]
                       :as req}]
-  (let [location (str uri (hash (select-keys request-instance [::site/resource ::site/location])))
-        existing (x/entity db location)]
+  (let [{::site/keys [resource]} request-instance
+        existing (x/entity db resource)]
     (->> (x/submit-tx
           crux-node
-          [[:crux.tx/put (merge {:crux.db/id location} request-instance)]])
+          [[:crux.tx/put (merge {:crux.db/id resource} (dissoc request-instance ::site/resource))]])
          (x/await-tx crux-node))
 
-    (into req {:ring.response/status (if existing 204 201)
-               :ring.response/headers {"location" location}})))
+    (into req {:ring.response/status (if existing 204 201)})))
 
 (defn POST [{::site/keys [resource request-id] :as req}]
   (let [rep (->
@@ -697,14 +696,19 @@
 
 (defn wrap-redirect [h]
   (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
-    (when-let [location (::http/redirect resource)]
-      (throw
-       (ex-info "Redirect"
-                (-> req
-                    (assoc :ring.response/status
-                           (case method (:get :head) 302 307))
-                    (update :ring.response/headers
-                            assoc "location" location)))))
+    (when (= (::site/type resource) "Redirect")
+      (let [status (case method (:get :head) 302 307)]
+        (throw
+         (ex-info
+          "Redirect"
+          (-> req
+              (assoc :ring.response/status status)
+              (assoc :ring.response/body
+                     (case status
+                       302 "Found\r\n"
+                       307 "Temporary Redirect\r\n"))
+              (update :ring.response/headers
+                      assoc "location" (::site/location resource)))))))
     (h req)))
 
 (defn wrap-find-current-representations
