@@ -859,7 +859,10 @@
     ;;        X-Download-Options: noopen
     ;;        X-Permitted-Cross-Domain-Policies: none
 
-    (h req)))
+    (let [res (h req)]
+      (cond-> res
+        ;; Don't allow Google to track your site visitors. Disable FLoC.
+        true (assoc-in [:ring.response/headers "permissions-policy"] "interest-cohort=()")))))
 
 (defn representation-headers [acc rep body]
   (letfn [(assoc-when-some [m k v]
