@@ -517,15 +517,15 @@
           :ring.request/headers {"accept" "image/png"}})]
     (is (= 406 (:ring.response/status response)))))
 
-;; Site templates can be defined as a TemplatedRepresentation resource which
-;; references a Template resource. The Template resource provides defaults for
-;; the representation metadata of the TemplatedRepresentation. The Template
-;; resource also references TemplateModel resource, which specifies the query
-;; used to extract the template model from the database. In this way, a template
-;; can be shared by multiple instances. Instances may provide data, which is
-;; accessible via the query using the 'resource' symbol. This implementation
-;; could be extended to support content negotiation, whereby the resource would
-;; be the resource of the URL, rather than the negotiated representation.
+;; Site templates can be defined as a resource which references a Template
+;; resource. The Template resource provides defaults for the representation
+;; metadata of the resource's selected representation. The Template resource
+;; also references TemplateModel resource, which specifies the query used to
+;; extract the template model from the database. In this way, a template can be
+;; shared by multiple instances. Instances may provide data, which is accessible
+;; via the query using the 'resource' symbol. This implementation could be
+;; extended to support content negotiation, whereby the resource would be the
+;; resource of the URL, rather than the negotiated representation.
 (deftest template-test
   (submit-and-await!
    [[:crux.tx/put access-all-areas]
@@ -552,7 +552,6 @@
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/nectarine.html"
-      ::site/type "TemplatedRepresentation"
       ::http/methods #{:get :head :options}
       ::site/template "https://example.org/template.html"
       :fruit "Nectarine"}]])
