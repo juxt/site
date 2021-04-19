@@ -427,6 +427,39 @@
      (is (= 302 (:ring.response/status response)))
      (is (= "/test.html" (get-in response [:ring.response/headers "location"])))))
 
+;; Site templates can be defined as a resource containing the template content
+;; coupled with the query used to construct the template's model. Templates can
+;; be referenced by representations.
+(deftest template-test
+  (submit-and-await!
+   [[:crux.tx/put access-all-areas]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/template.html"
+      ::http/methods #{:get :head :options}
+      ::site/type "Template"
+      ::http/content-type "text/plain;charset=utf-8"
+      ::http/content "<h1>{{title}}</h1><dl><dt>Fruit</dt><dd>{{fruit}}</dd></dl>"
+      ::site/template-engine :selmer
+      ::site/query '{:find [title fruit]
+                     :keys [title fruit]
+                     :where [[(identity "Favorites") title]
+                             [resource :fruit fruit]]}}]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/nectarine.html"
+      ::site/type "Resource"
+      ::http/methods #{:get :head :options}
+      ::site/template "https://example.org/template.html"
+      :fruit "Nectarine"}]])
+
+  (let [response (*handler*
+                  {:ring.request/method :get
+                   :ring.request/path "/nectarine.html"})]
+    (is (= 200 (:ring.response/status response)))
+    (is (= "<h1>Favorites</h1><dl><dt>Fruit</dt><dd>Nectarine</dd></dl>"
+           (:ring.response/body response)))))
+
 ;; TODO: Test that 401 gets an error representation
 #_((t/join-fixtures [with-crux with-handler])
    (fn []

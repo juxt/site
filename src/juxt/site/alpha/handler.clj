@@ -24,6 +24,8 @@
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.locator :as locator]
    [juxt.site.alpha.util :as util]
+   [juxt.site.alpha.templating :as templating]
+   juxt.site.alpha.selmer
    [juxt.site.alpha.triggers :as triggers]
    [taoensso.nippy.utils :refer [freezable?]]
    [juxt.site.alpha.rules :as rules])
@@ -55,7 +57,7 @@
   (let [{selected-representation ::pick/representation
          vary ::pick/vary}
         (when (seq current-representations)
-          ;; TODO: Pick must upgrade to ring headers
+          ;; TODO: Pick must upgrade to ring 2 headers
           (pick (assoc request :headers (:ring.request/headers request))
                 current-representations {::pick/vary? true}))]
 
@@ -473,50 +475,65 @@
     ::http/methods #{:get :head :options :put :post}
     ::site/put-fn put-static-resource}))
 
+(defn merge-template-maybe
+  "Some representations use a template engine to generate the payload. The
+  referenced template (::site/template) may provide defaults for the
+  representation metadata. This function takes a representation and merges in
+  its template's metadata, if necessary."
+  [db representation]
+  (if-let [template (some->> representation ::site/template (x/entity db))]
+    (merge
+     ;; Set a body-fn for rendering the template
+     {::site/body-fn (fn [req]
+                       (templating/render-template req template))}
+     (select-keys template [::http/content-type ::http/content-encoding ::http/content-language])
+     representation)
+    representation))
+
 (defn current-representations [{::site/keys [resource uri db]}]
-  (or
-   ;; This is not common in the Crux DB, but allows 'dynamic' resources to
-   ;; declare multiple representations.
-   (::http/representations resource)
+  (->> (or
+        ;; This is not common in the Crux DB, but allows 'dynamic' resources to
+        ;; declare multiple representations.
+        (::http/representations resource)
 
-   ;; See if there are variants
-   (let [variants (x/q db '{:find [r]
-                            :where [[v ::site/type "Variant"]
-                                    [v ::site/resource uri]
-                                    [v ::site/variant r]]
-                            :in [uri]
-                            } uri)]
-     (when (pos? (count variants))
-       (cond-> (for [[v] variants
-                     :let [rep (x/entity db v)]
-                     :when rep]
-                 (assoc rep ::http/content-location v))
-         (::http/content-type resource)
-         (conj resource))))
+        ;; See if there are variants
+        (let [variants (x/q db '{:find [r]
+                                 :where [[v ::site/type "Variant"]
+                                         [v ::site/resource uri]
+                                         [v ::site/variant r]]
+                                 :in [uri]
+                                 } uri)]
+          (when (pos? (count variants))
+            (cond-> (for [[v] variants
+                          :let [rep (x/entity db v)]
+                          :when rep]
+                      (assoc rep ::http/content-location v))
+              (or (::http/content-type resource) (::site/template resource))
+              (conj resource))))
 
-   ;; Most resources have a content-type, which indicates there is only one
-   ;; variant.
-   (when (::http/content-type resource)
-     [resource])
+        ;; Most resources have a content-type, which indicates there is only one
+        ;; variant.
+        (when (or (::http/content-type resource) (::site/template resource))
+          [resource])
 
-   ;; No representations. On a GET, this would yield a 404.
-   []))
+        ;; No representations. On a GET, this would yield a 404.
+        [])
+       ;; Merge in an template defaults
+       (mapv #(merge-template-maybe db %))))
 
-(defn GET [{::site/keys [selected-representation resource] :as req}]
+(defn GET [{::site/keys [selected-representation] :as req}]
   (evaluate-preconditions! req)
 
-  (let [{::http/keys [body content charset]} selected-representation
+  (let [{::http/keys [body content]} selected-representation
         {::site/keys [body-fn]} selected-representation
         body (cond
-               content (.getBytes content (or charset "utf-8"))
-               body body
-
                body-fn
-               (let [f (requiring-resolve body-fn)]
+               (let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
                  (log/debugf "Calling body-fn: %s" body-fn)
-                 (let [body (f req)]
-                   (cond-> body
-                     (string? body) (.getBytes (or charset "UTF-8"))))))]
+                 (f req))
+
+               content content
+               body body)]
 
     (cond-> (assoc req :ring.response/status 200)
       body (assoc :ring.response/body body))))
@@ -939,9 +956,11 @@
       (catch Exception e
         (log/error e "Failed to log request, recovering")))))
 
-(defn respond [{::site/keys [selected-representation body start-date base-uri request-id uri]
-                :ring.request/keys [method]
-                :as req}]
+(defn respond
+  [{::site/keys [selected-representation start-date base-uri request-id]
+    :ring.request/keys [method]
+    :ring.response/keys [body]
+    :as req}]
 
   (let [end-date (java.util.Date.)
         req (assoc req
@@ -997,6 +1016,41 @@
         (assoc-in [:ring.response/headers "access-control-allow-credentials"]
                   (str (get cors-headers ::site/access-control-allow-credentials)))))))
 
+(defn error-representations [req]
+  ;; It's possible to provide a different set of representations for different
+  ;; errors. We'll just return a single set for all errors.
+  [{::http/content-type "application/json"}
+   {::http/content-type "text/html;charset=utf-8"}
+   {::http/content-type "text/plain;charset=utf-8"}])
+
+(defn negotiate-error-representation [req err-reps]
+  ;; TODO: Pick could/should upgrade to support ring 2 headers (see original
+  ;; TODO in main conneg step)
+  (or
+   (::pick/representation
+    (pick (assoc req :headers (:ring.request/headers req)) err-reps))
+   {::http/content-type "text/plain;charset=utf-8"}))
+
+(defn expand-error [{:ring.response/keys [status]
+                     ::site/keys [selected-representation]
+                     :as req}]
+  ;; Can replace body according to status and selected-representation
+  (case status
+    401 (update req :ring.response/body str "-- TODO")
+    req))
+
+(defn errors-with-causes
+  "Return a collection of errors with their messages and causes"
+  [e]
+  (let [cause (.getCause e)]
+    (cond->
+        {:message (.getMessage e)
+         :stack (.getStackTrace e)}
+        (and
+         (instance? clojure.lang.ExceptionInfo e)
+         (nil? (::site/start-date (ex-data e)))) (assoc :ex-data (ex-data e))
+        cause (assoc :cause (errors-with-causes cause)))))
+
 (defn wrap-error-handling
   "Return a handler that constructs proper Ring responses, logs and error
   handling where appropriate."
@@ -1008,31 +1062,39 @@
     (try
       (h req)
       (catch clojure.lang.ExceptionInfo e
-        (let [{:ring.response/keys [status] :as exdata} (ex-data e)]
+        (let [{:ring.response/keys [status] :as ex-data} (ex-data e)]
           ;; Don't log exceptions which are used to escape (e.g. 302, 401).
           (when (or (not (integer? status)) (>= status 500))
-            (let [exdata (->serializable exdata)]
-              (log/errorf e "%s: %s" (.getMessage e) (pr-str exdata))))
+            (let [ex-data (->serializable ex-data)]
+              (log/errorf e "%s: %s" (.getMessage e) (pr-str ex-data))))
 
-          (respond
-           (-> (merge
-                ;; If this is a Clojure exception, but not a Site exception,
-                ;; let's start with the req as a base.
-                (when-not (::site/start-date exdata) req)
-                {:ring.response/status 500
-                 :ring.response/body "Internal Error\r\n"
-                 ::site/error (.getMessage e)
-                 ::site/error-stack-trace (.getStackTrace e)}
-                exdata)))))
+          (let [error-representation (negotiate-error-representation req (error-representations req))
+                site-exception? (some? (::site/start-date ex-data))]
+            (respond
+             (expand-error
+              (-> (merge
+                   (when-not site-exception? req)
+                   {:ring.response/status 500
+                    :ring.response/body "Internal Error\r\n"
+                    ::site/errors (errors-with-causes e)}
+                   {::site/selected-representation error-representation}
+                   ex-data)))))))
 
       (catch Throwable e
         (log/error e (.getMessage e))
         (respond
-         (into req
-               {:ring.response/status 500
-                :ring.response/body "Internal Error\r\n"})))
+         (into
+          req
+          {:ring.response/status 500
+           :ring.response/body "Internal Error\r\n"
+           ::site/error (.getMessage e)
+           ::site/error-stack-trace (.getStackTrace e)
+           ::site/selected-representation
+           (negotiate-error-representation req (error-representations req))})))
       (finally
         (org.slf4j.MDC/clear)))))
+
+
 
 ;; See https://portswigger.net/web-security/host-header and similar TODO: Have a
 ;; 'whitelist' in the config to check against - but this would require a reboot,

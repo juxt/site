@@ -48,7 +48,14 @@
         json-html/json-html {:mvn/version "0.4.0"}
 
         ;; AWS
-        amazonica/amazonica {:mvn/version "0.3.154"}}
+        amazonica/amazonica {:mvn/version "0.3.154"}
+
+        ;; Selmer templating (forked)
+        malcolmsparks/selmer
+        {:git/url "https://github.com/malcolmsparks/Selmer.git"
+         :sha "eb112b849d70e6b0f358a7fd8d41a63329c1cb63"
+         ;; :local/root "../../malcolmsparks/selmer"
+         }}
 
  :aliases
  {:dev
