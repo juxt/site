@@ -33,6 +33,16 @@
                          (::http/body res) (::http/body res)
                          :else (.getBytes "(template not found)"))))))))
 
+        template-model-> (::site/template-model template)
+        _ (assert template-model-> "Template must have a :juxt.site.alpha/template-model entry")
+        template-model (x/entity db template-model->)
+        _ (assert template-model (format "Template model of '%s' must exist" template-model->))
+        _ (when-not (= ( ::site/type template-model) "TemplateModel")
+            (throw
+             (ex-info
+              "Template model must be of type 'TemplateModel'"
+              {:template-model-id template-model->})))
+
         temp-id-map (->>
                      {'subject (::pass/subject req)
                       'resource resource}
@@ -50,12 +60,15 @@
 
         spec-db (x/with-tx db txes)
 
-        query (-> (::site/query template)
-                  (assoc :in (vec (keys temp-id-map))))
+        query (::site/query template-model)
+
+        _ (assert query "template-model must have a :juxt.site.alpha/query entry")
 
         _ (log/tracef "Query is %s" query)
 
-        model (first (apply x/q spec-db query (map :crux.db/id (vals temp-id-map))))]
+        model (first (apply x/q spec-db
+                            (assoc query :in (vec (keys temp-id-map)))
+                            (map :crux.db/id (vals temp-id-map))))]
 
     (log/tracef "Template model: %s" model)
 

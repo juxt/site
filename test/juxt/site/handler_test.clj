@@ -427,12 +427,29 @@
      (is (= 302 (:ring.response/status response)))
      (is (= "/test.html" (get-in response [:ring.response/headers "location"])))))
 
-;; Site templates can be defined as a resource containing the template content
-;; coupled with the query used to construct the template's model. Templates can
-;; be referenced by representations.
+;; Site templates can be defined as a TemplatedRepresentation resource which
+;; references a Template resource. The Template resource provides defaults for
+;; the representation metadata of the TemplatedRepresentation. The Template
+;; resource also references TemplateModel resource, which specifies the query
+;; used to extract the template model from the database. In this way, a template
+;; can be shared by multiple instances. Instances may provide data, which is
+;; accessible via the query using the 'resource' symbol. This implementation
+;; could be extended to support content negotiation, whereby the resource would
+;; be the resource of the URL, rather than the negotiated representation.
 (deftest template-test
   (submit-and-await!
    [[:crux.tx/put access-all-areas]
+
+    [:crux.tx/put
+     ;; By a template-model being a query, it can be subject to limitations
+     ;; imposed by authorization.
+     {:crux.db/id "https://example.org/template-model"
+      ::http/methods #{:get :head :options}
+      ::site/type "TemplateModel"
+      ::site/query '{:find [title fruit]
+                     :keys [title fruit]
+                     :where [[(identity "Favorites") title]
+                             [resource :fruit fruit]]}}]
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/template.html"
@@ -441,14 +458,11 @@
       ::http/content-type "text/plain;charset=utf-8"
       ::http/content "<h1>{{title}}</h1><dl><dt>Fruit</dt><dd>{{fruit}}</dd></dl>"
       ::site/template-engine :selmer
-      ::site/query '{:find [title fruit]
-                     :keys [title fruit]
-                     :where [[(identity "Favorites") title]
-                             [resource :fruit fruit]]}}]
+      ::site/template-model "https://example.org/template-model"}]
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/nectarine.html"
-      ::site/type "Resource"
+      ::site/type "TemplatedRepresentation"
       ::http/methods #{:get :head :options}
       ::site/template "https://example.org/template.html"
       :fruit "Nectarine"}]])
@@ -458,26 +472,27 @@
                    :ring.request/path "/nectarine.html"})]
     (is (= 200 (:ring.response/status response)))
     (is (= "<h1>Favorites</h1><dl><dt>Fruit</dt><dd>Nectarine</dd></dl>"
-           (:ring.response/body response)))))
+           (:ring.response/body response)))
+    (is (= "text/plain;charset=utf-8"
+           (get-in response [:ring.response/headers "content-type"])))))
 
 ;; TODO: Test that 401 gets an error representation
 #_((t/join-fixtures [with-crux with-handler])
-   (fn []
-     (submit-and-await!
-      [ ;;[:crux.tx/put access-all-areas]
-       [:crux.tx/put
-        {:crux.db/id "https://example.org/sensitive-report.html"
-         ::http/content-type "text/html;charset=utf-8"
-         ::http/content "Latest sales figures"
-         ::http/methods #{:get :head :options}
-         }]])
+ (fn []
+   (submit-and-await!
+    [ ;;[:crux.tx/put access-all-areas]
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/sensitive-report.html"
+       ::http/content-type "text/html;charset=utf-8"
+       ::http/content "Latest sales figures"
+       ::http/methods #{:get :head :options}}]])
 
-     (select-keys
-      (*handler*
-       {:ring.request/method :get
-        :ring.request/path "/sensitive-report.html"})
-      [:ring.response/status :ring.response/headers
-       ::site/selected-representation])))
+   (select-keys
+    (*handler*
+     {:ring.request/method :get
+      :ring.request/path "/sensitive-report.html"})
+    [:ring.response/status :ring.response/headers
+     ::site/selected-representation])))
 
 #_((t/join-fixtures [with-crux with-handler])
  (fn []
