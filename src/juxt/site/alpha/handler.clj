@@ -483,9 +483,6 @@
   [db representation]
   (if-let [template (some->> representation ::site/template (x/entity db))]
     (merge
-     ;; Set a body-fn for rendering the template
-     {::site/body-fn (fn [req]
-                       (templating/render-template req template))}
      (select-keys template [::http/content-type ::http/content-encoding ::http/content-language])
      representation)
     representation))
@@ -521,13 +518,16 @@
        ;; Merge in an template defaults
        (mapv #(merge-template-maybe db %))))
 
-(defn add-payload [{::site/keys [selected-representation] :as req}]
+(defn add-payload [{::site/keys [selected-representation db] :as req}]
   (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
+        template (some->> selected-representation ::site/template (x/entity db))
         body (cond
                body-fn
                (let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
                  (log/debugf "Calling body-fn: %s" body-fn)
                  (f req))
+
+               template (templating/render-template req template)
 
                content content
                body body)]
