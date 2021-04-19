@@ -521,11 +521,8 @@
        ;; Merge in an template defaults
        (mapv #(merge-template-maybe db %))))
 
-(defn GET [{::site/keys [selected-representation] :as req}]
-  (evaluate-preconditions! req)
-
-  (let [{::http/keys [body content]} selected-representation
-        {::site/keys [body-fn]} selected-representation
+(defn add-payload [{::site/keys [selected-representation] :as req}]
+  (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
         body (cond
                body-fn
                (let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
@@ -535,13 +532,17 @@
                content content
                body body)]
 
-    (cond-> (assoc req :ring.response/status 200)
-      body (assoc :ring.response/body body))))
+    (cond-> req body (assoc :ring.response/body body))))
+
+(defn GET [req]
+  (evaluate-preconditions! req)
+  (-> req
+      (assoc :ring.response/status 200)
+      (add-payload)))
 
 (defn post-variant [{::site/keys [crux-node db uri]
                      ::apex/keys [request-instance]
                      :as req}]
-
   (let [location
         (str uri (hash (select-keys request-instance [::site/resource ::site/variant])))
         existing (x/entity db location)]
@@ -1016,12 +1017,11 @@
         (assoc-in [:ring.response/headers "access-control-allow-credentials"]
                   (str (get cors-headers ::site/access-control-allow-credentials)))))))
 
-(defn error-representations [req]
-  ;; It's possible to provide a different set of representations for different
-  ;; errors. We'll just return a single set for all errors.
-  [{::http/content-type "application/json"}
-   {::http/content-type "text/html;charset=utf-8"}
-   {::http/content-type "text/plain;charset=utf-8"}])
+(defn error-representations [{::site/keys [db]} status]
+  (map first (x/q db '{:find [(pull er [*])]
+                       :where [[er ::site/type "ErrorRepresentation"]
+                               [er ::http/status status]]
+                       :in [status]} status)))
 
 (defn negotiate-error-representation [req err-reps]
   ;; TODO: Pick could/should upgrade to support ring 2 headers (see original
@@ -1068,17 +1068,25 @@
             (let [ex-data (->serializable ex-data)]
               (log/errorf e "%s: %s" (.getMessage e) (pr-str ex-data))))
 
-          (let [error-representation (negotiate-error-representation req (error-representations req))
+          (log/tracef "err-reps: %s" (error-representations req (or status 500)))
+
+          (let [error-representation
+                (negotiate-error-representation req (error-representations req (or status 500)))
                 site-exception? (some? (::site/start-date ex-data))]
-            (respond
-             (expand-error
-              (-> (merge
-                   (when-not site-exception? req)
-                   {:ring.response/status 500
-                    :ring.response/body "Internal Error\r\n"
-                    ::site/errors (errors-with-causes e)}
-                   {::site/selected-representation error-representation}
-                   ex-data)))))))
+            (-> (merge
+                 (when-not site-exception? req)
+                 {:ring.response/status 500
+                  ::site/errors (errors-with-causes e)}
+                 ex-data
+                 {::site/selected-representation
+                  (or
+                   error-representation
+                   (let [body "Internal Error\r\n"]
+                     {::http/content-type "text/plain;charset=utf-8"
+                      ::http/content-length (count body)
+                      :ring.response/body body}))})
+                add-payload
+                respond))))
 
       (catch Throwable e
         (log/error e (.getMessage e))

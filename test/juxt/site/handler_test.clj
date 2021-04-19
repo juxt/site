@@ -567,7 +567,7 @@
            (get-in response [:ring.response/headers "content-type"])))))
 
 ;; TODO: Test that 401 gets an error representation
-#_((t/join-fixtures [with-crux with-handler])
+((t/join-fixtures [with-crux with-handler])
  (fn []
    (submit-and-await!
     [ ;;[:crux.tx/put access-all-areas]
@@ -575,14 +575,39 @@
       {:crux.db/id "https://example.org/sensitive-report.html"
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "Latest sales figures"
+       ::http/methods #{:get :head :options}}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/401.html"
+       ::site/type "ErrorRepresentation"
+       ::http/status #{401 403}
+       ::http/content-type "text/html;charset=utf-8"
+       ::http/content "<h1>Unauthorized or Forbidden</h1>"}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/401.txt"
+       ::site/type "ErrorRepresentation"
+       ::http/status #{401}
+       ::http/content-type "text/plain;charset=utf-8"
+       ::http/content "Unauthorized"}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/406.html"
+       ::site/type "ErrorRepresentation"
+       ::http/status #{406}
+       ::http/content-type "text/html;charset=utf-8"
+       ::http/content "<h1>Unacceptable</h1>"
        ::http/methods #{:get :head :options}}]])
 
-   (select-keys
-    (*handler*
-     {:ring.request/method :get
-      :ring.request/path "/sensitive-report.html"})
-    [:ring.response/status :ring.response/headers
-     ::site/selected-representation])))
+   (let [db (x/db *crux-node*)]
+     (x/q db '{:find [er]
+               :where [[er ::site/type "ErrorRepresentation"]
+                       [er ::http/status 403]]}))
+
+   (*handler*
+    {:ring.request/method :get
+     :ring.request/path "/sensitive-report.html"
+     :ring.request/headers {"accept" "text/html"}})))
 
 #_((t/join-fixtures [with-crux with-handler])
  (fn []
