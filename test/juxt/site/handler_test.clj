@@ -427,6 +427,96 @@
      (is (= 302 (:ring.response/status response)))
      (is (= "/test.html" (get-in response [:ring.response/headers "location"])))))
 
+(deftest content-negotiation-test
+  (submit-and-await!
+   [[:crux.tx/put access-all-areas]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/report"
+      ::http/methods #{:get :head :options}
+      ::http/representations
+      #{{::http/content-type "text/html;charset=utf-8"
+         ::http/content "<h1>Latest sales figures</h1>"}
+        {::http/content-type "text/plain;charset=utf-8"
+         ::http/content "Latest sales figures"}}}]])
+
+  (let [response
+        (*handler*
+         {:ring.request/method :get
+          :ring.request/path "/report"
+          :ring.request/headers {"accept" "text/html"}})]
+    (is (= 200 (:ring.response/status response)))
+    (is (= "<h1>Latest sales figures</h1>" (:ring.response/body response))))
+
+  (let [response
+        (*handler*
+         {:ring.request/method :get
+          :ring.request/path "/report"
+          :ring.request/headers {"accept" "text/plain"}})]
+
+    (is (= 200 (:ring.response/status response)))
+    (is (= "Latest sales figures" (:ring.response/body response))))
+
+  (let [response
+        (*handler*
+         {:ring.request/method :get
+          :ring.request/path "/report"
+          :ring.request/headers {"accept" "image/png"}})]
+    (is (= 406 (:ring.response/status response)))))
+
+(deftest variants-test
+  (submit-and-await!
+   [[:crux.tx/put access-all-areas]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/report.html"
+      ::http/content-type "text/html;charset=utf-8"
+      ::http/content "<h1>Latest sales figures</h1>"}]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/report.txt"
+      ::http/content-type "text/plain;charset=utf-8"
+      ::http/content "Latest sales figures"}]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/report"
+      ::http/methods #{:get :head :options}}]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/variants/html"
+      ::site/type "Variant"
+      ::site/resource "https://example.org/report"
+      ::site/variant "https://example.org/report.html"}]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/variants/txt"
+      ::site/type "Variant"
+      ::site/resource "https://example.org/report"
+      ::site/variant "https://example.org/report.txt"}]])
+
+  (let [response
+        (*handler*
+         {:ring.request/method :get
+          :ring.request/path "/report"
+          :ring.request/headers {"accept" "text/html"}})]
+    (is (= 200 (:ring.response/status response)))
+    (is (= "<h1>Latest sales figures</h1>" (:ring.response/body response))))
+
+  (let [response
+        (*handler*
+         {:ring.request/method :get
+          :ring.request/path "/report"
+          :ring.request/headers {"accept" "text/plain"}})]
+    (is (= 200 (:ring.response/status response)))
+    (is (= "Latest sales figures" (:ring.response/body response))))
+
+  (let [response
+        (*handler*
+         {:ring.request/method :get
+          :ring.request/path "/report"
+          :ring.request/headers {"accept" "image/png"}})]
+    (is (= 406 (:ring.response/status response)))))
+
 ;; Site templates can be defined as a TemplatedRepresentation resource which
 ;; references a Template resource. The Template resource provides defaults for
 ;; the representation metadata of the TemplatedRepresentation. The Template
