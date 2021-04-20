@@ -1068,8 +1068,6 @@
             (let [ex-data (->serializable ex-data)]
               (log/errorf e "%s: %s" (.getMessage e) (pr-str ex-data))))
 
-          (log/tracef "err-reps: %s" (error-representations req (or status 500)))
-
           (let [error-representation
                 (negotiate-error-representation req (error-representations req (or status 500)))
                 site-exception? (some? (::site/start-date ex-data))]
@@ -1090,15 +1088,22 @@
 
       (catch Throwable e
         (log/error e (.getMessage e))
-        (respond
-         (into
-          req
-          {:ring.response/status 500
-           :ring.response/body "Internal Error\r\n"
-           ::site/error (.getMessage e)
-           ::site/error-stack-trace (.getStackTrace e)
-           ::site/selected-representation
-           (negotiate-error-representation req (error-representations req))})))
+        (let [err-reps (error-representations req 500)
+              default-body "Internal Error\r\n"]
+          (respond
+           (into
+            req
+            {:ring.response/status 500
+             :ring.response/body default-body
+             ::site/error (.getMessage e)
+             ::site/error-stack-trace (.getStackTrace e)
+             ::site/selected-representation
+             (if (seq err-reps)
+               (negotiate-error-representation req err-reps)
+               {::http/content-type "text/plain;charset=utf-8"
+                ::http/content-length (count default-body)
+                :ring.response/body default-body})
+             }))))
       (finally
         (org.slf4j.MDC/clear)))))
 
