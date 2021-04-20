@@ -33,52 +33,52 @@
                          (::http/body res) (::http/body res)
                          :else (.getBytes "(template not found)"))))))))
 
-        template-model-> (::site/template-model template)
-        _ (assert template-model-> "Template must have a :juxt.site.alpha/template-model entry")
+        template-model-> (::site/template-model selected-representation)
+        _ (assert template-model-> "Resource must have a :juxt.site.alpha/template-model entry")
         template-model (x/entity db template-model->)
         _ (assert template-model (format "Template model of '%s' must exist" template-model->))
+
+        ;; This will be checked by JSON Schema validation on entry, but doesn't
+        ;; hurt to assert it here too.
         _ (when-not (= ( ::site/type template-model) "TemplateModel")
             (throw
              (ex-info
               "Template model must be of type 'TemplateModel'"
               {:template-model-id template-model->})))
 
-        temp-id-map (->>
-                     {'subject (::pass/subject req)
-                      'resource resource}
-                     (reduce-kv
-                      ;; Preserve any existing crux.db/id - e.g. the resource will have one
-                      (fn [acc k v]
-                        (assoc acc k (-> v
-                                         util/->freezeable
-                                         (assoc :crux.db/id (java.util.UUID/randomUUID)))))
-                      {}))
+        temp-id-map
+        (->>
+         {'subject (::pass/subject req)
+          'resource resource}
+         (reduce-kv
+          ;; Preserve any existing crux.db/id - e.g. the resource will have one
+          (fn [acc k v]
+            (assoc acc k (-> v
+                             util/->freezeable
+                             (assoc :crux.db/id (java.util.UUID/randomUUID)))))
+          {}))
 
         txes (vec (for [[_ v] temp-id-map] [:crux.tx/put v]))
-
-        _ (log/tracef "txes: %s" txes)
 
         spec-db (x/with-tx db txes)
 
         query (::site/query template-model)
 
-        _ (assert query "template-model must have a :juxt.site.alpha/query entry")
-
-        _ (log/tracef "Query is %s" query)
-
         model (first (apply x/q spec-db
                             (assoc query :in (vec (keys temp-id-map)))
-                            (map :crux.db/id (vals temp-id-map))))]
+                            (map :crux.db/id (vals temp-id-map))))
 
-    (log/tracef "Template model: %s" model)
+        custom-resource-path (:selmer.util/custom-resource-path template)]
 
     (try
       (log/tracef "Render template: %s" (:crux.db/id template))
       (selmer/render-file
        (java.net.URL. nil (:crux.db/id template) ush)
        model
-       { ;;:custom-resource-path "http://localhost:2021/templates/"
-        :url-stream-handler ush})
+       (cond-> {:url-stream-handler ush}
+         custom-resource-path
+         (assoc :custom-resource-path custom-resource-path)))
+
       (catch Exception e
         (throw (ex-info (str "Failed to render template: " template) {:template template
                                                                       :exception-type (type e)} e))))))
