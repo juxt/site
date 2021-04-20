@@ -146,9 +146,8 @@
 (defn count-reqs
   "Count web requests"
   []
-  (count
-       (q '{:find [e]
-            :where [[e ::site/type "Request"]]})))
+  (first (map first (q '{:find [(count e)]
+                         :where [[e ::site/type "Request"]]}))))
 
 
 ;; TODO: Use a prefix search for performance
