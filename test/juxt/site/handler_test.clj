@@ -8,7 +8,9 @@
    [jsonista.core :as json]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
    [juxt.site.alpha.handler :as h]
-   [juxt.mail.alpha.mail :as mailer])
+   [juxt.mail.alpha.mail :as mailer]
+   [clojure.edn :as edn]
+   [clojure.java.io :as io])
   (:import
    (crux.api ICruxAPI)
    (java.io ByteArrayInputStream)))
@@ -532,10 +534,10 @@
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/templates/list.html"
-
+      ::http/methods #{:get :head :options}
       ::site/type "StaticRepresentation"
       ::http/content-type "text/plain;charset=utf-8"
-      ::http/content "<dl><dt>Fruit</dt><dd>{{fruit}}</dd></dl>"}]
+      ::http/content "<dl><dt>Fruit</dt><dd>{{list.fruit}}</dd></dl>"}]
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/templates/template-outer.html"
@@ -551,12 +553,14 @@
       ::site/type "TemplatedRepresentation"
       ::site/template "https://example.org/templates/template-outer.html"
       ::site/template-engine :selmer
-      ::site/template-model "https://example.org/fruit-model"
-      ::site/query '{:find [title fruit]
-                     :keys [title fruit]
-                     :where [[(identity "Favorites") title]
-                             [resource :fruit fruit]]}
-      :fruit "Nectarine"}]])
+      ::site/template-model {"title" "Favorites"
+                             "list"
+                             {::site/query '{:find [fruit]
+                                             :keys [fruit]
+                                             :where [[resource :fruit fruit]]}
+                              ::site/results 'first}}
+      :fruit "Nectarine"
+      }]])
 
   (let [response (*handler*
                   {:ring.request/method :get
@@ -577,7 +581,7 @@
        ::http/methods #{:get :head :options}
        ::site/type "StaticRepresentation"
        ::http/content-type "text/plain;charset=utf-8"
-       ::http/content "<dl><dt>Fruit</dt><dd>{{fruit}}</dd></dl>"}]
+       ::http/content "<dl><dt>Fruit</dt><dd>{{list.fruit}}</dd></dl>"}]
 
      [:crux.tx/put
       {:crux.db/id "https://example.org/templates/template-outer.html"
@@ -593,11 +597,14 @@
        ::site/type "TemplatedRepresentation"
        ::site/template "https://example.org/templates/template-outer.html"
        ::site/template-engine :selmer
-       ::site/query '{:find [title fruit]
-                      :keys [title fruit]
-                      :where [[(identity "Favorites") title]
-                              [resource :fruit fruit]]}
-       :fruit "Nectarine"}]])
+       ::site/template-model {"title" "Favorites"
+                              "list"
+                              {::site/query '{:find [fruit]
+                                              :keys [fruit]
+                                              :where [[resource :fruit fruit]]}
+                               ::site/results 'first}}
+       :fruit "Nectarine"
+       }]])
 
    (*handler*
     {:ring.request/method :get

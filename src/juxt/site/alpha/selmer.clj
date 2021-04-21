@@ -2,11 +2,12 @@
 
 (ns juxt.site.alpha.selmer
   (:require
-   [selmer.parser :as selmer]
-   [juxt.site.alpha.templating :as templating]
-   [crux.api :as x]
    [clojure.tools.logging :as log]
-   [juxt.site.alpha.util :as util])
+   [clojure.walk :refer [postwalk]]
+   [crux.api :as x]
+   [juxt.site.alpha.templating :as templating]
+   [juxt.site.alpha.util :as util]
+   [selmer.parser :as selmer])
   (:import (java.net URL)))
 
 (alias 'site (create-ns 'juxt.site.alpha))
@@ -55,11 +56,19 @@
 
         spec-db (x/with-tx db txes)
 
-        query (::site/query selected-representation)
+        template-model (::site/template-model resource)
 
-        model (first (apply x/q spec-db
-                            (assoc query :in (vec (keys temp-id-map)))
-                            (map :crux.db/id (vals temp-id-map))))
+        template-model
+        (postwalk
+         (fn [m]
+           (cond
+             (and (map? m) (contains? m ::site/query))
+             (cond-> (apply x/q spec-db
+                            (assoc (::site/query m) :in (vec (keys temp-id-map)))
+                            (map :crux.db/id (vals temp-id-map)))
+               (= (::site/results m) 'first) first)
+             :else m))
+         template-model)
 
         custom-resource-path (:selmer.util/custom-resource-path template)]
 
@@ -67,7 +76,7 @@
       (log/tracef "Render template: %s" (:crux.db/id template))
       (selmer/render-file
        (java.net.URL. nil (:crux.db/id template) ush)
-       model
+       template-model
        (cond-> {:url-stream-handler ush}
          custom-resource-path
          (assoc :custom-resource-path custom-resource-path)))
