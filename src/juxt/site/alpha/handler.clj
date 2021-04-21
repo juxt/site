@@ -1200,7 +1200,7 @@
 
    ;; Logging and store request
    wrap-log-request
-   wrap-store-request
+   ;; wrap-store-request
 
    ;; Error handling
    wrap-error-handling
