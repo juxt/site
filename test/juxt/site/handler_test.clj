@@ -553,14 +553,14 @@
       ::site/type "TemplatedRepresentation"
       ::site/template "https://example.org/templates/template-outer.html"
       ::site/template-engine :selmer
-      ::site/template-model {"title" "Favorites"
-                             "list"
-                             {::site/query '{:find [fruit]
-                                             :keys [fruit]
-                                             :where [[resource :fruit fruit]]}
-                              ::site/results 'first}}
-      :fruit "Nectarine"
-      }]])
+      ::site/template-model
+      {"title" "Favorites"
+       "list" {::site/query
+               '{:find [fruit]
+                 :keys [fruit]
+                 :where [[resource :fruit fruit]]}
+               ::site/results 'first}}
+      :fruit "Nectarine"}]])
 
   (let [response (*handler*
                   {:ring.request/method :get
