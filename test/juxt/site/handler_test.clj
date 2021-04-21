@@ -528,22 +528,11 @@
 ;; resource of the URL, rather than the negotiated representation.
 (deftest template-test
   (submit-and-await!
-    [[:crux.tx/put access-all-areas]
-
-    [:crux.tx/put
-     ;; By a template-model being a query, it can be subject to limitations
-     ;; imposed by authorization.
-     {:crux.db/id "https://example.org/fruit-model"
-      ::http/methods #{:get :head :options}
-      ::site/type "TemplateModel"
-      ::site/query '{:find [title fruit]
-                     :keys [title fruit]
-                     :where [[(identity "Favorites") title]
-                             [resource :fruit fruit]]}}]
+   [[:crux.tx/put access-all-areas]
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/templates/list.html"
-      ::http/methods #{:get :head :options}
+
       ::site/type "StaticRepresentation"
       ::http/content-type "text/plain;charset=utf-8"
       ::http/content "<dl><dt>Fruit</dt><dd>{{fruit}}</dd></dl>"}]
@@ -563,6 +552,10 @@
       ::site/template "https://example.org/templates/template-outer.html"
       ::site/template-engine :selmer
       ::site/template-model "https://example.org/fruit-model"
+      ::site/query '{:find [title fruit]
+                     :keys [title fruit]
+                     :where [[(identity "Favorites") title]
+                             [resource :fruit fruit]]}
       :fruit "Nectarine"}]])
 
   (let [response (*handler*
@@ -574,46 +567,37 @@
     (is (= "text/plain;charset=utf-8"
            (get-in response [:ring.response/headers "content-type"])))))
 
-
 #_((t/join-fixtures [with-crux with-handler])
  (fn []
    (submit-and-await!
     [[:crux.tx/put access-all-areas]
 
-    [:crux.tx/put
-     ;; By a template-model being a query, it can be subject to limitations
-     ;; imposed by authorization.
-     {:crux.db/id "https://example.org/fruit-model"
-      ::http/methods #{:get :head :options}
-      ::site/type "TemplateModel"
-      ::site/query '{:find [title fruit]
-                     :keys [title fruit]
-                     :where [[(identity "Favorites") title]
-                             [resource :fruit fruit]]}}]
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/templates/list.html"
+       ::http/methods #{:get :head :options}
+       ::site/type "StaticRepresentation"
+       ::http/content-type "text/plain;charset=utf-8"
+       ::http/content "<dl><dt>Fruit</dt><dd>{{fruit}}</dd></dl>"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/list.html"
-      ::http/methods #{:get :head :options}
-      ::site/type "StaticRepresentation"
-      ::http/content-type "text/plain;charset=utf-8"
-      ::http/content "<dl><dt>Fruit</dt><dd>{{fruit}}</dd></dl>"}]
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/templates/template-outer.html"
+       ::http/methods #{:get :head :options}
+       ::site/type "StaticRepresentation"
+       ::http/content-type "text/plain;charset=utf-8"
+       :selmer.util/custom-resource-path "https://example.org/templates/"
+       ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/template-outer.html"
-      ::http/methods #{:get :head :options}
-      ::site/type "StaticRepresentation"
-      ::http/content-type "text/plain;charset=utf-8"
-      :selmer.util/custom-resource-path "https://example.org/templates/"
-      ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/nectarine.html"
-      ::http/methods #{:get :head :options}
-      ::site/type "TemplatedRepresentation"
-      ::site/template "https://example.org/templates/template-outer.html"
-      ::site/template-engine :selmer
-      ::site/template-model "https://example.org/fruit-model"
-      :fruit "Nectarine"}]])
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/nectarine.html"
+       ::http/methods #{:get :head :options}
+       ::site/type "TemplatedRepresentation"
+       ::site/template "https://example.org/templates/template-outer.html"
+       ::site/template-engine :selmer
+       ::site/query '{:find [title fruit]
+                      :keys [title fruit]
+                      :where [[(identity "Favorites") title]
+                              [resource :fruit fruit]]}
+       :fruit "Nectarine"}]])
 
    (*handler*
     {:ring.request/method :get

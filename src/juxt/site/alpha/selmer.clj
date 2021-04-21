@@ -33,23 +33,16 @@
                          (::http/body res) (::http/body res)
                          :else (.getBytes "(template not found)"))))))))
 
-        template-model-> (::site/template-model selected-representation)
-        _ (assert template-model-> "Resource must have a :juxt.site.alpha/template-model entry")
-        template-model (x/entity db template-model->)
-        _ (assert template-model (format "Template model of '%s' must exist" template-model->))
-
-        ;; This will be checked by JSON Schema validation on entry, but doesn't
-        ;; hurt to assert it here too.
-        _ (when-not (= ( ::site/type template-model) "TemplateModel")
-            (throw
-             (ex-info
-              "Template model must be of type 'TemplateModel'"
-              {:template-model-id template-model->})))
-
         temp-id-map
         (->>
          {'subject (::pass/subject req)
-          'resource resource}
+          'resource resource
+          'request (select-keys
+                    req
+                    [:ring.request/headers :ring.request/method :ring.request/path
+                     :ring.request/query :ring.request/protocol :ring.request/remote-addr
+                     :ring.request/scheme :ring.request/server-name :ring.request/server-post
+                     :ring.request/ssl-client-cert])}
          (reduce-kv
           ;; Preserve any existing crux.db/id - e.g. the resource will have one
           (fn [acc k v]
@@ -62,7 +55,7 @@
 
         spec-db (x/with-tx db txes)
 
-        query (::site/query template-model)
+        query (::site/query selected-representation)
 
         model (first (apply x/q spec-db
                             (assoc query :in (vec (keys temp-id-map)))
