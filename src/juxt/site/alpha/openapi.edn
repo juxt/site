@@ -420,6 +420,18 @@
         :schema {"type" "array"
                  "items" {"$ref" "#/components/schemas/IdentifiedOpenAPI"}}}}}}}}
 
+  "/resources/"
+  {:post
+   {:description "Put a new resource, described by the payload"
+    :requestBody
+    {:required true
+     :content
+     {"application/edn" {}}}
+    :responses
+    {201 {:description "Resource successfully created"}
+     204 {:description "Resource successfully updated"}}
+    :juxt.site.alpha/post-fn juxt.site.alpha.resources/post-resource}}
+
   "/apis/{id}"
   {:parameters
    [{:name "id" :in "path" :required true

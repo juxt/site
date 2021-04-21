@@ -584,7 +584,7 @@
         ::site/logout (authn/logout-response req)
         (throw
          (ex-info
-          "Resource allows POST but doesn't contain have a post-fn function"
+          "Resource allows POST but doesn't have a post-fn function"
           (into req
                 {:ring.response/status 500
                  :ring.response/body "Internal Error\r\n"})))))))

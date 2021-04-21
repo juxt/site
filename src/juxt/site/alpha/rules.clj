@@ -22,8 +22,9 @@
           [[:crux.tx/put (merge {:crux.db/id location} request-instance)]])
          (x/await-tx crux-node))
 
-    (into req {:ring.response/status 201
-               :ring.response/headers {"location" location}})))
+    (-> req
+        (assoc :ring.response/status 201)
+        (update :ring.response/headers assoc "location" location))))
 
 (defn match-targets [db rules request-context]
   (let [temp-id-map (reduce-kv

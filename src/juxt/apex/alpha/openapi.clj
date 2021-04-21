@@ -67,7 +67,8 @@
 
   (let [body (::http/body received-representation)
         schema (get-in resource [::apex/operation "requestBody" "content"
-                                 "application/json" "schema"]) _ (assert schema)
+                                 "application/json" "schema"])
+        _ (assert schema)
         instance (json/read-value body) _ (assert instance)
         openapi-ref (get resource ::apex/openapi) _ (assert openapi-ref)
         openapi-resource (x/entity db openapi-ref) _ (assert openapi-resource)
@@ -310,7 +311,10 @@
            ::site/post-fn
            (fn post-fn-proxy [req]
              (log/debug "Calling post-fn" post-fn-sym)
-             (let [f (try
+             (let [rep (::site/received-representation req)
+                   {:juxt.reap.alpha.rfc7231/keys [type subtype]}
+                   (reap.decoders/content-type (::http/content-type rep))
+                   f (try
                        (requiring-resolve post-fn-sym)
                        (catch IllegalArgumentException _
                          (throw
@@ -322,16 +326,19 @@
                (f (assoc
                    req
                    ::apex/request-instance
-                   ;; TODO: Only do this when the request body is
-                   ;; application/json
-                   (received-body->json req))))))
+                   (cond
+                     (and
+                      (.equalsIgnoreCase "application" type)
+                      (.equalsIgnoreCase "json" subtype))
+                     (received-body->json req)
+                     :else rep))))))
 
           (= method :put)
           (assoc
            ::site/put-fn
            (fn put-fn [req]
              (let [rep (::site/received-representation req)
-                   {:juxt.reap.alpha.rfc7231/keys [type subtype parameter-map]}
+                   {:juxt.reap.alpha.rfc7231/keys [type subtype]}
                    (reap.decoders/content-type (::http/content-type rep))]
                (case
                    ;; TODO: Depending on requestBody

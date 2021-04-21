@@ -711,6 +711,31 @@
               (when content-type
                 (upload-file* access-token base-uri f content-type nil nil path opts)))))))))
 
+(defn post-resource
+  "Post a resource"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [base-uri file]
+         :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+
+    (let [{:keys [status headers body]}
+          (curl/post
+           (str base-uri "/_site/resources/")
+           {:headers (cond-> {"authorization" (format "Bearer %s" access-token)
+                              "content-type" "application/edn"})
+            :body (io/file file)
+            :throw false})]
+      (cond
+        (#{201 204} status)
+        (message! (format "Resource %s: %s"
+                          (case status 201 "created" 204 "updated")
+                          (get headers "location")))
+        :else
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
 (defn debugf
   "Write a debug message to the console, but only if *debug* is true."
   [& args]
@@ -829,13 +854,10 @@
                    ["-c" "--classification CLASSIFICATION" "The classification (e.g PUBLIC, RESTRICTED) applied to resource"]]
      :delegate put-asset}]
 
-   #_["init-db"
-    {:description (:doc (meta #'init-db))
-     :cli-options []
-     :delegate init-db}
-    ]
-
-   ])
+   ["post-resource"
+    {:description (:doc (meta #'post-resource))
+     :cli-options [["-f" "--file FILE" "Resource file (in EDN format)"]]
+     :delegate post-resource}]])
 
 (let [{:keys [options arguments summary errors]}
       (parse-opts (next *command-line-args*)  cli-options :in-order true)
