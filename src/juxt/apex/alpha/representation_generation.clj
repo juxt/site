@@ -76,11 +76,8 @@
         (or
          (when query
            (cond->> (x/q db query subject)
-             singular-result? first
-
-             (and (not singular-result?)
-                  (using-pull? query))
-             (apply concat)))
+             (using-pull? query) (apply concat)
+             singular-result? first))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
          ;; filter out the http metadata?

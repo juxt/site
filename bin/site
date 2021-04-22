@@ -652,8 +652,15 @@
                      encoding (assoc "content-encoding" encoding)
                      language (assoc "content-language" language)
                      classification (assoc "site-classification" classification))
-          :body (io/file file)
+          :body (case type
+                  "application/json"
+                  (cond-> (slurp (io/file file))
+                    :always (str/replace "{{base-uri}}" base-uri)
+                    (re-matches #".*\.edn$" file) edn-to-json)
+
+                  (io/file file))
           :throw false})]
+
     (cond
       (= status 401)
       (do
