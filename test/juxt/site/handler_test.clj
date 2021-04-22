@@ -544,7 +544,6 @@
       ::http/methods #{:get :head :options}
       ::site/type "StaticRepresentation"
       ::http/content-type "text/plain;charset=utf-8"
-      :selmer.util/custom-resource-path "https://example.org/templates/"
       ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
 
     [:crux.tx/put
@@ -560,6 +559,7 @@
                  :keys [fruit]
                  :where [[resource :fruit fruit]]}
                ::site/results 'first}}
+      :selmer.util/custom-resource-path "https://example.org/templates/"
       :fruit "Nectarine"}]])
 
   (let [response (*handler*
