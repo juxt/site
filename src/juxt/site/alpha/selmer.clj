@@ -70,7 +70,9 @@
              :else m))
          template-model)
 
-        custom-resource-path (:selmer.util/custom-resource-path template)]
+        _ (log/tracef "template model is %s" (pr-str template-model))
+
+        custom-resource-path (:selmer.util/custom-resource-path selected-representation)]
 
     (try
       (log/tracef "Render template: %s" (:crux.db/id template))
