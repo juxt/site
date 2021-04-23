@@ -718,8 +718,8 @@
               (when content-type
                 (upload-file* access-token base-uri f content-type nil nil path opts)))))))))
 
-(defn post-resource
-  "Post a resource"
+(defn post-resources
+  "Post one or more resources"
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri file]
@@ -733,12 +733,15 @@
                               "content-type" "application/edn"})
             :body (io/file file)
             :throw false})]
-      (cond
-        (#{201 204} status)
+      (case status
+        (201 204)
         (message! (format "Resource %s: %s"
                           (case status 201 "created" 204 "updated")
                           (get headers "location")))
-        :else
+
+        200
+        (message! "Resources uploaded")
+
         (do
           (error! "Server response: " status " " (str/trim body))
           (message! "Request id: " (get headers "site-request-id")))))))
@@ -861,10 +864,10 @@
                    ["-c" "--classification CLASSIFICATION" "The classification (e.g PUBLIC, RESTRICTED) applied to resource"]]
      :delegate put-asset}]
 
-   ["post-resource"
-    {:description (:doc (meta #'post-resource))
+   ["post-resources"
+    {:description (:doc (meta #'post-resources))
      :cli-options [["-f" "--file FILE" "Resource file (in EDN format)"]]
-     :delegate post-resource}]])
+     :delegate post-resources}]])
 
 (let [{:keys [options arguments summary errors]}
       (parse-opts (next *command-line-args*)  cli-options :in-order true)
