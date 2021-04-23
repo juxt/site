@@ -52,15 +52,15 @@
         text-template (some-> (x/entity db text-template) ::http/content)]
     (assert html-template)
     (assert text-template)
-    (doseq [{::mail/keys [to-phone-number] :as data} action-data]
-      (when to-phone-number
+    (doseq [{:keys [user] :as data} action-data]
+      (when-let [phone-number (:phone-number user)]
         (send-sms!
-         from-sms-name to-phone-number
+         from-sms-name phone-number
          (mail-merge subject data)
-         (mail-merge text-template data))))
-    (doseq [{::mail/keys [to] :as data} action-data]
+         (mail-merge text-template data)))
+
       (send-mail!
-       from to
+       from (:email user)
        (mail-merge subject data)
        (mail-merge html-template data)
        (mail-merge text-template data)))))
