@@ -739,8 +739,20 @@
                           (case status 201 "created" 204 "updated")
                           (get headers "location")))
 
-        200
-        (message! "Resources uploaded")
+        207
+        (let [results (edn/read-string body)
+              errors (filter #(contains? % :error) results)]
+          (if (pos? (count errors))
+            (do
+              (error! (format "Not all resources were accepted:"))
+              (dorun (map (fn [ix r]
+                            (cond
+                              (< (:status r) 400)
+                              (println (format "%s%d: %s%s" ansi/green-font ix r ansi/reset-font))
+                              :else
+                              (println (format "%s%d: %s%s" ansi/red-font ix r ansi/reset-font))))
+                          (range) results)))
+            (message! (format "Resources all posted OK"))))
 
         (do
           (error! "Server response: " status " " (str/trim body))
