@@ -731,7 +731,8 @@
            (str base-uri "/_site/resources/")
            {:headers (cond-> {"authorization" (format "Bearer %s" access-token)
                               "content-type" "application/edn"})
-            :body (io/file file)
+            :body (cond-> (slurp (io/file file))
+                    :always (str/replace "{{base-uri}}" base-uri))
             :throw false})]
       (case status
         (201 204)
