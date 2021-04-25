@@ -641,6 +641,7 @@
      (error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix)))))
 
 (defn upload-file* [access-token base-uri file type encoding language path opts]
+  (assert (instance? java.io.File file))
   (message! "Uploading file to" (str base-uri path))
 
   (let [classification (get-in opts [:options :classification])
@@ -652,13 +653,7 @@
                      encoding (assoc "content-encoding" encoding)
                      language (assoc "content-language" language)
                      classification (assoc "site-classification" classification))
-          :body (case type
-                  "application/json"
-                  (cond-> (slurp (io/file file))
-                    :always (str/replace "{{base-uri}}" base-uri)
-                    (re-matches #".*\.edn$" file) edn-to-json)
-
-                  (io/file file))
+          :body file
           :throw false})]
 
     (cond
@@ -693,7 +688,11 @@
     (when-not type (error-and-usage! "Content-type required" opts))
     (when-not path (error-and-usage! "Path required" opts))
 
-    (upload-file* access-token base-uri file type encoding language path opts)))
+    (upload-file*
+     access-token
+     base-uri
+     (io/file (str/replace file "{{base-uri}}" base-uri))
+     type encoding language path opts)))
 
 (defn put-swagger-ui
   "Install a distribution of Swagger UI"
