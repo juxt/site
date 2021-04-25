@@ -514,8 +514,8 @@
                       "content-type" "application/json"}
             :body (json/generate-string
                    (cond-> {"type" "Variant"
-                            "resource" resource
-                            "variant" variant}))
+                            "resource" (str/replace resource "{{base-uri}}" base-uri)
+                            "variant" (str/replace variant "{{base-uri}}" base-uri)}))
             :throw false})]
       (cond
         (= status 401)
