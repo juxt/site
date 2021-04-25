@@ -10,6 +10,7 @@
    [io.aviso.ansi :as ansi]
    [juxt.pass.alpha.authentication :as authn]
    [juxt.site.alpha.main :refer [system config]]
+   [juxt.site.alpha.handler :as handler]
    [juxt.site.alpha.init :as init])
   (:import (java.util Date)))
 
@@ -133,40 +134,10 @@
      (string? s) (java.util.UUID/fromString s)
      (uuid? s) s)))
 
-(defn reqs
-  "Display up to 5 of the most recent web requests, most recent first."
-  []
-  (map first
-       (q '{:find [(pull e [*]) ended]
-            :where [[e ::site/type "Request"]
-                    [e ::site/end-date ended]]
-            :order-by [[ended :desc]]
-            :limit 5})))
-
-(defn count-reqs
-  "Count web requests"
-  []
-  (first (map first (q '{:find [(count e)]
-                         :where [[e ::site/type "Request"]]}))))
-
-
-;; TODO: Use a prefix search for performance
-(defn req
-  "Display the most recent request."
-  ([]
-   (into (sorted-map) (first (reqs))))
-  ([search]
-   (let [results
-         (q '{:find [(pull e [*])]
-              :where [[e ::site/type "Request"]
-                      [(re-matches pat e)]]
-              :in [pat]
-              :limit 5}
-            (re-pattern (str "https?://.*/_site/requests/" search ".*")))]
-     (cond
-       (= (count results) 1)  (ffirst results)
-       (zero? (count results)) (throw (ex-info "Not found" {:search search}))
-       (> (count results) 1) (throw (ex-info "Ambiguous search" {:search search}))))))
+(defn req [s]
+  (some
+   #(when (re-seq (re-pattern s) (::site/request-id %)) %)
+   (seq handler/requests-cache)))
 
 (defn gc
   "Remove request data that is older than an hour."

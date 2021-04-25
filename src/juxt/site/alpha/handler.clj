@@ -22,6 +22,7 @@
    [juxt.reap.alpha.rfc7231 :as rfc7231]
    [juxt.reap.alpha.rfc7232 :as rfc7232]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
+   [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.locator :as locator]
    [juxt.site.alpha.util :as util]
    [juxt.site.alpha.templating :as templating]
@@ -915,12 +916,11 @@
                   (contains? headers "authorization")
                   (assoc "authorization" "(redacted)"))))))
 
-(defn ->serializable [{::site/keys [request-id db] :as req}]
+(defn ->storable [{::site/keys [request-id db] :as req}]
   (-> req
       (into (select-keys db [:crux.db/valid-time :crux.tx/tx-id]))
       (assoc :crux.db/id request-id ::site/type "Request")
       redact
-      ;; Dissoc known unfreezables
       (dissoc ::site/crux-node ::site/db :ring.request/body)
       (util/deep-replace
        (fn [form]
@@ -932,10 +932,7 @@
            (subvec 0 64)
 
            (and (list? form) (>= (count form) 64))
-           (#(take 64 %))
-
-           (not (freezable? form))
-           ((fn [form] (format "(unfreezable %s)" (type form)))))))))
+           (#(take 64 %)))))))
 
 (defn log-request! [{:ring.request/keys [method] :as req}]
   (assert method)
@@ -945,17 +942,6 @@
    (:ring.request/path req)
    (:ring.request/protocol req)
    (:ring.response/status req)))
-
-(defn store-request!
-  [{::site/keys [crux-node] :as req}]
-  (assert crux-node)
-  (let [blob (->serializable req)]
-    (try
-      (x/submit-tx
-       crux-node
-       [[:crux.tx/put blob]])
-      (catch Exception e
-        (log/error e "Failed to log request, recovering")))))
 
 (defn respond
   [{::site/keys [selected-representation start-date base-uri request-id]
@@ -1065,7 +1051,7 @@
         (let [{:ring.response/keys [status] :as ex-data} (ex-data e)]
           ;; Don't log exceptions which are used to escape (e.g. 302, 401).
           (when (or (not (integer? status)) (>= status 500))
-            (let [ex-data (->serializable ex-data)]
+            (let [ex-data (->storable ex-data)]
               (log/errorf e "%s: %s" (.getMessage e) (pr-str ex-data))))
 
           (let [error-representation
@@ -1223,9 +1209,15 @@
                             :ring.response/headers :headers
                             :ring.response/body :body})))))
 
+(def requests-cache
+  (cache/new-fifo-soft-atom-cache 1000))
+
 (defn wrap-store-request [h]
   (fn [req]
-    (doto (h req) (store-request!))))
+    (let [req (h req)]
+      (when-let [req-id (::site/request-id req)]
+        (cache/put! requests-cache req-id (->storable req)))
+      req)))
 
 (defn wrap-log-request [h]
   (fn [req]
@@ -1275,7 +1267,7 @@
 
    ;; Logging and store request
    wrap-log-request
-   ;; wrap-store-request
+   wrap-store-request
 
    ;; Error handling
    wrap-error-handling
