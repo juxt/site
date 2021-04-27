@@ -60,7 +60,8 @@
          (pdp/->authorized-query authorization))
 
         {singular-result? "juxt.site.alpha/singular-result?"
-         extract-first-projection? "juxt.site.alpha/extract-first-projection?"}
+         extract-first-projection? "juxt.site.alpha/extract-first-projection?"
+         extract-entry "juxt.site.alpha/extract-entry"}
         (get-in resource [::apex/operation "responses" "200"])
 
         resource-state
@@ -68,6 +69,7 @@
          (when query
            (cond->> (x/q db query subject)
              extract-first-projection? (map first)
+             extract-entry (map #(get % extract-entry))
              singular-result? first))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
