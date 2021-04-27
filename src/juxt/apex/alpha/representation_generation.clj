@@ -36,14 +36,6 @@
        x))
    input))
 
-(defn using-pull?
-  "Determine if a query is using pull-syntax"
-  [{:keys [find]}]
-  (some (fn [x]
-          (and (list? x)
-               (= 'pull (first x))))
-        find))
-
 ;; By default we output the resource state, but there may be a better rendering
 ;; of collections, which can be inferred from the schema being an array and use
 ;; the items subschema.
@@ -67,13 +59,15 @@
          (->inject-params-into-query (extract-params-from-request req param-defs))
          (pdp/->authorized-query authorization))
 
-        singular-result? (get-in resource [::apex/operation "responses" "200" "juxt.site.alpha/singular-result?"] false)
+        {singular-result? "juxt.site.alpha/singular-result?"
+         extract-first-projection? "juxt.site.alpha/extract-first-projection?"}
+        (get-in resource [::apex/operation "responses" "200"])
 
         resource-state
         (or
          (when query
            (cond->> (x/q db query subject)
-             (using-pull? query) (apply concat)
+             extract-first-projection? (map first)
              singular-result? first))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
