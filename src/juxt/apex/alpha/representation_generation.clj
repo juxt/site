@@ -68,9 +68,6 @@
          (pdp/->authorized-query authorization))
 
         singular-result? (get-in resource [::apex/operation "responses" "200" "juxt.site.alpha/singular-result?"] false)
-        _ (log/tracef "singular-result? %s %s" singular-result? (type singular-result?))
-
-        _ (log/debugf "Running query: %s" (pr-str query))
 
         resource-state
         (or
