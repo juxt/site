@@ -49,14 +49,19 @@
     "Linux" (io/file (System/getProperty "user.home") ".config/site/config.edn")
     (error-and-exit! 1 "Unsupported OS")))
 
-(assert (.exists config-file) (format "Config file does not exist: %s" (str config-file)))
+;;(assert (.exists config-file) (format "Config file does not exist: %s" (str config-file)))
 
 (def config
-  (edn/read-string
-   {:readers {'ig/ref identity
-              'ref identity
-              'profile #(get % :prod)}}
-   (slurp config-file)))
+  (cond-> {}
+    (.exists config-file)
+    (merge
+     (edn/read-string
+      {:readers {'ig/ref identity
+                 'ref identity
+                 'profile #(get % :prod)}}
+      (slurp config-file)))
+    (System/getenv "SITE_BASE_URI")
+    (assoc :juxt.site.alpha/base-uri (System/getenv "SITE_BASE_URI"))))
 
 (defn get-password-from-unix-pass [unix-pass-password-prefix username]
   (let [passfile (io/file
@@ -899,6 +904,10 @@
           (println)
           (println (str ansi/white-font "Global options" ansi/reset-font))
           (println summary)
+          (println)
+          (println (str ansi/white-font "Environment variables" ansi/reset-font))
+          (println)
+          (println "SITE_BASE_URI \tSet the default Base-URI")
           (println)
           (println (str ansi/white-font "Subcommands" ansi/reset-font))
           (println)
