@@ -765,7 +765,7 @@
     (println "DEBUG:" (apply format args))))
 
 (def cli-options
-  [["-s" "--base-uri BASE-URI" "The Base-URI of the server you are targetting"]
+  [["-b" "--base-uri BASE-URI" "The Base-URI of the server you are targetting"]
    ["-d" "--debug" "Enable debug mode"]
    ["-v" "--verbose" "Verbose mode"]
    ["-h" "--help" "Show this summary"]])
