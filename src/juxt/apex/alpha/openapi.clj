@@ -84,8 +84,6 @@
               "Schema validation failed"
               (-> req
                   (into {:ring.response/status 400
-                         ;; TODO: Content negotiation for error responses
-                         :ring.response/body "Bad Request\r\n"
                          ::jinx/validation-results validation})))))
 
         validation (-> validation

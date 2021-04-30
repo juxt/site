@@ -466,26 +466,30 @@
      representation)
     representation))
 
-(defn current-representations [{::site/keys [resource uri db]}]
+(defn find-variants [{::site/keys [resource uri db] :as req}]
+
+  (let [variants (x/q db '{:find [r]
+                           :where [[v ::site/type "Variant"]
+                                   [v ::site/resource uri]
+                                   [v ::site/variant r]]
+                           :in [uri]
+                           } uri)]
+    (when (pos? (count variants))
+      (cond-> (for [[v] variants
+                    :let [rep (x/entity db v)]
+                    :when rep]
+                (assoc rep ::http/content-location v))
+        (or (::http/content-type resource) (::site/template resource))
+        (conj resource)))))
+
+(defn current-representations [{::site/keys [resource uri db] :as req}]
   (->> (or
         ;; This is not common in the Crux DB, but allows 'dynamic' resources to
         ;; declare multiple representations.
         (::http/representations resource)
 
         ;; See if there are variants
-        (let [variants (x/q db '{:find [r]
-                                 :where [[v ::site/type "Variant"]
-                                         [v ::site/resource uri]
-                                         [v ::site/variant r]]
-                                 :in [uri]
-                                 } uri)]
-          (when (pos? (count variants))
-            (cond-> (for [[v] variants
-                          :let [rep (x/entity db v)]
-                          :when rep]
-                      (assoc rep ::http/content-location v))
-              (or (::http/content-type resource) (::site/template resource))
-              (conj resource))))
+        (find-variants req)
 
         ;; Most resources have a content-type, which indicates there is only one
         ;; variant.
@@ -962,27 +966,41 @@
         (assoc-in [:ring.response/headers "access-control-allow-credentials"]
                   (str (get cors-headers ::site/access-control-allow-credentials)))))))
 
-(defn error-representations [{::site/keys [db]} status]
-  (map first (x/q db '{:find [(pull er [*])]
-                       :where [[er ::site/type "ErrorRepresentation"]
-                               [er ::http/status status]]
-                       :in [status]} status)))
-
-(defn negotiate-error-representation [req err-reps]
-  ;; TODO: Pick could/should upgrade to support ring 2 headers (see original
-  ;; TODO in main conneg step)
-  (or
-   (::pick/representation
-    (pick (assoc req :headers (:ring.request/headers req)) err-reps))
-   {::http/content-type "text/plain;charset=utf-8"}))
-
-(defn expand-error [{:ring.response/keys [status]
-                     ::site/keys [selected-representation]
-                     :as req}]
-  ;; Can replace body according to status and selected-representation
+(defn status-message [status]
   (case status
-    401 (update req :ring.response/body str "-- TODO")
-    req))
+    200 "OK"
+    201 "Created"
+    202 "Accepted"
+    204 "No Content"
+    302 "Found"
+    307 "Temporary Redirect"
+    304 "Not Modified"
+    400 "Bad Request"
+    401 "Unauthorized"
+    403 "Forbidden"
+    404 "Not Found"
+    405 "Method Not Allowed"
+    409 "Conflict"
+    411 "Length Required"
+    412 "Precondition Failed"
+    413 "Payload Too Large"
+    415 "Unsupported Media Type"
+    500 "Server Error"
+    501 "Not Implemented"
+    503 "Service Unavailable"
+    "Error"))
+
+(defn error-resource
+  "Locate an error resource. Currently only uses a simple database lookup of an
+  'ErrorResource' entity matching the status. In future this could use rules to
+  use the environment (dev vs. prod), subject (developer vs. customer) or other
+  variables to determine the resource to use."
+  [{::site/keys [db]} status]
+  (ffirst
+   (x/q db '{:find [(pull er [*])]
+             :where [[er ::site/type "ErrorResource"]
+                     [er :ring.response/status status]]
+             :in [status]} status)))
 
 (defn errors-with-causes
   "Return a collection of errors with their messages and causes"
@@ -1007,34 +1025,64 @@
     (try
       (h req)
       (catch clojure.lang.ExceptionInfo e
+
         (let [{:ring.response/keys [status] :as ex-data} (ex-data e)]
+
+          (log/tracef "status %s" status)
+
           ;; Don't log exceptions which are used to escape (e.g. 302, 401).
           (when (or (not (integer? status)) (>= status 500))
             (let [ex-data (->storable ex-data)]
               (log/errorf e "%s: %s" (.getMessage e) (pr-str ex-data))))
 
-          (let [error-representation
-                (negotiate-error-representation req (error-representations req (or status 500)))
+          (let [error-resource (error-resource req (or status 500))
+                _ (log/tracef "error-resource: %s" (pr-str error-resource))
+
+                error-resource
+                (-> error-resource
+                    #_(update ::site/template-model assoc
+                            "_site" {"status" {"code" status
+                                               "message" (status-message status)}
+                                     "error" {"message" (.getMessage e)}
+                                     "uri" (::site/uri req)}))
+
+                error-representations
+                (when error-resource
+                  (current-representations
+                   (assoc req
+                          ::site/resource error-resource
+                          ::site/uri (:crux.db/id error-resource))))
+
+                _ (log/tracef "error-representations: %s" (pr-str error-representations))
+
+                representation
+                (or
+                 (when (seq error-representations)
+                   (some-> (negotiate-representation req error-representations)
+                           ;; Content-Location is not appropriate for errors.
+                           (dissoc ::http/content-location)))
+                 (let [content (str (status-message status) "\r\n")]
+                   {::http/content-type "text/plain;charset=utf-8"
+                    ::http/content-length (count content)
+                    ::http/content content}))
+
                 site-exception? (some? (::site/start-date ex-data))]
-            (-> (merge
-                 (when-not site-exception? req)
-                 {:ring.response/status 500
-                  ::site/errors (errors-with-causes e)}
-                 ex-data
-                 {::site/selected-representation
-                  (or
-                   error-representation
-                   (let [body "Internal Error\r\n"]
-                     {::http/content-type "text/plain;charset=utf-8"
-                      ::http/content-length (count body)
-                      :ring.response/body body}))})
-                add-payload
-                respond))))
+
+            (respond
+             (add-payload
+              (merge
+               (when-not site-exception? req)
+               {:ring.response/status 500
+                ::site/errors (errors-with-causes e)}
+               ex-data
+               {::site/resource error-resource}
+               (when representation
+                 {::site/selected-representation representation})))))))
 
       (catch Throwable e
         (log/error e (.getMessage e))
-        (let [err-reps (error-representations req 500)
-              default-body "Internal Error\r\n"]
+        ;; TODO: We should allow an ErrorResource for 500 errors
+        (let [default-body "Internal Error\r\n"]
           (respond
            (into
             req
@@ -1043,11 +1091,9 @@
              ::site/error (.getMessage e)
              ::site/error-stack-trace (.getStackTrace e)
              ::site/selected-representation
-             (if (seq err-reps)
-               (negotiate-error-representation req err-reps)
-               {::http/content-type "text/plain;charset=utf-8"
-                ::http/content-length (count default-body)
-                :ring.response/body default-body})
+             {::http/content-type "text/plain;charset=utf-8"
+              ::http/content-length (count default-body)
+              :ring.response/body default-body}
              }))))
       (finally
         (org.slf4j.MDC/clear)))))
@@ -1201,8 +1247,7 @@
        (ex-info
         "Service unavailable"
         (-> req
-            (into {:ring.response/status 503
-                   :ring.response/body "Service Unavailable\r\n"})
+            (into {:ring.response/status 503})
             (assoc-in [:ring.response/headers "retry-after"] "120")))))
     (h req)))
 
