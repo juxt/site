@@ -70,7 +70,7 @@
           ;; TODO: Must add list of available representations
           ;; TODO: Add to req with into
           {:ring.response/status 406
-           :ring.response/body "Not Acceptable\r\n"}))))
+           }))))
 
     (log/debug "result of negotiate-representation" (dissoc selected-representation ::http/body ::http/content))
 
@@ -92,16 +92,14 @@
             (throw
              (ex-info
               "Bad content length"
-              (into req {:ring.response/status 400
-                         :ring.response/body "Bad Request\r\n"})
+              (into req {:ring.response/status 400})
               e))))]
 
     (when (nil? content-length)
       (throw
        (ex-info
         "No Content-Length header found"
-        (into req {:ring.response/status 411
-                   :ring.response/body "Length Required\r\n"}))))
+        (into req {:ring.response/status 411}))))
 
     ;; Spin protects resources from PUTs that are too large. If you need to
     ;; exceed this limitation, explicitly declare ::spin/max-content-length in
@@ -111,16 +109,13 @@
         (throw
          (ex-info
           "Payload too large"
-          (into req
-                {:ring.response/status 413
-                 :ring.response/body "Payload Too Large\r\n"})))))
+          (into req {:ring.response/status 413})))))
 
     (when-not (:ring.request/body req)
       (throw
        (ex-info
         "No body in request"
-        (into req {:ring.response/status 400
-                   :ring.response/body "Bad Request\r\n"}))))
+        (into req {:ring.response/status 400}))))
 
     (let [decoded-representation
           (decode-maybe
@@ -150,7 +145,6 @@
                 "The content-type of the request payload is not supported by the resource"
                 (into req
                       {:ring.response/status 415
-                       :ring.response/body "Unsupported Media Type\r\n"
                        ::acceptable acceptable
                        ::content-type (get request-rep "content-type")})))
 
@@ -162,7 +156,6 @@
                (ex-info
                 "The Content-Type header in the request is a text type and is required to specify its charset as a media-type parameter"
                 (into req {:ring.response/status 415
-                           :ring.response/body "Unsupported Media Type\r\n"
                            ::acceptable acceptable
                            ::content-type (get request-rep "content-type")})))
 
@@ -171,7 +164,6 @@
                (ex-info
                 "The charset of the Content-Type header in the request is not supported by the resource"
                 (into req {:ring.response/status 415
-                           :ring.response/body "Unsupported Media Type\r\n"
                            ::acceptable acceptable
                            ::content-type (get request-rep "content-type")})))))
 
@@ -182,7 +174,6 @@
                (ex-info
                 "The content-encoding in the request is not supported by the resource"
                 (into req {:ring.response/status 409
-                           :ring.response/body "Conflict\r\n"
                            ::acceptable acceptable
                            ::content-encoding (get-in req [:ring.request/headers "content-encoding"] "identity")})))))
 
@@ -193,7 +184,6 @@
                (ex-info
                 "Request must contain Content-Language header"
                 (into req {:ring.response/status 409
-                           :ring.response/body "Conflict\r\n"
                            ::acceptable acceptable
                            ::content-language (get-in req [:ring.request/headers "content-language"])})))
 
@@ -202,7 +192,6 @@
                (ex-info
                 "The content-language in the request is not supported by the resource"
                 (into req {:ring.response/status 415
-                           :ring.response/body "Unsupported Media Type\r\n"
                            ::acceptable acceptable
                            ::content-language (get-in req [:ring.request/headers "content-language"])})))))))
 
@@ -211,8 +200,7 @@
          (ex-info
           "Content-Range header not allowed on a PUT request"
           (into req
-                {:ring.response/status 400
-                 :ring.response/body "Bad Request\r\n"}))))
+                {:ring.response/status 400}))))
 
       (with-open [in (:ring.request/body req)]
         (let [body (.readNBytes in content-length)
@@ -266,9 +254,7 @@
       (throw
        (ex-info
         "If-Match precondition failed"
-        (into req
-              {:ring.response/status 412
-               :ring.response/body "Precondition Failed\r\n"})))
+        (into req {:ring.response/status 412})))
 
       (sequential? header-field)
       (do
@@ -289,8 +275,7 @@
               (throw
                (ex-info
                 "No strong matches between if-match and current representations"
-                (into req {:ring.response/status 412
-                           :ring.response/body "Precondition Failed\r\n"})))))))))
+                (into req {:ring.response/status 412})))))))))
 
 ;; TODO: See Section 4.1, RFC 7232:
 ;;
@@ -318,14 +303,12 @@
                (ex-info
                 "Not modified"
                 (into req {:ring.response/status 304
-                           :ring.response/body "Not Modified\r\n"
                            ::matching-entity-tag etag}))
                ;; "… or 412 (Precondition Failed) status code for all other
                ;; request methods."
                (ex-info
                 "If-None-Match precondition failed"
                 (into req {:ring.response/status 412
-                           :ring.response/body "Precondition Failed\r\n"
                            ::matching-entity-tag etag})))))))
 
       ;; "If-None-Match can also be used with a value of '*' …"
@@ -341,12 +324,10 @@
                   ;; "the origin server MUST respond with either a) the 304 (Not
                   ;; Modified) status code if the request method is GET or HEAD
                   ;; …"
-                  {:ring.response/status 304
-                   :ring.response/body "Not Modified\r\n"}
+                  {:ring.response/status 304}
                   ;; "… or 412 (Precondition Failed) status code for all other
                   ;; request methods."
-                  {:ring.response/status 412
-                   :ring.response/body "Precondition Failed\r\n"}))))))))
+                  {:ring.response/status 412}))))))))
 
 (defn evaluate-if-unmodified-since! [{::site/keys [selected-representation] :as req}]
   (let [if-unmodified-since-date
@@ -360,8 +341,7 @@
       (throw
        (ex-info
         "Precondition failed"
-        (into req {:ring.resposne/status 304
-                   :ring.response/body "Precondition Failed\r\n"}))))))
+        (into req {:ring.resposne/status 304}))))))
 
 (defn evaluate-if-modified-since! [{::site/keys [selected-representation] :as req}]
   (let [if-modified-since-date
@@ -376,8 +356,7 @@
       (throw
        (ex-info
         "Not modified"
-        (into req {:ring.response/status 304
-                   :ring.response/body "Not Modified\r\n"}))))))
+        (into req {:ring.response/status 304}))))))
 
 (defn evaluate-preconditions!
   "Implementation of Section 6 of RFC 7232. Arguments are the (Ring) request, a
@@ -586,9 +565,7 @@
         (throw
          (ex-info
           "Resource allows POST but doesn't have a post-fn function"
-          (into req
-                {:ring.response/status 500
-                 :ring.response/body "Internal Error\r\n"})))))))
+          (into req {:ring.response/status 500})))))))
 
 (defn PUT [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
@@ -601,9 +578,7 @@
       :else
       (throw
        (ex-info "Resource allows PUT but doesn't contain have a put-fn function"
-                (into req
-                      {:ring.response/status 500
-                       :ring.response/body "Internal Error\r\n"}))))))
+                (into req {:ring.response/status 500}))))))
 
 (defn PATCH [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
@@ -617,14 +592,11 @@
       (throw
        (ex-info "Resource allows PATCH but doesn't contain have a patch-fn function"
                 (into req
-                      {:ring.response/status 500
-                       :ring.response/body "Internal Error\r\n"}))))))
+                      {:ring.response/status 500}))))))
 
 (defn DELETE [{::site/keys [crux-node uri] :as req}]
   (x/submit-tx crux-node [[:crux.tx/delete uri]])
-  (into req
-        {:ring.response/status 202
-         :ring.response/body "Accepted\r\n"}))
+  (into req {:ring.response/status 202}))
 
 (defn OPTIONS [{::site/keys [resource allowed-methods] :as req}]
   ;; TODO: Implement *
@@ -683,8 +655,7 @@
                ::http/options {"DAV" "1"}}]])]
     (x/await-tx crux-node tx))
   {:ring.response/status 201
-   :ring.response/headers {}
-   :ring.response/body "Collection created\r\n"})
+   :ring.response/headers {}})
 
 (defmethod transform-value "password" [_ instance]
   (password/encrypt instance 11))
@@ -701,10 +672,7 @@
       (throw
        (ex-info
         "Method not implemented"
-        (into
-         req
-         {:ring.response/status 501
-          :ring.response/body "Not Implemented\r\n"}))))
+        (into req {:ring.response/status 501}))))
     (h req)))
 
 (defn wrap-locate-resource [h]
@@ -722,10 +690,6 @@
           "Redirect"
           (-> req
               (assoc :ring.response/status status)
-              (assoc :ring.response/body
-                     (case status
-                       302 "Found\r\n"
-                       307 "Temporary Redirect\r\n"))
               (update :ring.response/headers
                       assoc "location" (::site/location resource)))))))
     (h req)))
@@ -740,8 +704,7 @@
            (ex-info
             "Not Found"
             (into req
-                  {:ring.response/status 404
-                   :ring.response/body "Not Found\r\n"}))))
+                  {:ring.response/status 404}))))
         (h (assoc req ::site/current-representations cur-reps)))
       (h req))))
 
@@ -792,13 +755,11 @@
 
       (when (and (not= method :options)
                  (not= (::pass/access authz) ::pass/approved))
-        (let [status (if-not (::pass/user subject) 401 403)
-              msg (case status 401  "Unauthorized" 403 "Forbidden")]
+        (let [status (if-not (::pass/user subject) 401 403)]
           (throw
-           (ex-info msg
-                    (into req
-                          {:ring.response/status status
-                           :ring.response/body (str msg "\r\n")})))))
+           (ex-info
+            (case status 401  "Unauthorized" 403 "Forbidden")
+            (into req {:ring.response/status status})))))
       (h req))))
 
 (defn wrap-method-not-allowed? [h]
@@ -811,8 +772,7 @@
             "Method not allowed"
             (into req
                   {:ring.response/status 405
-                   :ring.response/headers {"allow" (join-keywords allowed-methods true)}
-                   :ring.response/body "Method Not Allowed\r\n"}))))
+                   :ring.response/headers {"allow" (join-keywords allowed-methods true)}}))))
         (h (assoc req ::site/allowed-methods allowed-methods)))
       (h req))))
 

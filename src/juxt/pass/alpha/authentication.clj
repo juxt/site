@@ -54,8 +54,7 @@
   (when-not subject
     (throw
      (ex-info "Unauthorized"
-              (into req {:ring.response/status 401
-                         :ring.response/body "Unauthorized\r\n"}))))
+              (into req {:ring.response/status 401}))))
 
   (let [posted-body (slurp (::http/body received-representation))
 
@@ -253,5 +252,4 @@
 
            (throw
             (ex-info "Auth scheme unsupported"
-                     (into req {:ring.response/status 401
-                                :ring.response/body "Unauthorized\r\n"})))))))))
+                     (into req {:ring.response/status 401})))))))))
