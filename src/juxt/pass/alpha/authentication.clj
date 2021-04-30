@@ -8,7 +8,7 @@
    [crux.api :as x]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.rfc7235 :as rfc7235]
-   [ring.util.codec :refer [form-decode]]
+   [ring.util.codec :refer [form-decode url-decode]]
    [ring.middleware.cookies :refer [cookies-request cookies-response]]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -120,7 +120,6 @@
 
 (defn login-response
   [{::site/keys [received-representation db resource start-date]
-    :ring.request/keys [query]
     :as req}]
 
   ;; Check grant_type of posted-representation
@@ -131,7 +130,8 @@
         form (form-decode posted-body)
         username (get form "user")
         [user pwhash] (lookup-user db username)
-        password (get form "password")]
+        password (get form "password")
+        redirect (some-> (get form "_redirect") url-decode)]
     (or
      (when (and password pwhash (password/check password pwhash))
        (let [access-token (access-token)
@@ -151,7 +151,7 @@
                     ::http/content-type "text/plain")
              (update :ring.response/headers assoc
                      "cache-control" "no-store"
-                     "location" query)
+                     "location" redirect)
              (assoc :cookies {"site_session"
                               {:value
                                (json/write-value-as-string
