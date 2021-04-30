@@ -28,7 +28,6 @@
    [juxt.site.alpha.templating :as templating]
    juxt.site.alpha.selmer
    [juxt.site.alpha.triggers :as triggers]
-   [taoensso.nippy.utils :refer [freezable?]]
    [juxt.site.alpha.rules :as rules])
   (:import (java.net URI)))
 
