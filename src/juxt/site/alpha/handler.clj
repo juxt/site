@@ -61,7 +61,7 @@
           (pick (assoc request :headers (:ring.request/headers request))
                 current-representations {::pick/vary? true}))]
 
-    (when (contains? #{:get :head} (:ring.request/method request))
+    #_(when (contains? #{:get :head} (:ring.request/method request))
       (when-not selected-representation
         (throw
          (ex-info
