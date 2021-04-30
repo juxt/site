@@ -84,8 +84,6 @@
               "Schema validation failed"
               (-> req
                   (into {:ring.response/status 400
-                         ;; TODO: Content negotiation for error responses
-                         :ring.response/body "Bad Request\r\n"
                          ::jinx/validation-results validation})))))
 
         validation (-> validation
@@ -138,9 +136,8 @@
               (throw
                (ex-info
                 message
-                (-> req
-                    (into {:ring.response/status status
-                           :ring.response/body (str message "\r\n")}))))))
+                (into req {:ring.response/status status})))))
+
 
         already-exists? (x/entity db uri)
 
@@ -321,8 +318,7 @@
                           (ex-info
                            (str "Failed to find post-fn: " post-fn-sym)
                            (into req
-                                 {:ring.response/status 500
-                                  :ring.response/body "Internal Error\r\n"})))))]
+                                 {:ring.response/status 500})))))]
                (f (assoc
                    req
                    ::apex/request-instance

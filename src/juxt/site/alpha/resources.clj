@@ -53,16 +53,10 @@
                      0 400
                      1 (:status (first results))
                      207)]
-        (cond->
-            (assoc req
-                   :ring.response/status status
-                   :ring.response/body
-                   ;; TODO: For default error bodies we shouldn't add the body here
-                   ;; and let an error handler put in the default message.
-                   (case status
-                     400 "Bad Request\r\n"
-                     201 "Created\r\n"
-                     204 "No Content\r\n"
-                     207 (pr-str (map (fn [r] (dissoc r :tx)) results))))
-            (and (#{201 204} status) (:uri (first results)))
-            (assoc-in [:ring.response/headers "location"] (:uri (first results))))))))
+        (cond-> req
+          status (assoc :ring.response/status status)
+          (= status 207) (assoc :ring.response/body
+                                (pr-str (map (fn [r] (dissoc r :tx)) results)))
+
+          (and (#{201 204} status) (:uri (first results)))
+          (assoc-in [:ring.response/headers "location"] (:uri (first results))))))))
