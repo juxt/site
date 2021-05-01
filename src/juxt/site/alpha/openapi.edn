@@ -52,13 +52,12 @@
     {200
      {:juxt.site.alpha/query
       #juxt.site.alpha/as-str
-      {:find [e username name email]
-       :strs [id username name email]
+      {:find [(pull e [*]) username]
+       :strs [user username]
        :where [[e :juxt.site.alpha/type "User"]
-               [e :juxt.pass.alpha/username username]
-               [e :name name]
-               [e :email email]]
+               [e :juxt.pass.alpha/username username]]
        :order-by [[username :asc]]}
+      :juxt.site.alpha/extract-entry "user"
 
       :content
       {"application/json"
