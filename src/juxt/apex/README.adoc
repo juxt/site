@@ -1,0 +1,10 @@
+= Apex
+
+The code in this part of the code-base has been copied and derived from Apex,
+https://github.com/juxt/apex. The code is experimental and speculative, and
+therefore hard to read in places. OpenAPI is a reasonably large domain and with
+quite a few difficult open design choices in implementation. It is expected that
+this code will be fully rewritten at some point once the design has stablised.
+
+There are tests in the original code-base that might be copied over at some
+point as part of a newer test suite.
