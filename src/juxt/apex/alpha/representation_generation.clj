@@ -9,7 +9,6 @@
    [hiccup.page :as hp]
    [json-html.core :refer [edn->html]]
    [jsonista.core :as json]
-   [juxt.apex.alpha.parameters :refer [extract-params-from-request]]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.site.alpha.util :as util]
    [clojure.edn :as edn]
