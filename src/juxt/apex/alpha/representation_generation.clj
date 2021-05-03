@@ -55,7 +55,7 @@
         (some->
          (get-in resource [::apex/operation "responses" "200" "juxt.site.alpha/query"])
          (edn/read-string)
-         (->inject-params-into-query (extract-params-from-request req param-defs))
+         (->inject-params-into-query {:path (::apex/openapi-path-params resource)})
          (pdp/->authorized-query authorization))
 
         {singular-result? "juxt.site.alpha/singular-result?"
