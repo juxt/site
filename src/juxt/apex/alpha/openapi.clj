@@ -378,7 +378,6 @@
 
    (let [openapis (x/q db '{:find [openapi-uri openapi]
                             :where [[openapi-uri ::apex/openapi openapi]]})
-         ;; TODO: unnecessary let binding above
          matches
          (for [[openapi-uri openapi] openapis
                server (get openapi "servers")
