@@ -4,8 +4,8 @@
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
-   [crux.api :as x]
    [clojure.walk :refer [postwalk]]
+   [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
    [io.aviso.ansi :as ansi]
    [juxt.pass.alpha.authentication :as authn]
@@ -268,3 +268,13 @@
         crux-node (crux-node)]
     (init/put-site-txfns! crux-node config)
     (status)))
+
+(defn reset-password! [username password]
+  (let [user (str (::site/base-uri (config))  "/_site/users/" username)]
+    (put!
+     {:crux.db/id (str user "/password")
+      ::site/type "Password"
+      ::http/methods #{:post}
+      ::pass/user user
+      ::pass/password-hash (password/encrypt password)
+      ::pass/classification "RESTRICTED"})))
