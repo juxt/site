@@ -5,6 +5,7 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.walk :refer [postwalk]]
+   [crux.api :as x]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
    [io.aviso.ansi :as ansi]
