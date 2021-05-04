@@ -223,12 +223,12 @@
     [:crux.tx/put {:crux.db/id "https://example.org/users/sue"
                    ::site/type "User"
                    ::site/description "Sue should receive an email on every alert"
-                   ::email "sue@example.org"
+                   :email "sue@example.org"
                    ::email? true}]
     [:crux.tx/put {:crux.db/id "https://example.org/users/brian"
                    ::site/type "User"
                    ::site/description "Brian doesn't want emails"
-                   ::email "brian@example.org"
+                   :email "brian@example.org"
                    ::email? false}]
     [:crux.tx/put {:crux.db/id "https://example.org/roles/service-manager"
                    ::site/type "Role"
@@ -269,19 +269,14 @@
      {:crux.db/id "https://example.org/triggers/alert-notification"
       ::site/type "Trigger"
       ::site/query
-      '{:find [email alert asset-type customer]
-        :keys [juxt.mail.alpha/to href asset-type customer]
+      '{:find [(pull user [:email]) alert asset-type customer]
+        :keys [user href asset-type customer]
         :where [[request :ring.request/method :put]
                 [request ::site/uri alert]
                 [alert ::site/type "Alert"]
                 [alert :asset-type asset-type]
                 [alert :customer customer]
-
-                ;; All service managers
-                ;; TODO: Limit to alerts that are 'owned' by the same
-                ;; dealer as the service manager
                 [user ::site/type "User"]
-                [user ::email email]
                 [mapping ::role "https://example.org/roles/service-manager"]
                 [mapping ::user user]]}
 
