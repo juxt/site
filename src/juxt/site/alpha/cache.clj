@@ -1,7 +1,7 @@
 ;; Copyright © 2021, JUXT LTD.
 
 (ns juxt.site.alpha.cache
-  (:require-clojure :exclude [find])
+  (:refer-clojure :exclude [find])
   (:import (java.lang.ref SoftReference)))
 
 (defprotocol ICache
