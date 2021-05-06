@@ -26,4 +26,5 @@
   (m/repl
    :init repl-init
    :read s/repl-read
-   :prompt #(printf "site> ")))
+   :prompt #(printf "site> ")
+   :print pprint))
