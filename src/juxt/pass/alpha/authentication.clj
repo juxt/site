@@ -119,12 +119,12 @@
     (first users)))
 
 (defn login-response
-  [{::site/keys [received-representation db resource start-date]
+  [{::site/keys [received-representation db resource start-date uri]
     :as req}]
 
   ;; Check grant_type of posted-representation
   (assert (.startsWith (::http/content-type received-representation)
-             "application/x-www-form-urlencoded"))
+                       "application/x-www-form-urlencoded"))
 
   (let [posted-body (String. (::http/body received-representation))
         form (form-decode posted-body)
@@ -153,23 +153,46 @@
                      "cache-control" "no-store"
                      "location" redirect)
              (assoc :cookies {"site_session"
-                              {:value
-                               (json/write-value-as-string
-                                {"access_token" access-token
-                                 ;; The 'user' field tells user-agents where to
-                                 ;; find information about the user. It isn't
-                                 ;; otherwise used.
-                                 "user" user})
-                               :max-age expires-in
-                               :same-site :strict
-                               ;; We should set http-only to true.  However,
-                               ;; this stops Swagger UI from make API
-                               ;; requests. TODO: The plan is to figure out how
-                               ;; to use the auth features in Swagger UI to
-                               ;; allow these requests, and then we can set
-                               ;; http-only to true.
-                               :http-only false
-                               :path "/"}})
+                              (cond
+                                (.startsWith uri "https")
+                                {:value
+                                 (json/write-value-as-string
+                                  {"access_token" access-token
+                                   ;; The 'user' field tells user-agents where to
+                                   ;; find information about the user. It isn't
+                                   ;; otherwise used.
+                                   "user" user})
+                                 :max-age expires-in
+
+                                 :same-site :none
+                                 :secure true
+                                 ;; We should set http-only to true.  However,
+                                 ;; this stops Swagger UI from make API
+                                 ;; requests. TODO: The plan is to figure out how
+                                 ;; to use the auth features in Swagger UI to
+                                 ;; allow these requests, and then we can set
+                                 ;; http-only to true.
+                                 :http-only false
+                                 :path "/"}
+
+                                :else
+                                {:value
+                                 (json/write-value-as-string
+                                  {"access_token" access-token
+                                   ;; The 'user' field tells user-agents where to
+                                   ;; find information about the user. It isn't
+                                   ;; otherwise used.
+                                   "user" user})
+                                 :max-age expires-in
+                                 :same-site :strict
+                                 ;; We should set http-only to true.  However,
+                                 ;; this stops Swagger UI from make API
+                                 ;; requests. TODO: The plan is to figure out how
+                                 ;; to use the auth features in Swagger UI to
+                                 ;; allow these requests, and then we can set
+                                 ;; http-only to true.
+                                 :http-only false
+                                 :path "/"})})
              (cookies-response)
              ((fn [req] (assoc-in req [:ring.response/headers "set-cookie"] (get-in req [:headers "Set-Cookie"])))))))
      ;; else not user
