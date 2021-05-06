@@ -93,7 +93,14 @@
                                  "application/json" "schema"])
         _ (assert schema)
         body (::http/body received-representation)
-        instance (json/read-value body) _ (assert instance)
+        instance (try
+                   (json/read-value body)
+                   (catch Exception _
+                     (throw
+                      (ex-info
+                       "Bad JSON in input"
+                       (into req {:ring.response/status 400})))))
+        _ (assert instance)
         openapi-ref (get resource ::apex/openapi) _ (assert openapi-ref)
         openapi-resource (x/entity db openapi-ref) _ (assert openapi-resource)
 
