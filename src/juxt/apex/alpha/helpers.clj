@@ -10,14 +10,17 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn post-request-body [{::apex/keys [new-resource-state]
-                          ::site/keys [uri resource] :as req}]
+(defn post-request-body [{::site/keys [uri resource] :as req}]
   (let [;; Operation can contain extra config, such as uri-templates
         operation (::apex/operation resource)
+
+        resource-state (openapi/received-body->resource-state req)
+
         ;; TODO: This is just a hack to get a demo working - the method of
         ;; determining the identifier for the new resource needs to be more
         ;; configurable!
+
         id (str uri "/" (java.util.UUID/randomUUID))]
 
     (openapi/put-resource-state
-     req (assoc new-resource-state :crux.db/id id))))
+     req (assoc resource-state :crux.db/id id))))

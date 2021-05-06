@@ -346,10 +346,7 @@
                            (str "Failed to find post-fn: " post-fn-sym)
                            (into req
                                  {:ring.response/status 500})))))]
-               (f (assoc
-                   req
-                   ::apex/new-resource-state
-                   (received-body->resource-state req))))))
+               (f req))))
 
           (= method :put)
           (assoc

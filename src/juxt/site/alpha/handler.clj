@@ -538,14 +538,18 @@
     (into req {:ring.response/status (if existing 204 201)
                :ring.response/headers {"location" location}})))
 
-(defn post-redirect [{::site/keys [crux-node db uri]
-                      ::apex/keys [request-instance]
+(defn post-redirect [{::site/keys [crux-node db]
                       :as req}]
-  (let [{::site/keys [resource]} request-instance
+  (let [resource-state (openapi/received-body->resource-state req)
+        {::site/keys [resource]} resource-state
         existing (x/entity db resource)]
     (->> (x/submit-tx
           crux-node
-          [[:crux.tx/put (merge {:crux.db/id resource} (dissoc request-instance ::site/resource))]])
+          [[:crux.tx/put
+            (merge
+             {:crux.db/id resource}
+             ;; ::site/resource = :crux.db/id, no need to duplicate
+             (dissoc resource-state ::site/resource))]])
          (x/await-tx crux-node))
 
     (into req {:ring.response/status (if existing 204 201)})))
