@@ -67,11 +67,12 @@
   (let [passfile (io/file
                   (System/getProperty "user.home")
                   (str ".password-store/" unix-pass-password-prefix username ".gpg"))]
-    (when (.exists passfile)
+    (if (.exists passfile)
       (do
         (message! "Extracting password from " (str passfile))
         (let [{:keys [exit out]} (sh/sh "gpg" "-d" (str passfile))]
-          (when (zero? exit) (str/trim out)))))))
+          (when (zero? exit) (str/trim out))))
+      (error-and-exit! 1 (format "Passfile does not exist: %s" passfile)))))
 
 (defn get-password [unix-pass-password-prefix username]
   (or
@@ -96,8 +97,15 @@
   [opts]
   (let [{:keys [base-uri username password password-prefix curl]
          :or {base-uri (:juxt.site.alpha/base-uri config)
-              password-prefix (:juxt.site.alpha.unix-pass/password-prefix config)}}
+              password-prefix (or
+                               (when-let [dir (System/getenv "SITE_PASS_DIR")]
+                                 (cond-> dir
+                                   (not (.endsWith dir "/")) (str "/")))
+                               (:juxt.site.alpha.unix-pass/password-prefix config))}}
         (:options opts)]
+
+    (when password-prefix
+      (message! (format "Unix pass prefix: %s" password-prefix)))
 
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not username (error-and-exit! 1 "Username required"))
@@ -911,6 +919,7 @@
           (println (str ansi/white-font "Environment variables" ansi/reset-font))
           (println)
           (println "SITE_BASE_URI \tSet the default Base-URI")
+          (println "SITE_PASS_DIR \tOverride where Unix pass passwords are located")
           (println)
           (println (str ansi/white-font "Subcommands" ansi/reset-font))
           (println)
