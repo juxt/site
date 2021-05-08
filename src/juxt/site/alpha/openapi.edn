@@ -140,6 +140,7 @@
      {"application/json"
       {:schema {"$ref" "#/components/schemas/Password"}
        :example {"type" "Password"
+                 "user" "https://example.org/_site/users/alice"
                  "password" "TigerBuffalo42^&"}}}}
 
     :responses
