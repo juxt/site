@@ -131,7 +131,7 @@
      :schema {:type "string"}}]
 
    :put
-   {:summary "Puts a new password"
+   {:summary "Resets a password for a given user"
     :operationId "putPassword"
     :tags ["Users"]
     :requestBody
