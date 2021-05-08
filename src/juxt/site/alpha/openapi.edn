@@ -21,6 +21,7 @@
   {:get
    {:description "Return information about the currently logged in user"
     :operationId "getUserDetails"
+    :tags ["Users"]
     :responses
     {200
      {:juxt.site.alpha/query
@@ -47,6 +48,7 @@
   {:get
    {:description "Returns a list of all the users you're allowed to view"
     :operationId "findUsers"
+    :tags ["Users"]
 
     :responses
     {200
@@ -78,8 +80,9 @@
      :x-juxt-site-inject-property "juxt.pass.alpha/username"}]
 
    :get
-   {:description "Returns a given user",
-    :operationId "findUserById",
+   {:description "Returns a given user"
+    :operationId "findUserById"
+    :tags ["Users"]
 
     :responses
     {200
@@ -95,6 +98,7 @@
    :put
    {:description "Upserts a user"
     :operationId "putUser"
+    :tags ["Users"]
     :requestBody
     {:required true
      :content
@@ -114,6 +118,7 @@
    :delete
    {:description "Deletes a user"
     :operationId "deleteUser"
+    :tags ["Users"]
 
     :responses
     {204 {:description "User successfully deleted"
@@ -128,6 +133,7 @@
    :put
    {:description "Puts a new password"
     :operationId "putPassword"
+    :tags ["Users"]
     :requestBody
     {:required true
      :content
@@ -146,6 +152,7 @@
   {:get
    {:description "Returns all roles"
     :operationId "findRoles"
+    :tags ["Roles"]
     :parameters
     [{:name "limit" :in "query" :required false :default 100
       :description "Maximum number of results to return"
@@ -175,7 +182,7 @@
       :description "Role id"
       :schema {:type "string"}}]
     :operationId "findRoleById"
-
+    :tags ["Roles"]
     :responses
     {200 {:description "Single identified role"
           :content
@@ -186,6 +193,7 @@
    :put
    {:description "Upserts a role"
     :operationId "putRole"
+    :tags ["Roles"]
     :parameters
     [{:name "id" :in "path" :required true
       :description "Role id"
@@ -214,6 +222,7 @@
       :description "Username"
       :schema {:type "string"}}]
     :operationId "findUserRoleMapping"
+    :tags ["Roles"]
 
     :responses
     {200 {:description "User-role mapping"
@@ -224,6 +233,7 @@
    :put
    {:description "Upserts a user-role mapping"
     :operationId "putUserRoleMapping"
+    :tags ["Roles"]
     :parameters
     [{:name "id" :in "path" :required true
       :description "Role id"
@@ -246,7 +256,7 @@
   "/rules/"
   {:get
    {:description "Returns a list of all the rule"
-
+    :tags ["Rules"]
     :responses
     {200
      {:juxt.site.alpha/query
@@ -266,6 +276,7 @@
 
    :post
    {:juxt.site.alpha/post-fn juxt.site.alpha.rules/post-rule
+    :tags ["Rules"]
     :requestBody
     {:required true
      :content
@@ -280,6 +291,7 @@
 
    :get
    {:description "Returns a given rule",
+    :tags ["Rules"]
     :responses
     {200
      {:description "Single identified rule"
@@ -293,6 +305,7 @@
 
    :put
    {:description "Upserts a rule"
+    :tags ["Rules"]
     :requestBody
     {:required true
      :content
@@ -310,7 +323,7 @@
   "/triggers/"
   {:get
    {:description "Returns a list of all the trigger"
-
+    :tags ["Triggers"]
     :responses
     {200
      {:juxt.site.alpha/query
@@ -336,6 +349,7 @@
 
    :get
    {:description "Returns a given trigger",
+    :tags ["Triggers"]
     :responses
     {200
      {:description "Single identified trigger"
@@ -349,6 +363,7 @@
 
    :put
    {:description "Upserts a trigger"
+    :tags ["Triggers"]
     :requestBody
     {:required true
      :content
@@ -370,6 +385,7 @@
     representation. This is used when there are multiple
     representations (variants) for a resource which are subject to
     content-negotiation."
+    :tags ["Content Negotiation"]
     :requestBody
     {:required true
      :content
@@ -384,6 +400,7 @@
   "/redirects/"
   {:post
    {:juxt.site.alpha/post-fn juxt.site.alpha.handler/post-redirect
+    :tags ["Redirects"]
     :requestBody
     {:required true
      :content
@@ -396,6 +413,7 @@
   "/apis/"
   {:get
    {:description "Returns a list of all the APIs"
+    :tags ["APIs"]
     :responses
     {200
      {:juxt.site.alpha/query
@@ -420,6 +438,7 @@
   "/resources/"
   {:post
    {:description "Put a new resource, described by the payload"
+    :tags ["Resources"]
     :requestBody
     {:required true
      :content
@@ -437,6 +456,7 @@
 
    :get
    {:description "Returns a given OpenAPI description"
+    :tags ["APIs"]
     :responses
     {200
      {:description "Single identified API"
@@ -450,6 +470,7 @@
 
    :put
    {:description "Upserts an OpenAPI"
+    :tags ["APIs"]
     :requestBody
     {:required true
      :content
