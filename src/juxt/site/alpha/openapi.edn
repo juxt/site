@@ -19,7 +19,7 @@
  :paths
  {"/user"
   {:get
-   {:description "Return information about the currently logged in user"
+   {:summary "Return information about the currently logged in user"
     :operationId "getUserDetails"
     :tags ["Users"]
     :responses
@@ -46,7 +46,7 @@
 
   "/users/"
   {:get
-   {:description "Returns a list of all the users you're allowed to view"
+   {:summary "Returns a list of all the users you're allowed to view"
     :operationId "findUsers"
     :tags ["Users"]
 
@@ -75,18 +75,18 @@
   "/users/{id}"
   {:parameters
    [{:name "id" :in "path" :required true
-     :description "User id"
+     :summary "User id"
      :schema {:type "string"}
      :x-juxt-site-inject-property "juxt.pass.alpha/username"}]
 
    :get
-   {:description "Returns a given user"
+   {:summary "Returns a given user"
     :operationId "findUserById"
     :tags ["Users"]
 
     :responses
     {200
-     {:description "Single identified user"
+     {:summary "Single identified user"
       :content
       {"application/json"
        {:schema {"$ref" "#/components/schemas/User"}}
@@ -96,7 +96,7 @@
         :schema {"$ref" "#/components/schemas/User"}}}}}}
 
    :put
-   {:description "Upserts a user"
+   {:summary "Upserts a user"
     :operationId "putUser"
     :tags ["Users"]
     :requestBody
@@ -116,7 +116,7 @@
           :content {"text/plain;charset=utf-8" {}}}}}
 
    :delete
-   {:description "Deletes a user"
+   {:summary "Deletes a user"
     :operationId "deleteUser"
     :tags ["Users"]
 
@@ -131,7 +131,7 @@
      :schema {:type "string"}}]
 
    :put
-   {:description "Puts a new password"
+   {:summary "Puts a new password"
     :operationId "putPassword"
     :tags ["Users"]
     :requestBody
@@ -150,7 +150,7 @@
 
   "/roles/"
   {:get
-   {:description "Returns all roles"
+   {:summary "Returns all roles"
     :operationId "findRoles"
     :tags ["Roles"]
     :parameters
@@ -175,12 +175,12 @@
 
   "/roles/{id}"
   {:parameters
-    [{:name "id" :in "path" :required true
-      :description "Role id"
-      :schema {:type "string"}}]
+   [{:name "id" :in "path" :required true
+     :description "Role id"
+     :schema {:type "string"}}]
 
    :get
-   {:description "Returns a given role"
+   {:summary "Returns a given role"
     :operationId "findRoleById"
     :tags ["Roles"]
     :responses
@@ -191,7 +191,7 @@
            "text/html;charset=utf-8" {:title "Role"}}}}}
 
    :put
-   {:description "Upserts a role"
+   {:summary "Upserts a role"
     :operationId "putRole"
     :tags ["Roles"]
     :requestBody
@@ -208,15 +208,15 @@
 
   "/roles/{id}/users/{user}"
   {:parameters
-    [{:name "id" :in "path" :required true
-      :description "Role id"
-      :schema {:type "string"}}
-     {:name "user" :in "path" :required true
-      :description "Username"
-      :schema {:type "string"}}]
+   [{:name "id" :in "path" :required true
+     :description "Role id"
+     :schema {:type "string"}}
+    {:name "user" :in "path" :required true
+     :description "Username"
+     :schema {:type "string"}}]
 
    :get
-   {:description "Returns role mappings"
+   {:summary "Returns role mappings"
     :operationId "findUserRoleMapping"
     :tags ["Roles"]
 
@@ -227,7 +227,7 @@
            "text/html;charset=utf-8" {:title "User Role Mapping"}}}}}
 
    :put
-   {:description "Upserts a user-role mapping"
+   {:summary "Upserts a user-role mapping"
     :operationId "putUserRoleMapping"
     :tags ["Roles"]
     :requestBody
@@ -244,7 +244,7 @@
 
   "/rules/"
   {:get
-   {:description "Returns a list of all the rule"
+   {:summary "Returns a list of all the rule"
     :tags ["Rules"]
     :responses
     {200
@@ -279,7 +279,7 @@
      :schema {:type "string"}}]
 
    :get
-   {:description "Returns a given rule",
+   {:summary "Returns a given rule",
     :tags ["Rules"]
     :responses
     {200
@@ -293,7 +293,7 @@
         :schema {"$ref" "#/components/schemas/Rule"}}}}}}
 
    :put
-   {:description "Upserts a rule"
+   {:summary "Upserts a rule"
     :tags ["Rules"]
     :requestBody
     {:required true
@@ -311,7 +311,7 @@
 
   "/triggers/"
   {:get
-   {:description "Returns a list of all the trigger"
+   {:summary "Returns a list of all the trigger"
     :tags ["Triggers"]
     :responses
     {200
@@ -337,7 +337,7 @@
      :schema {:type "string"}}]
 
    :get
-   {:description "Returns a given trigger",
+   {:summary "Returns a given trigger",
     :tags ["Triggers"]
     :responses
     {200
@@ -351,7 +351,7 @@
         :schema {"$ref" "#/components/schemas/Trigger"}}}}}}
 
    :put
-   {:description "Upserts a trigger"
+   {:summary "Upserts a trigger"
     :tags ["Triggers"]
     :requestBody
     {:required true
@@ -370,8 +370,9 @@
   "/variants/"
   {:post
    {:juxt.site.alpha/post-fn juxt.site.alpha.handler/post-variant
-    :description "Create a new association between a resource and a variant
-    representation. This is used when there are multiple
+    :summary
+    "Create a new association between a resource and a variant representation."
+    :description "This is used when there are multiple
     representations (variants) for a resource which are subject to
     content-negotiation."
     :tags ["Content Negotiation"]
@@ -401,7 +402,7 @@
 
   "/apis/"
   {:get
-   {:description "Returns a list of all the APIs"
+   {:summary "Returns a list of all the APIs"
     :tags ["APIs"]
     :responses
     {200
@@ -426,7 +427,7 @@
 
   "/resources/"
   {:post
-   {:description "Put a new resource, described by the payload"
+   {:summary "Put a new resource, described by the payload"
     :tags ["Resources"]
     :requestBody
     {:required true
@@ -444,7 +445,7 @@
      :schema {:type "string"}}]
 
    :get
-   {:description "Returns a given OpenAPI description"
+   {:summary "Returns a given OpenAPI document"
     :tags ["APIs"]
     :responses
     {200
@@ -458,7 +459,7 @@
         :schema {"$ref" "#/components/schemas/OpenAPI"}}}}}}
 
    :put
-   {:description "Upserts an OpenAPI"
+   {:summary "Upserts an OpenAPI"
     :tags ["APIs"]
     :requestBody
     {:required true
