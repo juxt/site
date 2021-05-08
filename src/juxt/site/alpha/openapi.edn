@@ -174,13 +174,13 @@
                                       :type "edn-table"}}}}}}
 
   "/roles/{id}"
-  {:get
-   {:description "Returns a given role"
-    ;; NOTE: Path-object level parameters not yet supported!!
-    :parameters
+  {:parameters
     [{:name "id" :in "path" :required true
       :description "Role id"
       :schema {:type "string"}}]
+
+   :get
+   {:description "Returns a given role"
     :operationId "findRoleById"
     :tags ["Roles"]
     :responses
@@ -194,10 +194,6 @@
    {:description "Upserts a role"
     :operationId "putRole"
     :tags ["Roles"]
-    :parameters
-    [{:name "id" :in "path" :required true
-      :description "Role id"
-      :schema {:type "string"}}]
     :requestBody
     {:required true
      :content
@@ -211,16 +207,16 @@
           {"text/plain;charset=utf-8" {}}}}}}
 
   "/roles/{id}/users/{user}"
-  {:get
-   {:description "Returns role mappings"
-    ;; NOTE: Path-object level parameters not yet supported!!
-    :parameters
+  {:parameters
     [{:name "id" :in "path" :required true
       :description "Role id"
       :schema {:type "string"}}
      {:name "user" :in "path" :required true
       :description "Username"
       :schema {:type "string"}}]
+
+   :get
+   {:description "Returns role mappings"
     :operationId "findUserRoleMapping"
     :tags ["Roles"]
 
@@ -234,13 +230,6 @@
    {:description "Upserts a user-role mapping"
     :operationId "putUserRoleMapping"
     :tags ["Roles"]
-    :parameters
-    [{:name "id" :in "path" :required true
-      :description "Role id"
-      :schema {:type "string"}}
-     {:name "user" :in "path" :required true
-      :description "Username"
-      :schema {:type "string"}}]
     :requestBody
     {:required true
      :content
