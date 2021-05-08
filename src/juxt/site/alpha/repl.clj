@@ -12,6 +12,7 @@
    [juxt.pass.alpha.authentication :as authn]
    [juxt.site.alpha.main :refer [system config]]
    [juxt.site.alpha.handler :as handler]
+   [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.init :as init])
   (:import (java.util Date)))
 
@@ -136,9 +137,12 @@
      (uuid? s) s)))
 
 (defn req [s]
-  (some
-   #(when (re-seq (re-pattern s) (::site/request-id %)) %)
-   (seq handler/requests-cache)))
+  (cache/find
+   handler/requests-cache
+   (re-pattern (str "/_site/requests/" s))))
+
+(defn cache []
+  handler/requests-cache)
 
 (defn gc
   "Remove request data that is older than an hour."

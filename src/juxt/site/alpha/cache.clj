@@ -6,7 +6,8 @@
 
 (defprotocol ICache
   (put! [_ k obj] "Put object into the cache")
-  (find [_ pred] "Find object with k matching pred"))
+  (find [_ pat] "Find object with k matching regex in pat")
+  (size [_] "Count records in cache"))
 
 ;; This cache is designed for storing recent requests for debugging purposes
 ;; purposes.
@@ -38,16 +39,18 @@
          (cond-> (conj v [k (SoftReference. obj)])
            (>= prior-size capacity)
            (subvec (inc (- prior-size capacity))))))))
-  (find [_ f]
-    (let [results
+  (find [_ s]
+    (let [pat (re-pattern s)
+          results
           (keep
-           (fn [_ [k2 sr]]
-             (when (f k2) (.get sr)))
+           (fn [[k sr]]
+             (when (re-seq pat k) (.get sr)))
            @a)]
       (case (count results)
         0 nil
         1 (first results)
-        (throw (ex-info (format "%d results" (count results)) {}))))))
+        (throw (ex-info (format "%d results" (count results)) {})))))
+  (size [_] (count @a)))
 
 (defn new-fifo-soft-atom-cache [capacity]
   (->FifoSoftAtomCache (atom []) capacity))
