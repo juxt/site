@@ -114,6 +114,15 @@
         (map first)
         (sort-by str))))
 
+(defn ls-type
+  [t]
+  (->> (q '{:find [e]
+            :where [[e :crux.db/id]
+                    [e ::site/type t]]
+            :in [t]} t)
+       (map first)
+       (sort)))
+
 (defn cat-type
   [t]
   (->> (q '{:find [(pull e [*])]
