@@ -41,18 +41,20 @@
 
         evaluated-rules
         (try
-          (keep
-           (fn [rule-id]
-             (let [rule (x/entity db rule-id)]
-               ;; Arguably ::pass/target, ::pass/effect and ::pass/matched? should
-               ;; be re-namespaced.
-               (when-let [target (::pass/target rule)]
-                 (let [q {:find ['success]
-                          :where (into '[[(identity true) success]] target)
-                          :in (vec (keys temp-id-map))}
-                       match-results (apply x/q db q (map :crux.db/id (vals temp-id-map)))]
-                   (assoc rule ::pass/matched? (pos? (count match-results)))))))
-           rules)
+          (doall
+           (->> rules
+                (pmap
+                 (fn [rule-id]
+                   (let [rule (x/entity db rule-id)]
+                     ;; Arguably ::pass/target, ::pass/effect and ::pass/matched? should
+                     ;; be re-namespaced.
+                     (when-let [target (::pass/target rule)]
+                       (let [q {:find ['success]
+                                :where (into '[[(identity true) success]] target)
+                                :in (vec (keys temp-id-map))}
+                             match-results (apply x/q db q (map :crux.db/id (vals temp-id-map)))]
+                         (assoc rule ::pass/matched? (pos? (count match-results))))))))
+                (remove nil?)))
           (catch Exception e
             (log/error e "Failed to evaluate rules")
             ;; Return empty vector of rules to recover
