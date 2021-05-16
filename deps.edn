@@ -69,5 +69,9 @@
    {lambdaisland/kaocha {:mvn/version "1.0.829"}
     lambdaisland/kaocha-junit-xml {:mvn/version "0.0.76"}}}
 
+  :profile
+  {:extra-deps {com.clojure-goes-fast/clj-async-profiler {:mvn/version "0.5.0"}}
+   :jvm-opts ["-Djdk.attach.allowAttachSelf"]}
+
   :prod
   {:extra-paths ["prod"]}}}
