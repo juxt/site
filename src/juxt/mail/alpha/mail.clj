@@ -4,7 +4,7 @@
   (:require
    [amazonica.aws.simpleemail :as ses]
    [amazonica.aws.sns :as sns]
-   ;;   [amazonica.aws.pinpoint :as pp]
+   [integrant.core :as ig]
    [juxt.site.alpha.triggers :as triggers]
    [crux.api :as x]
    [clojure.tools.logging :as log]
@@ -16,22 +16,37 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'mail (create-ns 'juxt.mail.alpha))
 
-(defn send-sms! [from-sms-name to-phone-number subject text-body]
-  (sns/publish :message (str subject "\n--\n" text-body)
-               :phone-number to-phone-number
-               :message-attributes {"AWS.SNS.SMS.SenderID" (or from-sms-name "TESTSMS")
-                                    "AWS.SNS.SMS.SMSType" "Transactional"}))
+(defmethod ig/init-key ::sns-client [_ {:keys [enabled?]}]
+  (if enabled?
+    sns/publish
+    (partial prn 'sns-client)))
 
-(defn send-mail! [from to subject html-body text-body]
+(defmethod ig/init-key ::ses-client [_ {:keys [enabled?]}]
+  (if enabled?
+    ses/send-email
+    (partial prn 'ses-client)))
+
+(defn send-sms! [sns-client from-sms-name to-phone-number subject text-body]
+
+  (log/debugf "Sending sms to %s with subject %s, body %s" to-phone-number subject text-body)
+
+  (future
+    (sns-client :message (str subject "\n--\n" text-body)
+                :phone-number to-phone-number
+                :message-attributes {"AWS.SNS.SMS.SenderID" (or from-sms-name "TESTSMS")
+                                     "AWS.SNS.SMS.SMSType" "Transactional"})))
+
+(defn send-mail! [ses-client from to subject html-body text-body]
 
   (log/debugf "Sending email to %s with subject %s, body %s" to subject html-body)
 
-  (ses/send-email
-   :destination {:to-addresses [to]}
-   :source from
-   :message {:subject subject
-             :body {:html html-body
-                    :text text-body}}))
+  (future
+    (ses-client
+     :destination {:to-addresses [to]}
+     :source from
+     :message {:subject subject
+               :body {:html html-body
+                      :text text-body}})))
 
 (defn mail-merge [template data]
   (str/replace
@@ -46,21 +61,29 @@
       "<blank>"))))
 
 (defmethod triggers/run-action! ::mail/send-emails
-  [{::site/keys [db]} {:keys [trigger action-data]}]
-  (let [{::mail/keys [html-template text-template from from-sms-name subject]} trigger
+  [{::site/keys [db ses-client]} {:keys [trigger action-data]}]
+  (let [{::mail/keys [html-template text-template from subject]} trigger
         html-template (some-> (x/entity db html-template) ::http/content)
         text-template (some-> (x/entity db text-template) ::http/content)]
     (assert html-template)
     (assert text-template)
     (doseq [{:keys [user] :as data} action-data]
-      (when-let [phone-number (:phone-number user)]
-        (send-sms!
-         from-sms-name phone-number
-         (mail-merge subject data)
-         (mail-merge text-template data)))
-
       (send-mail!
+       ses-client
        from (:email user)
        (mail-merge subject data)
        (mail-merge html-template data)
        (mail-merge text-template data)))))
+
+(defmethod triggers/run-action! ::mail/send-sms
+  [{::site/keys [db sns-client]} {:keys [trigger action-data]}]
+  (let [{::mail/keys [text-template from-sms-name subject]} trigger
+        text-template (some-> (x/entity db text-template) ::http/content)]
+    (assert text-template)
+    (doseq [{:keys [user] :as data} action-data]
+      (when-let [phone-number (:phone-number user)]
+        (send-sms!
+         sns-client
+         from-sms-name phone-number
+         (mail-merge subject data)
+         (mail-merge text-template data))))))
