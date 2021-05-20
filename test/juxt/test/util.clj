@@ -44,9 +44,21 @@
                         ::site/uri-prefix "https://example.org"})]
     (f)))
 
+(defn with-timing [f]
+  (let [t0 (System/nanoTime)
+        result (f)
+        t1 (System/nanoTime)]
+    {:result result
+     :duration-µs (/ (- t1 t0) 1000.0)}))
+
 (defn with-db [f]
   (binding [*db* (x/db *crux-node*)]
     (f)))
+
+(defn with-open-db [f]
+  (with-open [db (x/open-db *crux-node*)]
+    (binding [*db* db]
+      (f))))
 
 (def access-all-areas
   {:crux.db/id "https://example.org/access-rule"
