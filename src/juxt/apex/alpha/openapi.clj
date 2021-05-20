@@ -326,7 +326,7 @@
              ;; just for testing.
              ::site/access-control-allow-origins
              {"http://localhost:8000"
-              {::site/access-control-allow-methods #{:get}
+              {::site/access-control-allow-methods #{:get :put :post :delete}
                ::site/access-control-allow-headers #{"authorization"}
                ::site/access-control-allow-credentials true}}
 
