@@ -42,7 +42,7 @@
                   ;; Rule combination algorithm is every?
                   (every? #(= (::pass/effect %) ::pass/allow) matched-rules))
 
-        _ (if (and (pos? (count matched-rules)) (every? #(= (::pass/effect %) ::pass/allow) matched-rules))
+        _ (if allowed?
             (log/debugf "Allowed due to rule matches (%d): %s" (count matched-rules) (pr-str matched-rules))
             (log/debugf "Disallowed, matched rule count is %d" (count matched-rules)))
 
