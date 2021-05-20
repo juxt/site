@@ -101,7 +101,8 @@
                                (when-let [dir (System/getenv "SITE_PASS_DIR")]
                                  (cond-> dir
                                    (not (.endsWith dir "/")) (str "/")))
-                               (:juxt.site.alpha.unix-pass/password-prefix config))}}
+                               (:juxt.site.alpha.unix-pass/password-prefix config))
+              username (System/getProperty "user.name")}}
         (:options opts)]
 
     (when password-prefix
