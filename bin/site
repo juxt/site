@@ -741,6 +741,7 @@
         {:keys [base-uri file]
          :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+    (when-not (.exists (io/file file)) (error-and-exit! 1 (str "File not found: " file)))
 
     (let [{:keys [status headers body]}
           (curl/post
