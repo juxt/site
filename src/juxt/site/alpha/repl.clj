@@ -292,3 +292,18 @@
       ::pass/user user
       ::pass/password-hash (password/encrypt password)
       ::pass/classification "RESTRICTED"})))
+
+(defn user [username]
+  (e (format "http://localhost:2021/_site/users/%s" username)))
+
+(defn user-apps [username]
+  (q '{:find [(pull application [*])]
+       :keys [app]
+       :where [[grant :juxt.site.alpha/type "Grant"]
+               [subject :juxt.pass.alpha/user user]
+               [user :juxt.pass.alpha/username username]
+               [grant :juxt.pass.alpha/user user]
+               [grant :juxt.pass.alpha/permission permission]
+               [permission :juxt.site.alpha/application application]]
+       :in [username]}
+     username))
