@@ -3,4 +3,17 @@
 (ns juxt.site.alpha.crux)
 
 (defn inline-clj-pred [f & args]
-  (eval (list apply f args)))
+  (apply (eval f) (vec args)))
+
+#_(inline-clj-pred
+ (fn [coll]
+    (map (fn [x] (dissoc x :user)) coll))
+ #{{:user "ken" :color "red"}})
+
+#_(eval
+ (list apply
+       '(fn [coll]
+          (map (fn [x] (dissoc x :user)) coll))
+
+       [#{
+          {:user "ken" :color "red"}}]))
