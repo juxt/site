@@ -66,7 +66,7 @@
         resource-state
         (or
          (when query
-           (cond->> (x/q db query subject)
+           (cond->> (x/q db query)
              extract-first-projection? (map first)
              extract-entry (map #(get % extract-entry))
              singular-result? first))
