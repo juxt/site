@@ -219,7 +219,7 @@
       {:complete? (pos? (count (superusers opts)))
        :happy-message "At least one superuser exists."
        :sad-message "No superusers exist."
-       :fix "Enter (put-superuser! <username> <password> <fullname>) to fix this."}])))
+       :fix "Enter (put-superuser! <username> <password> <fullname> <email>) to fix this."}])))
 
 (defn status
   ([] (status (steps (config))))
@@ -266,10 +266,10 @@
     (init/put-superuser-role! crux-node config)
     (status (steps config))))
 
-(defn put-superuser! [username password fullname]
+(defn put-superuser! [username password fullname email]
   (let [config (config)
         crux-node (crux-node)]
-    (init/put-superuser! crux-node username password fullname config)
+    (init/put-superuser! crux-node username password fullname email config)
     (status (steps config))))
 
 (defn allow-public-access-to-public-resources! []
