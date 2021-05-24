@@ -65,7 +65,6 @@
 
      {:crux.db/id (str user "/password")
       ::site/type "Password"
-      ::http/methods #{:post}
       ::pass/user user
       ::pass/password-hash (password/encrypt password)
       ::pass/classification "RESTRICTED"}
