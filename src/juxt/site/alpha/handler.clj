@@ -1286,6 +1286,10 @@
    wrap-log-request
    wrap-store-request
 
+   ;; Security
+   wrap-cors-headers
+   wrap-security-headers
+
    ;; Error handling
    wrap-error-handling
 
@@ -1309,10 +1313,6 @@
 
    ;; Custom middleware for Site
    wrap-triggers
-
-   ;; Security
-   wrap-cors-headers
-   wrap-security-headers
 
    ;; Create initial response
    wrap-initialize-response
