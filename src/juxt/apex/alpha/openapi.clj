@@ -327,7 +327,7 @@
              ::site/access-control-allow-origins
              {"http://localhost:8000"
               {::site/access-control-allow-methods #{:get :put :post :delete}
-               ::site/access-control-allow-headers #{"authorization"}
+               ::site/access-control-allow-headers #{"authorization" "content-type"}
                ::site/access-control-allow-credentials true}}
 
              ;; TODO: Merge in any properties of a resource that is in
