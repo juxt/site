@@ -1042,13 +1042,22 @@
           (let [error-resource (error-resource req (or status 500))
                 _ (log/tracef "error-resource: %s" (pr-str error-resource))
 
+                ;; Allow errors to be transmitted to developers
+                error-resource
+                (assoc error-resource
+                       ::site/access-control-allow-origins
+                       {"http://localhost:8000"
+                        {::site/access-control-allow-methods #{:get :put :post :delete}
+                         ::site/access-control-allow-headers #{"authorization" "content-type"}
+                         ::site/access-control-allow-credentials true}})
+
                 error-resource
                 (-> error-resource
                     #_(update ::site/template-model assoc
-                            "_site" {"status" {"code" status
-                                               "message" (status-message status)}
-                                     "error" {"message" (.getMessage e)}
-                                     "uri" (::site/uri req)}))
+                              "_site" {"status" {"code" status
+                                                 "message" (status-message status)}
+                                       "error" {"message" (.getMessage e)}
+                                       "uri" (::site/uri req)}))
 
                 error-representations
                 (when error-resource
