@@ -806,6 +806,36 @@
           (error! "Server response: " status " " (str/trim body))
           (message! "Request id: " (get headers "site-request-id")))))))
 
+(defn put-json
+  "PUT JSON to a resource"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [base-uri file url]
+         :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+    (when-not file (error-and-exit! 1 "File required"))
+    (when-not (.exists (io/file file)) (error-and-exit! 1 (str "File not found: " file)))
+    (when-not url (error-and-exit! 1 "URL is required"))
+
+    (let [url (str/replace url "{{base-uri}}" base-uri)
+          {:keys [status headers body]}
+          (curl/put
+           url
+           {:headers (cond-> {"authorization" (format "Bearer %s" access-token)
+                              "content-type" "application/json"})
+            :body (cond-> (slurp (io/file file))
+                    :always (str/replace "{{base-uri}}" base-uri)
+                    (.endsWith file ".edn") (edn-to-json))
+            :throw false})]
+      (case status
+        (201 204)
+        (message! (format "Resource %s: %s"
+                          (case status 201 "created" 204 "updated")
+                          (get headers "location")))
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
 (defn debugf
   "Write a debug message to the console, but only if *debug* is true."
   [& args]
@@ -933,7 +963,13 @@
     {:description (:doc (meta #'post-json))
      :cli-options [["-f" "--file FILE" "File containing data"]
                    ["-u" "--url URL" "URL to POST to"]]
-     :delegate post-json}]])
+     :delegate post-json}]
+
+   ["put-json"
+    {:description (:doc (meta #'put-json))
+     :cli-options [["-f" "--file FILE" "File containing data"]
+                   ["-u" "--url URL" "URL to POST to"]]
+     :delegate put-json}]])
 
 (let [{:keys [options arguments summary errors]}
       (parse-opts (next *command-line-args*)  cli-options :in-order true)
