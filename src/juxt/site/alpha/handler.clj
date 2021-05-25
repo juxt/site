@@ -2,6 +2,7 @@
 
 (ns juxt.site.alpha.handler
   (:require
+   [clojure.instant :refer [read-instant-date]]
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
@@ -668,7 +669,7 @@
   (password/encrypt instance 11))
 
 (defmethod transform-value "inst" [_ instance]
-  (java.util.Date/from (java.time.Instant/parse instance)))
+  (read-instant-date instance))
 
 (defn wrap-method-not-implemented? [h]
   (fn [{:ring.request/keys [method] :as req}]
