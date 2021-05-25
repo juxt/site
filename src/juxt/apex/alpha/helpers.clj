@@ -20,7 +20,9 @@
         ;; determining the identifier for the new resource needs to be more
         ;; configurable!
 
-        id (str uri "/" (java.util.UUID/randomUUID))]
+        id (cond-> uri
+             (not (.endsWith uri "/")) (str "/")
+             true (str (java.util.UUID/randomUUID)))]
 
     (openapi/put-resource-state
      req (assoc resource-state :crux.db/id id))))
