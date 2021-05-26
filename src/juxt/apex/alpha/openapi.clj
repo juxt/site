@@ -426,16 +426,16 @@
        ;; right.
 
        (if (= (count matches) 1)        ; this is the most common case
-         (let [openapi-resource (first matches)]
-           (let [resource (merge openapi-resource (x/entity db uri))]
-             (if (every? ::jinx/valid? (vals (::apex/openapi-path-params openapi-resource)))
-               resource
-               (throw
-                (ex-info
-                 "One or more of the path-parameters in the request did not validate against the required schema"
-                 (into req {::site/resource resource
-                            :ring.response/status 400
-                            :ring.response/body "Bad Request\r\n"}))))))
+         (let [openapi-resource (first matches)
+               resource (merge openapi-resource (x/entity db uri))]
+           (if (every? ::jinx/valid? (vals (::apex/openapi-path-params openapi-resource)))
+             resource
+             (throw
+              (ex-info
+               "One or more of the path-parameters in the request did not validate against the required schema"
+               (into req {::site/resource resource
+                          :ring.response/status 400
+                          :ring.response/body "Bad Request\r\n"})))))
 
          ;; Select one of the matches, and throw an error if this proves
          ;; impossible.
