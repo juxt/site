@@ -454,12 +454,13 @@
       ::http/redirect (cond-> loc (.startsWith loc base-uri)
                               (subs (count base-uri)))})
 
-   ;; Is it a request?
+   ;; Is it a cached request to debug?
    (when-let [request-to-show (get requests-cache uri)]
      (log/tracef "Found request object in cache")
      {::site/uri uri
       ::site/resource-provider ::requests-cache
       ::http/methods #{:get :head :options}
+      ::site/template-model request-to-show
       ::http/representations
       (remove nil? [(debug/json-representation-of-request req request-to-show)
                     (debug/html-representation-of-request req request-to-show)])})
