@@ -75,12 +75,11 @@
          ;; filter out the http metadata?
          (x/entity db uri)
 
-         ;; No body
+         ;; No resource-state, so there can be no representations, so 404.
          (throw
           (ex-info
-           (str "No strategy to produce body from OpenAPI path: " (::apex/openapi-path req))
-           (into req {:ring.response/status 204
-                      :ring.response/body "No Content\r\n"}))))]
+           (str "No resource state from OpenAPI path: " (::apex/openapi-path req))
+           (into req {:ring.response/status 404}))))]
 
     (case (::http/content-type selected-representation)
       "application/json"
