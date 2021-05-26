@@ -40,7 +40,7 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'rfc7230 (create-ns 'juxt.reap.alpha.rfc7230))
 
-(def requests-cache
+(defonce requests-cache
   (cache/new-fifo-soft-atom-cache 1000))
 
 (defn join-keywords
