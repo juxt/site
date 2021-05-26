@@ -19,20 +19,26 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn ->inject-params-into-query [input params]
+(defn ->inject-params-into-query [input params req]
 
   ;; Replace input with values from params
   (postwalk
    (fn [x]
-     (if (and (map? x)
-              (contains? x :name)
-              (#{"query" "path"} (:in x "query")))
+     (cond
+       (and (map? x)
+            (contains? x :name)
+            (#{"query" "path"} (:in x "query")))
        (let [kw (keyword (:in x "query"))]
          (or
           (get-in params [kw (:name x) :value])
           (:default x)
           (get-in params [kw (:name x) :param "default"])))
-       x))
+
+       (and (map? x)
+            (contains? x :juxt.site.alpha/ref))
+       (get-in req (get x :juxt.site.alpha/ref))
+
+       :else x))
    input))
 
 ;; By default we output the resource state, but there may be a better rendering
@@ -55,7 +61,7 @@
         (some->
          (get-in resource [::apex/operation "responses" "200" "juxt.site.alpha/query"])
          (edn/read-string)
-         (->inject-params-into-query {:path (::apex/openapi-path-params resource)})
+         (->inject-params-into-query {:path (::apex/openapi-path-params resource)} req)
          (pdp/->authorized-query authorization))
 
         {singular-result? "juxt.site.alpha/singular-result?"
