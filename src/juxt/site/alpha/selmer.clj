@@ -19,8 +19,7 @@
 (defmethod templating/render-template
   :selmer
   [{::site/keys [db resource selected-representation] :as req} template]
-  (let [{::site/keys [] id :crux.db/id} selected-representation
-        _ (assert id "Resource must have an id to be used as a template")
+  (let [{::site/keys []} selected-representation
         ush (proxy [java.net.URLStreamHandler] []
               (openConnection [url]
                 (log/tracef "Open connection: url=%s" url)
