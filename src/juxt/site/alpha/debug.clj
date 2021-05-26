@@ -17,8 +17,13 @@
   {::http/content-type "application/json"
    ::http/etag "\"v1\""
    ::http/last-modified (:juxt.site.alpha/start-date request-to-show)
-   ::site/body-fn (fn [req]
-                    (.getBytes (str (json/write-value-as-string request-to-show) "\r\n")))
+   ::site/body-fn
+   (fn [req]
+     (-> (sorted-map)
+         (into request-to-show)
+         json/write-value-as-string
+         (str "\r\n")
+         (.getBytes)))
    ;; TODO: use Cache-Control: immutable - see
    ;; https://www.keycdn.com/blog/cache-control-immutable and others
    })
