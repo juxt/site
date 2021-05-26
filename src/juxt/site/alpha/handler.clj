@@ -455,13 +455,14 @@
                               (subs (count base-uri)))})
 
    ;; Is it a request?
-   (when-let [req-obj (get requests-cache uri)]
+   (when-let [request-to-show (get requests-cache uri)]
      (log/tracef "Found request object in cache")
      {::site/uri uri
       ::site/resource-provider ::requests-cache
       ::http/methods #{:get :head :options}
       ::http/representations
-      (remove nil? [(debug/json-representation-of-request req-obj)])})
+      (remove nil? [(debug/json-representation-of-request req request-to-show)
+                    (debug/html-representation-of-request req request-to-show)])})
 
    ;; Return a back-stop resource
    {::site/resource-provider ::default-empty-resource
