@@ -455,15 +455,22 @@
                               (subs (count base-uri)))})
 
    ;; Is it a cached request to debug?
-   (when-let [request-to-show (get requests-cache uri)]
-     (log/tracef "Found request object in cache")
-     {::site/uri uri
-      ::site/resource-provider ::requests-cache
-      ::http/methods #{:get :head :options}
-      ::site/template-model request-to-show
-      ::http/representations
-      (remove nil? [(debug/json-representation-of-request req request-to-show)
-                    (debug/html-representation-of-request req request-to-show)])})
+   (let [[_ req-id suffix]
+         (re-matches
+          #"(.*/_site/requests/\p{Alnum}+)(\.[a-z]+)?"
+          uri)]
+
+     (when-let [request-to-show (get requests-cache req-id)]
+       (log/tracef "Found request object in cache")
+       {::site/uri uri
+        ::site/resource-provider ::requests-cache
+        ::http/methods #{:get :head :options}
+        ::site/template-model request-to-show
+        ::http/representations
+        (remove nil? [(when (or (nil? suffix) (= suffix ".json"))
+                        (debug/json-representation-of-request req request-to-show))
+                      (when (or (nil? suffix) (= suffix ".html"))
+                        (debug/html-representation-of-request req request-to-show))])}))
 
    ;; Return a back-stop resource
    {::site/resource-provider ::default-empty-resource
