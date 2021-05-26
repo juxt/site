@@ -24,6 +24,7 @@
    [juxt.reap.alpha.rfc7232 :as rfc7232]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.cache :as cache]
+   [juxt.site.alpha.debug :as debug]
    [juxt.site.alpha.locator :as locator]
    [juxt.site.alpha.util :as util]
    [juxt.site.alpha.templating :as templating]
@@ -38,6 +39,9 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'rfc7230 (create-ns 'juxt.reap.alpha.rfc7230))
+
+(def requests-cache
+  (cache/new-fifo-soft-atom-cache 1000))
 
 (defn join-keywords
   "Join method keywords into a single comma-separated string. Used for the Allow
@@ -449,6 +453,15 @@
       ::site/resource-provider r
       ::http/redirect (cond-> loc (.startsWith loc base-uri)
                               (subs (count base-uri)))})
+
+   ;; Is it a request?
+   (when-let [req-obj (get requests-cache uri)]
+     (log/tracef "Found request object in cache")
+     {::site/uri uri
+      ::site/resource-provider ::requests-cache
+      ::http/methods #{:get :head :options}
+      ::http/representations
+      (remove nil? [(debug/json-representation-of-request req-obj)])})
 
    ;; Return a back-stop resource
    {::site/resource-provider ::default-empty-resource
@@ -931,8 +944,10 @@
         (update :ring.response/headers
                 assoc "site-request-id"
                 (cond-> request-id
-                  (.startsWith request-id base-uri)
-                  (subs (count base-uri))))
+                  ;; Not sure I like this shortening, it's inconvenient to have
+                  ;; to prepend the base-uri each time
+                  #_(.startsWith request-id base-uri)
+                  #_(subs (count base-uri))))
 
         selected-representation
         (update :ring.response/headers
@@ -1227,9 +1242,6 @@
           (set/rename-keys {:ring.response/status :status
                             :ring.response/headers :headers
                             :ring.response/body :body})))))
-
-(def requests-cache
-  (cache/new-fifo-soft-atom-cache 1000))
 
 (defn wrap-store-request [h]
   (fn [req]
