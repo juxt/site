@@ -915,8 +915,8 @@
       (util/deep-replace
        (fn [form]
          (cond-> form
-           (and (string? form) (>= (count form) 64))
-           (subs 0 64)
+           (and (string? form) (>= (count form) 1024))
+           (subs 0 1024)
 
            (and (vector? form) (>= (count form) 64))
            (subvec 0 64)
