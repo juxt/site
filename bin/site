@@ -815,9 +815,17 @@
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not file (error-and-exit! 1 "File required"))
     (when-not (.exists (io/file file)) (error-and-exit! 1 (str "File not found: " file)))
-    (when-not url (error-and-exit! 1 "URL is required"))
 
-    (let [url (str/replace url "{{base-uri}}" base-uri)
+    (let [embedded-url (when (.endsWith file ".edn")
+                         (:crux.db/id (edn/read-string (slurp file))))
+
+          _ (when (and embedded-url url) (error-and-exit! 1 "Should not specify URL both in the document and as an option"))
+
+          url (or embedded-url url)
+
+          _ (when-not url (error-and-exit! 1 "Failed to specify identity (URI), either in the document (crux.db/id) or as an option"))
+
+          url (str/replace url "{{base-uri}}" base-uri)
           {:keys [status headers body]}
           (curl/put
            url
