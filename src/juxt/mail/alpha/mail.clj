@@ -19,12 +19,14 @@
 (defmethod ig/init-key ::sns-client [_ {:keys [enabled?]}]
   (if enabled?
     sns/publish
-    (partial prn 'sns-client)))
+    (fn [& args]
+      (log/infof "sns-client stub: %s"args))))
 
 (defmethod ig/init-key ::ses-client [_ {:keys [enabled?]}]
   (if enabled?
     ses/send-email
-    (partial prn 'ses-client)))
+    (fn [& args]
+      (log/infof "ses-client stub: %s" args))))
 
 (defn send-sms! [sns-client from-sms-name to-phone-number subject text-body]
 
