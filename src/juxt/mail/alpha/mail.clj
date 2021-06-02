@@ -33,22 +33,28 @@
   (log/debugf "Sending sms to %s with subject %s, body %s" to-phone-number subject text-body)
 
   (future
-    (sns-client :message (str subject "\n--\n" text-body)
-                :phone-number to-phone-number
-                :message-attributes {"AWS.SNS.SMS.SenderID" (or from-sms-name "TESTSMS")
-                                     "AWS.SNS.SMS.SMSType" "Transactional"})))
+    (try
+      (sns-client :message (str subject "\n--\n" text-body)
+                  :phone-number to-phone-number
+                  :message-attributes {"AWS.SNS.SMS.SenderID" (or from-sms-name "TESTSMS")
+                                       "AWS.SNS.SMS.SMSType" "Transactional"})
+      (catch Exception e
+        (log/error e)))))
 
 (defn send-mail! [ses-client from to subject html-body text-body]
 
   (log/debugf "Sending email to %s with subject %s, body %s" to subject html-body)
 
   (future
-    (ses-client
-     :destination {:to-addresses [to]}
-     :source from
-     :message {:subject subject
-               :body {:html html-body
-                      :text text-body}})))
+    (try
+      (ses-client
+       :destination {:to-addresses [to]}
+       :source from
+       :message {:subject subject
+                 :body {:html html-body
+                        :text text-body}})
+      (catch Exception e
+        (log/error e)))))
 
 (defn mail-merge [template data]
   (str/replace
