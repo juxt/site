@@ -4,13 +4,15 @@
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
-   [crux.api :as x]
    [clojure.walk :refer [postwalk]]
+   [crux.api :as x]
+   [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
    [io.aviso.ansi :as ansi]
    [juxt.pass.alpha.authentication :as authn]
    [juxt.site.alpha.main :refer [system config]]
    [juxt.site.alpha.handler :as handler]
+   [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.init :as init])
   (:import (java.util Date)))
 
@@ -112,6 +114,15 @@
         (map first)
         (sort-by str))))
 
+(defn ls-type
+  [t]
+  (->> (q '{:find [e]
+            :where [[e :crux.db/id]
+                    [e ::site/type t]]
+            :in [t]} t)
+       (map first)
+       (sort)))
+
 (defn cat-type
   [t]
   (->> (q '{:find [(pull e [*])]
@@ -135,9 +146,12 @@
      (uuid? s) s)))
 
 (defn req [s]
-  (some
-   #(when (re-seq (re-pattern s) (::site/request-id %)) %)
-   (seq handler/requests-cache)))
+  (cache/find
+   handler/requests-cache
+   (re-pattern (str "/_site/requests/" s))))
+
+(defn cache []
+  handler/requests-cache)
 
 (defn gc
   "Remove request data that is older than an hour."
@@ -205,7 +219,7 @@
       {:complete? (pos? (count (superusers opts)))
        :happy-message "At least one superuser exists."
        :sad-message "No superusers exist."
-       :fix "Enter (put-superuser! <username> <password> <fullname>) to fix this."}])))
+       :fix "Enter (put-superuser! <username> <password> <fullname> <email>) to fix this."}])))
 
 (defn status
   ([] (status (steps (config))))
@@ -252,10 +266,10 @@
     (init/put-superuser-role! crux-node config)
     (status (steps config))))
 
-(defn put-superuser! [username password fullname]
+(defn put-superuser! [username password fullname email]
   (let [config (config)
         crux-node (crux-node)]
-    (init/put-superuser! crux-node username password fullname config)
+    (init/put-superuser! crux-node username password fullname email config)
     (status (steps config))))
 
 (defn allow-public-access-to-public-resources! []
@@ -268,3 +282,28 @@
         crux-node (crux-node)]
     (init/put-site-txfns! crux-node config)
     (status)))
+
+(defn reset-password! [username password]
+  (let [user (str (::site/base-uri (config))  "/_site/users/" username)]
+    (put!
+     {:crux.db/id (str user "/password")
+      ::site/type "Password"
+      ::http/methods #{:post}
+      ::pass/user user
+      ::pass/password-hash (password/encrypt password)
+      ::pass/classification "RESTRICTED"})))
+
+(defn user [username]
+  (e (format "http://localhost:2021/_site/users/%s" username)))
+
+(defn user-apps [username]
+  (q '{:find [(pull application [*])]
+       :keys [app]
+       :where [[grant :juxt.site.alpha/type "Grant"]
+               [subject :juxt.pass.alpha/user user]
+               [user :juxt.pass.alpha/username username]
+               [grant :juxt.pass.alpha/user user]
+               [grant :juxt.pass.alpha/permission permission]
+               [permission :juxt.site.alpha/application application]]
+       :in [username]}
+     username))

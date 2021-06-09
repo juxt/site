@@ -7,12 +7,11 @@
    [crux.api :as x]
    [jsonista.core :as json]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
-   [juxt.site.alpha.handler :as h]
    [juxt.mail.alpha.mail :as mailer]
-   [clojure.edn :as edn]
-   [clojure.java.io :as io])
+   [juxt.test.util :refer [with-crux with-handler submit-and-await!
+                           *crux-node* *handler*
+                           access-all-areas access-all-apis]])
   (:import
-   (crux.api ICruxAPI)
    (java.io ByteArrayInputStream)))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -21,56 +20,7 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(def ^:dynamic *opts* {})
-(def ^:dynamic ^ICruxAPI *crux-node*)
-(def ^:dynamic *handler*)
-(def ^:dynamic *db*)
-
-(defn with-crux [f]
-  (with-open [node (x/start-node *opts*)]
-    (binding [*crux-node* node]
-      (f))))
-
-(defn submit-and-await! [transactions]
-  (->>
-   (x/submit-tx *crux-node* transactions)
-   (x/await-tx *crux-node*)))
-
-
-(defn make-handler [opts]
-  ((apply comp
-          (remove
-           #{h/wrap-healthcheck
-             h/wrap-ring-1-adapter}
-           (h/make-pipeline opts)))
-   identity))
-
-(defn with-handler [f]
-  (binding [*handler* (make-handler
-                       {::site/crux-node *crux-node*
-                        ::site/base-uri "https://example.org"
-                        ::site/uri-prefix "https://example.org"})]
-    (f)))
-
-(defn with-db [f]
-  (binding [*db* (x/db *crux-node*)]
-    (f)))
-
 (t/use-fixtures :each with-crux with-handler)
-
-(def access-all-areas
-  {:crux.db/id "https://example.org/access-rule"
-   ::site/description "A rule allowing access everything"
-   ::site/type "Rule"
-   ::pass/target '[]
-   ::pass/effect ::pass/allow})
-
-(def access-all-apis
-  {:crux.db/id "https://example.org/access-rule"
-   ::site/description "A rule allowing access to all APIs"
-   ::site/type "Rule"
-   ::pass/target '[[resource ::site/resource-provider ::apex/openapi-path]]
-   ::pass/effect ::pass/allow})
 
 (deftest put-test
   (submit-and-await!
@@ -223,12 +173,12 @@
     [:crux.tx/put {:crux.db/id "https://example.org/users/sue"
                    ::site/type "User"
                    ::site/description "Sue should receive an email on every alert"
-                   ::email "sue@example.org"
+                   :email "sue@example.org"
                    ::email? true}]
     [:crux.tx/put {:crux.db/id "https://example.org/users/brian"
                    ::site/type "User"
                    ::site/description "Brian doesn't want emails"
-                   ::email "brian@example.org"
+                   :email "brian@example.org"
                    ::email? false}]
     [:crux.tx/put {:crux.db/id "https://example.org/roles/service-manager"
                    ::site/type "Role"
@@ -269,19 +219,14 @@
      {:crux.db/id "https://example.org/triggers/alert-notification"
       ::site/type "Trigger"
       ::site/query
-      '{:find [email alert asset-type customer]
-        :keys [juxt.mail.alpha/to href asset-type customer]
+      '{:find [(pull user [:email]) alert asset-type customer]
+        :keys [user href asset-type customer]
         :where [[request :ring.request/method :put]
                 [request ::site/uri alert]
                 [alert ::site/type "Alert"]
                 [alert :asset-type asset-type]
                 [alert :customer customer]
-
-                ;; All service managers
-                ;; TODO: Limit to alerts that are 'owned' by the same
-                ;; dealer as the service manager
                 [user ::site/type "User"]
-                [user ::email email]
                 [mapping ::role "https://example.org/roles/service-manager"]
                 [mapping ::user user]]}
 
@@ -459,7 +404,8 @@
     (is (= 200 (:ring.response/status response)))
     (is (= "Latest sales figures" (:ring.response/body response))))
 
-  (let [response
+  ;; TODO: Enable test when 406 is re-instated
+  #_(let [response
         (*handler*
          {:ring.request/method :get
           :ring.request/path "/report"
@@ -512,7 +458,8 @@
     (is (= 200 (:ring.response/status response)))
     (is (= "Latest sales figures" (:ring.response/body response))))
 
-  (let [response
+  ;; TODO: Enable test when 406 is re-instated
+  #_(let [response
         (*handler*
          {:ring.request/method :get
           :ring.request/path "/report"

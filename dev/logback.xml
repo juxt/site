@@ -95,6 +95,9 @@
   <logger name="crux" level="INFO">
     <appender-ref ref="APP_LOG_FILE" />
   </logger>
+  <logger name="crux.query" level="INFO">
+    <appender-ref ref="APP_LOG_FILE" />
+  </logger>
 
   <!-- If you have a REPL or interactive shell with a logger named
        'user' or 'dev', send those messages to log/app.log too. -->

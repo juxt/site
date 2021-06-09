@@ -20,7 +20,7 @@
   (if enabled?
     sns/publish
     (fn [& args]
-      (log/infof "sns-client stub: %s"args))))
+      (log/infof "sns-client stub: %s" args))))
 
 (defmethod ig/init-key ::ses-client [_ {:keys [enabled?]}]
   (if enabled?

@@ -1,0 +1,7 @@
+= Optional additions to Site
+
+== Debug templates
+
+----
+site put-asset --file debug-request.html --type 'text/html;charset=utf-8' --path /_site/templates/debug-request.html
+----

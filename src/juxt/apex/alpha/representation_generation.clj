@@ -9,7 +9,7 @@
    [hiccup.page :as hp]
    [json-html.core :refer [edn->html]]
    [jsonista.core :as json]
-   [juxt.apex.alpha.parameters :refer [extract-params-from-request]]
+   [juxt.apex.alpha.parameters :as parameters]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.site.alpha.util :as util]
    [clojure.edn :as edn]
@@ -20,20 +20,26 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn ->inject-params-into-query [input params]
+(defn ->inject-params-into-query [input params req]
 
   ;; Replace input with values from params
   (postwalk
    (fn [x]
-     (if (and (map? x)
-              (contains? x :name)
-              (#{"query" "path"} (:in x "query")))
+     (cond
+       (and (map? x)
+            (contains? x :name)
+            (#{"query" "path"} (:in x "query")))
        (let [kw (keyword (:in x "query"))]
          (or
           (get-in params [kw (:name x) :value])
           (:default x)
           (get-in params [kw (:name x) :param "default"])))
-       x))
+
+       (and (map? x)
+            (contains? x :juxt.site.alpha/ref))
+       (get-in req (get x :juxt.site.alpha/ref))
+
+       :else x))
    input))
 
 ;; By default we output the resource state, but there may be a better rendering
@@ -52,11 +58,18 @@
                                (assoc :crux.db/id :subject)
                                util/->freezeable)]])
 
+        query-params (when-let [query-param-defs
+                                (not-empty (filter #(= (get % "in") "query") param-defs))]
+                       (parameters/process-query-string
+                        (:ring.request/query req)
+                        query-param-defs))
+
         query
         (some->
          (get-in resource [::apex/operation "responses" "200" "juxt.site.alpha/query"])
          (edn/read-string)
-         (->inject-params-into-query (extract-params-from-request req param-defs))
+         (->inject-params-into-query {:path (::apex/openapi-path-params resource)
+                                      :query query-params} req)
          (pdp/->authorized-query authorization))
 
         {singular-result? "juxt.site.alpha/singular-result?"
@@ -67,7 +80,7 @@
         resource-state
         (or
          (when query
-           (cond->> (x/q db query subject)
+           (cond->> (x/q db query)
              extract-first-projection? (map first)
              extract-entry (map #(get % extract-entry))
              singular-result? first))
@@ -76,12 +89,11 @@
          ;; filter out the http metadata?
          (x/entity db uri)
 
-         ;; No body
+         ;; No resource-state, so there can be no representations, so 404.
          (throw
           (ex-info
-           (str "No strategy to produce body from OpenAPI path: " (::apex/openapi-path req))
-           (into req {:ring.response/status 204
-                      :ring.response/body "No Content\r\n"}))))]
+           (str "No resource state from OpenAPI path: " (::apex/openapi-path req))
+           (into req {:ring.response/status 404}))))]
 
     (case (::http/content-type selected-representation)
       "application/json"

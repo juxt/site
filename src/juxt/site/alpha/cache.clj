@@ -1,12 +1,13 @@
 ;; Copyright © 2021, JUXT LTD.
 
 (ns juxt.site.alpha.cache
+  (:refer-clojure :exclude [find])
   (:import (java.lang.ref SoftReference)))
 
 (defprotocol ICache
   (put! [_ k obj] "Put object into the cache")
-  (find [_ pred] "Find object with k matching pred")
-  )
+  (find [_ pat] "Find object with k matching regex in pat")
+  (size [_] "Count records in cache"))
 
 ;; This cache is designed for storing recent requests for debugging purposes
 ;; purposes.
@@ -38,11 +39,18 @@
          (cond-> (conj v [k (SoftReference. obj)])
            (>= prior-size capacity)
            (subvec (inc (- prior-size capacity))))))))
-  (find [_ f]
-    (reduce
-     (fn [_ [k2 sr]]
-       (when (f k2) (reduced (.get sr))))
-     nil @a)))
+  (find [_ s]
+    (let [pat (re-pattern s)
+          results
+          (keep
+           (fn [[k sr]]
+             (when (re-seq pat k) (.get sr)))
+           @a)]
+      (case (count results)
+        0 nil
+        1 (first results)
+        (throw (ex-info (format "%d results" (count results)) {})))))
+  (size [_] (count @a)))
 
 (defn new-fifo-soft-atom-cache [capacity]
   (->FifoSoftAtomCache (atom []) capacity))

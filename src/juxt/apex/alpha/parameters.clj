@@ -5,7 +5,8 @@
    [clojure.string :as str]
    [juxt.jinx.alpha :as jinx]
    [juxt.jinx.alpha.validate :as jinx.validate]
-   [ring.util.codec :refer [url-decode]]))
+   [ring.util.codec :refer [url-decode]]
+   [clojure.tools.logging :as log]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 
@@ -280,46 +281,3 @@
 
       extract-undeclared-params
       ))))
-
-(defn process-path-parameters
-  ([params paramdefs]
-   (process-path-parameters params paramdefs {}))
-  ([params paramdefs
-    {:keys [coercions]
-     :or {coercions default-coercions}}]
-   (into
-    {}
-    (reduce                             ; reduce over paramdefs
-     (fn [acc {:strs [name required schema] :as paramdef}]
-       (let [[pkey pval] (find params name)]
-         (if pkey
-           (let [validation
-                 (jinx.validate/validate schema pval {:coercions coercions})]
-             (assoc
-              acc
-              name
-              (cond-> {:param paramdef
-                       :validation validation}
-
-                (::jinx/valid? validation)
-                (assoc :value (::jinx/instance validation))
-
-                (not (::jinx/valid? validation))
-                (assoc :apex/error
-                       {:apex.error/message "Path parameter not valid according to schema"}))))
-
-           (assoc acc name (cond-> {:param paramdef}
-                             required (assoc :apex/error {:apex.error/message "Required parameter not found"}))))))
-     {}
-     paramdefs))))
-
-
-(defn extract-params-from-request
-  [req param-defs]
-  (let [query-param-defs (not-empty (filter #(= (get % "in") "query") param-defs))
-        path-param-defs (not-empty (filter #(= (get % "in") "path") param-defs))]
-    (cond-> {}
-      query-param-defs
-      (assoc :query (process-query-string (:ring.request/query req) query-param-defs))
-      path-param-defs
-      (assoc :path (process-path-parameters (:path-params req) path-param-defs)))))

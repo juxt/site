@@ -2,6 +2,7 @@
 
 (ns juxt.site.alpha.handler
   (:require
+   [clojure.instant :refer [read-instant-date]]
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
@@ -23,6 +24,7 @@
    [juxt.reap.alpha.rfc7232 :as rfc7232]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.cache :as cache]
+   [juxt.site.alpha.debug :as debug]
    [juxt.site.alpha.locator :as locator]
    [juxt.site.alpha.util :as util]
    [juxt.site.alpha.templating :as templating]
@@ -37,6 +39,9 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'rfc7230 (create-ns 'juxt.reap.alpha.rfc7230))
+
+(defonce requests-cache
+  (cache/new-fifo-soft-atom-cache 1000))
 
 (defn join-keywords
   "Join method keywords into a single comma-separated string. Used for the Allow
@@ -449,6 +454,24 @@
       ::http/redirect (cond-> loc (.startsWith loc base-uri)
                               (subs (count base-uri)))})
 
+   ;; Is it a cached request to debug?
+   (let [[_ req-id suffix]
+         (re-matches
+          #"(.*/_site/requests/\p{Alnum}+)(\.[a-z]+)?"
+          uri)]
+
+     (when-let [request-to-show (get requests-cache req-id)]
+       (log/tracef "Found request object in cache")
+       {::site/uri uri
+        ::site/resource-provider ::requests-cache
+        ::http/methods #{:get :head :options}
+        ::site/template-model request-to-show
+        ::http/representations
+        (remove nil? [(when (or (nil? suffix) (= suffix ".json"))
+                        (debug/json-representation-of-request req request-to-show))
+                      (when (or (nil? suffix) (= suffix ".html"))
+                        (debug/html-representation-of-request req request-to-show))])}))
+
    ;; Return a back-stop resource
    {::site/resource-provider ::default-empty-resource
     ::http/methods #{:get :head :options :put :post}
@@ -538,14 +561,18 @@
     (into req {:ring.response/status (if existing 204 201)
                :ring.response/headers {"location" location}})))
 
-(defn post-redirect [{::site/keys [crux-node db uri]
-                      ::apex/keys [request-instance]
+(defn post-redirect [{::site/keys [crux-node db]
                       :as req}]
-  (let [{::site/keys [resource]} request-instance
+  (let [resource-state (openapi/received-body->resource-state req)
+        {::site/keys [resource]} resource-state
         existing (x/entity db resource)]
     (->> (x/submit-tx
           crux-node
-          [[:crux.tx/put (merge {:crux.db/id resource} (dissoc request-instance ::site/resource))]])
+          [[:crux.tx/put
+            (merge
+             {:crux.db/id resource}
+             ;; ::site/resource = :crux.db/id, no need to duplicate
+             (dissoc resource-state ::site/resource))]])
          (x/await-tx crux-node))
 
     (into req {:ring.response/status (if existing 204 201)})))
@@ -664,7 +691,7 @@
   (password/encrypt instance 11))
 
 (defmethod transform-value "inst" [_ instance]
-  (java.util.Date/from (java.time.Instant/parse instance)))
+  (read-instant-date instance))
 
 (defn wrap-method-not-implemented? [h]
   (fn [{:ring.request/keys [method] :as req}]
@@ -888,8 +915,8 @@
       (util/deep-replace
        (fn [form]
          (cond-> form
-           (and (string? form) (>= (count form) 64))
-           (subs 0 64)
+           (and (string? form) (>= (count form) 1024))
+           (subs 0 1024)
 
            (and (vector? form) (>= (count form) 64))
            (subvec 0 64)
@@ -926,8 +953,10 @@
         (update :ring.response/headers
                 assoc "site-request-id"
                 (cond-> request-id
-                  (.startsWith request-id base-uri)
-                  (subs (count base-uri))))
+                  ;; Not sure I like this shortening, it's inconvenient to have
+                  ;; to prepend the base-uri each time
+                  #_(.startsWith request-id base-uri)
+                  #_(subs (count base-uri))))
 
         selected-representation
         (update :ring.response/headers
@@ -1038,13 +1067,22 @@
           (let [error-resource (error-resource req (or status 500))
                 _ (log/tracef "error-resource: %s" (pr-str error-resource))
 
+                ;; Allow errors to be transmitted to developers
+                error-resource
+                (assoc error-resource
+                       ::site/access-control-allow-origins
+                       {"http://localhost:8000"
+                        {::site/access-control-allow-methods #{:get :put :post :delete}
+                         ::site/access-control-allow-headers #{"authorization" "content-type"}
+                         ::site/access-control-allow-credentials true}})
+
                 error-resource
                 (-> error-resource
                     #_(update ::site/template-model assoc
-                            "_site" {"status" {"code" status
-                                               "message" (status-message status)}
-                                     "error" {"message" (.getMessage e)}
-                                     "uri" (::site/uri req)}))
+                              "_site" {"status" {"code" status
+                                                 "message" (status-message status)}
+                                       "error" {"message" (.getMessage e)}
+                                       "uri" (::site/uri req)}))
 
                 error-representations
                 (when error-resource
@@ -1214,9 +1252,6 @@
                             :ring.response/headers :headers
                             :ring.response/body :body})))))
 
-(def requests-cache
-  (cache/new-fifo-soft-atom-cache 1000))
-
 (defn wrap-store-request [h]
   (fn [req]
     (let [req (h req)]
@@ -1273,6 +1308,10 @@
    wrap-log-request
    wrap-store-request
 
+   ;; Security
+   wrap-cors-headers
+   wrap-security-headers
+
    ;; Error handling
    wrap-error-handling
 
@@ -1296,10 +1335,6 @@
 
    ;; Custom middleware for Site
    wrap-triggers
-
-   ;; Security
-   wrap-cors-headers
-   wrap-security-headers
 
    ;; Create initial response
    wrap-initialize-response

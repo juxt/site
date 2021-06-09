@@ -54,18 +54,18 @@
 
 (defn put-superuser!
   "Create a superuser."
-  [crux-node username password fullname {::site/keys [base-uri]}]
+  [crux-node username password fullname email {::site/keys [base-uri]}]
   (let [user (str base-uri "/_site/users/" username)]
     (put!
      crux-node
      {:crux.db/id user
       ::site/type "User"
       ::pass/username username
-      :name fullname}
+      :name fullname
+      :email email}
 
      {:crux.db/id (str user "/password")
       ::site/type "Password"
-      ::http/methods #{:post}
       ::pass/user user
       ::pass/password-hash (password/encrypt password)
       ::pass/classification "RESTRICTED"}

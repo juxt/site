@@ -67,11 +67,12 @@
   (let [passfile (io/file
                   (System/getProperty "user.home")
                   (str ".password-store/" unix-pass-password-prefix username ".gpg"))]
-    (when (.exists passfile)
+    (if (.exists passfile)
       (do
         (message! "Extracting password from " (str passfile))
         (let [{:keys [exit out]} (sh/sh "gpg" "-d" (str passfile))]
-          (when (zero? exit) (str/trim out)))))))
+          (when (zero? exit) (str/trim out))))
+      (error-and-exit! 1 (format "Passfile does not exist: %s" passfile)))))
 
 (defn get-password [unix-pass-password-prefix username]
   (or
@@ -96,8 +97,16 @@
   [opts]
   (let [{:keys [base-uri username password password-prefix curl]
          :or {base-uri (:juxt.site.alpha/base-uri config)
-              password-prefix (:juxt.site.alpha.unix-pass/password-prefix config)}}
+              password-prefix (or
+                               (when-let [dir (System/getenv "SITE_PASS_DIR")]
+                                 (cond-> dir
+                                   (not (.endsWith dir "/")) (str "/")))
+                               (:juxt.site.alpha.unix-pass/password-prefix config))
+              username (System/getProperty "user.name")}}
         (:options opts)]
+
+    (when password-prefix
+      (message! (format "Unix pass prefix: %s" password-prefix)))
 
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not username (error-and-exit! 1 "Username required"))
@@ -647,6 +656,9 @@
 
 (defn upload-file* [access-token base-uri file type encoding language path opts]
   (assert (instance? java.io.File file))
+  (when-not (.exists file)
+    (error-and-exit! 1 (format "Cannot upload file that does not exist: %s" (str file))))
+
   (message! "Uploading file to" (str base-uri path))
 
   (let [classification (get-in opts [:options :classification])
@@ -729,6 +741,7 @@
         {:keys [base-uri file]
          :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+    (when-not (.exists (io/file file)) (error-and-exit! 1 (str "File not found: " file)))
 
     (let [{:keys [status headers body]}
           (curl/post
@@ -759,6 +772,74 @@
                           (range) results)))
             (message! (format "Resources all posted OK"))))
 
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
+(defn post-json
+  "Post JSON to a resource"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [base-uri file url]
+         :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+    (when-not file (error-and-exit! 1 "File required"))
+    (when-not (.exists (io/file file)) (error-and-exit! 1 (str "File not found: " file)))
+    (when-not url (error-and-exit! 1 "URL is required"))
+
+    (let [url (str/replace url "{{base-uri}}" base-uri)
+          {:keys [status headers body]}
+          (curl/post
+           url
+           {:headers (cond-> {"authorization" (format "Bearer %s" access-token)
+                              "content-type" "application/json"})
+            :body (cond-> (slurp (io/file file))
+                    :always (str/replace "{{base-uri}}" base-uri)
+                    (.endsWith file ".edn") (edn-to-json))
+            :throw false})]
+      (case status
+        (201 204)
+        (message! (format "Resource %s: %s"
+                          (case status 201 "created" 204 "updated")
+                          (get headers "location")))
+        (do
+          (error! "Server response: " status " " (str/trim body))
+          (message! "Request id: " (get headers "site-request-id")))))))
+
+(defn put-json
+  "PUT JSON to a resource"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [base-uri file url]
+         :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+    (when-not file (error-and-exit! 1 "File required"))
+    (when-not (.exists (io/file file)) (error-and-exit! 1 (str "File not found: " file)))
+
+    (let [embedded-url (when (.endsWith file ".edn")
+                         (:crux.db/id (edn/read-string (slurp file))))
+
+          _ (when (and embedded-url url) (error-and-exit! 1 "Should not specify URL both in the document and as an option"))
+
+          url (or embedded-url url)
+
+          _ (when-not url (error-and-exit! 1 "Failed to specify identity (URI), either in the document (crux.db/id) or as an option"))
+
+          url (str/replace url "{{base-uri}}" base-uri)
+          {:keys [status headers body]}
+          (curl/put
+           url
+           {:headers (cond-> {"authorization" (format "Bearer %s" access-token)
+                              "content-type" "application/json"})
+            :body (cond-> (slurp (io/file file))
+                    :always (str/replace "{{base-uri}}" base-uri)
+                    (.endsWith file ".edn") (edn-to-json))
+            :throw false})]
+      (case status
+        (201 204)
+        (message! (format "Resource %s: %s"
+                          (case status 201 "created" 204 "updated")
+                          (get headers "location")))
         (do
           (error! "Server response: " status " " (str/trim body))
           (message! "Request id: " (get headers "site-request-id")))))))
@@ -884,7 +965,19 @@
    ["post-resources"
     {:description (:doc (meta #'post-resources))
      :cli-options [["-f" "--file FILE" "Resource file (in EDN format)"]]
-     :delegate post-resources}]])
+     :delegate post-resources}]
+
+   ["post-json"
+    {:description (:doc (meta #'post-json))
+     :cli-options [["-f" "--file FILE" "File containing data"]
+                   ["-u" "--url URL" "URL to POST to"]]
+     :delegate post-json}]
+
+   ["put-json"
+    {:description (:doc (meta #'put-json))
+     :cli-options [["-f" "--file FILE" "File containing data"]
+                   ["-u" "--url URL" "URL to POST to"]]
+     :delegate put-json}]])
 
 (let [{:keys [options arguments summary errors]}
       (parse-opts (next *command-line-args*)  cli-options :in-order true)
@@ -908,6 +1001,7 @@
           (println (str ansi/white-font "Environment variables" ansi/reset-font))
           (println)
           (println "SITE_BASE_URI \tSet the default Base-URI")
+          (println "SITE_PASS_DIR \tOverride where Unix pass passwords are located")
           (println)
           (println (str ansi/white-font "Subcommands" ansi/reset-font))
           (println)

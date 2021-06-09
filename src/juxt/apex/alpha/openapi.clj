@@ -51,8 +51,7 @@
           ::http/content-type "application/json"
           :title (get-in openapi ["info" "title"])
           :version (get-in openapi ["info" "version"])
-          :description (get-in openapi ["info" "description"])
-          })]])
+          :description (get-in openapi ["info" "description"])})]])
      (x/await-tx crux-node))
 
     (assoc req
@@ -60,16 +59,47 @@
            (if (= (::site/resource-provider resource) ::openapi-empty-document-resource)
              201 204))))
 
-(defn- received-body->json
-  "Return a JSON instance from the request. Throw a 400 error if the JSON is
-  invalid."
-  [{::site/keys [resource received-representation db] :as req}]
+(defmulti received-body->resource-state
+  "Convert the request payload into the proposed new state of a resource."
+  (fn [req]
+    (let [rep (::site/received-representation req)
+          {:juxt.reap.alpha.rfc7231/keys [type subtype]}
+          (reap.decoders/content-type (::http/content-type rep))]
+      ;; TODO: Check that the OpenAPI supports the content-type of the request
+      ;; payload, if not, throw a 415.
+      (format "%s/%s" type subtype))))
 
-  (let [body (::http/body received-representation)
-        schema (get-in resource [::apex/operation "requestBody" "content"
+(defmethod received-body->resource-state :default [req]
+  ;; Regardless of whether the OpenAPI declares it can read the content-type, we
+  ;; can't process it. TODO: Should have some way of passing it 'raw' to some
+  ;; processing function that is able to turn it into resource state (a Crux
+  ;; resource)?
+  (throw
+   (ex-info
+    "Unsupported media type"
+    (into req {:ring.response/status 415}))))
+
+(defmethod received-body->resource-state "application/edn"
+  [{::site/keys [received-representation resource db] :as req}]
+  ;; The assumption here is that EDN resource is 'good to go' as resource
+  ;; state. But authorization rules will be run by put-resource-state that will
+  ;; determine whether it is allowed in.
+  received-representation)
+
+(defmethod received-body->resource-state "application/json"
+  [{::site/keys [received-representation resource db] :as req}]
+  (let [schema (get-in resource [::apex/operation "requestBody" "content"
                                  "application/json" "schema"])
         _ (assert schema)
-        instance (json/read-value body) _ (assert instance)
+        body (::http/body received-representation)
+        instance (try
+                   (json/read-value body)
+                   (catch Exception _
+                     (throw
+                      (ex-info
+                       "Bad JSON in input"
+                       (into req {:ring.response/status 400})))))
+        _ (assert instance)
         openapi-ref (get resource ::apex/openapi) _ (assert openapi-ref)
         openapi-resource (x/entity db openapi-ref) _ (assert openapi-resource)
 
@@ -89,21 +119,14 @@
         validation (-> validation
                        process-transformations process-keyword-mappings)
 
-        instance (::jinx/instance validation)]
-
-    ;; Replace any remaining string keys with keyword equivalents.
-    (reduce-kv
-     (fn [acc k v] (assoc acc (cond-> k (string? k) keyword) v))
-     {} instance)))
-
-(defn put-json-representation
-  [{::site/keys [received-representation start-date resource uri db crux-node]
-    ::pass/keys [subject]
-    :as req}]
-
-  (let [instance (received-body->json req)
-
         path-params (get-in req [::site/resource ::apex/openapi-path-params])
+
+        instance (::jinx/instance validation)
+
+        ;; Replace any remaining string keys with keyword equivalents.
+        instance (reduce-kv
+                  (fn [acc k v] (assoc acc (cond-> k (string? k) keyword) v))
+                  {} instance)
 
         ;; Inject path parameter values into body, this is a feature, enabled by
         ;; the x-juxt-site-inject-property OpenAPI extension keyword.
@@ -113,8 +136,21 @@
                       (cond-> acc
                         inject-property
                         (assoc (keyword inject-property) (:value v)))))
-                  instance path-params)
+                  instance path-params)]
+    instance))
 
+(defn put-resource-state
+  "Put some new resource state into Crux, if authorization checks pass. The new
+  resource state should be a valid Crux entity, with a :crux.db/id"
+  [{::site/keys [received-representation start-date resource db crux-node]
+    ::pass/keys [subject]
+    :as req}
+   new-resource-state]
+
+  (assert new-resource-state)
+
+  (let [id (:crux.db/id new-resource-state)
+        _ (assert id)
         authorization
         (pdp/authorization
          db
@@ -124,11 +160,11 @@
           ;; this point
           'request (select-keys req [:ring.request/method :ring.request/path])
           'environment {}
-          'new-state instance})
+          'new-state new-resource-state})
 
         _ (when-not (= (::pass/access authorization) ::pass/approved)
             (log/debug "Unauthorized OpenAPI JSON instance"
-                       instance authorization)
+                       new-resource-state authorization)
             (let [status (if-not (::pass/user subject) 401 403)
                   message (case status
                             401 "Unauthorized"
@@ -139,7 +175,7 @@
                 (into req {:ring.response/status status})))))
 
 
-        already-exists? (x/entity db uri)
+        already-exists? (x/entity db id)
 
         last-modified start-date
         etag (format "\"%s\"" (-> received-representation
@@ -155,15 +191,15 @@
 
     (->> (x/submit-tx
           crux-node
-          [[:crux.tx/put (assoc instance :crux.db/id uri)]])
+          [[:crux.tx/put new-resource-state]])
          (x/await-tx crux-node))
 
     (-> req
         (assoc :ring.response/status (if-not already-exists? 201 204)
                ::http/etag etag
                ::http/last-modified last-modified
-               ::apex/instance instance)
-        (update :ring.response/headers assoc "location" uri))))
+               ::apex/instance new-resource-state)
+        (update :ring.response/headers assoc "location" id))))
 
 (defn- path-parameter-defs->map [path-param-defs]
   (reduce
@@ -289,8 +325,8 @@
              ;; just for testing.
              ::site/access-control-allow-origins
              {"http://localhost:8000"
-              {::site/access-control-allow-methods #{:get}
-               ::site/access-control-allow-headers #{"authorization"}
+              {::site/access-control-allow-methods #{:get :put :post :delete}
+               ::site/access-control-allow-headers #{"authorization" "content-type"}
                ::site/access-control-allow-credentials true}}
 
              ;; TODO: Merge in any properties of a resource that is in
@@ -308,10 +344,7 @@
            ::site/post-fn
            (fn post-fn-proxy [req]
              (log/debug "Calling post-fn" post-fn-sym)
-             (let [rep (::site/received-representation req)
-                   {:juxt.reap.alpha.rfc7231/keys [type subtype]}
-                   (reap.decoders/content-type (::http/content-type rep))
-                   f (try
+             (let [f (try
                        (requiring-resolve post-fn-sym)
                        (catch IllegalArgumentException _
                          (throw
@@ -319,15 +352,7 @@
                            (str "Failed to find post-fn: " post-fn-sym)
                            (into req
                                  {:ring.response/status 500})))))]
-               (f (assoc
-                   req
-                   ::apex/request-instance
-                   (cond
-                     (and
-                      (.equalsIgnoreCase "application" type)
-                      (.equalsIgnoreCase "json" subtype))
-                     (received-body->json req)
-                     :else rep))))))
+               (f req))))
 
           (= method :put)
           (assoc
@@ -336,12 +361,12 @@
              (let [rep (::site/received-representation req)
                    {:juxt.reap.alpha.rfc7231/keys [type subtype]}
                    (reap.decoders/content-type (::http/content-type rep))]
-               (case
-                   ;; TODO: Depending on requestBody
-                   (and
-                    (.equalsIgnoreCase "application" type)
-                    (.equalsIgnoreCase "json" subtype))
-                   (put-json-representation req))))))))))
+               (put-resource-state
+                req
+                (-> req
+                    received-body->resource-state
+                    ;; Since this is a PUT, we add
+                    (assoc :crux.db/id (::site/uri req))))))))))))
 
 (defn locate-resource
   [db uri
@@ -378,7 +403,6 @@
 
    (let [openapis (x/q db '{:find [openapi-uri openapi]
                             :where [[openapi-uri ::apex/openapi openapi]]})
-         ;; TODO: unnecessary let binding above
          matches
          (for [[openapi-uri openapi] openapis
                server (get openapi "servers")
@@ -402,16 +426,16 @@
        ;; right.
 
        (if (= (count matches) 1)        ; this is the most common case
-         (let [openapi-resource (first matches)]
-           (let [resource (merge openapi-resource (x/entity db uri))]
-             (if (every? ::jinx/valid? (vals (::apex/openapi-path-params openapi-resource)))
-               resource
-               (throw
-                (ex-info
-                 "One or more of the path-parameters in the request did not validate against the required schema"
-                 (into req {::site/resource resource
-                            :ring.response/status 400
-                            :ring.response/body "Bad Request\r\n"}))))))
+         (let [openapi-resource (first matches)
+               resource (merge openapi-resource (x/entity db uri))]
+           (if (every? ::jinx/valid? (vals (::apex/openapi-path-params openapi-resource)))
+             resource
+             (throw
+              (ex-info
+               "One or more of the path-parameters in the request did not validate against the required schema"
+               (into req {::site/resource resource
+                          :ring.response/status 400
+                          :ring.response/body "Bad Request\r\n"})))))
 
          ;; Select one of the matches, and throw an error if this proves
          ;; impossible.
