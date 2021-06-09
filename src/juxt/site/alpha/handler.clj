@@ -1182,7 +1182,7 @@
 
 (defn wrap-initialize-request
   "Initialize request state."
-  [h {::site/keys [crux-node base-uri uri-prefix]}]
+  [h {::site/keys [crux-node base-uri uri-prefix] :as opts}]
   (assert crux-node)
   (assert base-uri)
   (fn [{:ring.request/keys [scheme] :as req}]
@@ -1207,12 +1207,12 @@
           ;; lower-case). The path, however, needs to be normalized here.
           uri (str scheme+authority (normalize-path (:ring.request/path req)))
 
-          req (into req {::site/start-date (java.util.Date.)
-                         ::site/request-id req-id
-                         ::site/uri uri
-                         ::site/crux-node crux-node
-                         ::site/db db
-                         ::site/base-uri base-uri})]
+          req (into req (merge
+                         {::site/start-date (java.util.Date.)
+                          ::site/request-id req-id
+                          ::site/uri uri
+                          ::site/db db}
+                         (dissoc opts ::site/uri-prefix)))]
 
       ;; The Ring request map becomes the container for all state collected
       ;; along the request processing pathway.
