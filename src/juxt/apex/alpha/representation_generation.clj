@@ -9,6 +9,7 @@
    [hiccup.page :as hp]
    [json-html.core :refer [edn->html]]
    [jsonista.core :as json]
+   [juxt.apex.alpha.parameters :as parameters]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.site.alpha.util :as util]
    [clojure.edn :as edn]
@@ -57,11 +58,18 @@
                                (assoc :crux.db/id :subject)
                                util/->freezeable)]])
 
+        query-params (when-let [query-param-defs
+                                (not-empty (filter #(= (get % "in") "query") param-defs))]
+                       (parameters/process-query-string
+                        (:ring.request/query req)
+                        query-param-defs))
+
         query
         (some->
          (get-in resource [::apex/operation "responses" "200" "juxt.site.alpha/query"])
          (edn/read-string)
-         (->inject-params-into-query {:path (::apex/openapi-path-params resource)} req)
+         (->inject-params-into-query {:path (::apex/openapi-path-params resource)
+                                      :query query-params} req)
          (pdp/->authorized-query authorization))
 
         {singular-result? "juxt.site.alpha/singular-result?"
