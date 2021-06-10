@@ -101,7 +101,7 @@
 (defn lookup-user
   "Return a vector of user, pwhash"
   [db username]
-  (when-not (re-matches #"[\p{Alnum}-_]+" username)
+  (when-not (and username (re-matches #"[\p{Alnum}-_]+" username))
     (throw (ex-info "Username not valid format" {})))
 
   (let [users (x/q db '{:find [r pwhash]
