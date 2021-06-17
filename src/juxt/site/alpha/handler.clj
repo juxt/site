@@ -795,7 +795,9 @@
 (defn wrap-method-not-allowed? [h]
   (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
     (if resource
-      (let [allowed-methods (set (::http/methods resource))]
+      (let [allowed-methods (cond-> (set (::http/methods resource))
+                              (::site/global-cors req) (conj :options))]
+
         (when-not (contains? allowed-methods method)
           (throw
            (ex-info
@@ -972,7 +974,10 @@
   (fn [req]
     (let [{::site/keys [resource] :as req} (h req)
           request-origin (get-in req [:ring.request/headers "origin"])
-          {::site/keys [access-control-allow-origins]} resource
+          {::site/keys [access-control-allow-origins]}
+          (if-let [global-cors (::site/global-cors req)]
+            global-cors
+            resource)
           allow-origin
           (when request-origin
             (or
@@ -980,8 +985,7 @@
                request-origin)
              (when (contains? access-control-allow-origins "*")
                "*")))
-          cors-headers (when allow-origin (get access-control-allow-origins allow-origin))
-          ]
+          cors-headers (when allow-origin (get access-control-allow-origins allow-origin))]
       (cond-> req
         allow-origin
         (assoc-in [:ring.response/headers "access-control-allow-origin"] allow-origin)
@@ -1069,12 +1073,9 @@
 
                 ;; Allow errors to be transmitted to developers
                 error-resource
-                (assoc error-resource
-                       ::site/access-control-allow-origins
-                       {"http://localhost:8000"
-                        {::site/access-control-allow-methods #{:get :put :post :delete}
-                         ::site/access-control-allow-headers #{"authorization" "content-type"}
-                         ::site/access-control-allow-credentials true}})
+                (if-let [global-cors (::site/global-cors req)]
+                  (merge error-resource global-cors)
+                  error-resource)
 
                 error-resource
                 (-> error-resource
