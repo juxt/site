@@ -526,19 +526,18 @@
 
 (defn add-payload [{::site/keys [selected-representation db] :as req}]
   (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
-        template (some->> selected-representation ::site/template (x/entity db))
-        body (cond
-               body-fn
-               (let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
-                 (log/debugf "Calling body-fn: %s" body-fn)
-                 (f req))
+        template (some->> selected-representation ::site/template (x/entity db))]
+    (cond
+      body-fn
+      (let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
+        (log/debugf "Calling body-fn: %s" body-fn)
+        (assoc req :ring.response/body (f req)))
 
-               template (templating/render-template req template)
+      template (assoc req :ring.response/body (templating/render-template req template))
 
-               content content
-               body body)]
-
-    (cond-> req body (assoc :ring.response/body body))))
+      content (assoc req :ring.response/body content)
+      body (assoc req :ring.response/body body)
+      :else req)))
 
 (defn GET [req]
   (evaluate-preconditions! req)

@@ -55,6 +55,8 @@
 
         spec-db (x/with-tx db txes)
 
+;;        template-models (x/pull db '[{:juxt.site.alpha/template-model [*]}] (:crux.db/id resource))
+
         template-model (assoc
                         (::site/template-model resource)
                         "_site" req)
