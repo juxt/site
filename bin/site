@@ -148,7 +148,7 @@
           (spit f (json/encode data {:pretty true}))
           (when curl
             (message! (format "Storing curl config in %s" curl))
-            (spit curl (format "-H \"Authorization: Bearer %s\"\n-H \"Accept: application/json,*/*;q=0.8\"\n" (get data "access_token")))))
+            (spit curl (format "-H \"Authorization: Bearer %s\"\n" (get data "access_token")))))
 
         :else
         (do
