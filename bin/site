@@ -92,16 +92,19 @@
   [opts]
   (pprint config))
 
+(defn get-password-prefix []
+  (or
+   (when-let [dir (System/getenv "SITE_PASS_DIR")]
+     (cond-> dir
+       (not (.endsWith dir "/")) (str "/")))
+   (:juxt.site.alpha.unix-pass/password-prefix config)))
+
 (defn get-token
   "Request a token"
   [opts]
   (let [{:keys [base-uri username password password-prefix curl]
          :or {base-uri (:juxt.site.alpha/base-uri config)
-              password-prefix (or
-                               (when-let [dir (System/getenv "SITE_PASS_DIR")]
-                                 (cond-> dir
-                                   (not (.endsWith dir "/")) (str "/")))
-                               (:juxt.site.alpha.unix-pass/password-prefix config))
+              password-prefix (get-password-prefix)
               username (System/getProperty "user.name")}}
         (:options opts)]
 
@@ -260,12 +263,19 @@
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri username password]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
-        (:options opts)]
+        (:options opts)
+        password-prefix (get-password-prefix)]
 
     (when-not base-uri (error-and-exit! 1 "Base-URI required"))
     (when-not username (error-and-usage! "User required" opts))
 
-    (let [password (or password (get-password username))
+    (let [password (cond
+                     password password
+                     password-prefix (get-password password-prefix username))
+
+          _ (when-not password
+              (error-and-exit! 1 "No password to set"))
+
           {:keys [status headers body]}
           (curl/put
            (format "%s/_site/users/%s/password" base-uri username)
