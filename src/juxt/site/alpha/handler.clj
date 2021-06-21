@@ -391,7 +391,7 @@
 (defn put-static-resource
   "PUT a new representation of the target resource. All other representations are
   replaced."
-  [{::site/keys [uri db received-representation start-date crux-node base-uri] :as req}]
+  [{::site/keys [uri db received-representation start-date crux-node base-uri request-id] :as req}]
   (let [existing? (x/entity db uri)
         classification (get-in req [:ring.request/headers "site-classification"])
         new-rep (merge
@@ -400,7 +400,8 @@
                       ::site/type "StaticRepresentation"
                       ::http/methods #{:get :head :options :put :patch}
                       ::http/etag (etag received-representation)
-                      ::http/last-modified start-date}
+                      ::http/last-modified start-date
+                      ::site/request request-id}
                      classification (assoc ::pass/classification classification))
                  received-representation)]
 
@@ -421,13 +422,30 @@
   [{::site/keys [received-representation] :as req}]
   (throw (ex-info "TODO: patch" (into req {::incoming received-representation}))))
 
+(def SITE_REQUEST_ID_PATTERN #"(.*/_site/requests/\p{Alnum}+)(\.[a-z]+)?")
+
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
   in :default."
   [{::site/keys [db uri base-uri] :as req}]
   (or
+
+   ;; Is it a cached request to debug?
+   (let [[_ req-id suffix] (re-matches SITE_REQUEST_ID_PATTERN uri)]
+     (when-let [request-to-show (get requests-cache req-id)]
+       (log/tracef "Found request object in cache")
+       {::site/uri uri
+        ::site/resource-provider ::requests-cache
+        ::http/methods #{:get :head :options}
+        ::site/template-model request-to-show
+        ::http/representations
+        (remove nil? [(when (or (nil? suffix) (= suffix ".json"))
+                        (debug/json-representation-of-request req request-to-show))
+                      (when (or (nil? suffix) (= suffix ".html"))
+                        (debug/html-representation-of-request req request-to-show))])}))
+
    ;; We call OpenAPI location here, because a resource can be defined in
-   ;; OpenAPI, and exits in Crux, simultaneously.
+   ;; OpenAPI, and exist in Crux, simultaneously.
    (openapi/locate-resource db uri req)
 
    ;; Is it in Crux?
@@ -454,23 +472,7 @@
       ::http/redirect (cond-> loc (.startsWith loc base-uri)
                               (subs (count base-uri)))})
 
-   ;; Is it a cached request to debug?
-   (let [[_ req-id suffix]
-         (re-matches
-          #"(.*/_site/requests/\p{Alnum}+)(\.[a-z]+)?"
-          uri)]
 
-     (when-let [request-to-show (get requests-cache req-id)]
-       (log/tracef "Found request object in cache")
-       {::site/uri uri
-        ::site/resource-provider ::requests-cache
-        ::http/methods #{:get :head :options}
-        ::site/template-model request-to-show
-        ::http/representations
-        (remove nil? [(when (or (nil? suffix) (= suffix ".json"))
-                        (debug/json-representation-of-request req request-to-show))
-                      (when (or (nil? suffix) (= suffix ".html"))
-                        (debug/html-representation-of-request req request-to-show))])}))
 
    ;; Return a back-stop resource
    {::site/resource-provider ::default-empty-resource
@@ -1252,11 +1254,28 @@
                             :ring.response/headers :headers
                             :ring.response/body :body})))))
 
-(defn wrap-store-request [h]
+(defn wrap-store-request-in-request-cache [h]
   (fn [req]
     (let [req (h req)]
       (when-let [req-id (::site/request-id req)]
         (cache/put! requests-cache req-id (->storable req)))
+      req)))
+
+(defn wrap-store-request [h]
+  (fn [req]
+    (let [req (h req)]
+      (when-let [req-id (::site/request-id req)]
+        (let [{:ring.request/keys [method] ::site/keys [crux-node]} req]
+          (when (or (= method :post) (= method :put))
+            (x/submit-tx
+             crux-node
+             [[:crux.tx/put (-> req ->storable
+                                (select-keys [:juxt.pass.alpha/subject
+                                              ::site/end-date
+                                              ::site/uri
+                                              :ring.request/method
+                                              :ring.response/status])
+                                (assoc :crux.db/id req-id))]]))))
       req)))
 
 (defn wrap-log-request [h]
@@ -1307,6 +1326,7 @@
    ;; Logging and store request
    wrap-log-request
    wrap-store-request
+   wrap-store-request-in-request-cache
 
    ;; Security
    wrap-cors-headers

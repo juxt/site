@@ -142,7 +142,7 @@
 (defn put-resource-state
   "Put some new resource state into Crux, if authorization checks pass. The new
   resource state should be a valid Crux entity, with a :crux.db/id"
-  [{::site/keys [received-representation start-date resource db crux-node]
+  [{::site/keys [received-representation start-date resource db crux-node request-id]
     ::pass/keys [subject]
     :as req}
    new-resource-state]
@@ -179,7 +179,11 @@
 
         last-modified start-date
         etag (format "\"%s\"" (-> received-representation
-                                  ::http/body util/hexdigest (subs 0 32)))]
+                                  ::http/body util/hexdigest (subs 0 32)))
+
+        ;; Link the resource state with the request that supplied it, for audit
+        ;; and other purposes.
+        new-resource-state (assoc new-resource-state ::site/request request-id)]
 
     ;; Since this resource is 'managed' by the locate-resource in this ns, we
     ;; don't have to worry about http attributes - these will be provided by
