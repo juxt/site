@@ -53,7 +53,9 @@
         db (x/db *crux-node*)]
 
     (is (= {:a/name "foo", :crux.db/id "https://example.org/things/foo"}
-           (x/entity db "https://example.org/things/foo")))))
+           (->
+            (x/entity db "https://example.org/things/foo")
+            (dissoc ::site/request))))))
 
 ;; Evoke "Throwing Multiple API paths match"
 
@@ -163,7 +165,9 @@
     (is (= {:name "zip",
             :juxt/code "ABC/DEF",
             :crux.db/id "https://example.org/things/ABC%2FDEF"}
-           (x/entity db (str "https://example.org" path))))))
+           (->
+            (x/entity db (str "https://example.org" path))
+            (dissoc ::site/request))))))
 
 (deftest triggers-test
   (log/trace "TESTING")
