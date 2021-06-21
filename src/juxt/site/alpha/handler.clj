@@ -941,6 +941,7 @@
   (let [end-date (java.util.Date.)
         req (assoc req
                    ::site/end-date end-date
+                   ::site/date end-date
                    ::site/duration-millis (- (.getTime end-date)
                                              (.getTime start-date)))]
     (cond->
