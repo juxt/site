@@ -1,0 +1,4 @@
+#!/bin/bash
+
+site put-asset --file login.html --type 'text/html;charset=utf-8' --path /_site/login.html
+site put-rule -n site-login-form -r login-form-rule.edn

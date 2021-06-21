@@ -1,7 +1,15 @@
 = Optional additions to Site
 
+== Login form
+
+----
+$ cd login-form
+$ ./deploy
+----
+
 == Debug templates
 
 ----
-site put-asset --file debug-request.html --type 'text/html;charset=utf-8' --path /_site/templates/debug-request.html
+$ cd debug-request
+$ ./deploy
 ----
