@@ -7,7 +7,8 @@
    [crux.api :as x]
    [juxt.site.alpha.templating :as templating]
    [juxt.site.alpha.util :as util]
-   [selmer.parser :as selmer])
+   [selmer.parser :as selmer]
+   selmer.tags)
   (:import (java.net URL)))
 
 (alias 'site (create-ns 'juxt.site.alpha))
@@ -15,6 +16,23 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 
 (selmer/cache-off!)
+
+(selmer/add-tag!
+   :sitedebug
+   (fn [args context-map tag-config]
+     (selmer.tags/prettify-edn context-map)))
+
+(defn expand-queries [template-model db temp-id-map]
+  (postwalk
+   (fn [m]
+     (cond
+       (and (map? m) (contains? m ::site/query))
+       (cond-> (apply x/q db
+                      (assoc (::site/query m) :in (vec (keys temp-id-map)))
+                      (map :crux.db/id (vals temp-id-map)))
+         (= (::site/results m) 'first) first)
+       :else m))
+   template-model))
 
 (defmethod templating/render-template
   :selmer
@@ -55,25 +73,19 @@
 
         spec-db (x/with-tx db txes)
 
-;;        template-models (x/pull db '[{:juxt.site.alpha/template-model [*]}] (:crux.db/id resource))
+        template-models (map :juxt.site.alpha/template-model
+                             (x/pull db '[{:juxt.site.alpha/template-model [*]}] (:crux.db/id resource)))
 
-        template-model (assoc
-                        (::site/template-model resource)
-                        "_site" req)
-
-        template-model
-        (postwalk
-         (fn [m]
-           (cond
-             (and (map? m) (contains? m ::site/query))
-             (cond-> (apply x/q spec-db
-                            (assoc (::site/query m) :in (vec (keys temp-id-map)))
-                            (map :crux.db/id (vals temp-id-map)))
-               (= (::site/results m) 'first) first)
-             :else m))
-         template-model)
-
-        _ (log/tracef "template model is %s" (pr-str template-model))
+        template-model (->
+                        (reduce
+                         (fn [acc tm]
+                           (log/tracef "merging tm: is %s" tm)
+                           (into acc (cond (string? tm) (-> (x/entity db tm)
+                                                            (dissoc :crux.db/id))
+                                           :else tm)))
+                         {} template-models)
+                        (assoc "_site" req)
+                        (expand-queries spec-db temp-id-map))
 
         custom-resource-path (:selmer.util/custom-resource-path selected-representation)]
 
