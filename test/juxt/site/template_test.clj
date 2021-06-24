@@ -127,7 +127,9 @@
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/template-models/fruits-a-query"
-      :fruits {::site/query '{:find [nm] :where [[e :type "Fruit"][e :name nm]]}
+      :fruits {::site/query '{:find [nm]
+                              :where [[e :type "Fruit"]
+                                      [e :name nm]]}
                ::site/extract-first-projection? true}}]
 
     [:crux.tx/put
