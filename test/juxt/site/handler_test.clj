@@ -470,15 +470,6 @@
           :ring.request/headers {"accept" "image/png"}})]
     (is (= 406 (:ring.response/status response)))))
 
-;; Site templates can be defined as a resource which references a Template
-;; resource. The Template resource provides defaults for the representation
-;; metadata of the resource's selected representation. The Template resource
-;; also references TemplateModel resource, which specifies the query used to
-;; extract the template model from the database. In this way, a template can be
-;; shared by multiple instances. Instances may provide data, which is accessible
-;; via the query using the 'resource' symbol. This implementation could be
-;; extended to support content negotiation, whereby the resource would be the
-;; resource of the URL, rather than the negotiated representation.
 (deftest template-test
   (submit-and-await!
    [[:crux.tx/put access-all-areas]
@@ -496,6 +487,21 @@
       ::site/type "StaticRepresentation"
       ::http/content-type "text/plain;charset=utf-8"
       ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/template-models/fruits"
+      ::http/methods #{:get :head :options}
+      ::site/type "TemplateModel"
+      ::http/content-type "text/plain;charset=utf-8"
+      ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/fruits/apple"
+      :fruit "Apple"}]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/fruits/orange"
+      :fruit "Orange"}]
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/nectarine.html"
@@ -522,44 +528,7 @@
     (is (= "text/plain;charset=utf-8"
            (get-in response [:ring.response/headers "content-type"])))))
 
-#_((t/join-fixtures [with-crux with-handler])
- (fn []
-   (submit-and-await!
-    [[:crux.tx/put access-all-areas]
 
-     [:crux.tx/put
-      {:crux.db/id "https://example.org/templates/list.html"
-       ::http/methods #{:get :head :options}
-       ::site/type "StaticRepresentation"
-       ::http/content-type "text/plain;charset=utf-8"
-       ::http/content "<dl><dt>Fruit</dt><dd>{{list.fruit}}</dd></dl>"}]
-
-     [:crux.tx/put
-      {:crux.db/id "https://example.org/templates/template-outer.html"
-       ::http/methods #{:get :head :options}
-       ::site/type "StaticRepresentation"
-       ::http/content-type "text/plain;charset=utf-8"
-       :selmer.util/custom-resource-path "https://example.org/templates/"
-       ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
-
-     [:crux.tx/put
-      {:crux.db/id "https://example.org/nectarine.html"
-       ::http/methods #{:get :head :options}
-       ::site/type "TemplatedRepresentation"
-       ::site/template "https://example.org/templates/template-outer.html"
-       ::site/template-engine :selmer
-       ::site/template-model {"title" "Favorites"
-                              "list"
-                              {::site/query '{:find [fruit]
-                                              :keys [fruit]
-                                              :where [[resource :fruit fruit]]}
-                               ::site/results 'first}}
-       :fruit "Nectarine"
-       }]])
-
-   (*handler*
-    {:ring.request/method :get
-     :ring.request/path "/nectarine.html"})))
 
 
 

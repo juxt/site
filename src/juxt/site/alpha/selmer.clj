@@ -27,10 +27,15 @@
    (fn [m]
      (cond
        (and (map? m) (contains? m ::site/query))
-       (cond-> (apply x/q db
-                      (assoc (::site/query m) :in (vec (keys temp-id-map)))
-                      (map :crux.db/id (vals temp-id-map)))
-         (= (::site/results m) 'first) first)
+       (cond->> (apply x/q db
+                       (assoc (::site/query m) :in (vec (keys temp-id-map)))
+                       (map :crux.db/id (vals temp-id-map)))
+         ;; Deprecate? Anything using this?
+         (= (::site/results m) 'first) first
+         ;; Copied from juxt.apex.alpha.representation_generation
+         (::site/extract-first-projection? m) (map first)
+         (::site/extract-entry m) (map #(get % (::site/extract-entry m)))
+         (::site/singular-result? m) first)
        :else m))
    template-model))
 
@@ -73,30 +78,38 @@
 
         spec-db (x/with-tx db txes)
 
-        template-models (map :juxt.site.alpha/template-model
-                             (x/pull db '[{:juxt.site.alpha/template-model [*]}] (:crux.db/id resource)))
+        template-models
+        (map first
+             (x/q db '{:find [(pull tm [*])]
+                       :where [[e ::site/template-model tm]]
+                       :in [e]} (:crux.db/id resource)))
 
-        template-model (->
-                        (reduce
-                         (fn [acc tm]
-                           (log/tracef "merging tm: is %s" tm)
-                           (into acc (cond (string? tm) (-> (x/entity db tm)
-                                                            (dissoc :crux.db/id))
-                                           :else tm)))
-                         {} template-models)
-                        (assoc "_site" req)
-                        (expand-queries spec-db temp-id-map))
+        processed-template-models
+        (for [tm template-models]
+          (expand-queries tm spec-db temp-id-map))
+
+        combined-template-model
+        (->> processed-template-models
+             (map #(dissoc % :crux.db/id))
+             (apply merge-with
+                    (fn [a b] (concat (if (sequential? a) a [a])
+                                      (if (sequential? b) b [b])))))
 
         custom-resource-path (:selmer.util/custom-resource-path selected-representation)]
 
     (try
       (log/tracef "Render template: %s" (:crux.db/id template))
-      (selmer/render-file
-       (java.net.URL. nil (:crux.db/id template) ush)
-       template-model
-       (cond-> {:url-stream-handler ush}
-         custom-resource-path
-         (assoc :custom-resource-path custom-resource-path)))
+      (let [body
+            (selmer/render-file
+             (java.net.URL. nil (:crux.db/id template) ush)
+             (assoc combined-template-model "_site" req)
+             (cond-> {:url-stream-handler ush}
+               custom-resource-path
+               (assoc :custom-resource-path custom-resource-path)))]
+        (assoc req
+               :ring.response/body body
+               ::site/processed-template-models processed-template-models
+               ::site/combined-template-model combined-template-model))
 
       (catch Exception e
         (throw (ex-info (str "Failed to render template: " template) {:template template

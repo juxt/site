@@ -535,7 +535,7 @@
         (log/debugf "Calling body-fn: %s" body-fn)
         (assoc req :ring.response/body (f req)))
 
-      template (assoc req :ring.response/body (templating/render-template req template))
+      template (templating/render-template req template)
 
       content (assoc req :ring.response/body content)
       body (assoc req :ring.response/body body)
