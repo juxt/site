@@ -1271,7 +1271,7 @@
              crux-node
              [[:crux.tx/put (-> req ->storable
                                 (select-keys [:juxt.pass.alpha/subject
-                                              ::site/end-date
+                                              ::site/date
                                               ::site/uri
                                               :ring.request/method
                                               :ring.response/status])
