@@ -1275,7 +1275,8 @@
                                               ::site/uri
                                               :ring.request/method
                                               :ring.response/status])
-                                (assoc :crux.db/id req-id))]]))))
+                                (assoc :crux.db/id req-id
+                                       ::site/type "Request"))]]))))
       req)))
 
 (defn wrap-log-request [h]
