@@ -103,7 +103,10 @@
             (selmer/render-file
              (java.net.URL. nil (:crux.db/id template) ush)
              (assoc combined-template-model
-                    "_site" (dissoc req ::site/crux-node))
+                    "_site"
+                    (dissoc req
+                            ::site/crux-node
+                            ::site/db))
              (cond-> {:url-stream-handler ush}
                custom-resource-path
                (assoc :custom-resource-path custom-resource-path)))]
