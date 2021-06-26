@@ -470,69 +470,6 @@
           :ring.request/headers {"accept" "image/png"}})]
     (is (= 406 (:ring.response/status response)))))
 
-(deftest template-test
-  (submit-and-await!
-   [[:crux.tx/put access-all-areas]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/list.html"
-      ::http/methods #{:get :head :options}
-      ::site/type "StaticRepresentation"
-      ::http/content-type "text/plain;charset=utf-8"
-      ::http/content "<dl><dt>Fruit</dt><dd>{{list.fruit}}</dd></dl>"}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/template-outer.html"
-      ::http/methods #{:get :head :options}
-      ::site/type "StaticRepresentation"
-      ::http/content-type "text/plain;charset=utf-8"
-      ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/template-models/fruits"
-      ::http/methods #{:get :head :options}
-      ::site/type "TemplateModel"
-      ::http/content-type "text/plain;charset=utf-8"
-      ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/fruits/apple"
-      :fruit "Apple"}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/fruits/orange"
-      :fruit "Orange"}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/nectarine.html"
-      ::http/methods #{:get :head :options}
-      ::site/type "TemplatedRepresentation"
-      ::site/template "https://example.org/templates/template-outer.html"
-      ::site/template-engine :selmer
-      ::site/template-model
-      {"title" "Favorites"
-       "list" {::site/query
-               '{:find [fruit]
-                 :keys [fruit]
-                 :where [[resource :fruit fruit]]}
-               ::site/results 'first}}
-      :selmer.util/custom-resource-path "https://example.org/templates/"
-      :fruit "Nectarine"}]])
-
-  (let [response (*handler*
-                  {:ring.request/method :get
-                   :ring.request/path "/nectarine.html"})]
-    (is (= 200 (:ring.response/status response)))
-    (is (= "<h1>Favorites</h1><dl><dt>Fruit</dt><dd>Nectarine</dd></dl>"
-           (:ring.response/body response)))
-    (is (= "text/plain;charset=utf-8"
-           (get-in response [:ring.response/headers "content-type"])))))
-
-
-
-
-
-;; TODO: Test that 401 gets an error representation
 #_((t/join-fixtures [with-crux with-handler])
  (fn []
    (submit-and-await!
