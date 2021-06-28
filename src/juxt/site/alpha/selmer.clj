@@ -8,6 +8,7 @@
    [juxt.site.alpha.templating :as templating]
    [juxt.site.alpha.util :as util]
    [selmer.parser :as selmer]
+   selmer.filters
    selmer.tags)
   (:import (java.net URL)))
 
@@ -21,6 +22,20 @@
    :sitedebug
    (fn [args context-map tag-config]
      (selmer.tags/prettify-edn context-map)))
+
+(def ^:dynamic *db* nil)
+
+(selmer.filters/add-filter!
+ :deref
+ (fn [x] (or (x/entity *db* x) x)))
+
+(selmer.filters/add-filter!
+ :render-segment
+ (fn [x] (if (vector? x)
+           (case (first x)
+             "text" (second x)
+             "em" [:safe (str "<em>" (second x) "</em>")])
+           (str x))))
 
 (defn expand-queries [template-model db temp-id-map]
   (postwalk
@@ -100,16 +115,17 @@
     (try
       (log/tracef "Render template: %s" (:crux.db/id template))
       (let [body
-            (selmer/render-file
-             (java.net.URL. nil (:crux.db/id template) ush)
-             (assoc combined-template-model
-                    "_site"
-                    (dissoc req
-                            ::site/crux-node
-                            ::site/db))
-             (cond-> {:url-stream-handler ush}
-               custom-resource-path
-               (assoc :custom-resource-path custom-resource-path)))]
+            (binding [*db* db]
+              (selmer/render-file
+               (java.net.URL. nil (:crux.db/id template) ush)
+               (assoc combined-template-model
+                      "_site"
+                      (dissoc req
+                              ::site/crux-node
+                              ::site/db))
+               (cond-> {:url-stream-handler ush}
+                 custom-resource-path
+                 (assoc :custom-resource-path custom-resource-path))))]
         (assoc req
                :ring.response/body body
                ::site/processed-template-models processed-template-models
