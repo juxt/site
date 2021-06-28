@@ -625,8 +625,8 @@
                       {:ring.response/status 500}))))))
 
 (defn DELETE [{::site/keys [crux-node uri] :as req}]
-  (x/submit-tx crux-node [[:crux.tx/delete uri]])
-  (into req {:ring.response/status 202}))
+  (x/await-tx crux-node (x/submit-tx crux-node [[:crux.tx/delete uri]]))
+  (into req {:ring.response/status 204}))
 
 (defn OPTIONS [{::site/keys [resource allowed-methods] :as req}]
   ;; TODO: Implement *
