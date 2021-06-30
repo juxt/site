@@ -143,9 +143,6 @@
                        (assoc "username" username)
                        (assoc "expires" (.format java.time.format.DateTimeFormatter/ISO_INSTANT (.toInstant expires))))]
 
-          (message! (format "Access token acquired for %s%s%s: %s%s%s"
-                            ansi/yellow-font username ansi/reset-font
-                            ansi/cyan-font (get data "access_token") ansi/reset-font))
           (message! (format "Token expires in %s seconds" (get data "expires_in")))
           (message! (format "Storing token in %s" f))
           (spit f (json/encode data {:pretty true}))
