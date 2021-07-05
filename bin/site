@@ -1,27 +1,27 @@
-#_( ;; Allow this script to be executed directly
-   "exec" "bb" "--classpath" "$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')" "$0" "$(readlink -f $(dirname $0)/..)" "$@"
-   )
+#!/usr/bin/env bb
 
 ;; Copyright © 2021, JUXT LTD.
 
 (ns site
   (:require
    [babashka.curl :as curl]
+   [babashka.deps :as deps]
    [clojure.tools.cli :refer [parse-opts summarize]]
    [clojure.java.io :as io]
    [clojure.java.shell :as sh]
    [cheshire.core :as json]
    [clojure.pprint :refer [pprint]]
    [clojure.edn :as edn]
-   [io.aviso.ansi :as ansi]
    [clojure.string :as str])
   (:import
    (java.nio.file Files)
    (java.nio.file.attribute FileAttribute)))
 
-(def ^:dynamic *debug* nil)
+(deps/add-deps '{:deps {io.aviso/pretty {:mvn/version "1.1"}}})
 
-(def site-root-dir (io/file (first *command-line-args*)))
+(require '[io.aviso.ansi :as ansi])
+
+(def ^:dynamic *debug* nil)
 
 (defn edn-to-json
   [edn]
@@ -980,7 +980,7 @@
      :delegate put-json}]])
 
 (let [{:keys [options arguments summary errors]}
-      (parse-opts (next *command-line-args*)  cli-options :in-order true)
+      (parse-opts *command-line-args* cli-options :in-order true)
       command (first arguments)
       {:keys [cli-options delegate]} ((into {} commands) (first arguments))
 
