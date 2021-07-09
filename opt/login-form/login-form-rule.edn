@@ -1,5 +1,6 @@
-{:type "Rule"
- :target
+{:juxt.site.alpha/type "Rule"
+ :juxt.site.alpha/comment "The login form page can be accessed by any"
+ :juxt.pass.alpha/target
  #juxt.site.alpha/as-str
  [[request :ring.request/path "/_site/login.html"]]
- :effect :juxt.pass.alpha/allow}
+ :juxt.pass.alpha/effect :juxt.pass.alpha/allow}

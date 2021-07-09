@@ -2,8 +2,10 @@
 
 (ns juxt.site.alpha.rules
   (:require
+   [clojure.edn :as edn]
    [crux.api :as x]
    [juxt.site.alpha.util :as util]
+   [jsonista.core :as json]
    [clojure.tools.logging :as log]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -11,15 +13,31 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn post-rule
-  [{::site/keys [crux-node uri] ::apex/keys [request-instance] :as req}]
+;; TODO repeated in juxt.site.alpha.resources
+(defn read-forms [r]
+  (lazy-seq
+   (let [res (edn/read {:eof :eof
+                        :readers {'regex #(re-pattern %)
+                                  'juxt.site.alpha/as-str identity}}
+                       r)]
+     (when-not (= res :eof)
+       (cons res (read-forms r))))))
 
-  (let [location
-        (str uri (hash (select-keys request-instance [::pass/target ::pass/effect])))]
+(defn post-rule
+  [{::site/keys [crux-node uri received-representation] :as req}]
+
+  (let [rules (read-forms ;; TODO repeated in juxt.site.alpha.resources
+                (java.io.PushbackReader.
+                  (java.io.InputStreamReader.
+                    (java.io.ByteArrayInputStream.
+                      (::http/body received-representation)))))
+        ;; TODO refactor for several rules
+        rule (first rules)
+        location (str uri (hash (select-keys rule [::pass/target ::pass/effect])))]
 
     (->> (x/submit-tx
           crux-node
-          [[:crux.tx/put (merge {:crux.db/id location} request-instance)]])
+          [[:crux.tx/put (merge {:crux.db/id location} rule)]])
          (x/await-tx crux-node))
 
     (-> req

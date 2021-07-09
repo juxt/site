@@ -46,7 +46,7 @@
 
   "/users/"
   {:get
-   {:summary "Returns a list of all the users you're allowed to view"
+   {:summary "Returns a list of all the users youre allowed to view"
     :operationId "findUsers"
     :tags ["Users"]
 
@@ -270,7 +270,7 @@
     :requestBody
     {:required true
      :content
-     {"application/json"
+     {"application/edn"
       {:schema {"$ref" "#/components/schemas/Rule"}}}}}}
 
   "/rules/{id}"
@@ -373,9 +373,7 @@
    {:juxt.site.alpha/post-fn juxt.site.alpha.handler/post-variant
     :summary
     "Create a new association between a resource and a variant representation."
-    :description "This is used when there are multiple
-    representations (variants) for a resource which are subject to
-    content-negotiation."
+    :description "This is used when there are multiple representations (variants) for a resource which are subject to content-negotiation."
     :tags ["Content Negotiation"]
     :requestBody
     {:required true
@@ -482,8 +480,7 @@
    {"$id" "/schemas/Identified"
     :type "object"
     :description
-    "The unique identifier of the document in the database. This is maps
-    directly to the crux.db/id attribute."
+    "The unique identifier of the document in the database. This is maps directly to the crux.db/id attribute."
     :required ["id"]
     :juxt.jinx.alpha/keyword-mappings {"id" "crux.db/id"}
     :properties

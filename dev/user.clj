@@ -36,3 +36,10 @@
   (println (ansi/yellow "Enter (help) for help"))
 
   :ready)
+
+
+(defn initialize-everything [username password name email]
+  (put-site-api!)
+  (put-auth-resources!)
+  (put-superuser-role!)
+  (put-superuser! username password name email))
