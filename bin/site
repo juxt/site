@@ -58,7 +58,9 @@
      (edn/read-string
       {:readers {'ig/ref identity
                  'ref identity
-                 'profile #(get % :prod)}}
+                 'profile #(get % :prod)
+                 'env #(System/getenv (str %))
+                 'join #(apply str %)}}
       (slurp config-file)))
     (System/getenv "SITE_BASE_URI")
     (assoc :juxt.site.alpha/base-uri (System/getenv "SITE_BASE_URI"))))
