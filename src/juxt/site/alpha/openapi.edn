@@ -46,7 +46,7 @@
 
   "/users/"
   {:get
-   {:summary "Returns a list of all the users youre allowed to view"
+   {:summary "Returns a list of all the users you're allowed to view"
     :operationId "findUsers"
     :tags ["Users"]
 
