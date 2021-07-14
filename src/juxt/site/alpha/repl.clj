@@ -13,7 +13,8 @@
    [juxt.site.alpha.main :refer [system config]]
    [juxt.site.alpha.handler :as handler]
    [juxt.site.alpha.cache :as cache]
-   [juxt.site.alpha.init :as init])
+   [juxt.site.alpha.init :as init]
+   [clojure.string :as str])
   (:import (java.util Date)))
 
 (alias 'dave (create-ns 'juxt.dave.alpha))
@@ -45,7 +46,7 @@
                 (= ::http/content (first x)) (str (subs (second x) 0 80) "…")
                 :else (format "(%d bytes)" (count (second x))))]
              x))
-   (x/entity (db) id)))
+   (x/entity (db) (str/trim id))))
 
 (defn put! [& ms]
   (->>
