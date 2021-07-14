@@ -38,9 +38,11 @@ Policy-Based Access Control, loosely based on XACML.
 
 == Test drive
 
-Before you start, you'll need to have both
-https://clojure.org/guides/getting_started[Clojure] and
-https://github.com/babashka/babashka[Babashka] installed on your system.
+Before you start, you'll need to have the following installed:
+
+* Java 9+ (Site is not compatible with Java 8 and below!)
+* https://clojure.org/guides/getting_started[Clojure] and
+* https://github.com/babashka/babashka[Babashka] installed on your system.
 
 Clone the repo to a preferred location which we'll refer to as $SITE_HOME.
 
