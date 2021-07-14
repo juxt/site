@@ -1,0 +1,36 @@
+;; Copy this to $HOME/.config/site/config.edn
+
+{
+ ;; Used by bin/site to know where to send HTTP API requests.
+ :juxt.site.alpha/base-uri "http://localhost:2021"
+
+ ;; If specified, this is used to source passwords from Unix pass.
+ ;;:juxt.site.alpha.unix-pass/password-prefix "site/local/"
+
+ :ig/system
+ {:juxt.site.alpha.db/crux-node
+  {:crux/tx-log
+   {:kv-store {:crux/module crux.rocksdb/->kv-store
+               :db-dir #join [#env HOME "/.local/share/site/db/txes"]}}
+
+   :crux/document-store
+   {:kv-store {:crux/module crux.rocksdb/->kv-store
+               :db-dir #join [#env HOME "/.local/share/site/db/docs"]}}
+
+   :crux/index-store
+   {:kv-store {:crux/module crux.rocksdb/->kv-store
+               :db-dir #join [#env HOME "/.local/share/site/db/idxs"]}}}
+
+  :juxt.site.alpha.server/server
+  {:juxt.site.alpha/crux-node #ig/ref :juxt.site.alpha.db/crux-node
+   :juxt.site.alpha/port 2021
+
+   ;; Really, this is the canoncial-uri prefix where /_site exists.
+   :juxt.site.alpha/base-uri #ref [:juxt.site.alpha/base-uri]
+
+   ;; If specified, inbound URLs will be uri-prefix + path. If not
+   ;; specified, will default to concatenating the request's proto (or
+   ;; X-Forwarded-Proto header) and Host (or X-Forwarded-Host) request header.
+   ;;:juxt.site.alpha/uri-prefix "https://my.juxt.site"
+
+   :juxt.site.alpha/dynamic? #profile {:dev true :prod false}}}}
