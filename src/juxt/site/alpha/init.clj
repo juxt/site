@@ -54,15 +54,19 @@
 
 (defn put-superuser!
   "Create a superuser."
-  [crux-node username password fullname email {::site/keys [base-uri]}]
+  [crux-node {:keys [username password fullname email]} {::site/keys [base-uri]}]
+  (assert username)
+  (assert password)
+  (assert fullname)
   (let [user (str base-uri "/_site/users/" username)]
     (put!
      crux-node
-     {:crux.db/id user
-      ::site/type "User"
-      ::pass/username username
-      :name fullname
-      :email email}
+     (merge
+      {:crux.db/id user
+       ::site/type "User"
+       ::pass/username username
+       :name fullname}
+      (when email {:email email}))
 
      {:crux.db/id (str user "/password")
       ::site/type "Password"

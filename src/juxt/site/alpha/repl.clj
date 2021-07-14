@@ -8,6 +8,7 @@
    [crux.api :as x]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
+   [clojure.java.shell :as sh]
    [io.aviso.ansi :as ansi]
    [juxt.pass.alpha.authentication :as authn]
    [juxt.site.alpha.main :refer [system config]]
@@ -220,7 +221,7 @@
       {:complete? (pos? (count (superusers opts)))
        :happy-message "At least one superuser exists."
        :sad-message "No superusers exist."
-       :fix "Enter (put-superuser! <username> <password> <fullname> <email>) to fix this."}])))
+       :fix "Enter (put-superuser! <username> <fullname>) or (put-superuser! <username> <fullname> <password>) to fix this."}])))
 
 (defn status
   ([] (status (steps (config))))
@@ -267,11 +268,28 @@
     (init/put-superuser-role! crux-node config)
     (status (steps config))))
 
-(defn put-superuser! [username password fullname email]
-  (let [config (config)
-        crux-node (crux-node)]
-    (init/put-superuser! crux-node username password fullname email config)
-    (status (steps config))))
+(defn get-password [pass-name]
+  (println "Getting password" pass-name)
+  (let [{:keys [exit out err]} (sh/sh "pass" "show" pass-name)]
+    (if (zero? exit) (str/trim out) (println (ansi/red "Failed to get password")))))
+
+(defn put-superuser!
+  ([username fullname]
+   (if-let [password-prefix (:juxt.site.alpha.unix-pass/password-prefix (config))]
+     (if-let [password (get-password (str password-prefix username))]
+       (put-superuser! username fullname password)
+       (println (ansi/red "Failed to get password")))
+     (println (ansi/red "Password required!"))))
+  ([username fullname password]
+   (let [config (config)
+         crux-node (crux-node)]
+     (init/put-superuser!
+      crux-node
+      {:username username
+       :fullname fullname
+       :password password}
+      config)
+     (status (steps config)))))
 
 (defn allow-public-access-to-public-resources! []
   (let [config (config)
