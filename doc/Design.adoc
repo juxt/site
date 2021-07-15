@@ -43,6 +43,80 @@ all information is centralised in this single map. This helps with error
 handling, since any error handler has all possible information about the request
 for diagnostic purposes.
 
+=== Resources
+
+In Site, Web resources are Crux entities.
+
+Since a resource is identified by a URI, we use its URI (or at least its path)
+to identify the Crux entity too.
+
+[source,clojure]
+----
+{:crux.db/id "https://my.site/hello"}
+----
+
+The resource's state is stored in the Crux entity's attributes, or in other Crux
+entities it may reference.
+
+[source,clojure]
+----
+{:crux.db/id "https://my.site/hello"
+ :message-today "Hello World!"}
+----
+
+The resource usually has some extra special attributes, defined by our
+https://github.com/juxt/spin[spin] library, which provide the resource's
+configuration, such as the methods allowed on the resource.
+
+[source,clojure]
+----
+{:crux.db/id "https://my.site/hello"
+ :message-today "Hello World!"
+ :juxt.spin.alpha/methods #{:get :head :options}}
+----
+
+TIP: If you want to learn more about resources, see
+https://tools.ietf.org/html/rfc7231#section-2[Section 2 of RFC 7231].
+
+=== Representations
+
+Representations are Clojure maps. You can either store these as Crux entities
+too (for example, if the current representations are likely to change
+often). But usually, you can store them with the resource's Crux entity, shown
+in <<ex-hello-world>>.
+
+[[ex-hello-world]]
+.Hello World
+====
+
+This resource has just one plain-text representation. On this occasion, given
+this is a static resource which remains constant, we've chosen to generate its
+payload ahead-of-time.
+
+[source,clojure]
+----
+(alias 'http (create-ns 'juxt.http.alpha))
+
+{:crux.db/id "https://my.site/hello"
+ :message-today "Hello World!"
+ ::http/methods #{:get :head :options}
+ ::http/representations
+ [{::http/content-type "text/plain"
+   ::http/content-language "en"
+   ::http/content "Hello World!\r\n"
+   ::http/content-length 14}]}
+----
+====
+
+At this stage, don't worry that in the example, the `::http/content` value seems to
+duplicate the `:message-today` value in the resource. If we want to allow the
+resource's state to change, we can then generate the representation's data from
+the resource's state on each web request. _The key thing to remember is that
+resources and representations are separate things_.
+
+TIP: If you want to learn more about representations, see
+https://tools.ietf.org/html/rfc7231#section-3[Section 3 of RFC 7231].
+
 === Exceptions
 
 Java exceptions are considered cheap enough to throw for any non-OK
@@ -51,3 +125,23 @@ given as the `ex-data` argument.
 
 The alternative is to write and maintain convoluted and highly-nested
 if/then/else logic.
+
+== Dependencies
+
+The web-layer is supported by some of our modern web libraries:
+
+* https://github.com/juxt/spin[spin] -- A set of supporting functions to model
+  web resources and representations as normal Clojure maps, supporting the REST
+  architectural style. You can learn more by reading our
+  https://www.rest.guide[guide to building RESTful Web APIs].
+
+* https://github.com/juxt/pick[pick] -- A library to negotiate the most
+  acceptable representation, if there is more than once to choose from.
+
+* https://github.com/juxt/reap[reap] -- A low-level codec library for HTTP
+  headers.
+
+The OpenAPI features are supported by some additional libraries:
+
+* https://github.com/juxt/jinx[jinx] -- A library for JSON Schema validation and
+  coercion in Clojure and ClojureScript.

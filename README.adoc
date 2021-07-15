@@ -38,147 +38,36 @@ Policy-Based Access Control, loosely based on XACML.
 
 == Test drive
 
+=== Requirements
+
 Before you start, you'll need to have the following installed:
 
 * Java 9+ (Site is not compatible with Java 8 and below!)
 * https://clojure.org/guides/getting_started[Clojure] and
 * https://github.com/babashka/babashka[Babashka] installed on your system.
 
-Clone the repo to a preferred location which we'll refer to as $SITE_HOME.
+=== Clone this repo
+
+----
+$ git clone https://github.com/juxt/site
+----
+
+=== Configure
+
+There's a sample configuration in `etc` you should copy to `$HOME/.config/site/config.edn`.
+
+----
+$ mkdir -p $HOME/.config/site
+$ cp site/etc/config.edn $HOME/.config/site/config.edn
+----
 
 === Start the server
 
 Start the Site server:
 
 ----
-$ $SITE_HOME/bin/site-server
+$ site/bin/site-server
 ----
-
-NOTE: There is a systemd service script in `/etc/systemd`.
-
-See link:doc[] for more documentation.
-
-== Status
-
-Site is very new, and is evolving. There isn't much to see yet.
-
-Be encouraged to study the code to improve your knowledge & understanding, for
-example, on how you can build a web application with Crux and spin.
-
-[CAUTION]
---
-Please be aware that many of the data structures are gradually evolving and are
-therefore labelled with `alpha`, meaning you may need to make explicitly changes
-to your application when upgrading to future versions of Site.
-
-To remove the need for wholesale changes to your code when Site and some of its
-supporting libraries leave alpha, it is recommended that you use namespace
-aliases. For example, write `::spin/methods` instead of
-`:juxt.site.alpha/methods`.
---
-
-== Technical Details
-
-Site is a RESTful web-layer over Crux. This section describes the concepts.
-
-=== Resources
-
-In Site, Web resources are Crux entities.
-
-Since a resource is identified by a URI, we use its URI (or at least its path)
-to identify the Crux entity too.
-
-[source,clojure]
-----
-{:crux.db/id "https://my.site/hello"}
-----
-
-The resource's state is stored in the Crux entity's attributes, or in other Crux
-entities it may reference.
-
-[source,clojure]
-----
-{:crux.db/id "https://my.site/hello"
- :message-today "Hello World!"}
-----
-
-The resource usually has some extra special attributes, defined by our
-https://github.com/juxt/spin[spin] library, which provide the resource's
-configuration, such as the methods allowed on the resource.
-
-[source,clojure]
-----
-{:crux.db/id "https://my.site/hello"
- :message-today "Hello World!"
- :juxt.spin.alpha/methods #{:get :head :options}}
-----
-
-TIP: If you want to learn more about resources, see
-https://tools.ietf.org/html/rfc7231#section-2[Section 2 of RFC 7231].
-
-=== Representations
-
-Representations are Clojure maps. You can either store these as Crux entities
-too (for example, if the current representations are likely to change
-often). But usually, you can store them with the resource's Crux entity, shown
-in <<ex-hello-world>>.
-
-[[ex-hello-world]]
-.Hello World
-====
-
-This resource has just one plain-text representation. On this occasion, given
-this is a static resource which remains constant, we've chosen to generate its
-payload ahead-of-time.
-
-[source,clojure]
-----
-(alias 'http (create-ns 'juxt.http.alpha))
-
-{:crux.db/id "https://my.site/hello"
- :message-today "Hello World!"
- ::http/methods #{:get :head :options}
- ::http/representations
- [{::http/content-type "text/plain"
-   ::http/content-language "en"
-   ::http/content "Hello World!\r\n"
-   ::http/content-length 14}]}
-----
-====
-
-At this stage, don't worry that in the example, the `::http/content` value seems to
-duplicate the `:message-today` value in the resource. If we want to allow the
-resource's state to change, we can then generate the representation's data from
-the resource's state on each web request. _The key thing to remember is that
-resources and representations are separate things_.
-
-TIP: If you want to learn more about representations, see
-https://tools.ietf.org/html/rfc7231#section-3[Section 3 of RFC 7231].
-
-== Dependencies
-
-The web-layer is supported by some of our modern web libraries:
-
-* https://github.com/juxt/spin[spin] -- A set of supporting functions to model
-  web resources and representations as normal Clojure maps, supporting the REST
-  architectural style. You can learn more by reading our
-  https://www.rest.guide[guide to building RESTful Web APIs].
-
-* https://github.com/juxt/pick[pick] -- A library to negotiate the most
-  acceptable representation, if there is more than once to choose from.
-
-* https://github.com/juxt/reap[reap] -- A low-level codec library for HTTP
-  headers.
-
-The OpenAPI features are supported by some additional libraries:
-
-* https://github.com/juxt/jinx[jinx] -- A library for JSON Schema validation and
-  coercion in Clojure and ClojureScript.
-
-== Consulting
-
-Consulting services are available directly from JUXT. Write to info@juxt.pro if
-you would like further details.
 
 == License
 
