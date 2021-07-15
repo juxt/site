@@ -5,7 +5,7 @@
  :juxt.site.alpha/base-uri "http://localhost:2021"
 
  ;; If specified, this is used to source passwords from Unix pass.
- ;;:juxt.site.alpha.unix-pass/password-prefix "site/local/"
+ :juxt.site.alpha.unix-pass/password-prefix "site/local/"
 
  :ig/system
  {:juxt.site.alpha.db/crux-node

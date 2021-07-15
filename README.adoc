@@ -10,8 +10,6 @@ System].
 
 == What is Site?
 
-CAUTION: This section describes functionality that may not yet be available.
-
 Site is a Resource Server, built on the Crux database.
 
 You can put things into Site with (HTTP) PUT requests. When you do this, Site
@@ -61,12 +59,107 @@ $ mkdir -p $HOME/.config/site
 $ cp site/etc/config.edn $HOME/.config/site/config.edn
 ----
 
+=== Configure a password
+
+[TIP]
+--
+If you have `pass` installed, this is a good time to configure a password for
+your superuser. We'll assume the superuser will be named `admin`, but feel free
+to choose your own username here.
+
+----
+$ pass generate site/local/admin
+----
+--
+
 === Start the server
 
 Start the Site server:
 
 ----
 $ site/bin/site-server
+----
+
+
+=== Bootstrap
+
+Bootstrap the new system by adding the minimum resources that are required to allow remote access.
+
+We'll be using ncat (`ncat`), but you can replace `ncat` with `telnet`, or `ncat`, depending on what's available for your system.
+
+[NOTE]
+--
+Arch users can install `ncat` by installing the `nmap` package:
+
+----
+$ sudo pacman -Sy nmap
+----
+--
+
+REPL-in to the server
+
+TIP: Prefix the command with `rlwrap` if you have it installed.
+
+----
+$ ncat localhost 50505
+
+Site by JUXT. Copyright (c) 2021, JUXT LTD.
+Type :repl/quit to exit
+
+[ ]  Site API not installed.  Enter (put-site-api!) to fix this.
+[ ]  Authentication resources not installed.  Enter (put-auth-resources!) to fix this.
+[ ]  Role of superuser not yet created. Enter (put-superuser-role!) to fix this.
+[ ]  No superusers exist. Enter (put-superuser! <username> <fullname>)
+     or (put-superuser! <username> <fullname> <password>) to fix this.
+site>
+----
+
+Install the Site API:
+
+----
+site> (put-site-api!)
+----
+
+Install the authentication rules:
+
+----
+site> (put-auth-resources!)
+----
+
+Install the superuser role:
+
+----
+site> (put-superuser-role!)
+----
+
+Finally, create a superuser.
+
+----
+site> (put-superuser! "admin" "Administrator")
+----
+
+Replace `"admin"` and `"Administrator"` with your own username and full name.
+
+NOTE: We recommend that you generate a password with `pass`, but if you haven't
+done so, you can add a password as a final argument to `put-superuser!`.
+
+Quit the REPL, for example, with `Ctrl-C` or by typing `:repl/quit`.
+
+=== Run the site tool
+
+The site tool is a command-line utility that allows you to remotely administer site.
+
+We must first get a token that we can use for API access. This process authenticates to the site server using your password.
+
+.Here, replace `admin` with your username (or let it default to your OS username)
+----
+$ site/bin/site get-token -u admin
+----
+
+Now we can use the site tool for remote administration. Try the following:
+
+----
+$ site/bin/site list-users
 ----
 
 == License
