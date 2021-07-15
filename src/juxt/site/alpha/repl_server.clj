@@ -4,7 +4,8 @@
   (:require
    [clojure.core.server :as s]
    [clojure.main :as m]
-   [clojure.pprint :refer [pprint]]))
+   [clojure.pprint :refer [pprint]]
+   [puget.printer :as puget]))
 
 (defn repl-init
   "Initialize repl in user namespace and make standard repl requires."
@@ -27,4 +28,4 @@
    :init repl-init
    :read s/repl-read
    :prompt #(printf "site> ")
-   :print pprint))
+   :print puget/cprint))
