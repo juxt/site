@@ -262,16 +262,7 @@
        {:title "Rules"
         :type "edn-table"
         :schema {"type" "array"
-                 "items" {"$ref" "#/components/schemas/IdentifiedRule"}}}}}}}
-
-   :post
-   {:juxt.site.alpha/post-fn juxt.site.alpha.rules/post-rule
-    :tags ["Rules"]
-    :requestBody
-    {:required true
-     :content
-     {"application/edn"
-      {:schema {"$ref" "#/components/schemas/Rule"}}}}}}
+                 "items" {"$ref" "#/components/schemas/IdentifiedRule"}}}}}}}}
 
   "/rules/{id}"
   {:parameters
@@ -291,24 +282,7 @@
 
        "text/html;charset=utf-8"
        {:title "Rule"
-        :schema {"$ref" "#/components/schemas/Rule"}}}}}}
-
-   :put
-   {:summary "Upserts a rule"
-    :tags ["Rules"]
-    :requestBody
-    {:required true
-     :content
-     {"application/json"
-      {:schema {"$ref" "#/components/schemas/Rule"}}}}
-
-    :responses
-    {200 {:description "Rule successfully updated"
-          :content
-          {"text/plain;charset=utf-8" {}}}
-     201 {:description "Rule successfully created"
-          :content
-          {"text/plain;charset=utf-8" {}}}}}}
+        :schema {"$ref" "#/components/schemas/Rule"}}}}}}}
 
   "/triggers/"
   {:get

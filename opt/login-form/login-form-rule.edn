@@ -1,6 +1,5 @@
-{:juxt.site.alpha/type "Rule"
+{:crux.db/id              "{{base-uri}}/_site/rules/site-login-form"
+ :juxt.site.alpha/type    "Rule"
  :juxt.site.alpha/comment "The login form page can be accessed by any"
- :juxt.pass.alpha/target
- #juxt.site.alpha/as-str
- [[request :ring.request/path "/_site/login.html"]]
- :juxt.pass.alpha/effect :juxt.pass.alpha/allow}
+ :juxt.pass.alpha/target  [[request :ring.request/path "/_site/login.html"]]
+ :juxt.pass.alpha/effect  :juxt.pass.alpha/allow}

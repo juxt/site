@@ -448,71 +448,6 @@
           (error! "Server response: " status " " (str/trim body))
           (message! "Request id: " (get headers "site-request-id")))))))
 
-(defn post-rule
-  "Post a rule"
-  [opts]
-  (let [{access-token "access_token"} (load-token)
-        {:keys [base-uri rule]
-         :or {base-uri (:juxt.site.alpha/base-uri config)}}
-        (:options opts)]
-
-    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
-    (when-not rule (error-and-usage! "Rule required" opts))
-    (when-not (.isFile (io/file rule)) (error-and-exit! 1 "Rule file must be a file"))
-
-    (let [{:keys [status headers body]}
-          (curl/post
-           (format "%s/_site/rules/" base-uri)
-           {:headers {"authorization" (format "Bearer %s" access-token)
-                      "content-type" "application/edn"}
-            :body (cond-> (slurp (io/file rule))
-                    :always (str/replace "{{base-uri}}" base-uri))
-            :throw false})]
-      (cond
-        (= status 201)
-        (message! (format "Rule created: %s" (get headers "location")))
-
-        (= status 204)
-        (message! (format "Rule updated: %s" (get headers "location")))
-
-        :else
-        (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
-
-(defn put-rule
-  "Put a rule"
-  [opts]
-  (let [{access-token "access_token"} (load-token)
-        {:keys [base-uri name rule]
-         :or {base-uri (:juxt.site.alpha/base-uri config)}}
-        (:options opts)]
-
-    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
-    (when-not name (error-and-usage! "Name required" opts))
-    (when-not rule (error-and-usage! "Rule required" opts))
-    (when-not (.isFile (io/file rule)) (error-and-exit! 1 "Rule file must be a file"))
-
-    (let [{:keys [status headers body]}
-          (curl/put
-           (format "%s/_site/rules/%s" base-uri name)
-           {:headers {"authorization" (format "Bearer %s" access-token)
-                      "content-type" "application/edn"}
-            :body (cond-> (slurp (io/file rule))
-                    :always (str/replace "{{base-uri}}" base-uri))
-            :throw false})]
-      (cond
-        (= status 201)
-        (message! (format "Rule created: %s" (get headers "location")))
-
-        (= status 204)
-        (message! (format "Rule updated: %s" (get headers "location")))
-
-        :else
-        (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
-
 (defn put-trigger
   "Put a trigger"
   [opts]
@@ -957,18 +892,6 @@
                    ["-r" "--role ROLE" "The role you are assigning"]
                    ["-j" "--justification JUSTIFICATION" "The business justification"]]
      :delegate assign-role}]
-
-   ["post-rule"
-    {:description (:doc (meta #'post-rule))
-     :cli-options [["-r" "--rule FILE" "Rule file"]]
-     :delegate post-rule}]
-
-
-   ["put-rule"
-    {:description (:doc (meta #'put-rule))
-     :cli-options [["-n" "--name NAME" "Rule name"]
-                   ["-r" "--rule FILE" "Rule file"]]
-     :delegate put-rule}]
 
    ["put-trigger"
     {:description (:doc (meta #'put-trigger))

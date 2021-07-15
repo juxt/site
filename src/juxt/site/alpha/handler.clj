@@ -207,8 +207,7 @@
                 {:ring.response/status 400}))))
 
       (with-open [in (:ring.request/body req)]
-        (let [body (byte-array content-length)
-              _ (.read in body 0 content-length)
+        (let [body (.readNBytes in content-length)
               content-type (:juxt.reap.alpha.rfc7231/content-type decoded-representation)]
 
           (merge

@@ -15,21 +15,12 @@ Clojure 1.10.1
 user=>
 ----
 
-Type `(dev)`
+Type `(start)`
 
 ----
-user=> (dev)
+user=> (start)
 ----
 
-Wait for the code to compile, and then start the API server with `(go)`:
-
-----
-[Edge] Loading Clojure code, please wait...
-[Edge] Enter (go) to start the dev system
-dev=> (go)
-----
-
-You should get something similar to the following:
 
 ----
 Starting Crux node
@@ -37,14 +28,26 @@ Starting Crux node
 :initiated
 ----
 
-If this is your first time running Site, you'll need to initialize your
-database. This adds various resources, such as the webmaster user which you'll
-need to begin adding your own resources.
+If this is your first time running Site, you'll need to initialize your database.
+Follow the setup instructions in the REPL to setup an API, authentication resources, superuser role, and superuser.
 
-Choose a strong password for your webmaster user, and call `init-db`.
+NOTE If at any point you need to restart from the beginning, simply delete the `log` and `db` folders.
 
 ----
-dev=> (init-db! (crux-node) <password>)
+rm -rf log db
 ----
 
-Now browse at https://localhost:2021 and login as webmaster.
+Some frontend apps need access to site's CLI in order to deploy their resources.
+
+In order to get the CLI up and running, start by adding `bin/site` to your PATH.
+
+If you did the previous setup correctly, you should be able to get a token from the webserver.
+
+----
+$ site get-token -u SUPER_USER_NAME -p SUPER_USER_PASSWORD
+site: Unix pass prefix: site/localhost/
+site: Get token from http://localhost:2021/_site/token
+site: Access token acquired for SUPER_USER_NAME: XXXXXXXXXXXXXXXXXXXXXXX
+site: Token expires in 3600 seconds
+site: Storing token in ~/.local/share/site/access-token.json
+----
