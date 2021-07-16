@@ -39,12 +39,6 @@ Starting Crux node
 
 If this is your first time running Site, you'll need to initialize your
 database. This adds various resources, such as the webmaster user which you'll
-need to begin adding your own resources.
+need to begin adding your own resources. This is as per the top-level README.
 
-Choose a strong password for your webmaster user, and call `init-db`.
-
-----
-dev=> (init-db! (crux-node) <password>)
-----
-
-Now browse at https://localhost:2021 and login as webmaster.
+Now browse at https://localhost:2021 and login with the username you created.
