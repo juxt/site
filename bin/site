@@ -516,49 +516,6 @@
           (error! "Server response: " status " " (str/trim body))
           (message! "Request id: " (get headers "site-request-id")))))))
 
-(defn put-variant
-  "Associate a variant representation to a resource"
-  [opts]
-  (let [{access-token "access_token"} (load-token)
-        {:keys [base-uri resource variant]
-         :or {base-uri (:juxt.site.alpha/base-uri config)}}
-        (:options opts)]
-
-    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
-    (when-not resource (error-and-usage! "Resource required" opts))
-    (when-not variant (error-and-usage! "Variant required" opts))
-
-    ;; TODO: Should return a 404, not 405!!!
-
-    (let [{:keys [status headers body]}
-          (curl/post
-           (format "%s/_site/variants/" base-uri)
-           {:headers {"authorization" (format "Bearer %s" access-token)
-                      "content-type" "application/json"}
-            :body (json/generate-string
-                   (cond-> {"type" "Variant"
-                            "resource" (str/replace resource "{{base-uri}}" base-uri)
-                            "variant" (str/replace variant "{{base-uri}}" base-uri)}))
-            :throw false})]
-      (cond
-        (= status 401)
-        (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Is your access-token valid?")
-          (message! "To get a new access token, use the get-token sub-command")
-          (message! "Request id: " (get headers "site-request-id")))
-
-        (= status 201)
-        (message! (format "Variant created: %s" (get headers "location")))
-
-        (= status 204)
-        (message! (format "Variant updated: %s" (get headers "location")))
-
-        :else
-        (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
-
 (defn put-redirect
   "Put a redirect"
   [opts]
@@ -937,12 +894,6 @@
      :cli-options [["-n" "--name NAME" "Trigger name"]
                    ["-t" "--trigger FILE" "Trigger file"]]
      :delegate put-trigger}]
-
-   ["put-variant"
-    {:description (:doc (meta #'put-variant))
-     :cli-options [["-r" "--resource URL" "Resource"]
-                   ["-v" "--variant URL" "Variant resource"]]
-     :delegate put-variant}]
 
    ["put-redirect"
     {:description (:doc (meta #'put-redirect))

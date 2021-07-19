@@ -368,26 +368,6 @@
           :content
           {"text/plain;charset=utf-8" {}}}}}}
 
-  "/variants/"
-  {:post
-   {:juxt.site.alpha/post-fn juxt.site.alpha.handler/post-variant
-    :summary
-    "Create a new association between a resource and a variant representation."
-    :description "This is used when there are multiple
-    representations (variants) for a resource which are subject to
-    content-negotiation."
-    :tags ["Content Negotiation"]
-    :requestBody
-    {:required true
-     :content
-     {"application/json"
-      {:schema {"$ref" "#/components/schemas/Variant"}}}}
-    :responses
-    {201 {:description "Variant successfully created"
-          :content
-          {"text/plain;charset=utf-8" {}}}
-     204 {:description "Variant successfully updated"}}}}
-
   "/redirects/"
   {:post
    {:juxt.site.alpha/post-fn juxt.site.alpha.handler/post-redirect
@@ -622,22 +602,6 @@
     :allOf
     [{"$ref" "#/components/schemas/Identified"}
      {"$ref" "#/components/schemas/Trigger"}]}
-
-   "Variant"
-   {"$id" "/schemas/Variant"
-    :allOf
-    [{"$ref" "#/components/schemas/Typed"}
-     {:type "object"
-      :required ["resource" "variant"]
-      :juxt.jinx.alpha/keyword-mappings
-      {"resource" "juxt.site.alpha/resource"
-       "variant" "juxt.site.alpha/variant"}
-      :properties
-      {"type" {:const "Variant"}
-       "resource" {:type "string"
-                   :format "uri-reference"}
-       "variant" {:type "string"
-                  :format "uri-reference"}}}]}
 
    "Redirect"
    {"$id" "/schemas/Redirect"
