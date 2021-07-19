@@ -392,8 +392,10 @@
   "PUT a new representation of the target resource. All other representations are
   replaced."
   [{::site/keys [uri db received-representation start-date crux-node base-uri request-id] :as req}]
+
   (let [existing? (x/entity db uri)
         classification (get-in req [:ring.request/headers "site-classification"])
+        variant-of (get-in req [:ring.request/headers "site-variant-of"])
         new-rep (merge
                  (cond->
                      {:crux.db/id uri
@@ -402,7 +404,8 @@
                       ::http/etag (etag received-representation)
                       ::http/last-modified start-date
                       ::site/request request-id}
-                     classification (assoc ::pass/classification classification))
+                   variant-of (assoc ::site/variant-of variant-of)
+                   classification (assoc ::pass/classification classification))
                  received-representation)]
 
     ;; Currently we cannot tell whether a submitted tx has been successful,
