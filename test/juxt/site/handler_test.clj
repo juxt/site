@@ -251,7 +251,7 @@
 
     (with-redefs
       [mailer/send-mail!
-       (fn [from to subject _ _]
+       (fn [_ from to subject _ _]
          (swap! emails conj {:from from :to to :subject subject}))]
 
       (*handler*
