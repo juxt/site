@@ -98,12 +98,11 @@
 (defn ls
   "List Site resources"
   ([]
-   (->> (q '{:find [e]
-             :where [[e :crux.db/id]
-                     [e ::site/type typ]]
-             :in [[typ ...]]}
-           (disj (set (types)) "Request"))
+   (->> (q '{:find [(pull e [:crux.db/id ::site/type])]
+             :where [[e :crux.db/id]]})
         (map first)
+        (filter #(not= (::site/type %) "Request"))
+        (map :crux.db/id)
         (sort-by str)))
   ([pat]
    (->> (q '{:find [e]
