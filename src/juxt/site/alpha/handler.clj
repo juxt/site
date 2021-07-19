@@ -493,17 +493,13 @@
 
 (defn find-variants [{::site/keys [resource uri db] :as req}]
 
-  (let [variants (x/q db '{:find [r]
-                           :where [[v ::site/type "Variant"]
-                                   [v ::site/resource uri]
-                                   [v ::site/variant r]]
-                           :in [uri]
-                           } uri)]
+  (let [variants (x/q db '{:find [(pull v [*])]
+                           :where [[v ::site/variant-of uri]]
+                           :in [uri]}
+                      uri)]
     (when (pos? (count variants))
-      (cond-> (for [[v] variants
-                    :let [rep (x/entity db v)]
-                    :when rep]
-                (assoc rep ::http/content-location v))
+      (cond-> (for [[v] variants]
+                (assoc v ::http/content-location (:crux.db/id v)))
         (or (::http/content-type resource) (::site/template resource))
         (conj resource)))))
 

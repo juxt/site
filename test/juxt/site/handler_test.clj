@@ -421,30 +421,20 @@
    [[:crux.tx/put access-all-areas]
 
     [:crux.tx/put
+     {:crux.db/id "https://example.org/report"
+      ::http/methods #{:get :head :options}}]
+
+    [:crux.tx/put
      {:crux.db/id "https://example.org/report.html"
+      ::site/variant-of "https://example.org/report"
       ::http/content-type "text/html;charset=utf-8"
       ::http/content "<h1>Latest sales figures</h1>"}]
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/report.txt"
+      ::site/variant-of "https://example.org/report"
       ::http/content-type "text/plain;charset=utf-8"
-      ::http/content "Latest sales figures"}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/report"
-      ::http/methods #{:get :head :options}}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/variants/html"
-      ::site/type "Variant"
-      ::site/resource "https://example.org/report"
-      ::site/variant "https://example.org/report.html"}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/variants/txt"
-      ::site/type "Variant"
-      ::site/resource "https://example.org/report"
-      ::site/variant "https://example.org/report.txt"}]])
+      ::http/content "Latest sales figures"}]])
 
   (let [response
         (*handler*
