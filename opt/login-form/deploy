@@ -2,3 +2,6 @@
 
 site put-asset --file login.html --type 'text/html;charset=utf-8' --path /_site/login.html
 site put-rule -n site-login-form -r login-form-rule.edn
+
+site put-asset --file 401.html --type 'text/html;charset=utf-8' --path /_site/errors/unauthorized.html --variant-of http://localhost:2021/_site/errors/unauthorized
+site post-resources -f resources.edn

@@ -1,5 +1,6 @@
 {:type "Rule"
  :target
  #juxt.site.alpha/as-str
- [[request :ring.request/path "/_site/login.html"]]
+ [[request :ring.request/path "/_site/login.html"]
+  [request :ring.request/method #{:get :head :options}]]
  :effect :juxt.pass.alpha/allow}

@@ -1,0 +1,22 @@
+{:crux.db/id "{{base-uri}}/secret"
+ :juxt.http.alpha/methods #{:get :head :options}
+ :juxt.http.alpha/content-type "text/plain;charset=utf-8"
+ :juxt.http.alpha/content "This is the secret word: bananas\r\n"}
+
+{:crux.db/id "{{base-uri}}/_site/errors/not-found"
+ :juxt.site.alpha/type "ErrorResource"
+ :ring.response/status 404}
+
+{:crux.db/id "{{base-uri}}/_site/errors/not-found.html"
+ :juxt.site.alpha/variant-of "{{base-uri}}/_site/errors/not-found"
+ :juxt.http.alpha/content-type "text/html;charset=utf-8"
+ :juxt.http.alpha/content "<h3>We could not find this resource!!!</h3>"}
+
+{:crux.db/id "{{base-uri}}/_site/errors/not-found.txt"
+ :juxt.site.alpha/variant-of "{{base-uri}}/_site/errors/not-found"
+ :juxt.http.alpha/content-type "text/plain;charset=utf-8"
+ :juxt.http.alpha/content "We could not find this resource!!!\r\n"}
+
+{:crux.db/id "{{base-uri}}/_site/errors/unauthorized"
+ :juxt.site.alpha/type "ErrorResource"
+ :ring.response/status 401}
