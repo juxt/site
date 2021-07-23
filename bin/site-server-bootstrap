@@ -1,0 +1,27 @@
+#!/bin/bash
+
+echo "Site by JUXT. Copyright (c) 2021, JUXT LTD."
+
+SITE_SUPERUSER_USERNAME=${SITE_SUPERUSER_USERNAME:-rlwsadmin}
+SITE_SUPERUSER_PASSWORD=${SITE_SUPERUSER_PASSWORD:-rlwspass123}
+SITE_SUPERUSER_NAME=${SITE_SUPERUSER_NAME:-RLWS Admin}
+
+cd $(dirname $0)/..
+clojure -J-Djava.awt.headless=true \
+        -J-Dclojure.server.site="{:port,50505,:accept,juxt.site.alpha.repl-server/repl,:address,\"localhost\"}" \
+        -J-Dlogback.configurationFile=$HOME/.config/site/logback.xml \
+        -J-Xms256m \
+        -J-Xmx2400m \
+        -Mprod \
+        -e "(do (require '[juxt.site.alpha.main :as main]) \
+                (require '[juxt.site.alpha.repl :as repl]) \
+                (let [main-thread (future (main/-main))] \
+                  (Thread/sleep 10000) \
+                  (repl/put-site-api!) \
+                  (repl/put-superuser-role!) \
+                  (repl/put-superuser! \"$SITE_SUPERUSER_USERNAME\" \
+                                       \"$SITE_SUPERUSER_PASSWORD\" \
+                                       \"$SITE_SUPERUSER_NAME\") \
+                  (repl/put-auth-resources!) \
+                  (repl/allow-public-access-to-public-resources!) \
+                  @main-thread))"
