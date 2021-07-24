@@ -44,24 +44,24 @@
 (defn message! [& msg]
   (apply println (apply str ansi/bold-green-font "site:" ansi/reset-font) msg))
 
-(def config-file
+(def default-config-file
   (case (System/getProperty "os.name")
-    "Linux" (io/file (System/getProperty "user.home") ".config/site/config.edn")
+    "Linux" (str (System/getProperty "user.home") "/.config/site/config.edn")
     (error-and-exit! 1 "Unsupported OS")))
 
-;;(assert (.exists config-file) (format "Config file does not exist: %s" (str config-file)))
-
-(def config
-  (cond-> {}
-    (.exists config-file)
-    (merge
-     (edn/read-string
-      {:readers {'ig/ref identity
-                 'ref identity
-                 'profile #(get % :prod)}}
-      (slurp config-file)))
-    (System/getenv "SITE_BASE_URI")
-    (assoc :juxt.site.alpha/base-uri (System/getenv "SITE_BASE_URI"))))
+(defn parse-config
+  [path]
+  (let [config-file (io/file path)]
+    (cond-> {}
+      (.exists config-file)
+      (merge
+       (edn/read-string
+        {:readers {'ig/ref identity
+                   'ref identity
+                   'profile #(get % :prod)}}
+        (slurp config-file)))
+      (System/getenv "SITE_BASE_URI")
+      (assoc :juxt.site.alpha/base-uri (System/getenv "SITE_BASE_URI")))))
 
 (defn get-password-from-unix-pass [unix-pass-password-prefix username]
   (let [passfile (io/file
@@ -89,12 +89,12 @@
 
 (defn show-config
   "Show configuration"
-  [opts]
+  [config opts]
   (pprint config))
 
 (defn get-token
   "Request a token"
-  [opts]
+  [config opts]
   (let [{:keys [base-uri username password password-prefix curl]
          :or {base-uri (:juxt.site.alpha/base-uri config)
               password-prefix (or
@@ -234,7 +234,7 @@
 
 (defn list-users
   "List users"
-  [opts]
+  [config opts]
   (let [{:keys [base-uri]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
@@ -256,7 +256,7 @@
 
 (defn reset-password
   "Reset a user's password"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri username password]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
@@ -290,7 +290,7 @@
 
 (defn put-user
   "Create or update a user"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri username password name email]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
@@ -335,7 +335,7 @@
 
 (defn put-role
   "Create or update a role"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri role description]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
@@ -376,7 +376,7 @@
 
 (defn list-roles
   "List roles"
-  [opts]
+  [config opts]
   (let [{:keys [base-uri]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)]
@@ -398,7 +398,7 @@
 
 (defn assign-role
   "Assign a role to a user"
-  [opts]
+  [config opts]
   (let [{access-token "access_token" assigner "username"} (load-token)
         {:keys [base-uri username role justification]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
@@ -440,7 +440,7 @@
 
 (defn put-rule
   "Put a rule"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri name rule]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
@@ -474,7 +474,7 @@
 
 (defn put-trigger
   "Put a trigger"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri name trigger]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
@@ -509,7 +509,7 @@
 
 (defn put-variant
   "Associate a variant representation to a resource"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri resource variant]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
@@ -552,7 +552,7 @@
 
 (defn put-redirect
   "Put a redirect"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri resource location]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
@@ -593,7 +593,7 @@
 
 (defn put-api
   "Upload and install an API"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri name openapi]
          :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)
@@ -654,7 +654,8 @@
            ".png" "image/png"} suffix)
      (error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix)))))
 
-(defn upload-file* [access-token base-uri file type encoding language path opts]
+(defn upload-file*
+  [access-token base-uri file type encoding language path opts]
   (assert (instance? java.io.File file))
   (when-not (.exists file)
     (error-and-exit! 1 (format "Cannot upload file that does not exist: %s" (str file))))
@@ -694,7 +695,7 @@
 
 (defn put-asset
   "Upload an asset"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri file type encoding language path]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
@@ -713,7 +714,7 @@
 
 (defn put-swagger-ui
   "Install a distribution of Swagger UI"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri version] :or {base-uri (:juxt.site.alpha/base-uri config)
                                        version "3.44.1"}} (:options opts)
@@ -736,7 +737,7 @@
 
 (defn post-resources
   "Post one or more resources"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri file]
          :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
@@ -778,7 +779,7 @@
 
 (defn post-json
   "Post JSON to a resource"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri file url]
          :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
@@ -808,7 +809,7 @@
 
 (defn put-json
   "PUT JSON to a resource"
-  [opts]
+  [config opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri file url]
          :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
@@ -854,7 +855,8 @@
   [["-b" "--base-uri BASE-URI" "The Base-URI of the server you are targetting"]
    ["-d" "--debug" "Enable debug mode"]
    ["-v" "--verbose" "Verbose mode"]
-   ["-h" "--help" "Show this summary"]])
+   ["-h" "--help" "Show this summary"]
+   [nil "--config CONFIG" "Path to config file"]])
 
 (def commands
   [["config"
@@ -979,53 +981,55 @@
                    ["-u" "--url URL" "URL to POST to"]]
      :delegate put-json}]])
 
-(let [{:keys [options arguments summary errors]}
+(defn print-help
+  [{:keys [summary]}]
+  (println (str ansi/bold-green-font "site" ansi/reset-font))
+  (println)
+  (println "This is a resource management tool for Site.")
+  (println)
+  (println (str ansi/white-font "Usage" ansi/reset-font))
+  (println)
+  (println "site <global-options> <subcommand> <subcommand-options>")
+  (println)
+  (println (str ansi/white-font "Global options" ansi/reset-font))
+  (println summary)
+  (println)
+  (println (str ansi/white-font "Environment variables" ansi/reset-font))
+  (println)
+  (println "SITE_BASE_URI \tSet the default Base-URI")
+  (println "SITE_PASS_DIR \tOverride where Unix pass passwords are located")
+  (println)
+  (println (str ansi/white-font "Subcommands" ansi/reset-font))
+  (println)
+  (doseq [[command {:keys [description cli-options delegate]}] commands]
+    (apply
+     println
+     (remove nil? [command (str ansi/yellow-font "(" description (when-not delegate " - coming soon!") ")" ansi/reset-font)]))
+    (when-let [summary (:summary (parse-opts [] cli-options))]
+      (when-not (str/blank? (str/trim summary))
+        (println summary)))
+    (println)))
+
+(let [{:keys [options arguments summary errors] :as global-parsed-opts}
       (parse-opts *command-line-args* cli-options :in-order true)
       command (first arguments)
-      {:keys [cli-options delegate]} ((into {} commands) (first arguments))
-
-      print-summary
-      (fn []
-        (do
-          (println (str ansi/bold-green-font "site" ansi/reset-font))
-          (println)
-          (println "This is a resource management tool for Site.")
-          (println)
-          (println (str ansi/white-font "Usage" ansi/reset-font))
-          (println)
-          (println "site <global-options> <subcommand> <subcommand-options>")
-          (println)
-          (println (str ansi/white-font "Global options" ansi/reset-font))
-          (println summary)
-          (println)
-          (println (str ansi/white-font "Environment variables" ansi/reset-font))
-          (println)
-          (println "SITE_BASE_URI \tSet the default Base-URI")
-          (println "SITE_PASS_DIR \tOverride where Unix pass passwords are located")
-          (println)
-          (println (str ansi/white-font "Subcommands" ansi/reset-font))
-          (println)
-          (doseq [[command {:keys [description cli-options delegate]}] commands]
-            (apply
-             println
-             (remove nil? [command (str ansi/yellow-font "(" description (when-not delegate " - coming soon!") ")" ansi/reset-font)]))
-            (when-let [summary (:summary (parse-opts [] cli-options))]
-              (when-not (str/blank? (str/trim summary))
-                (println summary)))
-            (println))))]
+      {:keys [cli-options delegate] :as command-opts} ((into {} commands) command)
+      _ (prn (or (:config options) default-config-file))
+      config (parse-config (or (:config options) default-config-file))]
 
   (cond
     (contains? options :help)
-    (print-summary)
+    (print-help global-parsed-opts)
 
     errors
     (doseq [err errors]
       (println err))
 
-    (find (into {} commands) command)
+    command-opts
     (binding [*debug* (:debug options)]
       (if delegate
         (delegate
+         config
          (-> (parse-opts (next arguments) cli-options)
              (update :options merge options)))
         (println "No implementation:" command)))
@@ -1034,7 +1038,7 @@
     (println "Unknown command:" (first arguments))
 
     :else
-    (print-summary)))
+    (print-help global-parsed-opts)))
 
 ;; Local Variables:
 ;; mode: clojure
