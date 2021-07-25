@@ -1014,7 +1014,6 @@
       (parse-opts *command-line-args* cli-options :in-order true)
       command (first arguments)
       {:keys [cli-options delegate] :as command-opts} ((into {} commands) command)
-      _ (prn (or (:config options) default-config-file))
       config (parse-config (or (:config options) default-config-file))]
 
   (cond
