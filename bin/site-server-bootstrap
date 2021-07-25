@@ -17,7 +17,8 @@ clojure -J-Djava.awt.headless=true \
                   (repl/put-superuser-role!) \
                   (repl/put-superuser! \"$SITE_SUPERUSER_USERNAME\" \
                                        \"$SITE_SUPERUSER_PASSWORD\" \
-                                       \"$SITE_SUPERUSER_NAME\") \
+                                       \"$SITE_SUPERUSER_NAME\" \
+				       \"$SITE_SUPERUSER_EMAIL\") \
                   (repl/put-auth-resources!) \
                   (repl/allow-public-access-to-public-resources!) \
                   @main-thread))"
