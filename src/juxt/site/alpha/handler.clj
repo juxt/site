@@ -1243,7 +1243,7 @@
            (fn [acc k v]
              (let [k2 (get mp k)]
                (cond-> acc k2 (assoc k2 v))))
-           (sorted-map) req)
+           {} req)
           (h)
           (select-keys
            [:ring.response/status
