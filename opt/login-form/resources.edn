@@ -1,0 +1,22 @@
+{:crux.db/id "{{base-uri}}/secret"
+ :juxt.http.alpha/methods #{:get :head :options}
+ :juxt.http.alpha/content-type "text/plain;charset=utf-8"
+ :juxt.http.alpha/content "This is the secret word: bananas\r\n"}
+
+{:crux.db/id "{{base-uri}}/_site/errors/unauthorized"
+ :juxt.site.alpha/type "ErrorResource"
+ :ring.response/status 401}
+
+{:crux.db/id "{{base-uri}}/_site/login.html"
+ :juxt.http.alpha/methods #{:get :head :options}
+ :juxt.site.alpha/type "TemplatedRepresentation"
+ :juxt.site.alpha/template-engine :selmer
+ :juxt.site.alpha/template "{{base-uri}}/_site/templates/login.html"}
+
+
+{:crux.db/id "{{base-uri}}/_site/errors/unauthorized.html"
+ :juxt.http.alpha/methods #{:get :head :options}
+ :juxt.site.alpha/variant-of "{{base-ur}}/_site/errors/unauthorized"
+ :juxt.site.alpha/type "TemplatedRepresentation"
+ :juxt.site.alpha/template-engine :selmer
+ :juxt.site.alpha/template "{{base-uri}}/_site/templates/unauthorized.html"}

@@ -1,4 +1,7 @@
 #!/bin/bash
 
-site put-asset --file login.html --type 'text/html;charset=utf-8' --path /_site/login.html
+site put-asset --file login.html --type 'text/html;charset=utf-8' --path /_site/templates/login.html
 site put-rule -n site-login-form -r login-form-rule.edn
+
+site put-asset --file unauthorized.html --type 'text/html;charset=utf-8' --path /_site/templates/unauthorized.html
+site post-resources -f resources.edn
