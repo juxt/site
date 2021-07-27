@@ -114,15 +114,18 @@
 
     (try
       (log/tracef "Render template: %s" (:crux.db/id template))
-      (let [body
+      (let [template-model-with-context
+            (assoc combined-template-model
+                   "_site"
+                   (dissoc req
+                           ::site/crux-node
+                           ::site/db))
+
+            body
             (binding [*db* db]
               (selmer/render-file
                (java.net.URL. nil (:crux.db/id template) ush)
-               (assoc combined-template-model
-                      "_site"
-                      (dissoc req
-                              ::site/crux-node
-                              ::site/db))
+               template-model-with-context
                (cond-> {:url-stream-handler ush}
                  custom-resource-path
                  (assoc :custom-resource-path custom-resource-path))))]
