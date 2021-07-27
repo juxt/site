@@ -584,18 +584,28 @@
         req (assoc req ::site/received-representation rep)
         post-fn (::site/post-fn resource)]
 
-    (cond
-      (fn? post-fn) (post-fn req)
+    (let [post
+          (cond
+            (fn? post-fn) post-fn
+            (symbol? post-fn)
+            (try
+              (requiring-resolve post-fn)
+              (catch Exception e
+                (throw (ex-info
+                        (format "post-fn '%s' is not resolvable" post-fn)
+                        (into req {::post-fn post-fn
+                                   :ring.response/status 500})))))
+            (nil? post-fn)
+            (throw
+             (ex-info
+              "Resource allows POST but doesn't have a post-fn function"
+              (into req {:ring.response/status 500})))
 
-      :else
-      (case (::site/purpose resource)
-        ::site/acquire-token (authn/token-response req)
-        ::site/login (authn/login-response req)
-        ::site/logout (authn/logout-response req)
-        (throw
-         (ex-info
-          "Resource allows POST but doesn't have a post-fn function"
-          (into req {:ring.response/status 500})))))))
+            :else
+            (throw
+             (ex-info (format "post-fn is neither a function or a symbol, but type '%s'" (type post-fn))
+                      (into req {:ring.response/status 500}))))]
+      (post req))))
 
 (defn PUT [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)

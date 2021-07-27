@@ -9,6 +9,7 @@
    [crux.api :as x]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
+   [juxt.pass.alpha.authentication :as authn]
    [juxt.reap.alpha.combinators :as p]
    [juxt.reap.alpha.regex :as re]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
@@ -135,7 +136,7 @@
      {:crux.db/id token-endpoint
       ::http/methods #{:post :options}
       ::http/acceptable "application/x-www-form-urlencoded"
-      ::site/purpose ::site/acquire-token
+      ::site/post-fn `authn/token-response
       ::site/access-control-allow-origins
       {"http://localhost:8000"
        {::site/access-control-allow-methods #{:post}
@@ -145,8 +146,8 @@
      {:crux.db/id (str base-uri "/_site/rules/anyone-can-ask-for-a-token")
       ::site/type "Rule"
       ::site/description "The token_endpoint must be accessible"
-      ::pass/target '[[request :ring.request/method #{:post}]
-                      [resource ::site/purpose ::site/acquire-token]]
+      ::pass/target [['request ::site/uri token-endpoint]
+                     ['request :ring.request/method #{:post}]]
       ::pass/effect ::pass/allow})
 
     (let [content
@@ -178,14 +179,14 @@
    {:crux.db/id (str base-uri "/_site/login")
     ::http/methods #{:post}
     ::http/acceptable "application/x-www-form-urlencoded"
-    ::site/purpose ::site/login
+    ::site/post-fn `authn/login-response
     ::pass/expires-in (* 3600 24 30)}
 
    {:crux.db/id (str base-uri "/_site/rules/anyone-can-post-login-credentials")
     ::site/type "Rule"
     ::site/description "The login POST handler must be accessible by all"
-    ::pass/target '[[request :ring.request/method #{:post}]
-                    [resource ::site/purpose ::site/login]]
+    ::pass/target [['request :ring.request/method #{:post}]
+                   ['request ::site/uri (str base-uri "/_site/login")]]
     ::pass/effect ::pass/allow}))
 
 (defn put-logout-endpoint! [crux-node {::site/keys [base-uri]}]
@@ -196,13 +197,13 @@
    {:crux.db/id (str base-uri "/_site/logout")
     ::http/methods #{:post}
     ::http/acceptable "application/x-www-form-urlencoded"
-    ::site/purpose ::site/logout}
+    ::site/post-fn `authn/logout-response}
 
    {:crux.db/id (str base-uri "/_site/rules/anyone-can-post-logout-credentials")
     ::site/type "Rule"
     ::site/description "The logout POST handler must be accessible by all"
-    ::pass/target '[[request :ring.request/method #{:post}]
-                    [resource ::site/purpose ::site/logout]]
+    ::pass/target [['request :ring.request/method #{:post}]
+                   ['request ::site/uri (str base-uri "/_site/logout")]]
     ::pass/effect ::pass/allow}))
 
 ;; Currently awaiting a fix to https://github.com/juxt/crux/issues/1480 because
