@@ -421,11 +421,25 @@
   [{::site/keys [received-representation] :as req}]
   (throw (ex-info "TODO: patch" (into req {::incoming received-representation}))))
 
+(defn static-resources
+  [uri req]
+  (case (:ring.request/path req)
+    "/healthcheck" {::site/resource-provider ::site/static-resources
+                    ::site/type "StaticRepresentation"
+                    ::http/content nil
+                    ::http/methods #{:get :head}
+                    ::pass/classification "PUBLIC"
+                    ::http/content-type "text/plain"}
+    nil))
+
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
   in :default."
   [{::site/keys [db uri base-uri] :as req}]
   (or
+   ;; We want some static server resources for things like healthchecks
+   (static-resources uri req)
+
    ;; We call OpenAPI location here, because a resource can be defined in
    ;; OpenAPI, and exits in Crux, simultaneously.
    (openapi/locate-resource db uri req)
