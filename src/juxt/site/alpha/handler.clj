@@ -777,7 +777,8 @@
                      [:ring.request/headers :ring.request/method :ring.request/path
                       :ring.request/query :ring.request/protocol :ring.request/remote-addr
                       :ring.request/scheme :ring.request/server-name :ring.request/server-post
-                      :ring.request/ssl-client-cert])
+                      :ring.request/ssl-client-cert
+                      ::site/uri])
            'representation (dissoc resource ::http/body ::http/content)
            'environment {}}
 
