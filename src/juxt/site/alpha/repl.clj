@@ -147,9 +147,11 @@
      (uuid? s) s)))
 
 (defn req [s]
-  (cache/find
-   handler/requests-cache
-   (re-pattern (str "/_site/requests/" s))))
+  (into
+   (sorted-map)
+   (cache/find
+    handler/requests-cache
+    (re-pattern (str "/_site/requests/" s)))))
 
 (defn cache []
   handler/requests-cache)
