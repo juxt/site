@@ -19,3 +19,11 @@
  :juxt.site.alpha/type "TemplatedRepresentation"
  :juxt.site.alpha/template-engine :selmer
  :juxt.site.alpha/template "{{base-uri}}/_site/templates/unauthorized.html"}
+
+{:crux.db/id "{{base-uri}}/_site/rules/unauthorized-html-resource",
+ :juxt.site.alpha/description "The unauthorized HTML page must be accessible by all"
+ :juxt.site.alpha/type "Rule"
+ :juxt.pass.alpha/effect :juxt.pass.alpha/allow
+ :juxt.pass.alpha/target
+ [[request :ring.request/uri "{{base-uri}}/_site/errors/unauthorized.html"]
+  [request :ring.request/method #{:get :head :options}]]}
