@@ -13,10 +13,9 @@
  :juxt.site.alpha/template-engine :selmer
  :juxt.site.alpha/template "{{base-uri}}/_site/templates/login.html"}
 
-
 {:crux.db/id "{{base-uri}}/_site/errors/unauthorized.html"
  :juxt.http.alpha/methods #{:get :head :options}
- :juxt.site.alpha/variant-of "{{base-ur}}/_site/errors/unauthorized"
+ :juxt.site.alpha/variant-of "{{base-uri}}/_site/errors/unauthorized"
  :juxt.site.alpha/type "TemplatedRepresentation"
  :juxt.site.alpha/template-engine :selmer
  :juxt.site.alpha/template "{{base-uri}}/_site/templates/unauthorized.html"}
