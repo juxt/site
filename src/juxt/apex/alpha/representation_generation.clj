@@ -20,8 +20,11 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn ->inject-params-into-query [input params req]
+(def coercions
+  {:keyword keyword
+   :symbol symbol})
 
+(defn ->inject-params-into-query [input params req]
   ;; Replace input with values from params
   (postwalk
    (fn [x]
@@ -29,16 +32,15 @@
        (and (map? x)
             (contains? x :name)
             (#{"query" "path"} (:in x "query")))
-       (let [kw (keyword (:in x "query"))]
-         (or
-          (get-in params [kw (:name x) :value])
-          (:default x)
-          (get-in params [kw (:name x) :param "default"])))
-
+       (let [kw (keyword (:in x "query"))
+             coerce (get coercions (:coerce x) identity)]
+         (coerce (or
+                  (get-in params [kw (:name x) :value])
+                  (:default x)
+                  (get-in params [kw (:name x) :param "default"]))))
        (and (map? x)
             (contains? x :juxt.site.alpha/ref))
        (get-in req (get x :juxt.site.alpha/ref))
-
        :else x))
    input))
 
