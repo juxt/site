@@ -46,7 +46,7 @@
 
 (def config-file
   (case (System/getProperty "os.name")
-    "Linux" (io/file (System/getProperty "user.home") ".config/site/config.edn")
+    ("Linux" "Mac OS X") (io/file (System/getProperty "user.home") ".config/site/config.edn")
     (error-and-exit! 1 "Unsupported OS")))
 
 ;;(assert (.exists config-file) (format "Config file does not exist: %s" (str config-file)))
