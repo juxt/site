@@ -298,6 +298,11 @@
 
             post-fn-sym (when (= method :post) (some-> (get operation-object "juxt.site.alpha/post-fn") symbol))
 
+            get-fn-sym (when (= method :get)
+                         (some-> operation-object
+                                 (get "juxt.site.alpha/get-fn")
+                                 symbol))
+
             resource
             {::site/resource-provider ::apex/openapi-path
 
@@ -338,6 +343,21 @@
         ;; Add conditional entries to the resource
         (cond-> resource
           (seq acceptable) (assoc ::http/acceptable {"accept" acceptable})
+
+          get-fn-sym
+          (assoc
+           ::site/get-fn
+           (fn get-fn-proxy [req]
+             (log/debug "Calling get-fn" get-fn-sym)
+             (let [f (try
+                       (requiring-resolve get-fn-sym)
+                       (catch IllegalArgumentException _
+                         (throw
+                          (ex-info
+                           (str "Failed to find get-fn: " get-fn-sym)
+                           (into req
+                                 {:ring.response/status 500})))))]
+               (f req))))
 
           post-fn-sym
           (assoc

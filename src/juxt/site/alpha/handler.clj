@@ -554,11 +554,14 @@
 
     (cond-> req body (assoc :ring.response/body body))))
 
-(defn GET [req]
+(defn GET [{::site/keys [resource] :as req}]
   (evaluate-preconditions! req)
-  (-> req
-      (assoc :ring.response/status 200)
-      (add-payload)))
+  (let [get-fn (::site/get-fn resource)]
+    (if (fn? get-fn)
+      (get-fn req)
+      (-> req
+          (assoc :ring.response/status 200)
+          (add-payload)))))
 
 (defn post-variant [{::site/keys [crux-node db uri]
                      ::apex/keys [request-instance]
