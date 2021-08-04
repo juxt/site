@@ -205,6 +205,7 @@
 
 (defn logout-response
   [req]
+  ;; TODO: We must clear out the session!
   (-> req
       (assoc :ring.response/status 302
              :ring.response/body (format "Logged out\r\n")
