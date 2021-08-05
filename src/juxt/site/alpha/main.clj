@@ -48,6 +48,7 @@
 
 (defn -main [& _]
   (log/info "Starting system")
+  (log/trace "TRACE on")
   (let [system-config (system-config)
         sys (ig/init system-config)]
     (log/infof "Configuration: %s" (pr-str system-config))

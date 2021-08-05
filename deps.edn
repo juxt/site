@@ -70,4 +70,6 @@
     lambdaisland/kaocha-junit-xml {:mvn/version "0.0.76"}}}
 
   :prod
-  {:extra-paths ["prod"]}}}
+  {:extra-paths ["prod"]
+   ;; nREPL can be useful debugging prod
+   :extra-deps {nrepl/nrepl {:mvn/version "0.8.3"}}}}}
