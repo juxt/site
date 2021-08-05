@@ -2,7 +2,7 @@
 
 (ns juxt.site.alpha.util
   (:require
-   [taoensso.nippy.utils :refer [freezable?]]))
+   [juxt.clojars-mirrors.nippy.v3v1v1.taoensso.nippy.utils :refer [freezable?]]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 

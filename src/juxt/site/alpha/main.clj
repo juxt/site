@@ -5,9 +5,7 @@
    [aero.core :as aero]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log]
-   [integrant.core :as ig]
-   ;; Bring in defmethod for sending emails
-   juxt.mail.alpha.mail))
+   [integrant.core :as ig]))
 
 (def system nil)
 
