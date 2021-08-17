@@ -151,9 +151,9 @@ The site tool is a command-line utility that allows you to remotely administer s
 
 If you're on MacOS, you will need to install the gnu version of `readlink`. You can do so with brew:
 ```
- brew install coreutils
- ln -s /usr/local/bin/greadlink /usr/local/bin/readlink
- ```
+brew install coreutils
+ln -s /usr/local/bin/greadlink /usr/local/bin/readlink
+```
 
 We must first get a token that we can use for API access. This process authenticates to the site server using your password.
 
