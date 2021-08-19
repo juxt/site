@@ -61,6 +61,9 @@
   (deep-replace
    form
    (fn [form]
-     (cond-> form
-       (not (freezable? form))
-       ((fn [_] ::site/unfreezable))))))
+     (cond
+       (nil? form) nil
+
+       (not (freezable? form)) ::site/unfreezable
+
+       :else (identity form)))))
