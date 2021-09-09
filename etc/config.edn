@@ -33,4 +33,8 @@
    ;; X-Forwarded-Proto header) and Host (or X-Forwarded-Host) request header.
    ;;:juxt.site.alpha/uri-prefix "https://my.juxt.site"
 
-   :juxt.site.alpha/dynamic? #profile {:dev true :prod false}}}}
+   :juxt.site.alpha/dynamic? #profile {:dev true :prod false}}
+
+  :juxt.site.alpha.nrepl/server
+  {:juxt.site.alpha/port 7888}
+  }}
