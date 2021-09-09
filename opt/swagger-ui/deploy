@@ -1,0 +1,44 @@
+#!/bin/bash
+
+version=3.44.1
+
+media-type() {
+    case ${1##*.} in
+        js) echo application/javascript
+            ;;
+        map) echo application/json
+             ;;
+        json) echo application/json
+              ;;
+        png) echo image/png
+             ;;
+        css) echo text/css
+             ;;
+        html) echo "text/html;charset=utf-8"
+             ;;
+        *) echo ${1#*.}
+           ;;
+    esac
+}
+
+tmp=tmp
+zipfile=swagger-ui.zip
+
+# Download swagger-ui distribution
+curl -o $zipfile https://codeload.github.com/swagger-api/swagger-ui/zip/v$version
+
+# Uncompress to tmp directory
+unzip -qo $zipfile -d $tmp "swagger-ui-$version/dist/*"
+
+prefix=$tmp/swagger-ui-$version/dist/
+
+# Upload each file in the distribution to site
+for f in $(find $prefix -type f); do
+    site put-asset \
+         --file $f \
+         --type $(media-type $f) \
+         --path /swagger-ui/${f:${#prefix}}
+done
+
+# Clean up
+rm -rf $tmp $zipfile

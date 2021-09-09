@@ -679,29 +679,6 @@
      (io/file (str/replace file "{{base-uri}}" base-uri))
      type encoding language path opts)))
 
-(defn put-swagger-ui
-  "Install a distribution of Swagger UI"
-  [opts]
-  (let [{access-token "access_token"} (load-token)
-        {:keys [base-uri version] :or {base-uri (:juxt.site.alpha/base-uri config)
-                                       version "3.44.1"}} (:options opts)
-        tmpdir (create-tmp-dir)
-        outfile (.resolve tmpdir "swagger-ui.zip")]
-    (message! "Downloading Swagger UI distribution: " (.toString outfile))
-    (sh "curl" "-o" (.toString outfile) (format "https://codeload.github.com/swagger-api/swagger-ui/zip/v%s" version))
-    (message! "Extracting Swagger UI distribution: " (.toString outfile))
-    (sh "unzip" (.toString outfile) "-d" (.toString tmpdir))
-    (let [dir (.resolve tmpdir (format "swagger-ui-%s" version))]
-      (doseq [f (file-seq (.toFile dir))
-              :when (.isFile f)]
-        (let [rel-path (.relativize tmpdir (.toPath f))
-              prefix (format "swagger-ui-%s/dist/" version)]
-          (when (.startsWith rel-path prefix)
-            (let [path (format "/swagger-ui/%s" (subs (.toString rel-path) (count prefix)))
-                  content-type (content-type (last (str/split (.toString rel-path) #"/")))]
-              (when content-type
-                (upload-file* access-token base-uri f content-type nil nil path opts)))))))))
-
 (defn post-resources
   "Post one or more resources"
   [opts]
@@ -908,11 +885,6 @@
      :cli-options [["-n" "--name NAME" "API name"]
                    ["-f" "--openapi FILE" "OpenAPI description file"]]
      :delegate put-api}]
-
-   ["put-swagger-ui"
-    {:description (:doc (meta #'put-swagger-ui))
-     :cli-options [["-v" "--version VERSION" "Swagger UI version (optional)"]]
-     :delegate put-swagger-ui}]
 
    ["put-asset"
     {:description (:doc (meta #'put-asset))
