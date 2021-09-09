@@ -8,9 +8,7 @@
    [clojure.tools.logging :as log]
    [juxt.site.alpha.repl :refer :all]
    [integrant.core :as ig]
-   [crux.api :as x]
-   ;; Bring in defmethod for sending emails
-   juxt.mail.alpha.mail))
+   [crux.api :as x]))
 
 (apply require clojure.main/repl-requires)
 

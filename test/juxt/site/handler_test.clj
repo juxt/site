@@ -7,7 +7,6 @@
    [crux.api :as x]
    [jsonista.core :as json]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
-   [juxt.mail.alpha.mail :as mailer]
    [juxt.test.util :refer [with-crux with-handler submit-and-await!
                            *crux-node* *handler*
                            access-all-areas access-all-apis]])
@@ -16,7 +15,6 @@
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
-(alias 'mail (create-ns 'juxt.mail.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
@@ -168,108 +166,6 @@
            (->
             (x/entity db (str "https://example.org" path))
             (dissoc ::site/request))))))
-
-(deftest triggers-test
-  (log/trace "TESTING")
-  (submit-and-await!
-   [[:crux.tx/put access-all-apis]
-
-    [:crux.tx/put {:crux.db/id "https://example.org/users/sue"
-                   ::site/type "User"
-                   ::site/description "Sue should receive an email on every alert"
-                   :email "sue@example.org"
-                   ::email? true}]
-    [:crux.tx/put {:crux.db/id "https://example.org/users/brian"
-                   ::site/type "User"
-                   ::site/description "Brian doesn't want emails"
-                   :email "brian@example.org"
-                   ::email? false}]
-    [:crux.tx/put {:crux.db/id "https://example.org/roles/service-manager"
-                   ::site/type "Role"
-                   ::site/description "A service manager"}]
-    [:crux.tx/put {:crux.db/id "https://example.org/users/sue-is-a-service-manager"
-                   ::site/type "UserRoleMapping"
-                   ::user "https://example.org/users/sue"
-                   ::role "https://example.org/roles/service-manager"}]
-    [:crux.tx/put {:crux.db/id "https://example.org/users/brian-is-a-service-manager"
-                   ::site/type "UserRoleMapping"
-                   ::user "https://example.org/users/brian"
-                   ::role "https://example.org/roles/service-manager"}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
-      ::site/type "OpenAPI"
-      :juxt.apex.alpha/openapi
-      {"servers" [{"url" ""}]
-       "paths"
-       {"/alerts/{id}"
-        {"put"
-         {"requestBody"
-          {"content"
-           {"application/json"
-            {"schema"
-             {"properties"
-              {"juxt.site.alpha/type" {"type" "string"}}}}}}}}}}}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/alert-notification.html"
-      ::http/content "<h1>Alert</h1><p>There has been an alert. See {{ :href }}</p>"}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/alert-notification.txt"
-      ::http/content "There has been an alert. See {{ :href }}"}]
-
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/triggers/alert-notification"
-      ::site/type "Trigger"
-      ::site/query
-      '{:find [(pull user [:email]) alert asset-type customer]
-        :keys [user href asset-type customer]
-        :where [[request :ring.request/method :put]
-                [request ::site/uri alert]
-                [alert ::site/type "Alert"]
-                [alert :asset-type asset-type]
-                [alert :customer customer]
-                [user ::site/type "User"]
-                [mapping ::role "https://example.org/roles/service-manager"]
-                [mapping ::user user]]}
-
-      ::site/action ::mail/send-emails
-      ::mail/from "notifications@example.org"
-      ::mail/subject "{{:asset-type}} Alert!"
-      ::mail/html-template "https://example.org/templates/alert-notification.html"
-      ::mail/text-template "https://example.org/templates/alert-notification.txt"}]])
-
-  (let [path "/alerts/123"
-        body (json/write-value-as-string
-              {"id" "123"
-               "juxt.site.alpha/type" "Alert"
-               "state" "unprocessed"
-               "asset-type" "Heart Monitor"
-               "customer" "Mountain Ridge Hospital"})
-        emails (atom [])]
-
-    (with-redefs
-      [mailer/send-mail!
-       (fn [_ from to subject _ _]
-         (swap! emails conj {:from from :to to :subject subject}))]
-
-      (*handler*
-       {:ring.request/method :put
-        :ring.request/path path
-        :ring.request/body (ByteArrayInputStream. (.getBytes body))
-        :ring.request/protocol "HTTP/1.1"
-        :ring.request/headers
-        {"content-length" (str (count body))
-         "content-type" "application/json"}}))
-
-    (is (= "123" (:id (x/entity (x/db *crux-node*) "https://example.org/alerts/123"))))
-    (is (= [{:from "notifications@example.org"
-             :to "brian@example.org"
-             :subject "Heart Monitor Alert!"}
-            {:from "notifications@example.org"
-             :to "sue@example.org"
-             :subject "Heart Monitor Alert!"}] @emails))))
 
 (deftest if-modified-since-test
   (submit-and-await!

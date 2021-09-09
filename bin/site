@@ -818,7 +818,7 @@
   (when *debug*
     (println "DEBUG:" (apply format args))))
 
-(def cli-options
+(def global-cli-options
   [["-b" "--base-uri BASE-URI" "The Base-URI of the server you are targetting"]
    ["-d" "--debug" "Enable debug mode"]
    ["-v" "--verbose" "Verbose mode"]
@@ -943,7 +943,7 @@
      :delegate put-json}]])
 
 (let [{:keys [options arguments summary errors]}
-      (parse-opts (next *command-line-args*)  cli-options :in-order true)
+      (parse-opts (next *command-line-args*)  global-cli-options :in-order true)
       command (first arguments)
       {:keys [cli-options delegate]} ((into {} commands) (first arguments))
 
@@ -988,9 +988,13 @@
     (find (into {} commands) command)
     (binding [*debug* (:debug options)]
       (if delegate
-        (delegate
-         (-> (parse-opts (next arguments) cli-options)
-             (update :options merge options)))
+        (let [opts (parse-opts (next arguments) (concat global-cli-options
+                                                        cli-options))]
+          (when-let [err (some->> opts :errors (str/join ", "))]
+            (println (str ansi/red-font "Error: " err)))
+          (delegate
+           (-> opts
+               (update :options merge options))))
         (println "No implementation:" command)))
 
     (first arguments)
