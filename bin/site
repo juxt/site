@@ -1,5 +1,5 @@
 #_( ;; Allow this script to be executed directly
-   "exec" "bb" "$0" "$(readlink -f $(dirname $0)/..)" "$@"
+   "exec" "bb" "--classpath" "$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')" "$0" "$(readlink -f $(dirname $0)/..)" "$@"
    )
 
 ;; Copyright © 2021, JUXT LTD.
