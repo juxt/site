@@ -63,7 +63,7 @@
   :test
   {:extra-paths ["dev" "test"]
    :extra-deps
-   {lambdaisland/kaocha {:mvn/version "1.0.829"}
+   {lambdaisland/kaocha {:mvn/version "1.0.887"}
     lambdaisland/kaocha-junit-xml {:mvn/version "0.0.76"}}}
 
   :prod
