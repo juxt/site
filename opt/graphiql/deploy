@@ -1,0 +1,7 @@
+#!/bin/bash
+
+curl -o index.html https://raw.githubusercontent.com/graphql/graphiql/main/examples/graphiql-cdn/index.html
+
+site put-asset --file index.html --type "text/html;charset=utf8" --path /graphiql/index.html
+
+#rm -f index.html
