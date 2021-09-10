@@ -124,6 +124,45 @@
        (map first)
        (sort)))
 
+(defn now-id []
+  (.format
+   (.withZone
+    (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd-HHmmss")
+    (java.time.ZoneId/systemDefault))
+   (java.time.Instant/now)))
+
+(defn export
+  "Export all resources to a file."
+  ([]
+   (let [zos (-> (str (now-id) ".edn.zip")
+                 io/file
+                 io/output-stream
+                 java.util.zip.ZipOutputStream.)
+         _ (.putNextEntry zos (java.util.zip.ZipEntry. "resources.edn"))
+         out (-> zos
+               java.io.OutputStreamWriter.
+               )]
+     (export out)))
+  ([out]
+   (let [encoder (java.util.Base64/getEncoder)
+         resources
+         (->> (q '{:find [(pull e [*])]
+                   :where [[e :crux.db/id]]})
+              (map first)
+              (filter #(not= (::site/type %) "Request"))
+              (sort-by str))]
+
+     (defmethod print-method (type (byte-array [])) [x writer]
+       (.write writer "#juxt.site/base64")
+       (.write writer (str " \"" (String. (.encode encoder x)) "\"")))
+
+     (with-open [w (io/writer out)]
+       (doseq [e resources]
+         (.write w (pr-str e))
+         (.write w (System/lineSeparator))))
+     (remove-method print-method (type (byte-array [])))
+     (printf "Dumped %d resources\n" (count resources)))))
+
 (defn cat-type
   [t]
   (->> (q '{:find [(pull e [*])]
