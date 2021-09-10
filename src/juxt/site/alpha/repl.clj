@@ -131,7 +131,28 @@
     (java.time.ZoneId/systemDefault))
    (java.time.Instant/now)))
 
-(defn export
+(defn base64-reader [form]
+  {:pre [(string? form)]}
+  (let [decoder (java.util.Base64/getDecoder)]
+    (.decode decoder form)))
+
+;; Start import at 00:35
+
+(defn resources-from-stream [in]
+  (let [record (edn/read {:eof :eof :readers {'juxt.site/base64 base64-reader}} in)]
+    (when (not= record :eof)
+      (cons record (lazy-seq (resources-from-stream in))))))
+
+(defn import-resources []
+  (let [node (crux-node)
+        in (java.io.PushbackReader. (io/reader (io/input-stream (io/file "import/resources.edn"))))]
+    (doseq [rec (resources-from-stream in)]
+      (println "Importing record" (:crux.db/id rec))
+      (x/submit-tx node [[:crux.tx/put rec]]))
+    (x/sync node)
+    (println "Import finished.")))
+
+(defn export-resources
   "Export all resources to a file."
   ([]
    (let [zos (doto
@@ -139,9 +160,9 @@
                      io/file
                      io/output-stream
                      java.util.zip.ZipOutputStream.)
-               (.putNextEntry (java.util.zip.ZipEntry. "resources.edn")))
+                 (.putNextEntry (java.util.zip.ZipEntry. "resources.edn")))
          out (java.io.OutputStreamWriter. zos)]
-     (export out)))
+     (export-resources out)))
   ([out]
    (let [encoder (java.util.Base64/getEncoder)
          resources
