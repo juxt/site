@@ -134,14 +134,13 @@
 (defn export
   "Export all resources to a file."
   ([]
-   (let [zos (-> (str (now-id) ".edn.zip")
-                 io/file
-                 io/output-stream
-                 java.util.zip.ZipOutputStream.)
-         _ (.putNextEntry zos (java.util.zip.ZipEntry. "resources.edn"))
-         out (-> zos
-               java.io.OutputStreamWriter.
-               )]
+   (let [zos (doto
+                 (-> (str (now-id) ".edn.zip")
+                     io/file
+                     io/output-stream
+                     java.util.zip.ZipOutputStream.)
+               (.putNextEntry (java.util.zip.ZipEntry. "resources.edn")))
+         out (java.io.OutputStreamWriter. zos)]
      (export out)))
   ([out]
    (let [encoder (java.util.Base64/getEncoder)
@@ -157,11 +156,18 @@
        (.write writer (str " \"" (String. (.encode encoder x)) "\"")))
 
      (with-open [w (io/writer out)]
-       (doseq [e resources]
-         (.write w (pr-str e))
-         (.write w (System/lineSeparator))))
+       (doseq [batch (partition-all 100 (map vector (range) resources))]
+         (doseq [[_ e] batch]
+           (.write w (pr-str e))
+           (.write w (System/lineSeparator)))
+         (let [n (inc (first (last batch)))
+               total (count resources)
+               pct (float (/ (* 100 n) total))]
+           (printf "Written %d/%d (%.2f%%) resources\n" n total pct))))
+
      (remove-method print-method (type (byte-array [])))
      (printf "Dumped %d resources\n" (count resources)))))
+
 
 (defn cat-type
   [t]
