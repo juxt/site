@@ -603,8 +603,9 @@
 
             :else
             (throw
-             (ex-info (format "post-fn is neither a function or a symbol, but type '%s'" (type post-fn))
-                      (into req {:ring.response/status 500}))))]
+             (ex-info
+              (format "post-fn is neither a function or a symbol, but type '%s'" (type post-fn))
+              (into req {:ring.response/status 500}))))]
       (post req))))
 
 (defn PUT [{::site/keys [resource] :as req}]
@@ -613,12 +614,29 @@
         put-fn (::site/put-fn resource)]
 
     (log/tracef "PUT, put-fn is %s" put-fn)
-    (cond
-      (fn? put-fn) (put-fn req)
-      :else
-      (throw
-       (ex-info "Resource allows PUT but doesn't contain have a put-fn function"
-                (into req {:ring.response/status 500}))))))
+    (let [put
+          (cond
+            (fn? put-fn) (put-fn req)
+            (symbol? put-fn)
+            (try
+              (requiring-resolve put-fn)
+              (catch Exception e
+                (throw (ex-info
+                        (format "put-fn '%s' is not resolvable" put-fn)
+                        (into req {::put-fn put-fn
+                                   :ring.response/status 500})))))
+            (nil? put-fn)
+            (throw
+             (ex-info
+              "Resource allows PUT but doesn't contain have a put-fn function"
+              (into req {:ring.response/status 500})))
+
+            :else
+            (throw
+             (ex-info
+              (format "put-fn is neither a function or a symbol, but type '%s'" (type put-fn))
+              (into req {:ring.response/status 500}))))]
+      (put req))))
 
 (defn PATCH [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
@@ -949,6 +967,9 @@
     :ring.request/keys [method]
     :ring.response/keys [body]
     :as req}]
+
+  (assert req)
+  (assert start-date)
 
   (let [end-date (java.util.Date.)
         req (assoc req
