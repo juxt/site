@@ -71,7 +71,7 @@
                   (str ".password-store/" unix-pass-password-prefix username ".gpg"))]
     (if (.exists passfile)
       (do
-        (message! "Extracting password from " (str passfile))
+        (message! "Extracting password from" (str passfile))
         (let [{:keys [exit out]} (sh/sh "gpg" "-d" (str passfile))]
           (when (zero? exit) (str/trim out))))
       (error-and-exit! 1 (format "Passfile does not exist: %s" passfile)))))
@@ -131,7 +131,7 @@
       (cond
         (= status 401)
         (do
-          (message! "Server response: " status " " body)
+          (message! "Server response:" status body)
           (message! (format "Are your credentials valid? request-id is %s" (get headers "site-request-id"))))
 
         (= status 200)
@@ -253,8 +253,8 @@
 
         :else
         (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
+          (error! "Server response:" status (str/trim body))
+          (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn reset-password
   "Reset a user's password"
@@ -295,7 +295,7 @@
         :else
         (do
           (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
+          (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn put-user
   "Create or update a user"
@@ -338,7 +338,7 @@
         :else
         (do
           (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id"))))
+          (message! "Request id:" (get headers "site-request-id"))))
 
       (when (#{201 204} status) (reset-password opts)))))
 
@@ -370,7 +370,7 @@
           (error! "Server response: " status " " (str/trim body))
           (message! "Is your access-token valid?")
           (message! "To get a new access token, use the get-token sub-command")
-          (message! "Request id: " (get headers "site-request-id")))
+          (message! "Request id:" (get headers "site-request-id")))
 
         (= status 201)
         (message! "Role created:" role)
@@ -381,7 +381,7 @@
         :else
         (do
           (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
+          (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn list-roles
   "List roles"
@@ -403,7 +403,7 @@
         :else
         (do
           (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
+          (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn assign-role
   "Assign a role to a user"
@@ -434,7 +434,7 @@
           (error! "Server response: " status " " (str/trim body))
           (message! "Is your access-token valid?")
           (message! "To get a new access token, use the get-token sub-command")
-          (message! "Request id: " (get headers "site-request-id")))
+          (message! "Request id:" (get headers "site-request-id")))
 
         (= status 201)
         (message! "Assignment created:" username "assigned role of" role)
@@ -444,8 +444,8 @@
 
         :else
         (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
+          (error! "Server response:" status (str/trim body))
+          (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn put-rule
   "Put a rule"
@@ -478,8 +478,8 @@
 
         :else
         (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
+          (error! "Server response:" status (str/trim body))
+          (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn put-trigger
   "Put a trigger"
@@ -513,8 +513,8 @@
 
         :else
         (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
+          (error! "Server response:" status (str/trim body))
+          (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn put-redirect
   "Put a redirect"
@@ -541,10 +541,10 @@
       (cond
         (= status 401)
         (do
-          (error! "Server response: " status " " (str/trim body))
+          (error! "Server response:" status (str/trim body))
           (message! "Is your access-token valid?")
           (message! "To get a new access token, use the get-token sub-command")
-          (message! "Request id: " (get headers "site-request-id")))
+          (message! "Request id:" (get headers "site-request-id")))
 
         (= status 201)
         (message! (format "Redirect created"))
@@ -554,8 +554,8 @@
 
         :else
         (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
+          (error! "Server response:" status (str/trim body))
+          (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn put-api
   "Upload and install an API"
@@ -594,8 +594,8 @@
 
       :else
       (do
-        (error! "Server response: " status " " (str/trim body))
-        (message! "Request id: " (get headers "site-request-id"))))))
+        (error! "Server response:" status (str/trim body))
+        (message! "Request id:" (get headers "site-request-id"))))))
 
 (defn sh [& args]
   (let [{:keys [exit out err]} (apply sh/sh args)]
@@ -605,7 +605,7 @@
 (defn create-tmp-dir []
   (let [tmpdir (Files/createTempDirectory
                 "site-" (into-array FileAttribute []))]
-    (message! "Created tmp dir: " (.toString tmpdir))
+    (message! "Created tmp dir:" (.toString tmpdir))
     tmpdir))
 
 (defn content-type [filename]
@@ -644,10 +644,10 @@
     (cond
       (= status 401)
       (do
-        (error! "Server response: " status " " (str/trim body))
+        (error! "Server response:" status (str/trim body))
         (message! "Is your access-token valid?")
         (message! "To get a new access token, use the get-token sub-command")
-        (message! "Request id: " (get headers "site-request-id")))
+        (message! "Request id:" (get headers "site-request-id")))
 
       (= status 201)
       (message! (format "Asset created: %s" path))
@@ -657,8 +657,8 @@
 
       :else
       (do
-        (error! "Server response: " status " " (str/trim body))
-        (message! "Request id: " (get headers "site-request-id"))))))
+        (error! "Server response:" status (str/trim body))
+        (message! "Request id:" (get headers "site-request-id"))))))
 
 (defn put-asset
   "Upload an asset"
@@ -718,8 +718,8 @@
             (message! (format "Resources all posted OK"))))
 
         (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
+          (error! "Server response:" status (str/trim body))
+          (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn post-json
   "Post JSON to a resource"
@@ -748,8 +748,8 @@
                           (case status 201 "created" 204 "updated")
                           (get headers "location")))
         (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
+          (error! "Server response:" status (str/trim body))
+          (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn put-json
   "PUT JSON to a resource"
@@ -786,8 +786,8 @@
                           (case status 201 "created" 204 "updated")
                           (get headers "location")))
         (do
-          (error! "Server response: " status " " (str/trim body))
-          (message! "Request id: " (get headers "site-request-id")))))))
+          (error! "Server response:" status (str/trim body))
+          (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn debugf
   "Write a debug message to the console, but only if *debug* is true."
