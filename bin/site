@@ -642,6 +642,9 @@
           :throw false})]
 
     (cond
+      (= status 400)
+      (error! "Server response: " status " " (str/trim body))
+
       (= status 401)
       (do
         (error! "Server response:" status (str/trim body))
