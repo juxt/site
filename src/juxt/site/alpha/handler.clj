@@ -1052,6 +1052,14 @@
     503 "Service Unavailable"
     "Error"))
 
+;; TODO: I'm beginning to think that a resource should include the handling of
+;; all possible errors and error representations. So there shouldn't be such a
+;; thing as an 'error resource'. In this perspective, site-wide 'common'
+;; policies, such as a common 404 page, can be merged into the resource by the
+;; resource locator. Whether a user-agent is given error information could be
+;; subject to policy which is part of a common configuration. But the resource
+;; itself should be ignorant of such policies.
+
 (defn error-resource
   "Locate an error resource. Currently only uses a simple database lookup of an
   'ErrorResource' entity matching the status. In future this could use rules to
