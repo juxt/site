@@ -289,7 +289,7 @@
             :throw false})]
       (cond
         (= status 401)
-        (error! "Server response: " status " " (str/trim body))
+        (error-and-exit! 1 "Server response: " status " " (str/trim body))
 
         (= (quot status 100) 2)
         (message! "Password reset for" username)
@@ -635,6 +635,8 @@
         (curl/put
          (str base-uri path)
          {:headers (cond-> {"authorization" (format "Bearer %s" access-token)
+                            ;; want errors in text/plain, will accept json
+                            "accept" "text/plain,application/json;q=0.8"
                             "content-type" type}
                      encoding (assoc "content-encoding" encoding)
                      language (assoc "content-language" language)
@@ -645,7 +647,9 @@
 
     (cond
       (= status 400)
-      (error! "Server response:" status (str/trim body))
+      (do
+        (error! "Server response:" status)
+        (when body (println (str/trim body))))
 
       (= status 401)
       (do
@@ -725,6 +729,57 @@
         (do
           (error! "Server response:" status (str/trim body))
           (message! "Request id:" (get headers "site-request-id")))))))
+
+(defn post
+  "Post a resource"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [base-uri path url type encoding language data file]
+         :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+
+    (when-not (or path url)
+      (error-and-exit! 1 "PATH or URI required"))
+
+    (when (and path url)
+      (error-and-exit! 1 "Must specify one of PATH and URI"))
+
+    (when (and data file)
+      (error-and-exit! 1 "Must specify one of DATA and FILE"))
+
+    (when (and file (not (.exists (io/file file))))
+      (error-and-exit! 1 (str "File not found: " file)))
+
+    (let [url (if path (str base-uri path) (str/replace url "{{base-uri}}" base-uri))
+
+          type (or
+                type
+                (when file (content-type (.getName file)))
+                (error-and-exit! 1 "Content-type must be specified or deducible from the file name"))
+
+          {:keys [status headers body]}
+          (curl/post
+           url
+           {:headers (cond-> {"authorization" (format "Bearer %s" access-token)
+                              "content-type" type}
+                       encoding (assoc "content-encoding" encoding)
+                       language (assoc "content-language" language))
+            :body (or data (slurp (io/file file)))
+            :throw false})]
+      (case status
+        200
+        (do
+          (message! (format "OK: %s" status))
+          (println (str/trim body)))
+
+        (201 204)
+        (message! (format "Resource %s: %s"
+                          (case status 201 "created" 204 "updated")
+                          (get headers "location")))
+        (do
+          (error-and-exit! 1 "Server response:" status (str/trim body))
+          ;;(message! "Request id:" (get headers "site-request-id"))
+          )))))
 
 (defn post-json
   "Post JSON to a resource"
@@ -907,6 +962,23 @@
     {:description (:doc (meta #'post-resources))
      :cli-options [["-f" "--file FILE" "Resource file (in EDN format)"]]
      :delegate post-resources}]
+
+   ["post"
+    {:description (:doc (meta #'post))
+     :cli-options
+     [ ;; One of these
+      ["-p" "--path PATH" "The destination path after the base-uri"]
+      ["-u" "--url URL" "URL to post to"]
+
+      ["-t" "--type MIME_TYPE" "The content-type"] ; If missing, try to deduce
+                                                   ; from other the file suffix
+      ["-e" "--encoding ENCODING" "The content-encoding (optional)"]
+      ["-l" "--language LANGUAGE" "The content-language (optional)"]
+
+      ;; One of these
+      ["-d" "--data DATA" "Data to post"]
+      ["-f" "--file FILE" "File containing data"]]
+     :delegate post}]
 
    ["post-json"
     {:description (:doc (meta #'post-json))
