@@ -19,6 +19,7 @@
    (java.nio.file Files)
    (java.nio.file.attribute FileAttribute)))
 
+(def ^:dynamic *silent* nil)
 (def ^:dynamic *debug* nil)
 
 (def site-root-dir (io/file (first *command-line-args*)))
@@ -42,7 +43,8 @@
   (System/exit 1))
 
 (defn message! [& msg]
-  (apply println (apply str ansi/bold-green-font "site:" ansi/reset-font) msg))
+  (when-not *silent*
+    (apply println (apply str ansi/bold-green-font "site:" ansi/reset-font) msg)))
 
 (def config-file
   (case (System/getProperty "os.name")
@@ -800,6 +802,7 @@
 
 (def global-cli-options
   [["-b" "--base-uri BASE-URI" "The Base-URI of the server you are targetting"]
+   ["-s" "--silent" "Silent mode"]
    ["-d" "--debug" "Enable debug mode"]
    ["-v" "--verbose" "Verbose mode"]
    ["-h" "--help" "Show this summary"]])
@@ -961,7 +964,8 @@
       (println err))
 
     (find (into {} commands) command)
-    (binding [*debug* (:debug options)]
+    (binding [*silent* (:silent options)
+              *debug* (:debug options)]
       (if delegate
         (let [opts (parse-opts (next arguments) (concat global-cli-options
                                                         cli-options))]
