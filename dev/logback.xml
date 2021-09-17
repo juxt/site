@@ -80,7 +80,7 @@
   </appender>
 
   <!-- Root log level is "ALL", meaning all log levels are emitted. -->
-  <root level="ALL">
+  <root level="INFO">
 
     <!-- Send all log messages to console (filtered to INFO) -->
     <appender-ref ref="CONSOLE" />
