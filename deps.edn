@@ -30,6 +30,12 @@
          :sha "e4b314cb9e94121fe8005c5628f7f33d28cdefd4"}
         #_{:local/root "../pick"}
 
+        juxt/grab
+        {:git/url "https://github.com/juxt/grab.git"
+         :sha "3a9fefbe3e92fc745f2c5ad69990cfc890f1f8fd"
+         ;;:local/root "../grab"
+         }
+
         ;; JSON Schema support functions
         jinx/jinx
         {:git/url "https://github.com/juxt/jinx.git"

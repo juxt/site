@@ -530,9 +530,14 @@
         template (some->> selected-representation ::site/template (x/entity db))]
     (cond
       body-fn
-      (let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
-        (log/debugf "Calling body-fn: %s" body-fn)
-        (assoc req :ring.response/body (f req)))
+      (if-let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
+        (do
+          (log/debugf "Calling body-fn: %s %s" body-fn (type body-fn))
+          (assoc req :ring.response/body (f req)))
+        (throw
+         (ex-info
+          (format "body-fn cannot be resolved: %s" body-fn)
+          {:body-fn body-fn})))
 
       template (templating/render-template req template)
 
@@ -616,7 +621,8 @@
     (log/tracef "PUT, put-fn is %s" put-fn)
     (let [put
           (cond
-            (fn? put-fn) (put-fn req)
+            (fn? put-fn)
+            put-fn
             (symbol? put-fn)
             (try
               (requiring-resolve put-fn)
@@ -636,7 +642,9 @@
              (ex-info
               (format "put-fn is neither a function or a symbol, but type '%s'" (type put-fn))
               (into req {:ring.response/status 500}))))]
-      (put req))))
+      (if-let [response (put req)]
+        response
+        (throw (ex-info "put-fn returned a nil response" {:put-fn put-fn}))))))
 
 (defn PATCH [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
@@ -999,7 +1007,10 @@
 
 (defn wrap-initialize-response [h]
   (fn [req]
-    (respond (h req))))
+    (assert req)
+    (let [response (h req)]
+      (assert response)
+      (respond response))))
 
 (defn wrap-cors-headers [h]
   (fn [req]
@@ -1052,13 +1063,58 @@
     503 "Service Unavailable"
     "Error"))
 
+(defn errors-with-causes
+  "Return a collection of errors with their messages and causes"
+  [e]
+  (let [cause (.getCause e)]
+    (cond->
+        {:message (.getMessage e)
+         :stack (.getStackTrace e)}
+        (and
+         (instance? clojure.lang.ExceptionInfo e)
+         (nil? (::site/start-date (ex-data e)))) (assoc :ex-data (ex-data e))
+        cause (assoc :cause (errors-with-causes cause)))))
+
+(defn put-error-representation
+  "If method is PUT"
+  [{::site/keys [resource] :ring.response/keys [status] :as req} e]
+  (let [{::http/keys [put-error-representations]} resource
+        put-error-representations
+        (filter
+         (fn [rep]
+           (if-some [applies-to (:ring.response/status rep)]
+             (= applies-to status)
+             true)) put-error-representations)]
+
+    (when (seq put-error-representations)
+      (some-> (negotiate-representation req put-error-representations)
+              ;; Content-Location is not appropriate for errors.
+              (dissoc ::http/content-location)))))
+
+(defn post-error-representation
+  "If method is POST"
+  [{::site/keys [resource] :ring.response/keys [status] :as req} e]
+  (let [{::http/keys [post-error-representations]} resource
+        post-error-representations
+        (filter
+         (fn [rep]
+           (if-some [applies-to (:ring.response/status rep)]
+             (= applies-to status)
+             true)) post-error-representations)]
+
+    (when (seq post-error-representations)
+      (some-> (negotiate-representation req post-error-representations)
+              ;; Content-Location is not appropriate for errors.
+              (dissoc ::http/content-location)))))
+
 ;; TODO: I'm beginning to think that a resource should include the handling of
 ;; all possible errors and error representations. So there shouldn't be such a
 ;; thing as an 'error resource'. In this perspective, site-wide 'common'
 ;; policies, such as a common 404 page, can be merged into the resource by the
 ;; resource locator. Whether a user-agent is given error information could be
 ;; subject to policy which is part of a common configuration. But the resource
-;; itself should be ignorant of such policies.
+;; itself should be ignorant of such policies. Additionally, this is more
+;; aligned to OpenAPI's declaration of per-resource errors.
 
 (defn error-resource
   "Locate an error resource. Currently only uses a simple database lookup of an
@@ -1072,17 +1128,97 @@
                      [er :ring.response/status status]]
              :in [status]} status)))
 
-(defn errors-with-causes
-  "Return a collection of errors with their messages and causes"
-  [e]
-  (let [cause (.getCause e)]
-    (cond->
-        {:message (.getMessage e)
-         :stack (.getStackTrace e)}
-        (and
-         (instance? clojure.lang.ExceptionInfo e)
-         (nil? (::site/start-date (ex-data e)))) (assoc :ex-data (ex-data e))
-        cause (assoc :cause (errors-with-causes cause)))))
+(defn error-resource-representation
+  "Experimental. An error resource is a Not sure this is a good idea to have a 'global' error
+  resource. Better to merge error handling into each resource (using the
+  resource locator)."
+  [req e]
+  (let [{:ring.response/keys [status] :as ex-data} (ex-data e)]
+
+    (when-let [error-resource (error-resource req (or status 500))]
+      (let [
+            ;; Allow errors to be transmitted to developers
+            error-resource
+            (assoc error-resource
+                   ::site/access-control-allow-origins
+                   {"http://localhost:8000"
+                    {::site/access-control-allow-methods #{:get :put :post :delete}
+                     ::site/access-control-allow-headers #{"authorization" "content-type"}
+                     ::site/access-control-allow-credentials true}})
+
+            error-resource
+            (-> error-resource
+                #_(update ::site/template-model assoc
+                          "_site" {"status" {"code" status
+                                             "message" (status-message status)}
+                                   "error" {"message" (.getMessage e)}
+                                   "uri" (::site/uri req)}))
+
+            error-representations
+            (current-representations
+             (assoc req
+                    ::site/resource error-resource
+                    ::site/uri (:crux.db/id error-resource)))
+
+            ]
+
+        (when (seq error-representations)
+          (some-> (negotiate-representation req error-representations)
+                  ;; Content-Location is not appropriate for errors.
+                  (dissoc ::http/content-location)))))))
+
+(defn respond-internal-error [req e]
+  (log/error e (.getMessage e))
+  ;; TODO: We should allow an ErrorResource for 500 errors
+  (let [default-body "Internal Error\r\n"]
+    (respond
+     (into
+      req
+      {:ring.response/status 500
+       :ring.response/body default-body
+       ::site/error (.getMessage e)
+       ::site/error-stack-trace (.getStackTrace e)
+       ::site/selected-representation
+       {::http/content-type "text/plain;charset=utf-8"
+        ::http/content-length (count default-body)
+        :ring.response/body default-body}
+       }))))
+
+(defn error-response
+  "Respond with the given error"
+  [req e]
+
+  (let [{:ring.request/keys [method]} req
+        {:ring.response/keys [status] :as ex-data} (ex-data e)
+
+        site-exception? (some? (::site/start-date ex-data))
+
+        _   (log/infof "Error response: method is %s" method)
+
+        representation (or
+                        (when (= method :put) (put-error-representation req e))
+                        (when (= method :post) (post-error-representation req e))
+                        (error-resource-representation req e)
+                        (let [content (str (status-message status) "\r\n")]
+                          {::http/content-type "text/plain;charset=utf-8"
+                           ::http/content-length (count content)
+                           ::http/content content}))]
+
+    (log/tracef "error-representation: %s" (pr-str representation))
+
+    (let [error-resource (merge
+                          (when-not site-exception? req)
+                          {:ring.response/status 500
+                           ::site/errors (errors-with-causes e)}
+                          ex-data
+                          {::site/resource error-resource}
+                          {::site/selected-representation representation})
+          response (try
+                     (add-payload error-resource)
+                     (catch Exception e
+                       (respond-internal-error req e)))]
+
+      (respond response))))
 
 (defn wrap-error-handling
   "Return a handler that constructs proper Ring responses, logs and error
@@ -1096,6 +1232,8 @@
       (h req)
       (catch clojure.lang.ExceptionInfo e
 
+        (log/info "ERROR")
+
         (let [{:ring.response/keys [status] :as ex-data} (ex-data e)]
 
           (log/tracef "status %s" status)
@@ -1105,75 +1243,11 @@
             (let [ex-data (->storable ex-data)]
               (log/errorf e "%s: %s" (.getMessage e) (pr-str ex-data))))
 
-          (let [error-resource (error-resource req (or status 500))
-                _ (log/tracef "error-resource: %s" (pr-str error-resource))
+          (error-response (if (some? (::site/start-date ex-data)) ex-data req) e)))
 
-                ;; Allow errors to be transmitted to developers
-                error-resource
-                (assoc error-resource
-                       ::site/access-control-allow-origins
-                       {"http://localhost:8000"
-                        {::site/access-control-allow-methods #{:get :put :post :delete}
-                         ::site/access-control-allow-headers #{"authorization" "content-type"}
-                         ::site/access-control-allow-credentials true}})
+      (catch Throwable t
+        (respond-internal-error req t))
 
-                error-resource
-                (-> error-resource
-                    #_(update ::site/template-model assoc
-                              "_site" {"status" {"code" status
-                                                 "message" (status-message status)}
-                                       "error" {"message" (.getMessage e)}
-                                       "uri" (::site/uri req)}))
-
-                error-representations
-                (when error-resource
-                  (current-representations
-                   (assoc req
-                          ::site/resource error-resource
-                          ::site/uri (:crux.db/id error-resource))))
-
-                _ (log/tracef "error-representations: %s" (pr-str error-representations))
-
-                representation
-                (or
-                 (when (seq error-representations)
-                   (some-> (negotiate-representation req error-representations)
-                           ;; Content-Location is not appropriate for errors.
-                           (dissoc ::http/content-location)))
-                 (let [content (str (status-message status) "\r\n")]
-                   {::http/content-type "text/plain;charset=utf-8"
-                    ::http/content-length (count content)
-                    ::http/content content}))
-
-                site-exception? (some? (::site/start-date ex-data))]
-
-            (respond
-             (add-payload
-              (merge
-               (when-not site-exception? req)
-               {:ring.response/status 500
-                ::site/errors (errors-with-causes e)}
-               ex-data
-               {::site/resource error-resource}
-               (when representation
-                 {::site/selected-representation representation})))))))
-
-      (catch Throwable e
-        (log/error e (.getMessage e))
-        ;; TODO: We should allow an ErrorResource for 500 errors
-        (let [default-body "Internal Error\r\n"]
-          (respond
-           (into
-            req
-            {:ring.response/status 500
-             :ring.response/body default-body
-             ::site/error (.getMessage e)
-             ::site/error-stack-trace (.getStackTrace e)
-             ::site/selected-representation
-             {::http/content-type "text/plain;charset=utf-8"
-              ::http/content-length (count default-body)
-              :ring.response/body default-body}
-             }))))
       (finally
         (org.slf4j.MDC/clear)))))
 

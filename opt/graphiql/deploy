@@ -1,7 +1,12 @@
 #!/bin/bash
 
-curl -o index.html https://raw.githubusercontent.com/graphql/graphiql/main/examples/graphiql-cdn/index.html
+# GraphiQL console
+site -s put-asset --file index.html --type "text/html;charset=utf8" --path /graphiql/index.html
 
-site put-asset --file index.html --type "text/html;charset=utf8" --path /graphiql/index.html
+# Set up /graphql to be a schema end-point where we can PUT schemas
+site -s post-resources --file resources.edn
 
-#rm -f index.html
+# Put the schema
+site -s put-asset --file schema.graphql --type application/graphql --path /graphql
+
+site -s post --data "{ holidays { id user { id username name email } startDate endDate description } }" --path "/graphql" --type "application/graphql"
