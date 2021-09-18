@@ -1129,25 +1129,25 @@
              :in [status]} status)))
 
 (defn error-resource-representation
-  "Experimental. An error resource is a Not sure this is a good idea to have a 'global' error
+  "Experimental. Not sure this is a good idea to have a 'global' error
   resource. Better to merge error handling into each resource (using the
   resource locator)."
   [req e]
-  (let [{:ring.response/keys [status] :as ex-data} (ex-data e)]
+  (let [{:ring.response/keys [status]} (ex-data e)]
 
-    (when-let [error-resource (error-resource req (or status 500))]
+    (when-let [er (error-resource req (or status 500))]
       (let [
             ;; Allow errors to be transmitted to developers
-            error-resource
-            (assoc error-resource
+            er
+            (assoc er
                    ::site/access-control-allow-origins
                    {"http://localhost:8000"
                     {::site/access-control-allow-methods #{:get :put :post :delete}
                      ::site/access-control-allow-headers #{"authorization" "content-type"}
                      ::site/access-control-allow-credentials true}})
 
-            error-resource
-            (-> error-resource
+            er
+            (-> er
                 #_(update ::site/template-model assoc
                           "_site" {"status" {"code" status
                                              "message" (status-message status)}
@@ -1157,10 +1157,8 @@
             error-representations
             (current-representations
              (assoc req
-                    ::site/resource error-resource
-                    ::site/uri (:crux.db/id error-resource)))
-
-            ]
+                    ::site/resource er
+                    ::site/uri (:crux.db/id er)))]
 
         (when (seq error-representations)
           (some-> (negotiate-representation req error-representations)
@@ -1193,8 +1191,6 @@
 
         site-exception? (some? (::site/start-date ex-data))
 
-        _   (log/infof "Error response: method is %s" method)
-
         representation (or
                         (when (= method :put) (put-error-representation req e))
                         (when (= method :post) (post-error-representation req e))
@@ -1211,7 +1207,7 @@
                           {:ring.response/status 500
                            ::site/errors (errors-with-causes e)}
                           ex-data
-                          {::site/resource error-resource}
+                          {::site/resource nil}
                           {::site/selected-representation representation})
           response (try
                      (add-payload error-resource)
