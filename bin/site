@@ -617,8 +617,8 @@
            ".json" "application/json"
            ".js.map" "application/json"
            ".css.map" "application/json"
-           ".css" "text/css"
-           ".html" "text/html"
+           ".css" "text/css;charset=utf-8"
+           ".html" "text/html;charset=utf-8"
            ".png" "image/png"} suffix)
      (error-and-exit! 1 "Failed to determine content-type for" filename (format "(suffix=%s)" suffix)))))
 
