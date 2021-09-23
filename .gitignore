@@ -2,3 +2,4 @@
 .nrepl-port
 log/
 db/
+opt/graphiql/target
