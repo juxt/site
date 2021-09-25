@@ -1,4 +1,4 @@
-.PHONY: download deploy
+.PHONY: download deploy introspect
 
 deploy:	download
 	site put-asset --file target/react.js --path /graphiql/react.js
@@ -18,7 +18,10 @@ target/react-dom.js:
 	curl -L -o $@ https://unpkg.com/react-dom@16/umd/react-dom.development.js
 
 target/graphiql.css:
-	curl -L -o $@ https://unpkg.com/graphiql/graphiql.min.css
+	curl -L -o $@ https://unpkg.com/graphiql/graphiql.css
 
 target/graphiql.js:
-	curl -L -o $@ https://unpkg.com/graphiql/graphiql.min.js
+	curl -L -o $@ https://unpkg.com/graphiql/graphiql.js
+
+introspect:
+	@site -s post --file graphiql-introspection-query.graphql --path /graphql --type application/graphql
