@@ -1069,7 +1069,7 @@
     412 "Precondition Failed"
     413 "Payload Too Large"
     415 "Unsupported Media Type"
-    500 "Server Error"
+    500 "Internal Server Error"
     501 "Not Implemented"
     503 "Service Unavailable"
     "Error"))
@@ -1179,7 +1179,7 @@
 (defn respond-internal-error [req e]
   (log/error e (.getMessage e))
   ;; TODO: We should allow an ErrorResource for 500 errors
-  (let [default-body "Internal Error\r\n"]
+  (let [default-body "Internal Server Error\r\n"]
     (respond
      (into
       req
