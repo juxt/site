@@ -2,16 +2,17 @@
 
 (ns juxt.site.alpha.graphql
   (:require
+   [clojure.pprint :refer [pprint]]
    [juxt.grab.alpha.schema :as schema]
    [juxt.grab.alpha.document :as document]
    [juxt.grab.alpha.execution :refer [execute-request]]
    [juxt.grab.alpha.parser :as parser]
    [jsonista.core :as json]
-   [clojure.java.io :as io]
    [clojure.string :as str]
    [crux.api :as xt]
    [clojure.tools.logging :as log]
-   [clojure.edn :as edn]))
+   [clojure.edn :as edn]
+   [clojure.walk :refer [postwalk]]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -25,15 +26,10 @@
     :field-resolver
     (fn [args]
       (let [lookup-type (::schema/provided-types schema)
-
             field (get-in args [:object-type ::schema/fields-by-name (get-in args [:field-name])])
-
-            xtdb-args (get-in field [::g/directives "xtdb" ::g/arguments])
-
+            xtdb-args (get-in field [::schema/directives-by-name "xtdb" ::g/arguments])
             field-kind (-> field ::g/type-ref ::g/name lookup-type ::g/kind)
-
             lookup-entity (fn [id] (xt/entity db id))]
-
         (cond
           (get xtdb-args "q")
           (for [[e] (xt/q db (edn/read-string (get xtdb-args "q")))]
@@ -46,27 +42,31 @@
               (lookup-entity val)
               val))
 
-
-          :else (do
-                  (def args args)
-                  (throw (ex-info (format "TODO: resolve field: %s" (:field-name args)) {:args args}))))))}))
-
-
-
-(comment
-  (let [schema (schema/compile-schema (parser/parse (slurp "opt/graphiql/schema.graphql")))
-        document (document/compile-document
-                  (parser/parse "query { holidays { id user { id name email } startDate endDate description } }")
-                  schema)]
-
-    (query schema document (juxt.site.alpha.repl/db))))
-
+          :else (throw
+                 (ex-info
+                  (format "TODO: resolve field: %s" (:field-name args)) {:args (with-out-str (pprint args))})))))}))
 
 (defn post-handler [{::site/keys [uri db] :as req}]
   (let [schema (some-> (xt/entity db uri) ::grab/schema)
-        document-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
+        body (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
+
+        _ (log/tracef "request keys are" (pr-str (keys (some-> req :juxt.site.alpha/received-representation))))
 
         ;; TODO: Should also support application/graphql+json
+        document-str
+        (case (some-> req ::site/received-representation ::http/content-type)
+          "application/json"
+          (some-> body json/read-value (get "query"))
+          (throw (ex-info "Unknown content type for GraphQL request" req))
+
+          "application/graphql"
+          body)
+
+        _ (log/tracef "GraphQL query is %s" document-str)
+
+        _ (when (nil? document-str)
+            (throw (ex-info "Nil GraphQL query" req)))
+
         document
         (try
           (document/compile-document (parser/parse document-str) schema)
@@ -79,14 +79,24 @@
                  req
                  (cond-> {:ring.response/status 400}
                    (seq errors) (assoc ::errors errors)))
-                e)))))]
+                e)))))
+
+        ;; TODO: If JSON, get operationName and use it here
+        results (query schema document db)
+
+        results (postwalk
+                  (fn [x]
+                    (cond-> x
+                      (and (vector? x) (= "kind" (first x)))
+                      (update 1 (comp str/upper-case name))))
+
+                  results)]
+
     (-> req
         (assoc
          :ring.response/status 200
-         :ring.response/body (json/write-value-as-string (query schema document db))))))
-
-;; Accept the application/graphql representation of the schema and compile
-;; it. The state of the resource is the compiled schema.
+         :ring.response/body
+         (json/write-value-as-string results)))))
 
 (defn put-handler [{::site/keys [uri db crux-node] :as req}]
   (let [schema-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
