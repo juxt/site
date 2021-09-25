@@ -582,6 +582,8 @@
 
     (into req {:ring.response/status (if existing 204 201)})))
 
+;; TODO: When this works, repeat for PUT
+
 (defn POST [{::site/keys [resource request-id] :as req}]
   (let [rep (->
              (receive-representation req)
@@ -589,17 +591,24 @@
         req (assoc req ::site/received-representation rep)
         post-fn (::site/post-fn resource)]
 
+    (log/tracef "post-fn is %s, type %s" post-fn (type post-fn))
+
     (let [post
           (cond
             (fn? post-fn) post-fn
+
             (symbol? post-fn)
             (try
-              (requiring-resolve post-fn)
+              (or
+               (requiring-resolve post-fn)
+               (throw (ex-info (format "Requiring resolve of %s returned nil" post-fn) {:post-fn post-fn})))
               (catch Exception e
-                (throw (ex-info
-                        (format "post-fn '%s' is not resolvable" post-fn)
-                        (into req {::post-fn post-fn
-                                   :ring.response/status 500})))))
+                (throw
+                 (ex-info
+                  (format "post-fn '%s' is not resolvable" post-fn)
+                  {::post-fn post-fn}
+                  e))))
+
             (nil? post-fn)
             (throw
              (ex-info
@@ -611,6 +620,8 @@
              (ex-info
               (format "post-fn is neither a function or a symbol, but type '%s'" (type post-fn))
               (into req {:ring.response/status 500}))))]
+
+      (assert post)
       (post req))))
 
 (defn PUT [{::site/keys [resource] :as req}]
