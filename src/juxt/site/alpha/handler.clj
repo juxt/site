@@ -1243,7 +1243,7 @@
 
         (let [{:ring.response/keys [status] :as ex-data} (ex-data e)]
 
-          (log/tracef "status %s" status)
+          (when status (log/tracef "status %s" status))
 
           ;; Don't log exceptions which are used to escape (e.g. 302, 401).
           (when (or (not (integer? status)) (>= status 500))
