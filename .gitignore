@@ -3,3 +3,6 @@
 log/
 db/
 opt/graphiql/target
+.DS_STORE
+.lsp
+.vscode
