@@ -1,0 +1,53 @@
+= GraphiQL browser
+
+graphiql.d.ts
+gulpfile.js  combining everything into a single file
+index.html
+Makefile
+package.json
+public
+README.md
+resources.edn the Site resource representing /graphql
+schema.graphql the GraphQL schema
+src where the code is
+tsconfig.json
+yarn.lock
+
+
+== Steps to install GraphiQL
+
+Install NPM packages
+
+----
+$ yarn
+----
+
+Build the index.html
+
+----
+$ yarn build
+----
+
+This outputs files into the `public` folder.
+
+Bundle the output files together into `build/index.html`
+
+----
+$ npx gulp
+----
+
+== Deploy the GraphiQL application to Site
+
+----
+$ site put-asset --file build/index.html --path /graphiql/index.html
+----
+
+
+
+
+
+== Steps to develop the GraphiQL console
+
+----
+$ yarn start
+----
