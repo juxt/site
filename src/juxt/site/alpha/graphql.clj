@@ -98,6 +98,14 @@
          :ring.response/body
          (json/write-value-as-string results)))))
 
+(defn put-schema [crux-node resource schema-str]
+  (let [schema (schema/compile-schema (parser/parse schema-str))]
+    (xt/await-tx
+     crux-node
+     (xt/submit-tx
+      crux-node
+      [[:crux.tx/put (assoc resource ::grab/schema schema)]]))))
+
 (defn put-handler [{::site/keys [uri db crux-node] :as req}]
   (let [schema-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
@@ -109,12 +117,18 @@
                req
                {:ring.response/status 400}))))
 
-        schema
-        (try
-          ;; The state of the resource
-          (schema/compile-schema (parser/parse schema-str))
-          (catch clojure.lang.ExceptionInfo e
-            (let [errors (:errors (ex-data e))]
+        resource (xt/entity db uri)]
+
+    (when (nil? resource)
+      (throw (ex-info "GraphQL resource not configured" {:uri uri})))
+
+    (try
+      (put-schema crux-node resource schema-str)
+      (assoc req :ring.response/status 204)
+      (catch clojure.lang.ExceptionInfo e
+        (let [errors (:errors (ex-data e))]
+          (if (seq errors)
+            (do
               (log/trace e "error")
               (log/tracef "schema errors: %s" (pr-str (:errors (ex-data e))))
               (throw
@@ -124,19 +138,14 @@
                  req
                  (cond-> {:ring.response/status 400}
                    (seq errors) (assoc ::errors errors)))
-                e)))))
-
-        resource (xt/entity db uri)]
-
-    (xt/await-tx
-     crux-node
-     (xt/submit-tx
-      crux-node
-      [[:crux.tx/put (assoc resource ::grab/schema schema)]]))
-
-    (-> req
-        (assoc
-         :ring.response/status 204))))
+                e)))
+            (throw
+             (ex-info
+              "Failed to put schema"
+              (into
+               req
+               {:ring.response/status 500})
+              e))))))))
 
 (defn put-error-json-body [req]
   (json/write-value-as-string

@@ -1,0 +1,24 @@
+schema {
+  query: Query
+}
+
+"""
+Root query object
+"""
+type Query {
+  allUsers: [User]
+@xtdb(q: """
+{:find [e] :where [[e :juxt.site.alpha/type "User"]]}
+""")
+  user(username: String): User
+}
+
+"""
+An object representing a Site user. Anyone who needs to log in to the system must have a user record.
+"""
+type User {
+  id: ID @xtdb(a: "crux.db/id")
+  username: String @xtdb(a: "juxt.pass.alpha/username")
+  name: String @xtdb(a: "name")
+  email: String @xtdb(a: "email")
+}
