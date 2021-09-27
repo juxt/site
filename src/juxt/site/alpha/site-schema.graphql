@@ -22,3 +22,9 @@ type User {
   name: String @xtdb(a: "name")
   email: String @xtdb(a: "email")
 }
+
+type Role {
+  id: ID @xtdb(a: "crux.db/id")
+  name: String @xtdb(a: "name")
+  description: String @xtdb(a: "description")
+}
