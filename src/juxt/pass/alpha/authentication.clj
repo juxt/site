@@ -8,6 +8,7 @@
    [crux.api :as x]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.rfc7235 :as rfc7235]
+   [juxt.site.alpha.main :refer [config]]
    [ring.util.codec :refer [form-decode url-decode]]
    [ring.middleware.cookies :refer [cookies-request cookies-response]]))
 
@@ -104,14 +105,16 @@
   (when-not (and username (re-matches #"[\p{Alnum}-_]+" username))
     (throw (ex-info "Username not valid format" {})))
 
-  (let [users (x/q db '{:find [r pwhash]
+  (let [{:juxt.site.alpha/keys [base-uri]} (config)
+        fq-username (str base-uri "/_site/users/" username)
+        users (x/q db '{:find [r pwhash]
                         :where [[r ::site/type "User"]
-                                [r ::pass/username username]
+                                [r :crux.db/id fq-username]
                                 [pe ::pass/user r]
                                 [pe ::site/type "Password"]
                                 [pe ::pass/password-hash pwhash]]
-                        :in [username]}
-                   username)]
+                        :in [fq-username]}
+                   fq-username)]
     (cond
       (> (count users) 1)
       (throw (ex-info (format "Multiple users found with username %s" username) {:users users})))
