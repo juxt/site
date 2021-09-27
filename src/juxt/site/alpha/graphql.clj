@@ -19,10 +19,11 @@
 (alias 'grab (create-ns 'juxt.grab.alpha))
 (alias 'g (create-ns 'juxt.grab.alpha.graphql))
 
-(defn query [schema document db]
+(defn query [schema document operation-name db]
   (execute-request
    {:schema schema
     :document document
+    :operation-name operation-name
     :field-resolver
     (fn [args]
       (let [lookup-type (::schema/provided-types schema)
@@ -53,14 +54,16 @@
         _ (log/tracef "request keys are" (pr-str (keys (some-> req :juxt.site.alpha/received-representation))))
 
         ;; TODO: Should also support application/graphql+json
-        document-str
+        [document-str operation-name]
         (case (some-> req ::site/received-representation ::http/content-type)
           "application/json"
-          (some-> body json/read-value (get "query"))
-          (throw (ex-info "Unknown content type for GraphQL request" req))
+          (let [json (some-> body json/read-value)]
+            [(get json "query") (get json "operationName")])
 
           "application/graphql"
-          body)
+          [body "Query"]
+
+          (throw (ex-info "Unknown content type for GraphQL request" req)))
 
         _ (log/tracef "GraphQL query is %s" document-str)
 
@@ -82,14 +85,14 @@
                 e)))))
 
         ;; TODO: If JSON, get operationName and use it here
-        results (query schema document db)
+        results (query schema document operation-name db)
 
+        ;; Map to application/json
         results (postwalk
                   (fn [x]
                     (cond-> x
                       (and (vector? x) (= "kind" (first x)))
                       (update 1 (comp str/upper-case name))))
-
                   results)]
 
     (-> req
