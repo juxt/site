@@ -7,11 +7,16 @@ Root query object
 """
 type Query {
   allUsers: [User]
-@xtdb(q: """
-{:find [e] :where [[e :juxt.site.alpha/type "User"]]}
-""")
-  user(username: String): User
-}
+  @xtdb(q: """
+    {:find [e] :where [[e :juxt.site.alpha/type "User"]]}
+    """)
+  user(username: String): [User]
+  @xtdb(q: """
+    {:find [e]
+    :where
+    [[e :juxt.site.alpha/type "User"]
+    [e :juxt.pass.alpha/username "mal"]]}
+    """)}
 
 """
 An object representing a Site user. Anyone who needs to log in to the system must have a user record.
@@ -21,6 +26,14 @@ type User {
   username: String @xtdb(a: "juxt.pass.alpha/username")
   name: String @xtdb(a: "name")
   email: String @xtdb(a: "email")
+  roles: [Role] @xtdb(q: """
+    {:find [role]
+    :where
+    [[role :juxt.site.alpha/type "Role"]
+     [mapping :juxt.site.alpha/type "UserRoleMapping"]
+     [mapping :juxt.pass.alpha/assignee object]
+     [mapping :juxt.pass.alpha/role role]]}
+""")
 }
 
 type Role {
