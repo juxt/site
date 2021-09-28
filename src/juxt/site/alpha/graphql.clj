@@ -31,10 +31,20 @@
             xtdb-args (get-in field [::schema/directives-by-name "xtdb" ::g/arguments])
             field-kind (-> field ::g/type-ref ::g/name lookup-type ::g/kind)
             lookup-entity (fn [id] (xt/entity db id))]
+
         (cond
           (get xtdb-args "q")
-          (for [[e] (xt/q db (edn/read-string (get xtdb-args "q")))]
-            (xt/entity db e))
+          (if-let [id (get-in args [:object-value :crux.db/id])]
+            (for [[e] (xt/q db
+                            (assoc
+                             (edn/read-string (get xtdb-args "q"))
+                             :in ['object])
+                            id)]
+              (xt/entity db e))
+
+            ;; No object
+            (for [[e] (xt/q db(edn/read-string (get xtdb-args "q")))]
+              (xt/entity db e)))
 
           (get xtdb-args "a")
           (let [att (get xtdb-args "a")
@@ -45,7 +55,7 @@
 
           :else (throw
                  (ex-info
-                  (format "TODO: resolve field: %s" (:field-name args)) {:args (with-out-str (pprint args))})))))}))
+                  (format "TODO: resolve field: %s" (:field-name args)) {:args args})))))}))
 
 (defn post-handler [{::site/keys [uri db] :as req}]
   (let [schema (some-> (xt/entity db uri) ::grab/schema)
