@@ -20,6 +20,7 @@
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
+(alias 'pass (create-ns 'juxt.pass.alpha))
 
 (t/use-fixtures :each with-crux with-handler)
 
@@ -57,7 +58,7 @@
 
 
 
-#_((t/join-fixtures [with-crux with-handler])
+((t/join-fixtures [with-crux with-handler])
  (fn []
    (submit-and-await!
     [[:crux.tx/put
@@ -79,4 +80,67 @@
          query "{ allUsers { id name } }"
          document (document/compile-document (parser/parse query) schema)]
 
-     (graphql/query schema document (x/db *crux-node*)))))
+     (graphql/query schema document nil (x/db *crux-node*)))))
+
+((t/join-fixtures [with-crux with-handler])
+ (fn []
+   (submit-and-await!
+    [[:crux.tx/put
+      {:crux.db/id "https://example.org/_site/users/mal",
+       :juxt.site.alpha/type "User",
+       :juxt.pass.alpha/username "mal",
+       :email "mal@juxt.pro",
+       :name "Malcolm Sparks"}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/_site/users/alx",
+       :juxt.site.alpha/type "User",
+       :juxt.pass.alpha/username "alx",
+       :email "alx@juxt.pro",
+       :name "Alex Davis"}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/_site/users/joa",
+       :juxt.site.alpha/type "User",
+       :juxt.pass.alpha/username "joa",
+       :email "joa@juxt.pro",
+       :name "Johanna Antonelli"}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/_site/roles/superuser",
+       :juxt.site.alpha/type "Role",
+       :name "superuser",
+       :description "Superuser"}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/_site/roles/developer",
+       :juxt.site.alpha/type "Role",
+       :name "developer",
+       :description "Developer"}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/_site/roles/superuser/users/mal",
+       ::site/type "UserRoleMapping",
+       ::pass/assignee "https://example.org/_site/users/mal",
+       ::pass/role "https://example.org/_site/roles/superuser"}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/_site/roles/developer/users/mal",
+       ::site/type "UserRoleMapping",
+       ::pass/assignee "https://example.org/_site/users/mal",
+       ::pass/role "https://example.org/_site/roles/developer"}]
+
+     [:crux.tx/put
+      {:crux.db/id "https://example.org/_site/roles/superuser/users/joa",
+       ::site/type "UserRoleMapping",
+       ::pass/assignee "https://example.org/_site/users/joa",
+       ::pass/role "https://example.org/_site/roles/developer"}]
+
+     ])
+
+   (let [schema-str (slurp (io/resource "juxt/site/alpha/site-schema.graphql"))
+         schema (schema/compile-schema (parser/parse schema-str))
+         query "{ allUsers { id  name email roles { name } } }"
+         document (document/compile-document (parser/parse query) schema)]
+
+     (graphql/query schema document nil (x/db *crux-node*)))))
