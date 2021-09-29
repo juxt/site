@@ -5,6 +5,8 @@
    [clojure.walk :refer [postwalk-replace]]
    [clojure.tools.logging :as log]
    [crux.api :as crux]
+   [clojure.string :as str]
+   [juxt.site.alpha.main :refer [config]]
    [juxt.site.alpha.rules :as rules]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -29,9 +31,10 @@
         ;; attributes to merge into the target, then for each rule in the
         ;; policy... the apply rule-combining algo...
 
-        rules (map first
-                   (crux/q db '{:find [rule]
-                                :where [[rule ::site/type "Rule"]]}))
+        rules (->> (crux/q db '{:find [rule]
+                                :where [[rule ::site/type "Rule"]]})
+                   (map first)
+                   (filter #(str/starts-with? % (::site/base-uri (config)))))
 
         ;;_  (log/debugf "Rules to match are %s" (pr-str rules))
 
