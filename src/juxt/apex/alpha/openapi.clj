@@ -421,8 +421,9 @@
        ::http/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.0.2"}
        ::site/put-fn put-openapi}))
 
-   (let [openapis (x/q db '{:find [openapi-uri openapi]
-                            :where [[openapi-uri ::apex/openapi openapi]]})
+   (let [openapis (filter (comp util/starts-with-base-uri? first)
+                          (x/q db '{:find [openapi-uri openapi]
+                                    :where [[openapi-uri ::apex/openapi openapi]]}))
          matches
          (for [[openapi-uri openapi] openapis
                server (get openapi "servers")
