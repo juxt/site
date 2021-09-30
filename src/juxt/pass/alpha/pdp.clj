@@ -35,7 +35,7 @@
                    (map first)
                    (filter util/starts-with-base-uri?))
 
-        _  (log/infof "Rules to match are %s" (pr-str rules))
+        ;;_ (log/debugf "Rules to match are %s" (pr-str rules))
 
         matched-rules (rules/match-targets db rules request-context)
 
