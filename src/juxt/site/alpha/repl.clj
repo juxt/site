@@ -19,7 +19,8 @@
    [juxt.site.alpha.handler :as handler]
    [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.init :as init]
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [juxt.grab.alpha.parser :as parser])
   (:import (java.util Date)))
 
 (alias 'dave (create-ns 'juxt.dave.alpha))
@@ -399,6 +400,16 @@
      username))
 
 (defn introspect-graphql []
-  (let [schema (:juxt.grab.alpha/schema (e "http://localhost:2021/_site/graphql"))
+  (let [config (config)
+        schema (:juxt.grab.alpha/schema (e (format "/_site/graphql" (::site/base-uri config))))
         document (graphql.document/compile-document (graphql.parser/parse (slurp (io/file "opt/graphql/graphiql-introspection-query.graphql"))) schema)]
     (graphql/query schema document "IntrospectionQuery" (db))))
+
+(defn g [q]
+  (let [schema (-> "juxt/site/alpha/site-schema.graphql"
+                   io/resource
+                   slurp
+                   graphql.parser/parse
+                   graphql.schema/compile-schema)
+        document (graphql.document/compile-document (graphql.parser/parse q) schema)]
+    (graphql/query schema document nil (db))))
