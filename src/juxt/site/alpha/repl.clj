@@ -380,7 +380,7 @@
       ::pass/classification "RESTRICTED"})))
 
 (defn user [username]
-  (e (format "http://localhost:2021/_site/users/%s" username)))
+  (e (format "%s/_site/users/%s" (::site/base-uri (config)) username)))
 
 (defn user-apps [username]
   (q '{:find [(pull application [*])]
