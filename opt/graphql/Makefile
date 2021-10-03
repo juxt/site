@@ -1,21 +1,12 @@
-.PHONY: all init build-graphiql deploy-graphiql deploy-schema introspect
-.DEFAULT: all
+.PHONY: all init deploy introspect
 
-all:	init deploy-schema
-
-deploy-graphiql:	build-graphiql
-	site put-asset --file build/index.html --path /_site/graphiql/index.html
+all:	init deploy
 
 init:
 	site post-resources --file resources.edn
 
-deploy-schema:
+deploy:
 	site put-asset --file schema.graphql --type application/graphql --path /_site/graphql
 
-build-graphiql:
-	yarn
-	yarn build
-	npx gulp
-
 introspect:
-	@site -s post --file graphiql-introspection-query.graphql --path /graphql --type application/graphql
+	@site -s post --file <(./json) --path /_site/graphql --type application/json

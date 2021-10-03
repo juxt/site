@@ -1,0 +1,20 @@
+#_( ;; Allow this script to be executed directly
+   "exec" "bb" "--classpath" "$(clojure -Spath -Sdeps '{:deps {io.aviso/pretty {:mvn/version "RELEASE"}}}')" "$0" "$(readlink -f $(dirname $0)/..)" "$@"
+   )
+
+;; Copyright © 2021, JUXT LTD.
+
+(ns json
+  (:require
+   [cheshire.core :as json]
+   [clojure.java.io :as io]))
+
+(println
+ (json/generate-string
+  {:query (slurp (io/file "graphiql-introspection-query.graphql"))
+   :operationName "IntrospectionQuery"}))
+
+
+;; Local Variables:
+;; mode: clojure
+;; End:

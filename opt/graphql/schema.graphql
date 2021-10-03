@@ -1,0 +1,32 @@
+schema {
+  query: Query
+}
+
+"""
+Root queries
+"""
+type Query {
+  users: [User] @xtdb(q: """
+{:find [e] :where [[e :juxt.site.alpha/type "User"]]}
+    """)
+}
+
+"""
+Site users. Not all users have passwords.
+"""
+type User {
+  id: ID @xtdb(a: "crux.db/id")
+  username: String @xtdb(a: "juxt.pass.alpha/username")
+  name: String @xtdb(a: "name")
+  email: String @xtdb(a: "email")
+  roles: [Role] @xtdb(q: """
+{:find [e] :where [[m :juxt.site.alpha/type "UserRoleMapping"]
+                   [m :juxt.pass.alpha/role e]
+                   [m :juxt.pass.alpha/assignee object]]}
+""")
+}
+
+type Role {
+  id: ID @xtdb(a: "crux.db/id")
+  name: String @xtdb(a: "name")
+}
