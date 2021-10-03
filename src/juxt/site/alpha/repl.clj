@@ -11,6 +11,10 @@
    [clojure.java.shell :as sh]
    [io.aviso.ansi :as ansi]
    [juxt.pass.alpha.authentication :as authn]
+   [juxt.site.alpha.graphql :as graphql]
+   [juxt.grab.alpha.schema :as graphql.schema]
+   [juxt.grab.alpha.document :as graphql.document]
+   [juxt.grab.alpha.parser :as graphql.parser]
    [juxt.site.alpha.main :refer [system config]]
    [juxt.site.alpha.handler :as handler]
    [juxt.site.alpha.cache :as cache]
@@ -393,3 +397,8 @@
                [permission :juxt.site.alpha/application application]]
        :in [username]}
      username))
+
+(defn introspect-graphql []
+  (let [schema (:juxt.grab.alpha/schema (e "http://localhost:2021/_site/graphql"))
+        document (graphql.document/compile-document (graphql.parser/parse (slurp (io/file "opt/graphql/graphiql-introspection-query.graphql"))) schema)]
+    (graphql/query schema document "IntrospectionQuery" (db))))
