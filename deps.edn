@@ -32,7 +32,7 @@
 
         juxt/grab
         {:git/url "https://github.com/juxt/grab.git"
-         :sha "238965c0bc6fef15b7b9e3da16c4855502ed54ad"
+         :sha "23b3a1fb076f17e58e3951a6a1886b55dfb34682"
          ;;:local/root "../grab"
          }
 
