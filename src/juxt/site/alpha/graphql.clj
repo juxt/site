@@ -100,7 +100,7 @@
         results (postwalk
                   (fn [x]
                     (cond-> x
-                      (and (vector? x) (= "kind" (first x)))
+                      (and (vector? x) (= :kind (first x)))
                       (update 1 (comp str/upper-case name))))
                   results)]
 
