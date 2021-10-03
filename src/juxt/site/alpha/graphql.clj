@@ -35,15 +35,20 @@
         (cond
           (get xtdb-args "q")
           (if-let [id (get-in args [:object-value :crux.db/id])]
-            (for [[e] (xt/q db
-                            (assoc
-                             (edn/read-string (get xtdb-args "q"))
-                             :in ['object])
-                            id)]
+            (for [[e] (apply
+                       xt/q db
+                       (assoc
+                        (edn/read-string (get xtdb-args "q"))
+                        :in (vec (concat ['object] (map symbol (keys (:argument-values args))))))
+                       id (vals (:argument-values args)))]
               (xt/entity db e))
 
             ;; No object
-            (for [[e] (xt/q db(edn/read-string (get xtdb-args "q")))]
+            (for [[e] (apply
+                       xt/q db (assoc
+                                (edn/read-string (get xtdb-args "q"))
+                                :in (mapv symbol (keys (:argument-values args))))
+                       (vals (:argument-values args)))]
               (xt/entity db e)))
 
           (get xtdb-args "a")

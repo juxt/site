@@ -10,12 +10,13 @@ type Query {
   @xtdb(q: """
     {:find [e] :where [[e :juxt.site.alpha/type "User"]]}
     """)
-  user(username: String): [User]
+  user(username: String!): [User]
   @xtdb(q: """
     {:find [e]
     :where
-    [[e :juxt.site.alpha/type "User"]
-    [e :juxt.pass.alpha/username "mal"]]}
+    [
+     [e :juxt.site.alpha/type "User"]
+     [e :juxt.pass.alpha/username username]]}
     """)}
 
 """
