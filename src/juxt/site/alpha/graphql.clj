@@ -75,11 +75,10 @@
 
           (throw (ex-info "Unknown content type for GraphQL request" req)))
 
-        _ (log/tracef "GraphQL query is %s" document-str)
-
         _ (when (nil? document-str)
-            (throw (ex-info "Nil GraphQL query" req)))
-
+            (throw (ex-info "Nil GraphQL query" (-> req
+                                                    (update-in [::site/resource] dissoc ::grab/schema)
+                                                    (dissoc :juxt.pass.alpha/request-context)))))
         document
         (try
           (document/compile-document (parser/parse document-str) schema)
