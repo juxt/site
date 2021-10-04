@@ -421,6 +421,6 @@
                    graphql.parser/parse
                    graphql.schema/compile-schema)
         config (config)
-        schema (:juxt.grab.alpha/schema (e (format "/_site/graphql" (::site/base-uri config))))
+        schema (:juxt.grab.alpha/schema (e (format "%s/_site/graphql" (::site/base-uri config))))
         document (graphql.document/compile-document (graphql.parser/parse q) schema)]
     (graphql/query schema document nil (db))))
