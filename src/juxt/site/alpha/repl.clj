@@ -15,7 +15,7 @@
    [juxt.grab.alpha.schema :as graphql.schema]
    [juxt.grab.alpha.document :as graphql.document]
    [juxt.grab.alpha.parser :as graphql.parser]
-   [juxt.site.alpha.main :refer [system config]]
+   [juxt.site.alpha.main :as main]
    [juxt.site.alpha.handler :as handler]
    [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.init :as init]
@@ -28,6 +28,12 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
+(defn config []
+  (main/config))
+
+(defn system []
+  main/system)
+
 (defn help []
   (doseq [[_ v] (sort (ns-publics 'juxt.site.alpha.repl))
           :let [m (meta v)]]
@@ -36,7 +42,7 @@
   :ok)
 
 (defn crux-node []
-  (:juxt.site.alpha.db/crux-node system))
+  (:juxt.site.alpha.db/crux-node main/system))
 
 (defn db []
   (x/db (crux-node)))

@@ -2,14 +2,13 @@
 
 (ns juxt.site.alpha.graphql-resolver
   (:require
-   [juxt.site.alpha.repl :as repl]
-   [juxt.site.alpha.main :as main]))
+   [juxt.site.alpha.repl :as repl]))
 
 (defn config [_]
-  (pr-str (main/config)))
+  (repl/config))
 
 (defn system [_]
-  (pr-str (main/system)))
+  (repl/system))
 
 (defn status [_]
-  (pr-str (repl/status)))
+  (repl/status))
