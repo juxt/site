@@ -12,12 +12,25 @@
    [crux.api :as xt]
    [clojure.tools.logging :as log]
    [clojure.edn :as edn]
-   [clojure.walk :refer [postwalk]]))
+   [clojure.walk :refer [postwalk]]
+   [juxt.site.alpha.repl :as repl]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'grab (create-ns 'juxt.grab.alpha))
 (alias 'g (create-ns 'juxt.grab.alpha.graphql))
+
+(defn run-program [object program]
+  (reduce
+   (fn [acc [cmd arg]]
+     (case cmd
+       "get-kw" (get acc (keyword arg))
+       "call-fn" (if-let [f (requiring-resolve (symbol "crux.api/status"))]
+                   (f acc)
+                   (throw (ex-info (format "Could not resolve symbol: %s" arg) {})))
+       (throw (ex-info (format "Command not recognised: %s" cmd) {}))))
+   object
+   program))
 
 (defn query [schema document operation-name db]
   (execute-request
@@ -58,19 +71,12 @@
               (lookup-entity val)
               val))
 
-          (get site-args "getIn")
-          (let [ks (get site-args "getIn")
-                val (get-in args (apply vector :object-value (map keyword ks)))]
-            (println "keys"ks)
-            (println "object-value"(:object-value args))
-            (println "val"val)
-            (if (= field-kind :object)
-              (lookup-entity val)
-              val))
-
           (get site-args "resolver")
           (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
             (resolver args))
+
+          (get site-args "x")
+          (run-program (get args :object-value) (get site-args "x"))
 
           :else
           (throw

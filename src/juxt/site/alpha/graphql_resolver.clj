@@ -9,6 +9,3 @@
 
 (defn system [_]
   (repl/system))
-
-(defn status [_]
-  (repl/status))

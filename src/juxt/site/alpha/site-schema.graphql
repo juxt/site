@@ -35,14 +35,9 @@ type Query {
   configuration: Configuration @site(resolver: "juxt.site.alpha.graphql-resolver/config")
 
   """
-  Access Site's status
-  """
-  status: String @site(resolver: "juxt.site.alpha.graphql-resolver/status")
-
-  """
   Access Site's system
   """
-  system: String @site(resolver: "juxt.site.alpha.graphql-resolver/system")
+  system: System @site(resolver: "juxt.site.alpha.graphql-resolver/system")
 }
 
 """
@@ -75,5 +70,19 @@ type Role {
 type Configuration {
   baseUri: String @site(a: "juxt.site.alpha/base-uri")
   unixPassPasswordPrefix: String @site(a: "juxt.site.alpha.unix-pass/password-prefix")
-  serverPortNumber: Int @site(getIn: ["ig/system" "juxt.site.alpha.server/server" "juxt.site.alpha/port"])
+  serverPortNumber: Int @site(x: [["get-kw" "ig/system"]
+                                  ["get-kw" "juxt.site.alpha.server/server"]
+                                  ["get-kw" "juxt.site.alpha/port"]])}
+
+type System {
+  database: DatabaseStatus @site(x: [["get-kw" "juxt.site.alpha.db/crux-node"]
+                                     ["call-fn" "crux.api/status"]])}
+
+type DatabaseStatus {
+  version: String @site(a: "crux.version/version")
+  revision: String @site(a: "crux.version/revision")
+  indexVersion: Int @site(a: "crux.index/index-version")
+  kvStore: String @site(a: "crux.kv/kv-store")
+  estimateNumKeys: Int @site(a: "crux.kv/estimate-num-keys")
+  kvSize: Int @site(a: "crux.kv/size")
 }
