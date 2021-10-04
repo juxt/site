@@ -12,8 +12,7 @@
    [crux.api :as xt]
    [clojure.tools.logging :as log]
    [clojure.edn :as edn]
-   [clojure.walk :refer [postwalk]]
-   [juxt.site.alpha.repl :as repl]))
+   [clojure.walk :refer [postwalk]]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
