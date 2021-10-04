@@ -406,10 +406,15 @@
     (graphql/query schema document "IntrospectionQuery" (db))))
 
 (defn g [q]
-  (let [schema (-> "juxt/site/alpha/site-schema.graphql"
+  ;; When developing the schema, this might help rapid development, however,
+  ;; it's unsafe to assume it's been deployed, so use the database version of
+  ;; the schema when not developing.
+  (let [#_#_schema (-> "juxt/site/alpha/site-schema.graphql"
                    io/resource
                    slurp
                    graphql.parser/parse
                    graphql.schema/compile-schema)
+        config (config)
+        schema (:juxt.grab.alpha/schema (e (format "/_site/graphql" (::site/base-uri config))))
         document (graphql.document/compile-document (graphql.parser/parse q) schema)]
     (graphql/query schema document nil (db))))
