@@ -19,25 +19,13 @@
 (alias 'grab (create-ns 'juxt.grab.alpha))
 (alias 'g (create-ns 'juxt.grab.alpha.graphql))
 
-(defn run-program [object program]
-  (reduce
-   (fn [acc [cmd arg]]
-     (case cmd
-       "get-kw" (get acc (keyword arg))
-       "call-fn" (if-let [f (requiring-resolve (symbol "crux.api/status"))]
-                   (f acc)
-                   (throw (ex-info (format "Could not resolve symbol: %s" arg) {})))
-       (throw (ex-info (format "Command not recognised: %s" cmd) {}))))
-   object
-   program))
-
 (defn query [schema document operation-name db]
   (execute-request
    {:schema schema
     :document document
     :operation-name operation-name
     :field-resolver
-    (fn [args]
+    (fn [{:keys [object-value field-name] :as args}]
       (let [lookup-type (::schema/provided-types schema)
             field (get-in args [:object-type ::schema/fields-by-name (get-in args [:field-name])])
             site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
@@ -46,7 +34,7 @@
 
         (cond
           (get site-args "q")
-          (if-let [id (get-in args [:object-value :crux.db/id])]
+          (if-let [id (:crux.db/id object-value)]
             (for [[e] (apply
                        xt/q db
                        (assoc
@@ -65,7 +53,7 @@
 
           (get site-args "a")
           (let [att (get site-args "a")
-                val (get-in args [:object-value (keyword att)])]
+                val (get object-value (keyword att))]
             (if (= field-kind :object)
               (lookup-entity val)
               val))
@@ -74,13 +62,17 @@
           (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
             (resolver args))
 
-          (get site-args "x")
-          (run-program (get args :object-value) (get site-args "x"))
+          ;; Another strategy is to see if the field indexes the
+          ;; object-value. This strategy allows for delays to be used to prevent
+          ;; computing field values that aren't resolved.
+          (contains? object-value field-name)
+          (force (get object-value field-name))
 
           :else
           (throw
            (ex-info
             (format "TODO: resolve field: %s" (:field-name args)) args)))))}))
+
 
 (defn post-handler [{::site/keys [uri db] :as req}]
   (let [schema (some-> (xt/entity db uri) ::grab/schema)

@@ -9,7 +9,7 @@ type Query {
   """
   Access user details for all users in the system
   """
-  allUsers: [User]
+  allUsers: [SiteUser]
   @site(q: """
     {:find [e] :where [[e :juxt.site.alpha/type "User"]]}
     """)
@@ -17,7 +17,7 @@ type Query {
   """
   Access a single user's details
   """
-  user(username: String!): [User]
+  user(username: String!): [SiteUser]
   @site(q: """
     {:find [e]
     :where
@@ -27,28 +27,20 @@ type Query {
     """)
 
   """
-  Access Site's configuration
-  """
-  # Adding a NON_NULL wrapper (Configuration!) seems to break introspection on
-  # GraphiQL, this might not have been completely implemented yet. For now,
-  # don't use NON_NULL.
-  configuration: Configuration @site(resolver: "juxt.site.alpha.graphql-resolver/config")
-
-  """
   Access Site's system
   """
-  system: System @site(resolver: "juxt.site.alpha.graphql-resolver/system")
+  system: SiteSystem @site(resolver: "juxt.site.alpha.graphql-resolver/system")
 }
 
 """
 An object representing a Site user. Anyone who needs to log in to the system must have a user record.
 """
-type User {
+type SiteUser {
   id: ID @site(a: "crux.db/id")
   username: String @site(a: "juxt.pass.alpha/username")
   name: String @site(a: "name")
   email: String @site(a: "email")
-  roles: [Role] @site(q: """
+  roles: [SiteRole] @site(q: """
     {:find [role]
     :where
     [[role :juxt.site.alpha/type "Role"]
@@ -61,28 +53,40 @@ type User {
 """
 A Site role, for using in policies to grant authorization to access certain resources.
 """
-type Role {
+type SiteRole {
   id: ID @site(a: "crux.db/id")
   name: String @site(a: "name")
   description: String @site(a: "description")
 }
 
-type Configuration {
-  baseUri: String @site(a: "juxt.site.alpha/base-uri")
-  unixPassPasswordPrefix: String @site(a: "juxt.site.alpha.unix-pass/password-prefix")
-  serverPortNumber: Int @site(x: [["get-kw" "ig/system"]
-                                  ["get-kw" "juxt.site.alpha.server/server"]
-                                  ["get-kw" "juxt.site.alpha/port"]])}
+type SiteConfiguration {
+  baseUri: String
+  unixPassPasswordPrefix: String
+  serverPortNumber: Int
+}
 
-type System {
-  database: DatabaseStatus @site(x: [["get-kw" "juxt.site.alpha.db/crux-node"]
-                                     ["call-fn" "crux.api/status"]])}
+type SiteSystem {
+  database: SiteDatabaseStatus
+  """
+  Access Site's configuration
+  """
+  # Adding a NON_NULL wrapper (Configuration!) seems to break introspection on
+  # GraphiQL, this might not have been completely implemented yet. For now,
+  # don't use NON_NULL.
+  configuration: SiteConfiguration
+}
 
-type DatabaseStatus {
-  version: String @site(a: "crux.version/version")
-  revision: String @site(a: "crux.version/revision")
-  indexVersion: Int @site(a: "crux.index/index-version")
-  kvStore: String @site(a: "crux.kv/kv-store")
-  estimateNumKeys: Int @site(a: "crux.kv/estimate-num-keys")
-  kvSize: Int @site(a: "crux.kv/size")
+type SiteDatabaseStatus {
+  version: String
+  revision: String
+  indexVersion: Int
+  kvStore: String
+  estimateNumKeys: Int
+  kvSize: Int
+  attributeStats: [SiteAttributeStat]
+}
+
+type SiteAttributeStat {
+  attribute: String
+  frequency: Int
 }
