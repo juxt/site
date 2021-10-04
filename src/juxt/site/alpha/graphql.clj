@@ -29,6 +29,7 @@
       (let [lookup-type (::schema/provided-types schema)
             field (get-in args [:object-type ::schema/fields-by-name (get-in args [:field-name])])
             xtdb-args (get-in field [::schema/directives-by-name "xtdb" ::g/arguments])
+            site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
             field-kind (-> field ::g/type-ref ::g/name lookup-type ::g/kind)
             lookup-entity (fn [id] (xt/entity db id))]
 
@@ -57,6 +58,10 @@
             (if (= field-kind :object)
               (lookup-entity val)
               val))
+
+          (get site-args "resolver")
+          (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
+            (resolver args))
 
           :else (throw
                  (ex-info
