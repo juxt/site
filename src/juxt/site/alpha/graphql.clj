@@ -28,18 +28,17 @@
     (fn [args]
       (let [lookup-type (::schema/provided-types schema)
             field (get-in args [:object-type ::schema/fields-by-name (get-in args [:field-name])])
-            xtdb-args (get-in field [::schema/directives-by-name "xtdb" ::g/arguments])
             site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
             field-kind (-> field ::g/type-ref ::g/name lookup-type ::g/kind)
             lookup-entity (fn [id] (xt/entity db id))]
 
         (cond
-          (get xtdb-args "q")
+          (get site-args "q")
           (if-let [id (get-in args [:object-value :crux.db/id])]
             (for [[e] (apply
                        xt/q db
                        (assoc
-                        (edn/read-string (get xtdb-args "q"))
+                        (edn/read-string (get site-args "q"))
                         :in (vec (concat ['object] (map symbol (keys (:argument-values args))))))
                        id (vals (:argument-values args)))]
               (xt/entity db e))
@@ -47,14 +46,24 @@
             ;; No object
             (for [[e] (apply
                        xt/q db (assoc
-                                (edn/read-string (get xtdb-args "q"))
+                                (edn/read-string (get site-args "q"))
                                 :in (mapv symbol (keys (:argument-values args))))
                        (vals (:argument-values args)))]
               (xt/entity db e)))
 
-          (get xtdb-args "a")
-          (let [att (get xtdb-args "a")
+          (get site-args "a")
+          (let [att (get site-args "a")
                 val (get-in args [:object-value (keyword att)])]
+            (if (= field-kind :object)
+              (lookup-entity val)
+              val))
+
+          (get site-args "getIn")
+          (let [ks (get site-args "getIn")
+                val (get-in args (apply vector :object-value (map keyword ks)))]
+            (println "keys"ks)
+            (println "object-value"(:object-value args))
+            (println "val"val)
             (if (= field-kind :object)
               (lookup-entity val)
               val))
@@ -63,9 +72,10 @@
           (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
             (resolver args))
 
-          :else (throw
-                 (ex-info
-                  (format "TODO: resolve field: %s" (:field-name args)) {:args args})))))}))
+          :else
+          (throw
+           (ex-info
+            (format "TODO: resolve field: %s" (:field-name args)) args)))))}))
 
 (defn post-handler [{::site/keys [uri db] :as req}]
   (let [schema (some-> (xt/entity db uri) ::grab/schema)

@@ -10,7 +10,7 @@ type Query {
   Access user details for all users in the system
   """
   allUsers: [User]
-  @xtdb(q: """
+  @site(q: """
     {:find [e] :where [[e :juxt.site.alpha/type "User"]]}
     """)
 
@@ -18,7 +18,7 @@ type Query {
   Access a single user's details
   """
   user(username: String!): [User]
-  @xtdb(q: """
+  @site(q: """
     {:find [e]
     :where
     [
@@ -29,7 +29,10 @@ type Query {
   """
   Access Site's configuration
   """
-  configuration: String @site(resolver: "juxt.site.alpha.graphql-resolver/config")
+  # Adding a NON_NULL wrapper (Configuration!) seems to break introspection on
+  # GraphiQL, this might not have been completely implemented yet. For now,
+  # don't use NON_NULL.
+  configuration: Configuration @site(resolver: "juxt.site.alpha.graphql-resolver/config")
 
   """
   Access Site's status
@@ -46,11 +49,11 @@ type Query {
 An object representing a Site user. Anyone who needs to log in to the system must have a user record.
 """
 type User {
-  id: ID @xtdb(a: "crux.db/id")
-  username: String @xtdb(a: "juxt.pass.alpha/username")
-  name: String @xtdb(a: "name")
-  email: String @xtdb(a: "email")
-  roles: [Role] @xtdb(q: """
+  id: ID @site(a: "crux.db/id")
+  username: String @site(a: "juxt.pass.alpha/username")
+  name: String @site(a: "name")
+  email: String @site(a: "email")
+  roles: [Role] @site(q: """
     {:find [role]
     :where
     [[role :juxt.site.alpha/type "Role"]
@@ -64,7 +67,13 @@ type User {
 A Site role, for using in policies to grant authorization to access certain resources.
 """
 type Role {
-  id: ID @xtdb(a: "crux.db/id")
-  name: String @xtdb(a: "name")
-  description: String @xtdb(a: "description")
+  id: ID @site(a: "crux.db/id")
+  name: String @site(a: "name")
+  description: String @site(a: "description")
+}
+
+type Configuration {
+  baseUri: String @site(a: "juxt.site.alpha/base-uri")
+  unixPassPasswordPrefix: String @site(a: "juxt.site.alpha.unix-pass/password-prefix")
+  serverPortNumber: Int @site(getIn: ["ig/system" "juxt.site.alpha.server/server" "juxt.site.alpha/port"])
 }
