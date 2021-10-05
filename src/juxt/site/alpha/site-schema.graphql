@@ -31,10 +31,10 @@ type Query {
 An object representing a Site user. Anyone who needs to log in to the system must have a user record.
 """
 type SiteUser {
-  id: ID @site(a: "crux.db/id")
+  id: ID @site(a: "crux.db/id") # should definitely default this for ID scalars...
   username: String @site(a: "juxt.pass.alpha/username")
-  name: String @site(a: "name")
-  email: String @site(a: "email")
+  name: String
+  email: String
   roles: [SiteRole]
     @site(q: { find: [role]
                where: [[role {keyword: "juxt.site.alpha/type"} "Role"]

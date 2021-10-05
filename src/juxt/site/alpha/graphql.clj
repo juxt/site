@@ -78,6 +78,10 @@
           (contains? object-value field-name)
           (force (get object-value field-name))
 
+          ;; Or simply try to extract the keyword
+          (contains? object-value (keyword field-name))
+          (get object-value (keyword field-name))
+
           :else
           (throw
            (ex-info
