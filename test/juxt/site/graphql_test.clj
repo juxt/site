@@ -3,6 +3,7 @@
 (ns juxt.site.graphql-test
   (:require
    [crux.api :as x]
+   [jsonista.core :as json]
    [juxt.grab.alpha.schema :as schema]
    [juxt.grab.alpha.document :as document]
    [juxt.grab.alpha.execution :refer [execute-request]]
@@ -29,8 +30,22 @@
    [[:crux.tx/put access-all-areas]
     [:crux.tx/put
      (edn/read-string (str/replace
-                       (slurp "opt/graphiql/resources.edn")
-                       "{{base-uri}}" "https://example.org"))]])
+                       (slurp "opt/graphql/resources.edn")
+                       "{{base-uri}}" "https://example.org"))]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/_site/users/mal",
+      :juxt.site.alpha/type "User",
+      :juxt.pass.alpha/username "mal",
+      :email "mal@juxt.pro",
+      :name "Malcolm Sparks"}]
+
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/_site/users/alx",
+      :juxt.site.alpha/type "User",
+      :juxt.pass.alpha/username "alx",
+      :email "alx@juxt.pro",
+      :name "Alex Davis"}]])
 
   ;; Install schema (via HTTP, for accuracy)
   (let [schema (slurp (io/resource "juxt/site/alpha/site-schema.graphql"))
@@ -38,7 +53,7 @@
 
         r (*handler*
            {:ring.request/method :put
-            :ring.request/path "/graphql"
+            :ring.request/path "/_site/graphql"
             :ring.request/headers {"content-length" (str (count bytes))}
             :ring.request/body (ByteArrayInputStream. bytes)
             })]
@@ -46,43 +61,25 @@
 
   ;; GraphQL query (direct, for EDN)
   (let [query "{ allUsers { id } }"
-        bytes (.getBytes query)
+        json (json/write-value-as-string {:query query
+                                          :operationName nil})
+        bytes (.getBytes json)
 
         r (*handler*
            {:ring.request/method :post
-            :ring.request/path "/graphql"
-            :ring.request/headers {"content-length" (str (count bytes))}
+            :ring.request/path "/_site/graphql"
+            :ring.request/headers {"content-length" (str (count bytes))
+                                   "content-type" "application/json"}
             :ring.request/body (ByteArrayInputStream. bytes)})]
 
-    (is (= 200 (:ring.response/status r)))))
+    (is (= 200 (:ring.response/status r)))
+    (is (= {"data"
+            {"allUsers"
+             [{"id" "https://example.org/_site/users/alx"}
+              {"id" "https://example.org/_site/users/mal"}]}} (json/read-value (:ring.response/body r))))))
 
 
-
-((t/join-fixtures [with-crux with-handler])
- (fn []
-   (submit-and-await!
-    [[:crux.tx/put
-      {:crux.db/id "https://example.org/_site/users/mal",
-       :juxt.site.alpha/type "User",
-       :juxt.pass.alpha/username "mal",
-       :email "mal@juxt.pro",
-       :name "Malcolm Sparks"}]
-
-     [:crux.tx/put
-      {:crux.db/id "https://example.org/_site/users/alx",
-       :juxt.site.alpha/type "User",
-       :juxt.pass.alpha/username "alx",
-       :email "alx@juxt.pro",
-       :name "Alex Davis"}]])
-
-   (let [schema-str (slurp (io/resource "juxt/site/alpha/site-schema.graphql"))
-         schema (schema/compile-schema (parser/parse schema-str))
-         query "{ allUsers { id name } }"
-         document (document/compile-document (parser/parse query) schema)]
-
-     (graphql/query schema document nil (x/db *crux-node*)))))
-
-((t/join-fixtures [with-crux with-handler])
+#_((t/join-fixtures [with-crux with-handler])
  (fn []
    (submit-and-await!
     [[:crux.tx/put

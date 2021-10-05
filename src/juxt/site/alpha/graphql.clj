@@ -2,7 +2,6 @@
 
 (ns juxt.site.alpha.graphql
   (:require
-   [clojure.pprint :refer [pprint]]
    [juxt.grab.alpha.schema :as schema]
    [juxt.grab.alpha.document :as document]
    [juxt.grab.alpha.execution :refer [execute-request]]
@@ -11,13 +10,24 @@
    [clojure.string :as str]
    [crux.api :as xt]
    [clojure.tools.logging :as log]
-   [clojure.edn :as edn]
    [clojure.walk :refer [postwalk]]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'grab (create-ns 'juxt.grab.alpha))
 (alias 'g (create-ns 'juxt.grab.alpha.graphql))
+
+(defn to-xt-query [query]
+  (postwalk
+   (fn [x]
+     (cond-> x
+       (and (map? x) (:keyword x))
+       (-> (get :keyword) keyword)
+
+       (and (map? x) (::g/name x))
+       (-> (get ::g/name) symbol))
+     )
+   query))
 
 (defn query [schema document operation-name db]
   (execute-request
@@ -38,7 +48,7 @@
             (for [[e] (apply
                        xt/q db
                        (assoc
-                        (edn/read-string (get site-args "q"))
+                        (to-xt-query (get site-args "q"))
                         :in (vec (concat ['object] (map symbol (keys (:argument-values args))))))
                        id (vals (:argument-values args)))]
               (xt/entity db e))
@@ -46,7 +56,7 @@
             ;; No object
             (for [[e] (apply
                        xt/q db (assoc
-                                (edn/read-string (get site-args "q"))
+                                (to-xt-query (get site-args "q"))
                                 :in (mapv symbol (keys (:argument-values args))))
                        (vals (:argument-values args)))]
               (xt/entity db e)))
@@ -90,7 +100,7 @@
           "application/graphql"
           [body "Query"]
 
-          (throw (ex-info "Unknown content type for GraphQL request" req)))
+          (throw (ex-info (format "Unknown content type for GraphQL request: %s" (some-> req ::site/received-representation ::http/content-type)) req)))
 
         _ (when (nil? document-str)
             (throw (ex-info "Nil GraphQL query" (-> req

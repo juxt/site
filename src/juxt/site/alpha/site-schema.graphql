@@ -10,21 +10,16 @@ type Query {
   Access user details for all users in the system
   """
   allUsers: [SiteUser]
-  @site(q: """
-    {:find [e] :where [[e :juxt.site.alpha/type "User"]]}
-    """)
+  @site(q: { find: [e] where: [[e {keyword: "juxt.site.alpha/type"} "User"]]})
 
   """
   Access a single user's details
   """
   user(username: String!): [SiteUser]
-  @site(q: """
-    {:find [e]
-    :where
-    [
-     [e :juxt.site.alpha/type "User"]
-     [e :juxt.pass.alpha/username username]]}
-    """)
+  @site(q:
+    { find: [e]
+      where: [[e {keyword: "juxt.site.alpha/type"} "User"]
+              [e {keyword: "juxt.pass.alpha/username"} username]]})
 
   """
   Access Site's system
@@ -40,15 +35,13 @@ type SiteUser {
   username: String @site(a: "juxt.pass.alpha/username")
   name: String @site(a: "name")
   email: String @site(a: "email")
-  roles: [SiteRole] @site(q: """
-    {:find [role]
-    :where
-    [[role :juxt.site.alpha/type "Role"]
-     [mapping :juxt.site.alpha/type "UserRoleMapping"]
-     [mapping :juxt.pass.alpha/assignee object]
-     [mapping :juxt.pass.alpha/role role]]}
-""")
-}
+  roles: [SiteRole]
+    @site(q: { find: [role]
+               where: [[role {keyword: "juxt.site.alpha/type"} "Role"]
+                       [mapping {keyword: "juxt.site.alpha/type"} "UserRoleMapping"]
+                       [mapping {keyword: "juxt.pass.alpha/assignee"} object]
+                       [mapping {keyword: "juxt.pass.alpha/role"} role]]})}
+
 
 """
 A Site role, for using in policies to grant authorization to access certain resources.
