@@ -15,4 +15,3 @@ WARNING: Terrible puns and word-plays ahead.
 * pass -- authentication, authorization -- as in, "You Shall Not Pass!!!" (Site
   attempts to protect resources from Balrogs)
 
-* spin -- extras that are related to spin, as in, a spider 'spins' its web. Spin is a dependency library declared in deps.edn.
