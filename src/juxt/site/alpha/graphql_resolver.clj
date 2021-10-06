@@ -4,7 +4,16 @@
   (:require
    [juxt.site.alpha.repl :as repl]
    [crux.api :as xt]
-   [clojure.set :as set]))
+   [clojure.set :as set]
+   [clojure.java.shell :as sh]
+   [clojure.string :as str]))
+
+
+(defn git-sha []
+  (let [{:keys [out err]} (sh/sh "git" "rev-parse" "HEAD")]
+    (when (seq err)
+      (throw (ex-info "Failed to get git sha1 version" {})))
+    (str/trim out)))
 
 (defn system [_]
   (let [system (repl/system)]
@@ -35,6 +44,7 @@
            (delay
              (for [[name frequency] (xt/attribute-stats node)]
                {"attribute" (str name) "frequency" frequency}))})))
-     #_#_"jvm"
-     (delay
-       )}))
+
+     "version"
+     {"gitSha" (delay (git-sha))}
+     }))

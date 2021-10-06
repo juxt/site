@@ -67,6 +67,12 @@ type SiteSystem {
   # GraphiQL, this might not have been completely implemented yet. For now,
   # don't use NON_NULL.
   configuration: SiteConfiguration
+
+  version: VersionDetails
+}
+
+type VersionDetails {
+  gitSha: String
 }
 
 type SiteDatabaseStatus {
