@@ -69,10 +69,17 @@ type SiteSystem {
   configuration: SiteConfiguration
 
   version: VersionDetails
+  status: StatusDetails
 }
 
 type VersionDetails {
   gitSha: String
+}
+
+type StatusDetails {
+  txLogAvail: Int
+  docStoreAvail: Int
+  indexStoreAvail: Int
 }
 
 type SiteDatabaseStatus {

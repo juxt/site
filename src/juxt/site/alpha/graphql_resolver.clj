@@ -6,8 +6,20 @@
    [crux.api :as xt]
    [clojure.set :as set]
    [clojure.java.shell :as sh]
+   [juxt.site.alpha.main :as main]
    [clojure.string :as str]))
 
+(defn config []
+  (main/config))
+
+(defn df [dir]
+  (when-let [out (:out (sh/sh "df" "--output=avail" dir))]
+    (Long/parseLong
+     (str/trim
+      (second (str/split out #"\n"))))))
+
+(defn tx-log-avail []
+  )
 
 (defn git-sha []
   (let [{:keys [out err]} (sh/sh "git" "rev-parse" "HEAD")]
@@ -46,5 +58,11 @@
                {"attribute" (str name) "frequency" frequency}))})))
 
      "version"
-     {"gitSha" (delay (git-sha))}
+     {"gitSha" (delay (git-sha))
+      }
+
+     "status"
+     {"txLogAvail" (delay (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/tx-log :kv-store :db-dir])))
+      "docStoreAvail" (delay (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/document-store :kv-store :db-dir])))
+      "indexStoreAvail" (delay (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/index-store :kv-store :db-dir])))}
      }))
