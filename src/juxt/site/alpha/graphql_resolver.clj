@@ -58,9 +58,10 @@
                {"attribute" (str name) "frequency" frequency}))})))
 
      "version"
-     {"gitSha" (delay (git-sha))
-      }
+     {"gitSha" (delay (git-sha))}
 
+     ;; TODO: Push these into JMX and pull JMX mbeans into GraphQL
+     ;; TODO: Suggest to jms he does the same with XT
      "status"
      {"txLogAvail" (delay (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/tx-log :kv-store :db-dir])))
       "docStoreAvail" (delay (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/document-store :kv-store :db-dir])))
