@@ -132,7 +132,7 @@
                   (fn [x]
                     (cond-> x
                       (and (vector? x) (= :kind (first x)))
-                      (update 1 (comp str/upper-case name))))
+                      (update 1 (comp str/upper-case #(str/replace % "-" "_") name))))
                   results)]
 
     (-> req
