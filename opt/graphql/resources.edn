@@ -4,6 +4,11 @@
  :juxt.http.alpha/methods #{:post :put :options}
  :juxt.http.alpha/acceptable "application/graphql"
 
+ :juxt.site.alpha/access-control-allow-origins
+ {#regex "http://localhost:\\p{Digit}+"
+  {:juxt.site.alpha/access-control-allow-methods #{:post}
+   :juxt.site.alpha/access-control-allow-headers #{"authorization" "content-type"}}}
+
  ;; For handling the upsert the schema
  :juxt.site.alpha/put-fn juxt.site.alpha.graphql/put-handler
  :juxt.http.alpha/put-error-representations
