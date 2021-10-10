@@ -1253,7 +1253,7 @@
       (h req)
       (catch clojure.lang.ExceptionInfo e
 
-        (log/info "ERROR")
+        (log/info (str "ERROR: " (.getMessage e)))
 
         (let [{:ring.response/keys [status] :as ex-data} (ex-data e)]
 
