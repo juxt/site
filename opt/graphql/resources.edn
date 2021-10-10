@@ -29,4 +29,7 @@
  :juxt.http.alpha/post-error-representations
  [{:ring.response/status 400
    :juxt.http.alpha/content-type "text/plain"
-   :juxt.site.alpha/body-fn juxt.site.alpha.graphql/post-error-text-body}]}
+   :juxt.site.alpha/body-fn juxt.site.alpha.graphql/post-error-text-body}
+  {:ring.response/status 400
+   :juxt.http.alpha/content-type "application/json"
+   :juxt.site.alpha/body-fn juxt.site.alpha.graphql/post-error-json-body}]}

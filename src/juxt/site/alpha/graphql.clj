@@ -92,7 +92,7 @@
   (let [schema (some-> (xt/entity db uri) ::grab/schema)
         body (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
-        _ (log/tracef "request keys are" (pr-str (keys (some-> req :juxt.site.alpha/received-representation))))
+        _ (log/tracef "received-representation is %s" (pr-str (keys (some-> req :juxt.site.alpha/received-representation))))
 
         ;; TODO: Should also support application/graphql+json
         [document-str operation-name]
@@ -113,11 +113,11 @@
         document
         (try
           (document/compile-document (parser/parse document-str) schema)
-          (catch clojure.lang.ExceptionInfo e
+          (catch Exception e
             (let [errors (:errors (ex-data e))]
               (throw
                (ex-info
-                "Errors in query"
+                "Error parsing or compiling GraphQL query"
                 (into
                  req
                  (cond-> {:ring.response/status 400}
@@ -221,3 +221,8 @@
        (:location error) (str " (line " (-> error :location :row inc) ")")))
    (into ["Query errors"])
    (str/join (System/lineSeparator))))
+
+(defn post-error-json-body [req]
+  (json/write-value-as-string
+   {:message "Document errors"
+    :errors (::errors req)}))
