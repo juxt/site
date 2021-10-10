@@ -33,3 +33,17 @@ $ site put-asset --file build/index.html --path /_site/graphiql/index.html
 ----
 $ yarn start
 ----
+
+
+== Troubleshooting
+
+=== Emacs and the webpack dev server
+
+When developing the GraphiQL console with Emacs, `yarn start` exits with an error when it sees an Emacs lockfile. The workaround is to edit watchOptions in node_modules/react-scripts/config/webpackDevServer.config.js to the following
+
+[source]
+----
+    watchOptions: {
+      ignored: [ignoredFiles(paths.appSrc), '**/.#*', '**/*~', '**/#*#'],
+    },
+----
