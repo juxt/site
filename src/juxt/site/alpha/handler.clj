@@ -895,7 +895,8 @@
       (try
         ;; TODO: Can we use the new refreshed db here to save another call to x/db?
         (let [actions (rules/eval-triggers (x/db crux-node) triggers request-context)]
-          (log/tracef "Triggered actions are %s" (pr-str actions))
+          (when (seq actions)
+            (log/tracef "Triggered actions are %s" (pr-str actions)))
           (doseq [action actions]
             (log/tracef "Running action: %s" (get-in action [:trigger ::site/action]))
             (triggers/run-action! req action)))
