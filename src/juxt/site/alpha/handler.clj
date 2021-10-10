@@ -880,7 +880,6 @@
           (map first
                (x/q db '{:find [rule]
                          :where [[rule ::site/type "Trigger"]]}))
-          _ (log/tracef "Triggers are %s" (pr-str triggers))
 
           request-context
           {'subject subject
