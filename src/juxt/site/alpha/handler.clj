@@ -1416,7 +1416,10 @@
 
 (defn wrap-log-request [h]
   (fn [req]
-    (doto (h req) (log-request!))))
+    (let [req (h req)]
+      (assert req)
+      (log-request! req)
+      req)))
 
 (defn wrap-healthcheck
   [h]
