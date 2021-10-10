@@ -1024,32 +1024,37 @@
       (assert response)
       (respond response))))
 
+(defn access-control-match-origin [allow-origins origin]
+  (some (fn [[pattern result]]
+          (when (or
+                 (and (string? pattern) (= pattern origin))
+                 (and (instance? java.util.regex.Pattern pattern) (re-matches pattern origin)))
+            result))
+        allow-origins))
+
 (defn wrap-cors-headers [h]
   (fn [req]
     (let [{::site/keys [resource] :as req} (h req)
           request-origin (get-in req [:ring.request/headers "origin"])
           {::site/keys [access-control-allow-origins]} resource
-          allow-origin
+
+          access-control
           (when request-origin
-            (or
-             (when (contains? access-control-allow-origins request-origin)
-               request-origin)
-             (when (contains? access-control-allow-origins "*")
-               "*")))
-          cors-headers (when allow-origin (get access-control-allow-origins allow-origin))
-          ]
+            (access-control-match-origin access-control-allow-origins request-origin))]
+
       (cond-> req
-        allow-origin
-        (assoc-in [:ring.response/headers "access-control-allow-origin"] allow-origin)
-        (contains? cors-headers ::site/access-control-allow-methods)
+        access-control
+        (assoc-in [:ring.response/headers "access-control-allow-origin"] request-origin)
+
+        (contains? access-control ::site/access-control-allow-methods)
         (assoc-in [:ring.response/headers "access-control-allow-methods"]
-                  (join-keywords (get cors-headers ::site/access-control-allow-methods) true))
-        (contains? cors-headers ::site/access-control-allow-headers)
+                  (join-keywords (get access-control ::site/access-control-allow-methods) true))
+        (contains? access-control ::site/access-control-allow-headers)
         (assoc-in [:ring.response/headers "access-control-allow-headers"]
-                  (join-keywords (get cors-headers ::site/access-control-allow-headers) false))
-        (contains? cors-headers ::site/access-control-allow-credentials)
+                  (join-keywords (get access-control ::site/access-control-allow-headers) false))
+        (contains? access-control ::site/access-control-allow-credentials)
         (assoc-in [:ring.response/headers "access-control-allow-credentials"]
-                  (str (get cors-headers ::site/access-control-allow-credentials)))))))
+                  (str (get access-control ::site/access-control-allow-credentials)))))))
 
 (defn status-message [status]
   (case status
