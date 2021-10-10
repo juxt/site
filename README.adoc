@@ -68,7 +68,7 @@ your superuser. We'll assume the superuser will be named `admin`, but feel free
 to choose your own username here.
 
 ----
-$ pass generate site/local/admin
+$ pass generate -n site/local/admin
 ----
 --
 
