@@ -1035,13 +1035,7 @@
 (defn wrap-cors-headers [h]
   (fn [req]
     (let [{::site/keys [resource] :as req}
-          (try
-            (h req)
-            (catch Throwable e
-              ;; We're expecting the error handling to have fully resolved any
-              ;; errors, it should not throw
-              (log/error e "Error not handled!")
-              (throw e)))
+          (h req)
 
           _ (log/tracef "Add CORS headers?")
           request-origin (get-in req [:ring.request/headers "origin"])
@@ -1272,7 +1266,17 @@
       (finally
         (org.slf4j.MDC/clear)))))
 
-
+(defn wrap-check-error-handling
+  "Ensure that on exceptions slip through the net."
+  [h]
+  (fn [req]
+    (try
+      (h req)
+      (catch Throwable e
+        ;; We're expecting the error handling to have fully resolved any
+        ;; errors, it should not throw
+        (log/error e "ERROR NOT HANDLED!")
+        (throw e)))))
 
 ;; See https://portswigger.net/web-security/host-header and similar TODO: Have a
 ;; 'whitelist' in the config to check against - but this would require a reboot,
@@ -1471,6 +1475,7 @@
    wrap-security-headers
 
    ;; Error handling
+   wrap-check-error-handling
    wrap-error-handling
 
    ;; 501
