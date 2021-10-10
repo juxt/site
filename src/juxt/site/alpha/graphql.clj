@@ -112,7 +112,12 @@
                                                     (dissoc :juxt.pass.alpha/request-context)))))
         document
         (try
-          (document/compile-document (parser/parse document-str) schema)
+          (let [document
+                (try
+                  (parser/parse document-str)
+                  (catch Exception e
+                    (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]}))))]
+            (document/compile-document document schema))
           (catch Exception e
             (let [errors (:errors (ex-data e))]
               (throw
@@ -224,5 +229,8 @@
 
 (defn post-error-json-body [req]
   (json/write-value-as-string
-   {:message "Document errors"
-    :errors (::errors req)}))
+   {:errors
+    (for [error (::errors req)
+          :let [location (:location error)]]
+      (cond-> error
+        location (assoc :location location)))}))
