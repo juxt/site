@@ -1233,7 +1233,6 @@
                           {:ring.response/status 500
                            ::site/errors (errors-with-causes e)}
                           ex-data
-                          {::site/resource nil}
                           {::site/selected-representation representation})
           response (try
                      (add-payload error-resource)
