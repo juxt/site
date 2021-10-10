@@ -1192,7 +1192,7 @@
                   (dissoc ::http/content-location)))))))
 
 (defn respond-internal-error [req e]
-  (log/error e (.getMessage e))
+  (log/error e (str "Internal Error: " (.getMessage e)))
   ;; TODO: We should allow an ErrorResource for 500 errors
   (let [default-body "Internal Server Error\r\n"]
     (respond
