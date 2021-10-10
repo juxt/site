@@ -43,7 +43,7 @@ When developing the GraphiQL console with Emacs, `yarn start` exits with an erro
 
 [source]
 ----
-    watchOptions: {
-      ignored: [ignoredFiles(paths.appSrc), '**/.#*', '**/*~', '**/#*#'],
-    },
+watchOptions: {
+  ignored: [ignoredFiles(paths.appSrc), '**/.#*', '**/*~', '**/#*#'],
+},
 ----
