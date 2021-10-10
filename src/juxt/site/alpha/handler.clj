@@ -1037,7 +1037,6 @@
     (let [{::site/keys [resource] :as req}
           (h req)
 
-          _ (log/tracef "Add CORS headers?")
           request-origin (get-in req [:ring.request/headers "origin"])
           {::site/keys [access-control-allow-origins]} resource
 
