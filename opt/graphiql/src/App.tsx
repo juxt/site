@@ -48,7 +48,7 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    fetchGraphQlSchema(graphQLFetcher).then((s) => setSchema(s));
+    fetchGraphQlSchema(graphQLFetcher).then((s) => setSchema(s)).catch(error => console.log('ERROR'));
   }, []);
   return (
     <div className={`graphiql-container`}>
