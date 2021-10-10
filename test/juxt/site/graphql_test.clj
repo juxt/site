@@ -29,9 +29,11 @@
   (submit-and-await!
    [[:crux.tx/put access-all-areas]
     [:crux.tx/put
-     (edn/read-string (str/replace
-                       (slurp "opt/graphql/resources.edn")
-                       "{{base-uri}}" "https://example.org"))]
+     (edn/read-string
+      {:readers {'regex #(re-pattern %)}}
+      (str/replace
+       (slurp "opt/graphql/resources.edn")
+       "{{base-uri}}" "https://example.org"))]
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/_site/users/mal",
