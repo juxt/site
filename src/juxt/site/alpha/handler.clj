@@ -1034,7 +1034,16 @@
 
 (defn wrap-cors-headers [h]
   (fn [req]
-    (let [{::site/keys [resource] :as req} (h req)
+    (let [{::site/keys [resource] :as req}
+          (try
+            (h req)
+            (catch Throwable e
+              ;; We're expecting the error handling to have fully resolved any
+              ;; errors, it should not throw
+              (log/error e "Error not handled!")
+              (throw e)))
+
+          _ (log/tracef "Add CORS headers?")
           request-origin (get-in req [:ring.request/headers "origin"])
           {::site/keys [access-control-allow-origins]} resource
 
