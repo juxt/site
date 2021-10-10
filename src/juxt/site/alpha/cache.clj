@@ -78,3 +78,6 @@
     (put! cache "2" "two")
     (seq cache)
     ))
+
+(defonce requests-cache
+  (new-fifo-soft-atom-cache 1000))

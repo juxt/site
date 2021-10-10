@@ -227,11 +227,11 @@
   (into
    (sorted-map)
    (cache/find
-    handler/requests-cache
+    cache/requests-cache
     (re-pattern (str "/_site/requests/" s)))))
 
-(defn cache []
-  handler/requests-cache)
+(defn requests-cache []
+  cache/requests-cache)
 
 (defn gc
   "Remove request data that is older than an hour."

@@ -40,9 +40,6 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'rfc7230 (create-ns 'juxt.reap.alpha.rfc7230))
 
-(defonce requests-cache
-  (cache/new-fifo-soft-atom-cache 1000))
-
 (defn join-keywords
   "Join method keywords into a single comma-separated string. Used for the Allow
   response header value, and others."
@@ -435,7 +432,7 @@
 
    ;; Is it a cached request to debug?
    (let [[_ req-id suffix] (re-matches SITE_REQUEST_ID_PATTERN uri)]
-     (when-let [request-to-show (get requests-cache req-id)]
+     (when-let [request-to-show (get cache/requests-cache req-id)]
        (log/tracef "Found request object in cache")
        {::site/uri uri
         ::site/resource-provider ::requests-cache
@@ -1395,7 +1392,7 @@
   (fn [req]
     (let [req (h req)]
       (when-let [req-id (::site/request-id req)]
-        (cache/put! requests-cache req-id (->storable req)))
+        (cache/put! cache/requests-cache req-id (->storable req)))
       req)))
 
 (defn wrap-store-request [h]
