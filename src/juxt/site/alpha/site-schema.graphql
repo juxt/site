@@ -70,6 +70,7 @@ type SiteSystem {
 
   version: VersionDetails
   status: StatusDetails
+  requests: SiteRequests
 }
 
 type VersionDetails {
@@ -95,4 +96,22 @@ type SiteDatabaseStatus {
 type SiteAttributeStat {
   attribute: String
   frequency: Int
+}
+
+type SiteRequests {
+  count: Int
+  summaries: [SiteRequestSummary]
+  request(search: String): SiteRequest
+}
+
+type SiteRequestSummary {
+  id: ID
+  status: Int
+  date: String
+}
+
+type SiteRequest {
+  id: ID
+  status: Int
+  date: String
 }

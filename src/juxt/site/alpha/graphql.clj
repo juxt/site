@@ -76,7 +76,8 @@
           ;; object-value. This strategy allows for delays to be used to prevent
           ;; computing field values that aren't resolved.
           (contains? object-value field-name)
-          (force (get object-value field-name))
+          (let [f (force (get object-value field-name))]
+            (if (fn? f) (f (:argument-values args)) f))
 
           ;; Or simply try to extract the keyword
           (contains? object-value (keyword field-name))

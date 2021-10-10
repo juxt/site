@@ -7,6 +7,7 @@
    [clojure.set :as set]
    [clojure.java.shell :as sh]
    [juxt.site.alpha.main :as main]
+   [juxt.site.alpha.cache :as cache]
    [clojure.string :as str]))
 
 (defn config []
@@ -66,4 +67,25 @@
      {"txLogAvail" (delay (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/tx-log :kv-store :db-dir])))
       "docStoreAvail" (delay (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/document-store :kv-store :db-dir])))
       "indexStoreAvail" (delay (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/index-store :kv-store :db-dir])))}
-     }))
+
+
+     "requests"
+     {"count"
+      (delay (.size cache/requests-cache))
+
+      "summaries"
+      (delay
+        (for [{:keys [crux.db/id ring.response/status juxt.site.alpha/date]}
+              (seq cache/requests-cache)]
+          {"id" id
+           "status" status
+           "date" (str date)}))
+
+      "request" (fn [{:strs [search] :as args}]
+                  (set/rename-keys
+                   (cache/find
+                    cache/requests-cache
+                    (re-pattern (str "/_site/requests/" search)))
+                   {:crux.db/id "id"
+                    :ring.response/status "status"
+                    :juxt.site.alpha/date "date"}))}}))
