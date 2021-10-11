@@ -31,7 +31,7 @@
 (defn system [_]
   (let [system (repl/system)]
     {"configuration"
-     (delay
+     (fn [_]
        (let [config (repl/config)]
          {"baseUri" (:juxt.site.alpha/base-uri config)
           "unixPassPasswordPrefix"
@@ -41,7 +41,7 @@
                           :juxt.site.alpha.server/server
                           :juxt.site.alpha/port])}))
      "database"
-     (delay
+     (fn [_]
        (let [node (:juxt.site.alpha.db/crux-node system)
              status (xt/status node)]
          (merge
@@ -54,27 +54,27 @@
             :crux.kv/estimate-num-keys "estimateNumKeys"
             :crux.kv/size "kvSize"})
           {"attributeStats"
-           (delay
+           (fn [_]
              (for [[name frequency] (xt/attribute-stats node)]
                {"attribute" (str name) "frequency" frequency}))})))
 
      "version"
-     {"gitSha" (delay (git-sha))}
+     {"gitSha" (fn [_] (git-sha))}
 
      ;; TODO: Push these into JMX and pull JMX mbeans into GraphQL
      ;; TODO: Suggest to jms he does the same with XT
      "status"
-     {"txLogAvail" (delay (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/tx-log :kv-store :db-dir])))
-      "docStoreAvail" (delay (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/document-store :kv-store :db-dir])))
-      "indexStoreAvail" (delay (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/index-store :kv-store :db-dir])))}
+     {"txLogAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/tx-log :kv-store :db-dir])))
+      "docStoreAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/document-store :kv-store :db-dir])))
+      "indexStoreAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/index-store :kv-store :db-dir])))}
 
 
      "requests"
      {"count"
-      (delay (.size cache/requests-cache))
+      (fn [_] (.size cache/requests-cache))
 
       "summaries"
-      (delay
+      (fn [_]
         (for [{:keys [crux.db/id ring.response/status juxt.site.alpha/date]}
               (seq cache/requests-cache)]
           {"id" id

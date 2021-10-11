@@ -49,7 +49,8 @@
                        xt/q db
                        (assoc
                         (to-xt-query (get site-args "q"))
-                        :in (vec (concat ['object] (map symbol (keys (:argument-values args))))))
+                        :in (vec (concat ['object] (map symbol (keys (:argument-values args)))))
+                        )
                        id (vals (:argument-values args)))]
               (xt/entity db e))
 
