@@ -15,6 +15,7 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'grab (create-ns 'juxt.grab.alpha))
+(alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'g (create-ns 'juxt.grab.alpha.graphql))
 
 (defn to-xt-query [query]
@@ -29,7 +30,7 @@
      )
    query))
 
-(defn query [schema document operation-name db]
+(defn query [schema document operation-name db subject]
   (execute-request
    {:schema schema
     :document document
@@ -71,7 +72,7 @@
 
           (get site-args "resolver")
           (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
-            (resolver args))
+            (resolver (assoc args ::pass/subject subject :db db)))
 
           ;; Another strategy is to see if the field indexes the
           ;; object-value. This strategy allows for delays to be used to prevent
@@ -90,7 +91,9 @@
             (format "TODO: resolve field: %s" (:field-name args)) args)))))}))
 
 
-(defn post-handler [{::site/keys [uri db] :as req}]
+(defn post-handler [{::site/keys [uri db]
+                     ::pass/keys [subject]
+                     :as req}]
   (let [schema (some-> (xt/entity db uri) ::grab/schema)
         body (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
@@ -132,7 +135,7 @@
                 e)))))
 
         ;; TODO: If JSON, get operationName and use it here
-        results (query schema document operation-name db)
+        results (query schema document operation-name db subject)
 
         ;; Map to application/json
         results (postwalk

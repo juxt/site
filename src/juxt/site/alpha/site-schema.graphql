@@ -25,6 +25,16 @@ type Query {
   Access Site's system
   """
   system: SiteSystem @site(resolver: "juxt.site.alpha.graphql-resolver/system")
+
+  """
+  Access the currently logged in user
+  """
+  subject: SiteSubject @site(resolver: "juxt.site.alpha.graphql.internal-resolver/subject")
+}
+
+type SiteSubject {
+  user: SiteUser
+  authScheme: String
 }
 
 """
