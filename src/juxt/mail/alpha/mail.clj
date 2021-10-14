@@ -2,13 +2,13 @@
 
 (ns juxt.mail.alpha.mail
   (:require
-   [amazonica.aws.simpleemail :as ses]
    [amazonica.aws.sns :as sns]
    [integrant.core :as ig]
    [juxt.site.alpha.triggers :as triggers]
    [crux.api :as x]
    [clojure.tools.logging :as log]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [postal.core :as postal]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -22,14 +22,14 @@
     (fn [& {:keys [message phone-number message-attributes]}]
       (log/infof "sns-client/publish-stub: phone-number %s, message %s" phone-number message))))
 
-(defmethod ig/init-key ::ses-client [_ {:keys [enabled?]}]
+(defmethod ig/init-key ::smtp-client [_ {:keys [enabled?]}]
   (if enabled?
-    ses/send-email
-    (fn [& {:keys [destination source message]}]
-      (log/infof "ses-client/send-email-stub: destination %s, source %s, message %s"
-                 destination
-                 source
-                 (dissoc message :body)))))
+    postal/send-message
+    (fn [_ {:keys [to from subject]}]
+      (log/infof "smtp-client/send-email-stub: to %s, from %s, subject %s"
+                 to
+                 from
+                 subject))))
 
 (defn send-sms! [sns-client from-sms-name to-phone-number subject text-body]
 
@@ -44,18 +44,21 @@
       (catch Exception e
         (log/error e)))))
 
-(defn send-mail! [ses-client from to subject html-body text-body]
+(defn send-mail! [smtp-client server from to subject html-body text-body]
 
   (log/debugf "Sending email to %s with subject %s, body %s" to subject html-body)
 
   (future
     (try
-      (ses-client
-       :destination {:to-addresses [to]}
-       :source from
-       :message {:subject subject
-                 :body {:html html-body
-                        :text text-body}})
+      (smtp-client server
+                   {:from from
+                    :to to
+                    :subject subject
+                    :body [:alternative
+                           {:type "text/plain"
+                            :content text-body}
+                           {:type "text/html"
+                            :content html-body}]})
       (catch Exception e
         (log/error e)))))
 
@@ -72,15 +75,27 @@
       "<blank>"))))
 
 (defmethod triggers/run-action! ::mail/send-emails
-  [{::site/keys [db ses-client]} {:keys [trigger action-data]}]
-  (let [{::mail/keys [html-template text-template from subject]} trigger
+  [{::site/keys [db smtp-client]} {:keys [trigger action-data]}]
+  (let [{::mail/keys [html-template
+                      text-template
+                      from
+                      subject
+                      host
+                      username
+                      password
+                      port]} trigger
         html-template (some-> (x/entity db html-template) ::http/content)
         text-template (some-> (x/entity db text-template) ::http/content)]
     (assert html-template)
     (assert text-template)
     (doseq [{:keys [user] :as data} action-data]
       (send-mail!
-       ses-client
+       smtp-client
+       {:host host
+        :user username
+        :pass password
+        :port port
+        :tls true}
        from (:email user)
        (mail-merge subject data)
        (mail-merge html-template data)

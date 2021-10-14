@@ -50,6 +50,9 @@
         ;; AWS
         amazonica/amazonica {:mvn/version "0.3.154"}
 
+        ;; SMTP
+        com.draines/postal {:mvn/version "2.0.4"}
+
         ;; Selmer templating
         selmer/selmer {:mvn/version "1.12.40"}}
 
