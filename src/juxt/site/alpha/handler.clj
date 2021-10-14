@@ -642,7 +642,7 @@
             (nil? put-fn)
             (throw
              (ex-info
-              "Resource allows PUT but doesn't contain have a put-fn function"
+              "Resource allows PUT but doesn't contain a put-fn function"
               (into req {:ring.response/status 500})))
 
             :else
