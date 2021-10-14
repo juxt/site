@@ -51,6 +51,10 @@
     ("Linux" "Mac OS X") (io/file (System/getProperty "user.home") ".config/site/config.edn")
     (error-and-exit! 1 "Unsupported OS")))
 
+(defn file-extension
+  [path]
+  (subs path (inc (str/last-index-of path "."))))
+
 ;;(assert (.exists config-file) (format "Config file does not exist: %s" (str config-file)))
 
 (def config
@@ -850,6 +854,87 @@
           (error! "Server response:" status (str/trim body))
           (message! "Request id:" (get headers "site-request-id")))))))
 
+(defn infer-content-type
+  [extension]
+  (case extension
+    ("htm" "html") "text/html;charset=utf-8"
+    "js" "text/javascript"
+    "json" "application/json"
+    "edn" "application/edn"
+    "csv" "text/csv"
+    "png" "image/png"
+    ("jpg" "jpeg") "image/jpeg"
+    "svg" "image/svg+xml"
+    "ico" "image/x-icon"
+    ("gif" "webp" "bmp") (str "image/" extension)
+    "css" "text/css; charset=utf-8"
+    ("woff" "woff2" "otf" "ttf") (str "font/" extension)
+    ("mp4" "mpeg" "webm") (str "video/" extension)
+    ("opus" "wav" "aac") (str "audio/" extension)
+    "mp3" "audio/mpeg"
+
+    "application/octet-stream"))
+
+(defn put-static-site
+  "Given a path and a directory containing at least an index.html file, serves the
+  files in the directory using the given path as the root"
+  [opts]
+  (try
+    (let [{access-token "access_token"} (load-token)
+          {:keys [base-uri directory path]
+           :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
+      (message! "putting site" base-uri directory path)
+      (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+      (when-not (some->> (str directory "/index.html")
+                         io/file
+                         .exists)
+        (error-and-exit! 1 (str "No index.html found in directory: " directory)))
+      (let [put-file
+            (fn [file]
+              (def file file)
+              (let [base (str (.getPath (.toURI (io/file (System/getProperty "user.dir")))) directory)
+                    relative-path (str path (str/replace-first (.getPath (.toURI file)) base ""))
+                    destination (str base-uri "/" relative-path)
+                    _ (message! (str "Putting file " (.getAbsolutePath file) " to path " destination))
+                    {:keys [status headers body]}
+                    (curl/put
+                     destination
+                     {:headers {"authorization" (format "Bearer %s" access-token)
+                                "content-type" (infer-content-type (file-extension (.getName file)))}
+                      :body (some-> (slurp (io/file file))
+                                    (str/replace "{{base-uri}}" base-uri))
+                      :throw false})]
+                (case status
+                  (201 204)
+                  (message! (format "Resource %s: %s"
+                                    (case status 201 "created" 204 "updated")
+                                    (get headers "location")))
+
+                  207
+                  (let [results (edn/read-string body)
+                        errors (filter #(contains? % :error) results)]
+                    (if (pos? (count errors))
+                      (do
+                        (error! (format "Not all resources were accepted:"))
+                        (dorun (map (fn [ix r]
+                                      (cond
+                                        (< (:status r) 400)
+                                        (println (format "%s%d: %s%s" ansi/green-font ix r ansi/reset-font))
+                                        :else
+                                        (println (format "%s%d: %s%s" ansi/red-font ix r ansi/reset-font))))
+                                    (range) results)))
+                      (message! (format "Resources all posted OK"))))
+
+                  (do
+                    (error! "Server response:" status (str/trim body))
+                    (message! "Request id:" (get headers "site-request-id"))))))]
+        (some->> directory
+                 io/file
+                 file-seq
+                 (filter #(.isFile %))
+                 (mapv put-file))))
+    (catch Exception e (str "error putting static site " e))))
+
 (defn debugf
   "Write a debug message to the console, but only if *debug* is true."
   [& args]
@@ -859,7 +944,7 @@
 (def global-cli-options
   [["-b" "--base-uri BASE-URI" "The Base-URI of the server you are targetting"]
    ["-s" "--silent" "Silent mode"]
-   ["-d" "--debug" "Enable debug mode"]
+   ["-D" "--debug" "Enable debug mode"]
    ["-v" "--verbose" "Verbose mode"]
    ["-h" "--help" "Show this summary"]])
 
@@ -991,7 +1076,13 @@
     {:description (:doc (meta #'put-json))
      :cli-options [["-f" "--file FILE" "File containing data"]
                    ["-u" "--url URL" "URL to POST to"]]
-     :delegate put-json}]])
+     :delegate put-json}]
+
+   ["put-static-site"
+    {:description (:doc (meta #'put-static-site))
+     :cli-options [["-d" "--directory DIR" "Directory containing static site files"]
+                   ["-p" "--path PATH" "Path the site will be available at. e.g -p mysite will make the site available at BASE_URI/mysite/index.html"]]
+     :delegate put-static-site}]])
 
 (let [{:keys [options arguments summary errors]}
       (parse-opts (next *command-line-args*)  global-cli-options :in-order true)
