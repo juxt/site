@@ -30,7 +30,8 @@
       (json/encode)))
 
 (defn error! [& msg]
-  (apply println (apply str ansi/red-font "fail:" ansi/reset-font) msg))
+  (when-not *silent*
+    (apply println (apply str ansi/red-font "fail:" ansi/reset-font) msg)))
 
 (defn error-and-exit! [exit & msg]
   (apply error! msg)
@@ -171,28 +172,30 @@
         (json/decode (slurp f))]
 
     (if (.isBefore (java.time.Instant/parse expires) (java.time.Instant/now))
-      (error-and-exit! 1 "Access token has expired. Please request a new token with the 'get-token' subcommand")
+      (error-and-exit! 1 (format "Access token has expired. Request a new token with %ssite get-token%s" ansi/cyan-font ansi/reset-font))
       token)))
 
 (defn check-token
   "Check the validity of the locally cached token"
   [_]
-  (let [token (json/decode (slurp (local-token-file)))
-        expires (get token "expires")]
-    (if (.isBefore (java.time.Instant/parse expires) (java.time.Instant/now))
-      (message! "Access token has expired")
-      (let [mins-left (.until (java.time.Instant/now)
-                              (java.time.Instant/parse expires)
-                              java.time.temporal.ChronoUnit/MINUTES)]
-        (message! (format "Access token is owned by %s%s%s: %s%s%s"
-                          ansi/yellow-font (get token "username") ansi/reset-font
-                          ansi/cyan-font (get token "access_token") ansi/reset-font))
-        (if (> mins-left 1)
-          (message! (format "Access token expires in %d minutes" mins-left))
-          (message! (format "Access token expires in %d seconds"
-                            (.until (java.time.Instant/now)
-                                    (java.time.Instant/parse expires)
-                                    java.time.temporal.ChronoUnit/SECONDS))))))))
+  (let [local-token-file (local-token-file)]
+
+    (if-not (.exists local-token-file)
+      (error-and-exit! 1 (format "Access token does not exist. Request a token with %ssite get-token%s" ansi/cyan-font ansi/reset-font))
+      (let [token (json/decode (slurp local-token-file))
+            expires (get token "expires")]
+
+        (if (.isBefore (java.time.Instant/parse expires) (java.time.Instant/now))
+          (error-and-exit! 1 "Access token has expired")
+          (let [mins-left (.until (java.time.Instant/now)
+                                  (java.time.Instant/parse expires)
+                                  java.time.temporal.ChronoUnit/MINUTES)]
+            (if (> mins-left 5)
+              (message! (format "Access token expires in %d minutes" mins-left))
+              (error-and-exit! 2 (format "Access token expires in %d seconds and should be refreshed"
+                                         (.until (java.time.Instant/now)
+                                                 (java.time.Instant/parse expires)
+                                                 java.time.temporal.ChronoUnit/SECONDS))))))))))
 
 (defn clear-token
   "Clear the token to end the session"
