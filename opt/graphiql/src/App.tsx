@@ -17,8 +17,10 @@ async function fetchGraphQlSchema(fetcher: import("graphiql").Fetcher) {
 }
 
 const graphQLFetcher: import("graphiql").Fetcher = async (graphQLParams) => {
+  const queryParams = new URLSearchParams(window.location.search);
+  const endpoint = queryParams.get('url') ?? '/_site/graphql';
   const data = await fetch(
-    '/_site/graphql',
+    endpoint,
     {
       method: 'POST',
       headers: {
@@ -29,7 +31,7 @@ const graphQLFetcher: import("graphiql").Fetcher = async (graphQLParams) => {
       credentials: 'include',
     }
   );
-  return data.json().catch(() => console.error('error fetching from /_site/graphql', data));
+  return data.json().catch(() => console.error('error fetching from ' + endpoint, data));
 }
 
 const App = () => {
