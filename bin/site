@@ -162,44 +162,6 @@
         (do
           (println "Server response:" status (str/trim body)))))))
 
-(defn repl-command [{:keys [in out]} cmd]
-  (doto out (.write cmd) (.newLine) (.flush))
-  (.readLine in)
-  ;;(loop [] (when (.ready in) (cons (.readLine in) (recur))))
-  )
-
-;; Possibly this is better to do manually by the operator, now the REPL
-;; interface is nicer. This command is also one that only works locally, whereas
-;; the site tool is meant to be location transparent.
-#_(defn init-db
-  "Initialize a new Site instance"
-  [opts]
-  (message! "Initializing database")
-  ;; It's only possible to initialize the local instance, so the config will
-  ;; always be sourced directly from ../src/config.edn
-  (let [config (edn/read-string
-                {:readers {'ig/ref identity 'ref identity}}
-                (slurp (io/file site-root-dir "src/config.edn")))
-
-        {:juxt.site.alpha/keys [base-uri master-username]
-         :juxt.site.alpha.unix-pass/keys [password-prefix] :as opts}
-        config
-
-        master-password (get-password password-prefix master-username)
-
-        opts (-> opts
-                 (select-keys [:juxt.site.alpha/base-uri :juxt.site.alpha/master-username])
-                 (assoc :juxt.site.alpha/master-password master-password))]
-
-    (let [sock (java.net.Socket. "localhost" 50505)
-          repl {:in (io/reader (.getInputStream sock))
-                :out (io/writer (.getOutputStream sock))}]
-      (repl-command repl "(require 'juxt.site.alpha.init)")
-      (repl-command repl "(def crux-node (:juxt.site.alpha.db/crux-node juxt.site.alpha.main/system))")
-      (repl-command repl (format "(juxt.site.alpha.init/init-db! crux-node %s)" (pr-str opts)))
-;;      (.readLine (:in repl))
-      )))
-
 (defn load-token []
   "Load token from local cache"
   (let [f (local-token-file)
