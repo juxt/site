@@ -4,34 +4,32 @@
 
 Install NPM packages
 
+[source, bash]
 ----
-$ yarn
+ yarn
 ----
 
 Build the index.html
 
+[source, bash]
 ----
-$ yarn build
+yarn build
 ----
 
-This outputs files into the `public` folder.
-
-Bundle the output files together into `build/index.html`
-
-----
-$ npx gulp
-----
+This outputs files into the `build` folder.
 
 == Deploy the GraphiQL application to Site
 
+[source, bash]
 ----
-$ site put-asset --file build/index.html --path /_site/graphiql/index.html
+site put-static-site -d build -p _site/graphiql
 ----
 
 == Steps to develop the GraphiQL console
 
+[source, bash]
 ----
-$ yarn start
+yarn start
 ----
 
 
@@ -47,3 +45,12 @@ watchOptions: {
   ignored: [ignoredFiles(paths.appSrc), '**/.#*', '**/*~', '**/#*#'],
 },
 ----
+
+You can also disable lockfiles for this directory with a .dirlocals containing
+
+[source]
+----
+((nil . ((create-lockfiles . nil))))
+----
+
+This means you don't have to mess with node modules which will probably cause some issues
