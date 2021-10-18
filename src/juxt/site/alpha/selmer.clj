@@ -5,7 +5,6 @@
    [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk]]
    [crux.api :as x]
-   [juxt.site.alpha.templating :as templating]
    [juxt.site.alpha.util :as util]
    [selmer.parser :as selmer]
    selmer.filters
@@ -54,8 +53,8 @@
        :else m))
    template-model))
 
-(defmethod templating/render-template
-  :selmer
+;; This is now deprecated but remains to support pre-existing use-cases
+(defn old-render-template
   [{::site/keys [db resource selected-representation] :as req} template]
   (let [{::site/keys []} selected-representation
         ush (proxy [java.net.URLStreamHandler] []
@@ -133,6 +132,38 @@
                :ring.response/body body
                ::site/processed-template-models processed-template-models
                ::site/combined-template-model combined-template-model))
+
+      (catch Exception e
+        (throw (ex-info (str "Failed to render template: " template) {:template template
+                                                                      :exception-type (type e)} e))))))
+
+
+
+(defn render-template [{::site/keys [db selected-representation] :as req} template template-model]
+  (let [custom-resource-path (:selmer.util/custom-resource-path selected-representation)
+        ush (proxy [java.net.URLStreamHandler] []
+              (openConnection [url]
+                (log/tracef "Open connection: url=%s" url)
+                (proxy [java.net.URLConnection] [url]
+                  (getInputStream []
+                    (log/tracef "Loading template: url=%s" url)
+                    (let [res (x/entity db (str url))]
+                      (java.io.ByteArrayInputStream.
+                       (cond
+                         (::http/content res) (.getBytes (::http/content res) (or (::http/charset res) "UTF-8"))
+                         (::http/body res) (::http/body res)
+                         :else (.getBytes "(template not found)"))))))))]
+    (try
+      (log/tracef "Render template: %s" (:crux.db/id template))
+      (let [body
+            (binding [*db* db]
+              (selmer/render-file
+               (java.net.URL. nil (:crux.db/id template) ush)
+               template-model
+               (cond-> {:url-stream-handler ush}
+                 custom-resource-path
+                 (assoc :custom-resource-path custom-resource-path))))]
+        (assoc req :ring.response/body body))
 
       (catch Exception e
         (throw (ex-info (str "Failed to render template: " template) {:template template
