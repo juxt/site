@@ -393,6 +393,7 @@
   (let [existing? (x/entity db uri)
         classification (get-in req [:ring.request/headers "site-classification"])
         variant-of (get-in req [:ring.request/headers "site-variant-of"])
+        template-dialect (get-in req [:ring.request/headers "site-template-dialect"])
         new-rep (merge
                  (cond->
                      {:crux.db/id uri
@@ -402,7 +403,8 @@
                       ::http/last-modified start-date
                       ::site/request request-id}
                    variant-of (assoc ::site/variant-of variant-of)
-                   classification (assoc ::pass/classification classification))
+                   classification (assoc ::pass/classification classification)
+                   template-dialect (assoc ::site/template-dialect (str/lower-case template-dialect)))
                  received-representation)]
 
     ;; Currently we cannot tell whether a submitted tx has been successful,

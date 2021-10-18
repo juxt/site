@@ -619,6 +619,7 @@
 
   (let [variant-of (get-in opts [:options :variant-of])
         classification (get-in opts [:options :classification])
+        dialect (get-in opts [:options :dialect])
         {:keys [status headers body]}
         (curl/put
          (str base-uri path)
@@ -629,7 +630,8 @@
                      encoding (assoc "content-encoding" encoding)
                      language (assoc "content-language" language)
                      variant-of (assoc "site-variant-of" variant-of)
-                     classification (assoc "site-classification" classification))
+                     classification (assoc "site-classification" classification)
+                     dialect (assoc "site-template-dialect" dialect))
           :body file
           :throw false})]
 
@@ -670,6 +672,27 @@
     (when-not file (error-and-usage! "Asset file required" opts))
     (when-not type (error-and-usage! "Content-type required" opts))
     (when-not path (error-and-usage! "Path required" opts))
+
+    (upload-file*
+     access-token
+     base-uri
+     (io/file (str/replace file "{{base-uri}}" base-uri))
+     type encoding language path opts)))
+
+(defn put-template
+  "Upload an template"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [base-uri file type encoding language path dialect]
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
+        (:options opts)
+        type (or type (when file (content-type (.getName file))))]
+
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+    (when-not file (error-and-usage! "Asset file required" opts))
+    (when-not type (error-and-usage! "Content-type required" opts))
+    (when-not path (error-and-usage! "Path required" opts))
+    (when-not dialect (error-and-usage! "Dialect required" opts))
 
     (upload-file*
      access-token
@@ -1008,6 +1031,16 @@
                    ["-l" "--language LANGUAGE" "The content-language (optional)"]
                    ["-v" "--variant-of CLASSIFICATION" "The resource for which this asset is a variant of"]
                    ["-c" "--classification CLASSIFICATION" "The classification (e.g PUBLIC, RESTRICTED) applied to resource"]]
+     :delegate put-asset}]
+
+   ["put-template"
+    {:description (:doc (meta #'put-template))
+     :cli-options [["-f" "--file FILE" "The template file"]
+                   ["-p" "--path PATH" "The destination path after the base-uri"]
+                   ["-t" "--type MIME_TYPE" "The content-type"]
+                   ["-e" "--encoding ENCODING" "The content-encoding (optional)"]
+                   ["-l" "--language LANGUAGE" "The content-language (optional)"]
+                   ["-d" "--dialect DIALECT" "The template dialect (e.g. selmer, mustache)"]]
      :delegate put-asset}]
 
    ["post-resources"
