@@ -32,7 +32,7 @@
 
         juxt/grab
         {:git/url "https://github.com/juxt/grab.git"
-         :sha "0a5011f7bb68004a4e1e12a3a69c24fd7c64f279"
+         :sha "0879930c12015da6dbae2246d37d206d88139ae8"
          }
 
         ;; JSON Schema support functions
