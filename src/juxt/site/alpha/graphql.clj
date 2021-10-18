@@ -197,11 +197,6 @@
                {:ring.response/status 500})
               e))))))))
 
-(defn put-error-json-body [req]
-  (json/write-value-as-string
-   {:message "Schema compilation errors"
-    :errors (::errors req)}))
-
 (defn put-error-text-body [req]
   (log/tracef "put-error-text-body: %d errors" (count (::errors req)))
   (cond
