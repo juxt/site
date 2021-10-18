@@ -45,23 +45,20 @@
 
         (cond
           (get site-args "q")
-          (if-let [id (:crux.db/id object-value)]
-            (for [[e] (apply
-                       xt/q db
-                       (assoc
-                        (to-xt-query (get site-args "q"))
-                        :in (vec (concat ['object] (map symbol (keys (:argument-values args)))))
-                        )
-                       id (vals (:argument-values args)))]
-              (xt/entity db e))
-
-            ;; No object
-            (for [[e] (apply
-                       xt/q db (assoc
-                                (to-xt-query (get site-args "q"))
-                                :in (mapv symbol (keys (:argument-values args))))
-                       (vals (:argument-values args)))]
-              (xt/entity db e)))
+          (let [object-id (:crux.db/id object-value)]
+            (log/tracef "field is %s" field)
+            (log/tracef "q found, field name is %s, kind is %s" field-name field-kind)
+            (let [q (assoc
+                     (to-xt-query (get site-args "q"))
+                     :in (vec (cond->> (map symbol (keys (:argument-values args)))
+                                object-id (concat ['object]))))
+                  results (for [[e] (apply
+                                     xt/q db q (cond->> (vals (:argument-values args))
+                                                 object-id (concat [object-id])))]
+                            (xt/entity db e))]
+              ;; If this isn't a list type, take the first
+              (cond-> results
+                (not (-> field ::g/type-ref ::g/list-type)) first)))
 
           (get site-args "a")
           (let [att (get site-args "a")
