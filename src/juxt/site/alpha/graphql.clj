@@ -197,13 +197,20 @@
                {:ring.response/status 500})
               e))))))))
 
+(defn plain-text-error-message [error]
+  (str (:message error)
+       " [" (->> (dissoc error :message)
+                 sort
+                 (map (fn [[k v]] (format "%s=%s" (name k) v)))
+                 (str/join ", ")) "]"))
+
 (defn put-error-text-body [req]
   (log/tracef "put-error-text-body: %d errors" (count (::errors req)))
   (cond
     (::errors req)
     (->>
      (for [error (::errors req)]
-       (cond-> (str \tab (:error error))
+       (cond-> (str \tab (plain-text-error-message error))
          (:location error) (str " (line " (-> error :location :row inc) ")")))
      (into ["Schema compilation errors"])
      (str/join (System/lineSeparator)))
