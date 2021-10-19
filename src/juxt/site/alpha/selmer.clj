@@ -42,8 +42,11 @@
      (cond
        (and (map? m) (contains? m ::site/query))
        (cond->> (apply x/q db
+                       ;; TODO: Add ACL checks
                        (assoc (::site/query m) :in (vec (keys temp-id-map)))
                        (map :crux.db/id (vals temp-id-map)))
+
+
          ;; Deprecate? Anything using this?
          (= (::site/results m) 'first) first
          ;; Copied from juxt.apex.alpha.representation_generation
