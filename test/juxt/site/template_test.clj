@@ -169,9 +169,7 @@
     [:crux.tx/put
      {:crux.db/id "https://example.org/index.html"
       ::http/methods #{:get :head :options}
-      ::site/template "https://example.org/templates/outer.html"
-      ;;:selmer.util/custom-resource-path "https://example.org/templates/"
-      }]])
+      ::site/template "https://example.org/templates/outer.html"}]])
 
   (let [r (*handler*
            {:ring.request/method :get
