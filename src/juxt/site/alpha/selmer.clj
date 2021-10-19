@@ -53,22 +53,25 @@
        :else m))
    template-model))
 
+(defn xt-template-loader [db]
+  (proxy [java.net.URLStreamHandler] []
+    (openConnection [url]
+      (log/tracef "Open connection: url=%s" url)
+      (proxy [java.net.URLConnection] [url]
+        (getInputStream []
+          (log/tracef "Loading template: url=%s" url)
+          (let [res (x/entity db (str url))]
+            (java.io.ByteArrayInputStream.
+             (cond
+               (::http/content res) (.getBytes (::http/content res) (or (::http/charset res) "UTF-8"))
+               (::http/body res) (::http/body res)
+               :else (.getBytes "(template not found)")))))))))
+
 ;; This is now deprecated but remains to support pre-existing use-cases
 (defn old-render-template
   [{::site/keys [db resource selected-representation] :as req} template]
   (let [{::site/keys []} selected-representation
-        ush (proxy [java.net.URLStreamHandler] []
-              (openConnection [url]
-                (log/tracef "Open connection: url=%s" url)
-                (proxy [java.net.URLConnection] [url]
-                  (getInputStream []
-                    (log/tracef "Loading template: url=%s" url)
-                    (let [res (x/entity db (str url))]
-                      (java.io.ByteArrayInputStream.
-                       (cond
-                         (::http/content res) (.getBytes (::http/content res) (or (::http/charset res) "UTF-8"))
-                         (::http/body res) (::http/body res)
-                         :else (.getBytes "(template not found)"))))))))
+        ush (xt-template-loader db)
 
         temp-id-map
         (->>
