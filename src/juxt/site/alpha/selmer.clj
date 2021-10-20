@@ -71,6 +71,8 @@
                :else (.getBytes "(template not found)")))))))))
 
 ;; This is now deprecated but remains to support pre-existing use-cases
+;; Template model production should be moved out of this
+
 (defn old-render-template
   [{::site/keys [db resource selected-representation] :as req} template]
   (let [{::site/keys []} selected-representation
@@ -119,7 +121,11 @@
 
     (try
       (log/tracef "Render template: %s" (:crux.db/id template))
-      (let [template-model-with-context
+      (let [
+            ;; This should be removed. Site internal information could instead
+            ;; be made available via GraphQL where entity objects are subject to
+            ;; access control.
+            template-model-with-context
             (assoc combined-template-model
                    "_site"
                    (dissoc req

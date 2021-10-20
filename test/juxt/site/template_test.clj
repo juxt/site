@@ -69,6 +69,8 @@
     (is (= "Fruits: * apple * orange * banana"
            (:ring.response/body r)))))
 
+;; Multiple template models are supported but should encourage a single GraphQL
+;; query over a single schema (perhaps created via schema-stitching)
 (deftest multiple-template-models-test
   (submit-and-await!
    [[:crux.tx/put access-all-areas]

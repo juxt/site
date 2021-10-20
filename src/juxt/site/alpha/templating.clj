@@ -37,8 +37,4 @@
     ;; We much prefer the requiring-resolve pattern because it doesn't require a
     ;; defmethod's namespace to have been previously required.
 
-
-
-
-
 ))
