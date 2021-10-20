@@ -16,7 +16,8 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [crux.api :as xt]
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [juxt.jinx.alpha.jsonpointer :refer [json-pointer]])
   (:import (java.io ByteArrayInputStream)))
 
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -36,17 +37,17 @@
        "{{base-uri}}" "https://example.org"))]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/users/mal",
-      :juxt.site.alpha/type "User",
-      :juxt.pass.alpha/username "mal",
-      :email "mal@juxt.pro",
+     {:crux.db/id "https://example.org/_site/users/mal"
+      :juxt.site.alpha/type "User"
+      :juxt.pass.alpha/username "mal"
+      :email "mal@juxt.pro"
       :name "Malcolm Sparks"}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/users/alx",
-      :juxt.site.alpha/type "User",
-      :juxt.pass.alpha/username "alx",
-      :email "alx@juxt.pro",
+     {:crux.db/id "https://example.org/_site/users/alx"
+      :juxt.site.alpha/type "User"
+      :juxt.pass.alpha/username "alx"
+      :email "alx@juxt.pro"
       :name "Alex Davis"}]])
 
   ;; Install schema (via HTTP, for accuracy)
@@ -143,3 +144,94 @@
          document (document/compile-document (parser/parse query) schema)]
 
      (graphql/query schema document nil (x/db *crux-node*)))))
+
+
+(defn add-body [m s ct]
+  (let [bytes (.getBytes s)]
+    (-> m
+        (assoc-in [:ring.request/headers "content-length"] (str (count bytes)))
+        (assoc-in [:ring.request/headers "content-type"] ct)
+        (assoc :ring.request/body (java.io.ByteArrayInputStream. bytes)))))
+
+(defn install-schema-and-query-it []
+  (let [query "query { persons { name }}"]
+
+    (submit-and-await!
+     [[:crux.tx/put access-all-areas]
+
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/alice"
+        :type "Person"
+        :name "Alice"}]
+
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/bob"
+        :type "Person"
+        :name "Bob"}]
+
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/graphql"
+        :doc "A GraphQL endpoint"
+        :juxt.http.alpha/methods #{:post :put :options}
+        :juxt.http.alpha/acceptable "application/graphql"
+        :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/put-handler
+        :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/post-handler}]
+
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/get-persons"
+        :doc "A GraphQL stored query"
+        :juxt.http.alpha/methods #{:put :post}
+        :juxt.http.alpha/acceptable #{"application/graphql" "application/json"}
+        :juxt.site.alpha/graphql-schema "https://example.org/graphql"
+        :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/query-put-handler
+        :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/query-post-handler}]
+
+      ;; Install variants to have CSV output
+      ])
+
+    ;; Install a GraphQL schema at /graphql
+    (let [schema "
+type Query { persons: [Person] @site(q: { find: [e] where: [[e {keyword: \"type\"} \"Person\"]]})}
+type Person { name: String @site(a: \"name\")}"
+          response (*handler*
+                    (-> {:ring.request/method :put
+                         :ring.request/path "/graphql"}
+                        (add-body schema "application/graphql")))]
+      (is (= 204 (:ring.response/status response))))
+
+    ;; POST a query to that schema
+    (let [response
+          (*handler*
+           (-> {:ring.request/method :post
+                :ring.request/path "/graphql"}
+               (add-body query "application/graphql")))
+          body (json/read-value (:ring.response/body response))]
+
+      (is (= 200 (:ring.response/status response)))
+      (is (= {"data" {"persons" [{"name" "Bob"} {"name" "Alice"}]}} body)))
+
+    ;; PUT a stored query
+    (*handler*
+     (-> {:ring.request/method :put
+          :ring.request/path "/get-persons"}
+         (add-body query "application/graphql")))))
+
+
+#_((t/join-fixtures [with-crux with-handler])
+ install-schema-and-query-it
+ )
+
+(deftest install-schema-and-query-it-test
+  (install-schema-and-query-it))
+
+
+;; For CSV output
+(comment
+  (json-pointer {"person" {"name" ["Alice" "Bob"]}} "/person/name"))
+
+;; Schema stitching
+(comment
+  (schema/compile-schema (parser/parse "extend schema @site(import: \"/graphql\") type Query { person: Person } type Person { name: String }")))
+
+
+;; "https://example.org/template-models/fruits-a"
