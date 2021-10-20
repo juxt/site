@@ -104,7 +104,7 @@
             [(get json "query") (get json "operationName")])
 
           "application/graphql"
-          [body "Query"]
+          [body nil]
 
           (throw (ex-info (format "Unknown content type for GraphQL request: %s" (some-> req ::site/received-representation ::http/content-type)) req)))
 
