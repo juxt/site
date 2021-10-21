@@ -153,7 +153,7 @@
         (assoc-in [:ring.request/headers "content-type"] ct)
         (assoc :ring.request/body (java.io.ByteArrayInputStream. bytes)))))
 
-(defn install-schema-and-query-it []
+(defn stored-query []
   (let [query "query { persons { name }}"]
 
     (submit-and-await!
@@ -183,8 +183,8 @@
         :juxt.http.alpha/methods #{:put :post}
         :juxt.http.alpha/acceptable #{"application/graphql" "application/json"}
         :juxt.site.alpha/graphql-schema "https://example.org/graphql"
-        :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/query-put-handler
-        :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/query-post-handler}]
+        :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/stored-document-put-handler
+        :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/stored-document-post-handler}]
 
       ;; Install variants to have CSV output
       ])
@@ -214,15 +214,20 @@ type Person { name: String @site(a: \"name\")}"
     (*handler*
      (-> {:ring.request/method :put
           :ring.request/path "/get-persons"}
-         (add-body query "application/graphql")))))
+         (add-body query "application/graphql")))
 
+    ;; POST to a stored query
+    #_(*handler*
+       (-> {:ring.request/method :post
+            :ring.request/path "/get-persons"}
+           (add-body (json/write-value-as-string {}) "application/json")))))
 
 #_((t/join-fixtures [with-crux with-handler])
- install-schema-and-query-it
+ stored-query
  )
 
-(deftest install-schema-and-query-it-test
-  (install-schema-and-query-it))
+(deftest stored-query-test
+  (stored-query))
 
 
 ;; For CSV output
@@ -232,6 +237,3 @@ type Person { name: String @site(a: \"name\")}"
 ;; Schema stitching
 (comment
   (schema/compile-schema (parser/parse "extend schema @site(import: \"/graphql\") type Query { person: Person } type Person { name: String }")))
-
-
-;; "https://example.org/template-models/fruits-a"

@@ -10,7 +10,8 @@
    [clojure.string :as str]
    [crux.api :as xt]
    [clojure.tools.logging :as log]
-   [clojure.walk :refer [postwalk]]))
+   [clojure.walk :refer [postwalk]]
+   [crux.api :as x]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -96,7 +97,6 @@
 
         _ (log/tracef "received-representation is %s" (pr-str (keys (some-> req :juxt.site.alpha/received-representation))))
 
-        ;; TODO: Should also support application/graphql+json
         [document-str operation-name]
         (case (some-> req ::site/received-representation ::http/content-type)
           "application/json"
@@ -238,3 +238,70 @@
           :let [location (:location error)]]
       (cond-> error
         location (assoc :location location)))}))
+
+(defn stored-document-put-handler [{::site/keys [uri db crux-node] :as req}]
+  (let [document-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
+
+        _ (when-not document-str
+            (throw
+             (ex-info
+              "No document in request"
+              (into
+               req
+               {:ring.response/status 400}))))
+
+        resource (xt/entity db uri)]
+
+    (when (nil? resource)
+      (throw (ex-info "GraphQL stored-document resource not configured" {:uri uri})))
+
+    ;; Validate resource
+    (when-not (::site/graphql-schema resource)
+      (throw (ex-info "Resource should have a :juxt.site.alpha/graphql-schema key" {::site/resource resource})))
+
+    (let [schema-id (::site/graphql-schema resource)
+          schema (some-> db (xt/entity schema-id) :juxt.grab.alpha/schema)]
+
+      (when-not schema
+        (throw
+         (ex-info
+          "Cannot store a GraphQL document when the schema hasn't been added"
+          {::site/graph-schema schema-id})))
+
+      (try
+        (let [document (document/compile-document
+                        (parser/parse document-str)
+                        schema)]
+          (xt/await-tx
+           crux-node
+           (xt/submit-tx
+            crux-node
+            [[:crux.tx/put (assoc resource ::grab/document document)]])))
+
+        (assoc req :ring.response/status 204)
+
+        (catch clojure.lang.ExceptionInfo e
+          (let [errors (:errors (ex-data e))]
+            (if (seq errors)
+              (do
+                (log/tracef "GraphQL document errors: %s" (pr-str (:errors (ex-data e))))
+                (throw
+                 (ex-info
+                  "Errors in GraphQL document"
+                  (into
+                   req
+                   (cond-> {:ring.response/status 400}
+                     (seq errors) (assoc ::errors errors)))
+                  e)))
+              (throw
+               (ex-info
+                "Failed to store GraphQL document due to error"
+                (into
+                 req
+                 {:ring.response/status 500})
+                e)))))))))
+
+
+(defn stored-document-post-handler [_]
+  (throw (ex-info "TODO" {}))
+  )
