@@ -633,9 +633,12 @@
           (cond
             (fn? put-fn)
             put-fn
+
             (symbol? put-fn)
             (try
-              (requiring-resolve put-fn)
+              (or
+               (requiring-resolve put-fn)
+               (throw (ex-info (format "Requiring resolve of %s returned nil" put-fn) {:put-fn put-fn})))
               (catch Exception e
                 (throw (ex-info
                         (format "put-fn '%s' is not resolvable" put-fn)
