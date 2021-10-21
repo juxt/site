@@ -153,18 +153,7 @@
 
 (defn render-template [{::site/keys [db selected-representation] :as req} template template-model]
   (let [custom-resource-path (:selmer.util/custom-resource-path selected-representation)
-        ush (proxy [java.net.URLStreamHandler] []
-              (openConnection [url]
-                (log/tracef "Open connection: url=%s" url)
-                (proxy [java.net.URLConnection] [url]
-                  (getInputStream []
-                    (log/tracef "Loading template: url=%s" url)
-                    (let [res (x/entity db (str url))]
-                      (java.io.ByteArrayInputStream.
-                       (cond
-                         (::http/content res) (.getBytes (::http/content res) (or (::http/charset res) "UTF-8"))
-                         (::http/body res) (::http/body res)
-                         :else (.getBytes "(template not found)"))))))))]
+        ush (xt-template-loader db)]
     (try
       (log/tracef "Render template: %s" (:crux.db/id template))
       (let [body
