@@ -3,9 +3,7 @@
 (ns juxt.site.alpha.selmer
   (:require
    [clojure.tools.logging :as log]
-   [clojure.walk :refer [postwalk]]
    [crux.api :as x]
-   [juxt.site.alpha.util :as util]
    [selmer.parser :as selmer]
    selmer.filters
    selmer.tags)
@@ -36,26 +34,6 @@
              "em" [:safe (str "<em>" (second x) "</em>")])
            (str x))))
 
-(defn expand-queries [template-model db temp-id-map]
-  (postwalk
-   (fn [m]
-     (cond
-       (and (map? m) (contains? m ::site/query))
-       (cond->> (apply x/q db
-                       ;; TODO: Add ACL checks
-                       (assoc (::site/query m) :in (vec (keys temp-id-map)))
-                       (map :crux.db/id (vals temp-id-map)))
-
-
-         ;; Deprecate? Anything using this?
-         (= (::site/results m) 'first) first
-         ;; Copied from juxt.apex.alpha.representation_generation
-         (::site/extract-first-projection? m) (map first)
-         (::site/extract-entry m) (map #(get % (::site/extract-entry m)))
-         (::site/singular-result? m) first)
-       :else m))
-   template-model))
-
 (defn xt-template-loader [db]
   (proxy [java.net.URLStreamHandler] []
     (openConnection [url]
@@ -73,87 +51,12 @@
 ;; This is now deprecated but remains to support pre-existing use-cases
 ;; Template model production should be moved out of this
 
-(defn old-render-template
-  [{::site/keys [db resource selected-representation] :as req} template]
+(defn render-template
+  [{::site/keys [db selected-representation] :as req} template template-model]
   (let [{::site/keys []} selected-representation
         ush (xt-template-loader db)
-
-        temp-id-map
-        (->>
-         {'subject (::pass/subject req)
-          'resource resource
-          'request (select-keys
-                    req
-                    [:ring.request/headers :ring.request/method :ring.request/path
-                     :ring.request/query :ring.request/protocol :ring.request/remote-addr
-                     :ring.request/scheme :ring.request/server-name :ring.request/server-post
-                     :ring.request/ssl-client-cert])}
-         (reduce-kv
-          ;; Preserve any existing crux.db/id - e.g. the resource will have one
-          (fn [acc k v]
-            (assoc acc k (-> v
-                             util/->freezeable
-                             (assoc :crux.db/id (java.util.UUID/randomUUID)))))
-          {}))
-
-        txes (vec (for [[_ v] temp-id-map] [:crux.tx/put v]))
-
-        spec-db (x/with-tx db txes)
-
-        template-models
-        (map first
-             (x/q db '{:find [(pull tm [*])]
-                       :where [[e ::site/template-model tm]]
-                       :in [e]} (:crux.db/id resource)))
-
-        processed-template-models
-        (for [tm template-models]
-          (expand-queries tm spec-db temp-id-map))
-
-        combined-template-model
-        (->> processed-template-models
-             (map #(dissoc % :crux.db/id))
-             (apply merge-with
-                    (fn [a b] (concat (if (sequential? a) a [a])
-                                      (if (sequential? b) b [b])))))
-
         custom-resource-path (:selmer.util/custom-resource-path selected-representation)]
 
-    (try
-      (log/tracef "Render template: %s" (:crux.db/id template))
-      (let [
-            ;; This should be removed. Site internal information could instead
-            ;; be made available via GraphQL where entity objects are subject to
-            ;; access control.
-            template-model-with-context
-            (assoc combined-template-model
-                   "_site"
-                   (dissoc req
-                           ::site/crux-node
-                           ::site/db))
-
-            body
-            (binding [*db* db]
-              (selmer/render-file
-               (java.net.URL. nil (:crux.db/id template) ush)
-               template-model-with-context
-               (cond-> {:url-stream-handler ush}
-                 custom-resource-path
-                 (assoc :custom-resource-path custom-resource-path))))]
-        (assoc req
-               :ring.response/body body
-               ::site/processed-template-models processed-template-models
-               ::site/combined-template-model combined-template-model))
-
-      (catch Exception e
-        (throw (ex-info (str "Failed to render template: " template) {:template template
-                                                                      :exception-type (type e)} e))))))
-
-
-
-(defn render-template [{::site/keys [db selected-representation] :as req} template template-model]
-  (let [custom-resource-path (:selmer.util/custom-resource-path selected-representation)
-        ush (xt-template-loader db)]
     (try
       (log/tracef "Render template: %s" (:crux.db/id template))
       (let [body
@@ -164,8 +67,13 @@
                (cond-> {:url-stream-handler ush}
                  custom-resource-path
                  (assoc :custom-resource-path custom-resource-path))))]
-        (assoc req :ring.response/body body))
+        (assoc req
+               :ring.response/body body
+               ::site/template-model template-model))
 
       (catch Exception e
-        (throw (ex-info (str "Failed to render template: " template) {:template template
-                                                                      :exception-type (type e)} e))))))
+        (throw
+         (ex-info
+          (str "Failed to render template: " template)
+          {:template template
+           :exception-type (type e)} e))))))

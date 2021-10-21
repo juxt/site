@@ -3,38 +3,55 @@
 (ns juxt.site.alpha.templating
   (:require
    [juxt.site.alpha.selmer :as selmer]
-   [clojure.tools.logging :as log]))
+   [clojure.walk :refer [postwalk]]
+   [clojure.tools.logging :as log]
+   [crux.api :as xt]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
+
+(defn expand-queries [template-model db]
+  (postwalk
+   (fn [m]
+     (cond
+       (and (map? m) (contains? m ::site/query))
+       (cond->> (xt/q db
+                       ;; TODO: Add ACL checks
+                       (::site/query m))
+
+         ;; Deprecate? Anything using this?
+         (= (::site/results m) 'first) first
+         ;; Copied from juxt.apex.alpha.representation_generation
+         (::site/extract-first-projection? m) (map first)
+         (::site/extract-entry m) (map #(get % (::site/extract-entry m)))
+         (::site/singular-result? m) first)
+       :else m))
+   template-model))
 
 (defn render-template
   "Methods should return a modified request (first arg), typically associated
   a :ring.response/body entry."
-  [{::site/keys [selected-representation] :as req} template]
-  (log/tracef "Render template! %s" (sort (keys template)))
-  (cond
-    (::site/template-model-provider selected-representation)
-    (let [template-model-provider (requiring-resolve (::site/template-model-provider selected-representation))]
-      (when-not template-model-provider
-        (throw
-         (ex-info
-          "Failed to resolve template-model-provider"
-          (select-keys selected-representation [::site/template-model-provider]))))
+  [{::site/keys [db resource] :as req} template]
 
-      (let [template-model (template-model-provider req)]
-        (case (::site/template-dialect template)
-          "selmer" (selmer/render-template req template template-model)
-          nil (throw (ex-info "No template dialect found" {}))
-          (throw (ex-info "Unsupported template dialect" {::site/template-dialect (::site/template-dialect template)})))))
+  (let [template-models
+        (map first
+             (xt/q db '{:find [(pull tm [*])]
+                        :where [[e ::site/template-model tm]]
+                        :in [e]} (:crux.db/id resource)))
 
-    ;; Deprecated. Included to retain compatibility with previous versions of
-    ;; Site.
-    :else ;;(::site/template-engine selected-representation)
-    (do
-      (log/warn "Resource entry of :juxt.site.alpha/template-engine is deprecated and may be removed in a future release")
-      (selmer/old-render-template req template))
+        processed-template-models
+        (for [tm template-models]
+          (expand-queries tm db))
 
-    ;; We much prefer the requiring-resolve pattern because it doesn't require a
-    ;; defmethod's namespace to have been previously required.
+        combined-template-model
+        (->> processed-template-models
+             (map #(dissoc % :crux.db/id))
+             (apply merge-with
+                    (fn [a b] (concat (if (sequential? a) a [a])
+                                      (if (sequential? b) b [b])))))]
 
-))
+    ;; Possibly we can make this an open-for-extension thing in the future. We
+    ;; could register template dialects in the database and look them up here.
+    (case (::site/template-dialect template)
+      "selmer" (selmer/render-template req template combined-template-model)
+      nil (throw (ex-info "No template dialect found" {}))
+      (throw (ex-info "Unsupported template dialect" {::site/template-dialect (::site/template-dialect template)})))))

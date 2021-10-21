@@ -31,6 +31,7 @@
      {:crux.db/id "https://example.org/templates/fruits.html"
       ::http/methods #{:get :head :options}
       ::http/content-type "text/plain"
+      ::site/template-dialect "selmer"
       ::http/content "Fruits"}]
 
     [:crux.tx/put
@@ -51,6 +52,7 @@
      {:crux.db/id "https://example.org/templates/fruits.html"
       ::http/methods #{:get :head :options}
       ::http/content-type "text/plain"
+      ::site/template-dialect "selmer"
       ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
 
     [:crux.tx/put
@@ -79,6 +81,7 @@
      {:crux.db/id "https://example.org/templates/fruits.html"
       ::http/methods #{:get :head :options}
       ::http/content-type "text/plain"
+      ::site/template-dialect "selmer"
       ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
 
     [:crux.tx/put
@@ -110,6 +113,7 @@
      {:crux.db/id "https://example.org/templates/fruits.html"
       ::http/methods #{:get :head :options}
       ::http/content-type "text/plain"
+      ::site/template-dialect "selmer"
       ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
 
     [:crux.tx/put
@@ -150,7 +154,7 @@
             :ring.request/path "/fruits.html"})]
 
     (is (= {:fruits ["apple" "banana" "orange" "strawberry" "kiwi" "pineapple"]}
-           (:juxt.site.alpha/combined-template-model r)))))
+           (:juxt.site.alpha/template-model r)))))
 
 (deftest template-inclusion-test
   (submit-and-await!
@@ -160,12 +164,14 @@
      {:crux.db/id "https://example.org/templates/outer.html"
       ::http/methods #{:get :head :options}
       ::http/content-type "text/plain"
+      ::site/template-dialect "selmer"
       ::http/content "outer {% include \"https://example.org/templates/inner.html\" %}"}]
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/templates/inner.html"
       ::http/methods #{:get :head :options}
       ::http/content-type "text/plain"
+      ::site/template-dialect "selmer"
       ::http/content "inner"}]
 
     [:crux.tx/put
@@ -192,12 +198,14 @@
      {:crux.db/id "https://example.org/templates/outer.html"
       ::http/methods #{:get :head :options}
       ::http/content-type "text/plain"
+      ::site/template-dialect "selmer"
       ::http/content "outer {% include \"inner.html\" %}"}]
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/templates/inner.html"
       ::http/methods #{:get :head :options}
       ::http/content-type "text/plain"
+      ::site/template-dialect "selmer"
       ::http/content "inner"}]
 
     [:crux.tx/put
@@ -246,12 +254,14 @@
      {:crux.db/id "https://example.org/templates/inner.html"
       ::http/methods #{:get :head :options}
       ::http/content-type "text/plain"
+      ::site/template-dialect "selmer"
       ::http/content "{% for f in fruits %} * {{f}}{% endfor %}"}]
 
     [:crux.tx/put
      {:crux.db/id "https://example.org/templates/outer.html"
       ::http/methods #{:get :head :options}
       ::http/content-type "text/plain"
+      ::site/template-dialect "selmer"
       ::http/content "outer{% include \"inner.html\" %}"}]
 
     [:crux.tx/put
