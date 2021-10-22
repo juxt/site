@@ -400,11 +400,12 @@
   replaced."
   [{::site/keys [uri db received-representation start-date crux-node base-uri request-id] :as req}]
 
-  (let [existing? (x/entity db uri)
+  (let [existing (x/entity db uri)
         classification (get-in req [:ring.request/headers "site-classification"])
         variant-of (get-in req [:ring.request/headers "site-variant-of"])
         template-dialect (get-in req [:ring.request/headers "site-template-dialect"])
         new-rep (merge
+                 existing
                  (cond->
                      {:crux.db/id uri
                       ::site/type "StaticRepresentation"
@@ -428,7 +429,7 @@
           [[:crux.tx/put new-rep]])
          (x/await-tx crux-node))
 
-    (into req {:ring.response/status (if existing? 204 201)})))
+    (into req {:ring.response/status (if existing 204 201)})))
 
 (defn patch-static-resource
   [{::site/keys [received-representation] :as req}]
