@@ -82,7 +82,7 @@
 
 (defn receive-representation
   "Check and load the representation enclosed in the request message payload."
-  [{::site/keys [resource start-date] :as req}]
+  [{::site/keys [resource start-date] :ring.request/keys [method] :as req}]
 
   (let [content-length
         (try
@@ -133,7 +133,17 @@
              (contains? (:ring.request/headers req) "content-language")
              (assoc ::http/content-language (get-in req [:ring.request/headers "content-language"]))))]
 
-      (when-let [acceptable (::http/acceptable resource)]
+      ;; TODO: Someday there should be a functions that could be specified to
+      ;; handle conversions as described in RFC 7231 Section 4.3.4
+
+      ;; TODO: Add tests for content type (and other axes of) acceptance of PUT
+      ;; and POST
+
+      (when-let [acceptable
+                 (get resource
+                      (case method
+                        :put ::http/acceptable-on-put
+                        :post ::http/acceptable-on-post))]
 
         (let [prefs (headers->decoded-preferences acceptable)
               request-rep (rate-representation prefs decoded-representation)]
