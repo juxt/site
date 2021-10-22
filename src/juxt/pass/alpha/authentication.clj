@@ -149,7 +149,7 @@
          (-> req
              (assoc :ring.response/status 302
                     :ring.response/body
-                    (format "Thanks! Your access token is %s\r\n" access-token)
+                    "Login successful"
                     ::http/content-type "text/plain")
              (update :ring.response/headers assoc
                      "cache-control" "no-store"
