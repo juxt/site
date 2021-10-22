@@ -301,5 +301,8 @@
 
 
 (defn stored-document-post-handler [_]
-  (throw (ex-info "TODO" {}))
-  )
+  (throw (ex-info "TODO" {})))
+
+(defn text-plain-representation-body [{::site/keys [db] :as req}]
+  (let [lookup (fn [id] (xt/entity db id))]
+    (-> req ::site/selected-representation ::site/variant-of lookup ::http/body (String. "utf-8"))))

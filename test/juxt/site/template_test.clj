@@ -23,257 +23,258 @@
 
 (t/use-fixtures :each with-crux with-handler)
 
-(deftest simple-template-test
-  (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+(comment
+  (deftest simple-template-test
+    (submit-and-await!
+     [[:crux.tx/put access-all-areas]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/fruits.html"
-      ::http/methods #{:get :head :options}
-      ::http/content-type "text/plain"
-      ::site/template-dialect "selmer"
-      ::http/content "Fruits"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/templates/fruits.html"
+        ::http/methods #{:get :head :options}
+        ::http/content-type "text/plain"
+        ::site/template-dialect "selmer"
+        ::http/content "Fruits"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/fruits.html"
-      ::http/methods #{:get :head :options}
-      ::site/template "https://example.org/templates/fruits.html"}]])
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/fruits.html"
+        ::http/methods #{:get :head :options}
+        ::site/template "https://example.org/templates/fruits.html"}]])
 
-  (let [r (*handler*
-           {:ring.request/method :get
-            :ring.request/path "/fruits.html"})]
-    (is (= "Fruits" (:ring.response/body r)))))
+    (let [r (*handler*
+             {:ring.request/method :get
+              :ring.request/path "/fruits.html"})]
+      (is (= "Fruits" (:ring.response/body r)))))
 
-(deftest single-template-model-test
-  (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+  (deftest single-template-model-test
+    (submit-and-await!
+     [[:crux.tx/put access-all-areas]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/fruits.html"
-      ::http/methods #{:get :head :options}
-      ::http/content-type "text/plain"
-      ::site/template-dialect "selmer"
-      ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/templates/fruits.html"
+        ::http/methods #{:get :head :options}
+        ::http/content-type "text/plain"
+        ::site/template-dialect "selmer"
+        ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/template-models/fruits"
-      :fruits ["apple" "orange" "banana"]}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/template-models/fruits"
+        :fruits ["apple" "orange" "banana"]}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/fruits.html"
-      ::http/methods #{:get :head :options}
-      ::site/template "https://example.org/templates/fruits.html"
-      ::site/template-model "https://example.org/template-models/fruits"}]])
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/fruits.html"
+        ::http/methods #{:get :head :options}
+        ::site/template "https://example.org/templates/fruits.html"
+        ::site/template-model "https://example.org/template-models/fruits"}]])
 
-  (let [r (*handler*
-           {:ring.request/method :get
-            :ring.request/path "/fruits.html"})]
-    (is (= "Fruits: * apple * orange * banana"
-           (:ring.response/body r)))))
+    (let [r (*handler*
+             {:ring.request/method :get
+              :ring.request/path "/fruits.html"})]
+      (is (= "Fruits: * apple * orange * banana"
+             (:ring.response/body r)))))
 
-;; Multiple template models are supported but should encourage a single GraphQL
-;; query over a single schema (perhaps created via schema-stitching)
-(deftest multiple-template-models-test
-  (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+  ;; Multiple template models are supported but should encourage a single GraphQL
+  ;; query over a single schema (perhaps created via schema-stitching)
+  (deftest multiple-template-models-test
+    (submit-and-await!
+     [[:crux.tx/put access-all-areas]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/fruits.html"
-      ::http/methods #{:get :head :options}
-      ::http/content-type "text/plain"
-      ::site/template-dialect "selmer"
-      ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/templates/fruits.html"
+        ::http/methods #{:get :head :options}
+        ::http/content-type "text/plain"
+        ::site/template-dialect "selmer"
+        ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/template-models/fruits-a"
-      :fruits ["apple" "orange" "banana"]}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/template-models/fruits-a"
+        :fruits ["apple" "orange" "banana"]}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/template-models/fruits-b"
-      :fruits ["strawberry" "kiwi" "pineapple"]}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/template-models/fruits-b"
+        :fruits ["strawberry" "kiwi" "pineapple"]}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/fruits.html"
-      ::http/methods #{:get :head :options}
-      ::site/template "https://example.org/templates/fruits.html"
-      ::site/template-model ["https://example.org/template-models/fruits-a"
-                             "https://example.org/template-models/fruits-b"]}]])
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/fruits.html"
+        ::http/methods #{:get :head :options}
+        ::site/template "https://example.org/templates/fruits.html"
+        ::site/template-model ["https://example.org/template-models/fruits-a"
+                               "https://example.org/template-models/fruits-b"]}]])
 
-  (let [r (*handler*
-           {:ring.request/method :get
-            :ring.request/path "/fruits.html"})]
-    (is (= "Fruits: * apple * orange * banana * strawberry * kiwi * pineapple"
-           (:ring.response/body r)))))
+    (let [r (*handler*
+             {:ring.request/method :get
+              :ring.request/path "/fruits.html"})]
+      (is (= "Fruits: * apple * orange * banana * strawberry * kiwi * pineapple"
+             (:ring.response/body r)))))
 
-(deftest template-model-as-query-test
-  (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+  (deftest template-model-as-query-test
+    (submit-and-await!
+     [[:crux.tx/put access-all-areas]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/fruits.html"
-      ::http/methods #{:get :head :options}
-      ::http/content-type "text/plain"
-      ::site/template-dialect "selmer"
-      ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/templates/fruits.html"
+        ::http/methods #{:get :head :options}
+        ::http/content-type "text/plain"
+        ::site/template-dialect "selmer"
+        ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/apple"
-      :type "Fruit"
-      :name "apple"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/apple"
+        :type "Fruit"
+        :name "apple"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/orange"
-      :type "Fruit"
-      :name "orange"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/orange"
+        :type "Fruit"
+        :name "orange"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/banana"
-      :type "Fruit"
-      :name "banana"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/banana"
+        :type "Fruit"
+        :name "banana"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/template-models/fruits-a-query"
-      :fruits {::site/query '{:find [nm]
-                              :where [[e :type "Fruit"]
-                                      [e :name nm]]}
-               ::site/extract-first-projection? true}}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/template-models/fruits-a-query"
+        :fruits {::site/query '{:find [nm]
+                                :where [[e :type "Fruit"]
+                                        [e :name nm]]}
+                 ::site/extract-first-projection? true}}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/template-models/fruits-b"
-      :fruits ["strawberry" "kiwi" "pineapple"]}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/template-models/fruits-b"
+        :fruits ["strawberry" "kiwi" "pineapple"]}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/fruits.html"
-      ::http/methods #{:get :head :options}
-      ::site/template "https://example.org/templates/fruits.html"
-      ::site/template-model ["https://example.org/template-models/fruits-a-query"
-                             "https://example.org/template-models/fruits-b"]}]])
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/fruits.html"
+        ::http/methods #{:get :head :options}
+        ::site/template "https://example.org/templates/fruits.html"
+        ::site/template-model ["https://example.org/template-models/fruits-a-query"
+                               "https://example.org/template-models/fruits-b"]}]])
 
-  (let [r (*handler*
-           {:ring.request/method :get
-            :ring.request/path "/fruits.html"})]
+    (let [r (*handler*
+             {:ring.request/method :get
+              :ring.request/path "/fruits.html"})]
 
-    (is (= {:fruits ["apple" "banana" "orange" "strawberry" "kiwi" "pineapple"]}
-           (:juxt.site.alpha/template-model r)))))
+      (is (= {:fruits ["apple" "banana" "orange" "strawberry" "kiwi" "pineapple"]}
+             (:juxt.site.alpha/template-model r)))))
 
-(deftest template-inclusion-test
-  (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+  (deftest template-inclusion-test
+    (submit-and-await!
+     [[:crux.tx/put access-all-areas]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/outer.html"
-      ::http/methods #{:get :head :options}
-      ::http/content-type "text/plain"
-      ::site/template-dialect "selmer"
-      ::http/content "outer {% include \"https://example.org/templates/inner.html\" %}"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/templates/outer.html"
+        ::http/methods #{:get :head :options}
+        ::http/content-type "text/plain"
+        ::site/template-dialect "selmer"
+        ::http/content "outer {% include \"https://example.org/templates/inner.html\" %}"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/inner.html"
-      ::http/methods #{:get :head :options}
-      ::http/content-type "text/plain"
-      ::site/template-dialect "selmer"
-      ::http/content "inner"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/templates/inner.html"
+        ::http/methods #{:get :head :options}
+        ::http/content-type "text/plain"
+        ::site/template-dialect "selmer"
+        ::http/content "inner"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/index.html"
-      ::http/methods #{:get :head :options}
-      ::site/template "https://example.org/templates/outer.html"}]])
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/index.html"
+        ::http/methods #{:get :head :options}
+        ::site/template "https://example.org/templates/outer.html"}]])
 
-  (let [r (*handler*
-           {:ring.request/method :get
-            :ring.request/path "/index.html"})]
+    (let [r (*handler*
+             {:ring.request/method :get
+              :ring.request/path "/index.html"})]
 
-    (is (= "outer inner"
-           (:ring.response/body r)))))
+      (is (= "outer inner"
+             (:ring.response/body r)))))
 
-;; The include in template-inclusion-test is unwieldy because it requires the
-;; entire URL of the included template. Often, the absolute URL would not be
-;; possible to know in advance, and the template would use relative URLs. We can
-;; support this case by adding :selmer.util/custom-resource-path
-(deftest template-inclusion-with-custom-resource-path-test
-  (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+  ;; The include in template-inclusion-test is unwieldy because it requires the
+  ;; entire URL of the included template. Often, the absolute URL would not be
+  ;; possible to know in advance, and the template would use relative URLs. We can
+  ;; support this case by adding :selmer.util/custom-resource-path
+  (deftest template-inclusion-with-custom-resource-path-test
+    (submit-and-await!
+     [[:crux.tx/put access-all-areas]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/outer.html"
-      ::http/methods #{:get :head :options}
-      ::http/content-type "text/plain"
-      ::site/template-dialect "selmer"
-      ::http/content "outer {% include \"inner.html\" %}"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/templates/outer.html"
+        ::http/methods #{:get :head :options}
+        ::http/content-type "text/plain"
+        ::site/template-dialect "selmer"
+        ::http/content "outer {% include \"inner.html\" %}"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/inner.html"
-      ::http/methods #{:get :head :options}
-      ::http/content-type "text/plain"
-      ::site/template-dialect "selmer"
-      ::http/content "inner"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/templates/inner.html"
+        ::http/methods #{:get :head :options}
+        ::http/content-type "text/plain"
+        ::site/template-dialect "selmer"
+        ::http/content "inner"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/index.html"
-      ::http/methods #{:get :head :options}
-      ::site/template "https://example.org/templates/outer.html"
-      :selmer.util/custom-resource-path "https://example.org/templates/"}]])
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/index.html"
+        ::http/methods #{:get :head :options}
+        ::site/template "https://example.org/templates/outer.html"
+        :selmer.util/custom-resource-path "https://example.org/templates/"}]])
 
-  (let [r (*handler*
-           {:ring.request/method :get
-            :ring.request/path "/index.html"})]
+    (let [r (*handler*
+             {:ring.request/method :get
+              :ring.request/path "/index.html"})]
 
-    (is (= "outer inner" (:ring.response/body r)))))
+      (is (= "outer inner" (:ring.response/body r)))))
 
-;; Putting it all together into a combined complex case, to test everything
-;; works together.
-(deftest combination-test
-  (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+  ;; Putting it all together into a combined complex case, to test everything
+  ;; works together.
+  (deftest combination-test
+    (submit-and-await!
+     [[:crux.tx/put access-all-areas]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/apple"
-      :type "Fruit"
-      :name "apple"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/apple"
+        :type "Fruit"
+        :name "apple"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/orange"
-      :type "Fruit"
-      :name "orange"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/orange"
+        :type "Fruit"
+        :name "orange"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/banana"
-      :type "Fruit"
-      :name "banana"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/banana"
+        :type "Fruit"
+        :name "banana"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/template-models/fruits-a-query"
-      :fruits {::site/query '{:find [nm] :where [[e :type "Fruit"][e :name nm]]}
-               ::site/extract-first-projection? true}}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/template-models/fruits-a-query"
+        :fruits {::site/query '{:find [nm] :where [[e :type "Fruit"][e :name nm]]}
+                 ::site/extract-first-projection? true}}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/template-models/fruits-b"
-      :fruits ["strawberry" "kiwi" "pineapple"]}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/template-models/fruits-b"
+        :fruits ["strawberry" "kiwi" "pineapple"]}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/inner.html"
-      ::http/methods #{:get :head :options}
-      ::http/content-type "text/plain"
-      ::site/template-dialect "selmer"
-      ::http/content "{% for f in fruits %} * {{f}}{% endfor %}"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/templates/inner.html"
+        ::http/methods #{:get :head :options}
+        ::http/content-type "text/plain"
+        ::site/template-dialect "selmer"
+        ::http/content "{% for f in fruits %} * {{f}}{% endfor %}"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/outer.html"
-      ::http/methods #{:get :head :options}
-      ::http/content-type "text/plain"
-      ::site/template-dialect "selmer"
-      ::http/content "outer{% include \"inner.html\" %}"}]
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/templates/outer.html"
+        ::http/methods #{:get :head :options}
+        ::http/content-type "text/plain"
+        ::site/template-dialect "selmer"
+        ::http/content "outer{% include \"inner.html\" %}"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/fruits.html"
-      ::http/methods #{:get :head :options}
-      ::site/template "https://example.org/templates/outer.html"
-      ::site/template-model ["https://example.org/template-models/fruits-a-query"
-                             "https://example.org/template-models/fruits-b"]
-      :selmer.util/custom-resource-path "https://example.org/templates/"}]])
+      [:crux.tx/put
+       {:crux.db/id "https://example.org/fruits.html"
+        ::http/methods #{:get :head :options}
+        ::site/template "https://example.org/templates/outer.html"
+        ::site/template-model ["https://example.org/template-models/fruits-a-query"
+                               "https://example.org/template-models/fruits-b"]
+        :selmer.util/custom-resource-path "https://example.org/templates/"}]])
 
-  (let [r (*handler*
-           {:ring.request/method :get
-            :ring.request/path "/fruits.html"})]
+    (let [r (*handler*
+             {:ring.request/method :get
+              :ring.request/path "/fruits.html"})]
 
-    (is (= "outer * apple * banana * orange * strawberry * kiwi * pineapple" (:ring.response/body r)))))
+      (is (= "outer * apple * banana * orange * strawberry * kiwi * pineapple" (:ring.response/body r))))))

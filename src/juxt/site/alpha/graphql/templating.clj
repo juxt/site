@@ -15,19 +15,26 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'grab (create-ns 'juxt.grab.alpha))
 
-;;(identity selected-representation)
+(defn template-model
+  [{::site/keys [db]
+    ::pass/keys [subject] :as req}
+   {graphql-schema-id ::site/graphql-schema
+    :as stored-document-entity}]
 
-(defn template-model-provider
-  [{::site/keys [db selected-representation]
-    ::pass/keys [subject] :as req}]
+  (assert graphql-schema-id "No graphql-schema reference in stored document entity")
 
-  ;;(def selected-representation selected-representationa)
+  (let [graphql-query-bytes (::http/body stored-document-entity)
+        _ (assert graphql-query-bytes (pr-str stored-document-entity))
 
-  (log/tracef "selected-rep is %s" selected-representation)
+        graphql-query (String. graphql-query-bytes "UTF-8")
 
-  (let [{::site/keys [graphql-endpoint graphql-query graphql-operation]} selected-representation
+        graphql-schema-entity (xt/entity db graphql-schema-id)
 
-        schema (some-> (xt/entity db graphql-endpoint) ::grab/schema)
+        _ (assert graphql-schema-entity (str "No graphql-schema in database with id of " graphql-schema-id))
+
+        schema (::grab/schema graphql-schema-entity)
+
+        _ (assert schema (str "GraphQL schema entity does not have a current schema"))
 
         _ (log/tracef "GraphQL query is %s" graphql-query)
 
@@ -54,4 +61,4 @@
     (assert graphql-query)
     (log/debugf "Executing GraphQL query for template: %s" graphql-query)
     ;; TODO: Check for errors
-    (:data (graphql/query schema document graphql-operation db subject))))
+    (:data (graphql/query schema document nil db subject))))

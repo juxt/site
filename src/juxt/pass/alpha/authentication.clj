@@ -279,3 +279,9 @@
            (throw
             (ex-info "Auth scheme unsupported"
                      (into req {:ring.response/status 401})))))))))
+
+(defn login-template-model [req]
+  {:query (str (:ring.request/query req))})
+
+(defn unauthorized-template-model [req]
+  {:uri (::site/uri req)})

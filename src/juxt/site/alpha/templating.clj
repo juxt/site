@@ -4,6 +4,7 @@
   (:require
    [juxt.site.alpha.selmer :as selmer]
    [clojure.walk :refer [postwalk]]
+   [juxt.site.alpha.graphql.templating :as graphql-templating]
    [clojure.tools.logging :as log]
    [crux.api :as xt]))
 
@@ -27,20 +28,67 @@
        :else m))
    template-model))
 
+(defn process-template-model [template-model {::site/keys [db] :as req}]
+  ;; A template model can be a stored query.
+
+
+
+  (let [f (cond
+            ;; If a symbol, it is expected to be a resolvable internal function
+            ;; (to support basic templates built on the request and internal
+            ;; Site data).
+            (symbol? template-model)
+            (try
+              (or
+               (requiring-resolve template-model)
+               (throw
+                (ex-info
+                 (format "Requiring resolve of %s returned nil" template-model)
+                 {:template-model template-model})))
+              (catch Exception e
+                (throw
+                 (ex-info
+                  (format "template-model fn '%s' not resolveable" template-model)
+                  {:template-model template-model}))))
+
+            ;; It can also be an id of an entity in the database which contains
+            ;; metadata, e.g. for a GraphQL query.
+            (string? template-model)
+            ;; This is treated as a reference to another entity
+            (if-let [template-model-entity (xt/entity db template-model)]
+              (cond
+                (:juxt.site.alpha/graphql-schema template-model-entity)
+                (fn [req]
+                  (graphql-templating/template-model req template-model-entity))
+
+                :else
+                (throw
+                 (ex-info
+                  "Unsupported template-model entity"
+                  {:template-model-entity template-model-entity})))
+              (throw
+               (ex-info
+                "Template model entity not found in database"
+                {:template-model template-model})))
+
+            :else
+            (throw (ex-info "Unsupported form of template-model" {:type (type template-model)})))]
+    (f req)))
+
 (defn render-template
   "Methods should return a modified request (first arg), typically associated
   a :ring.response/body entry."
-  [{::site/keys [db resource] :as req} template]
+  [{::site/keys [db selected-representation] :as req} template]
 
   (let [template-models
         (map first
-             (xt/q db '{:find [(pull tm [*])]
+             (xt/q db '{:find [tm]
                         :where [[e ::site/template-model tm]]
-                        :in [e]} (:crux.db/id resource)))
+                        :in [e]} (:crux.db/id selected-representation)))
 
         processed-template-models
         (for [tm template-models]
-          (expand-queries tm db))
+          (process-template-model tm req))
 
         combined-template-model
         (->> processed-template-models
