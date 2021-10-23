@@ -299,10 +299,18 @@
                  {:ring.response/status 500})
                 e)))))))))
 
-
 (defn stored-document-post-handler [_]
+  ;; Look up GraphQL document from resource
+  ;; Get operationName from form of received representation
+  ;; Call GraphQL
+  ;; Convert results to JSON
   (throw (ex-info "TODO" {})))
 
 (defn text-plain-representation-body [{::site/keys [db] :as req}]
   (let [lookup (fn [id] (xt/entity db id))]
     (-> req ::site/selected-representation ::site/variant-of lookup ::http/body (String. "utf-8"))))
+
+(defn text-html-template-model [{::site/keys [resource selected-representation] :as req}]
+  (let [charset (get-in selected-representation [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
+    {:document (String. (::http/body resource) charset)
+     :endpoint (:juxt.site.alpha/graphql-schema resource)}))
