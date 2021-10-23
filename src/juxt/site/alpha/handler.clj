@@ -405,12 +405,12 @@
         variant-of (get-in req [:ring.request/headers "site-variant-of"])
         template-dialect (get-in req [:ring.request/headers "site-template-dialect"])
         new-rep (merge
+                 {:crux.db/id uri
+                  ::http/methods #{:get :head :options :put :patch}
+                  ::site/type "StaticRepresentation"}
                  existing
                  (cond->
-                     {:crux.db/id uri
-                      ::site/type "StaticRepresentation"
-                      ::http/methods #{:get :head :options :put :patch}
-                      ::http/etag (etag received-representation)
+                     {::http/etag (etag received-representation)
                       ::http/last-modified start-date
                       ::site/request request-id}
                    variant-of (assoc ::site/variant-of variant-of)
