@@ -37,11 +37,11 @@
     :document document
     :operation-name operation-name
     :field-resolver
-    (fn [{:keys [object-value field-name] :as args}]
-      (let [lookup-type (::schema/provided-types schema)
-            field (get-in args [:object-type ::schema/fields-by-name (get-in args [:field-name])])
+    (fn [{:keys [object-type object-value field-name argument-values] :as args}]
+      (let [types-by-name (::schema/types-by-name schema)
+            field (get-in object-type [::schema/fields-by-name (get-in args [:field-name])])
             site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
-            field-kind (-> field ::g/type-ref ::g/name lookup-type ::g/kind)
+            field-kind (-> field ::g/type-ref ::g/name types-by-name ::g/kind)
             lookup-entity (fn [id] (xt/entity db id))]
 
         (cond
