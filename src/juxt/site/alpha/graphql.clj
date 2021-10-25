@@ -11,7 +11,7 @@
    [crux.api :as xt]
    [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk]]
-   [crux.api :as x]))
+   [crux.api :as xt]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -27,32 +27,70 @@
        (-> (get :keyword) keyword)
 
        (and (map? x) (::g/name x))
-       (-> (get ::g/name) symbol))
-     )
+       (-> (get ::g/name) symbol)))
    query))
 
-(defn query [schema document operation-name db subject]
+(defn generate-value [{:keys [type pathPrefix] :as m}]
+  (when type
+    (str pathPrefix (java.util.UUID/randomUUID))))
+
+(defn args-to-entity [args field]
+  (reduce
+   (fn [acc arg-def]
+     (let [generator-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "gen"])
+           kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])
+           arg-type-ref (::g/type-ref arg-def)
+           ]
+       (cond
+         (::g/name arg-def)
+         (let [val (or (get args (::g/name arg-def))
+                       ;; TODO: default value?
+                       (generate-value generator-args))]
+           (cond-> acc
+             (some? val) (assoc (keyword (or kw (::g/name arg-def))) val)))
+         :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
+   {}
+   (::g/arguments-definition field)))
+
+(defn query [schema document operation-name crux-node db subject]
   (execute-request
    {:schema schema
     :document document
     :operation-name operation-name
     :field-resolver
-    (fn [{:keys [object-type object-value field-name argument-values] :as args}]
+    (fn [{:keys [object-type object-value field-name argument-values] :as field-resolver-args}]
+
+      (when (= "putPerson" field-name)
+        (def field-resolver-args field-resolver-args))
+
       (let [types-by-name (::schema/types-by-name schema)
-            field (get-in object-type [::schema/fields-by-name (get-in args [:field-name])])
+            field (get-in object-type [::schema/fields-by-name field-name])
             site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
             field-kind (-> field ::g/type-ref ::g/name types-by-name ::g/kind)
-            lookup-entity (fn [id] (xt/entity db id))]
+            lookup-entity (fn [id] (xt/entity db id))
+            mutation? (=
+                       (get-in schema [::schema/root-operation-type-names :mutation])
+                       (::g/name object-type))]
 
         (cond
+          mutation?
+          (let [object-to-put (args-to-entity argument-values field)]
+            (def object-to-put object-to-put)
+            (xt/await-tx
+             crux-node
+             (xt/submit-tx
+              crux-node
+              [[:crux.tx/put object-to-put]]))
+            object-to-put)
+
           (get site-args "q")
           (let [object-id (:crux.db/id object-value)
                 q (assoc
                    (to-xt-query (get site-args "q"))
-                   :in (vec (cond->> (map symbol (keys (:argument-values args)))
+                   :in (vec (cond->> (map symbol (keys argument-values))
                               object-id (concat ['object]))))
                 results (for [[e] (apply
-                                   xt/q db q (cond->> (vals (:argument-values args))
+                                   xt/q db q (cond->> (vals argument-values)
                                                object-id (concat [object-id])))]
                           (xt/entity db e))]
             ;; If this isn't a list type, take the first
@@ -68,14 +106,14 @@
 
           (get site-args "resolver")
           (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
-            (resolver (assoc args ::pass/subject subject :db db)))
+            (resolver (assoc field-resolver-args ::pass/subject subject :db db)))
 
           ;; Another strategy is to see if the field indexes the
           ;; object-value. This strategy allows for delays to be used to prevent
           ;; computing field values that aren't resolved.
           (contains? object-value field-name)
           (let [f (force (get object-value field-name))]
-            (if (fn? f) (f (:argument-values args)) f))
+            (if (fn? f) (f argument-values) f))
 
           ;; Or simply try to extract the keyword
           (contains? object-value (keyword field-name))
@@ -84,16 +122,15 @@
           :else
           (throw
            (ex-info
-            (format "TODO: resolve field: %s" (:field-name args)) args)))))}))
+            (format "TODO: resolve field: %s" field-name) field-resolver-args)))))}))
 
 
-(defn post-handler [{::site/keys [uri db]
+(defn post-handler [{::site/keys [uri crux-node db]
                      ::pass/keys [subject]
                      :as req}]
+
   (let [schema (some-> (xt/entity db uri) ::grab/schema)
         body (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
-
-        _ (log/tracef "received-representation is %s" (pr-str (keys (some-> req :juxt.site.alpha/received-representation))))
 
         [document-str operation-name]
         (case (some-> req ::site/received-representation ::http/content-type)
@@ -130,7 +167,7 @@
                 e)))))
 
         ;; TODO: If JSON, get operationName and use it here
-        results (query schema document operation-name db subject)
+        results (query schema document operation-name crux-node db subject)
 
         ;; Map to application/json
         results (postwalk
@@ -144,7 +181,8 @@
         (assoc
          :ring.response/status 200
          :ring.response/body
-         (json/write-value-as-string results)))))
+         (json/write-value-as-string results))
+        (update :ring.response/headers assoc "content-type" "application/json"))))
 
 (defn put-schema [crux-node resource schema-str]
   (let [schema (schema/compile-schema (parser/parse schema-str))]

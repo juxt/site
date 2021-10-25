@@ -240,24 +240,17 @@ type Person { name: String @site(a: \"name\")}"
   (schema/compile-schema (parser/parse "extend schema @site(import: \"/graphql\") type Query { person: Person } type Person { name: String }")))
 
 
-#_(do
-  (defn mutation []
+(defn mutation []
     (let [schema "
 schema { query: Query mutation: Mutation }
 type Query { person: Person }
-type Person { id: ID name: String }
+type Person { id: ID @site(a: \"crux.db/id\") name: String }
 scalar Date
-type Holiday {
-  beginning: Date!
-  ending: Date!
-  description: String
-}
 type Mutation {
-  addPerson(id: ID! @site(a: \"crux.db/id\") name: String!): Person
-  addHoliday(person: ID! beginning: Date! ending: Date! description: String): Holiday
+  addPerson(id: ID @site(a: \"crux.db/id\") name: String): Person
 }
 "
-          query "mutation { addPerson(id: \"mal\" name: \"Malcolm Sparks\") { name }}"]
+          query "mutation { addPerson(id: \"https://example.org/persons/mal\" name: \"Malcolm Sparks\") { id name }}"]
 
       (submit-and-await!
        [[:crux.tx/put access-all-areas]
@@ -277,24 +270,47 @@ type Mutation {
                           (add-body schema "application/graphql")))]
         (is (= 204 (:ring.response/status response))))
 
-      ;; POST a query to that schema
+      ;; POST a mutation to that endpoint
       (let [response
             (*handler*
              (-> {:ring.request/method :post
                   :ring.request/path "/graphql"}
-                 (add-body query "application/graphql")))
-            body (json/read-value (:ring.response/body response))]
+                 (add-body query "application/graphql")))]
+
+        (when (= (get-in response [:ring.response/status]) 500)
+          (throw (ex-info "Unexpected error" {:response response})))
 
         (is (= 200 (:ring.response/status response)))
-        (is (= {"data"
-                {"id" "https://example.org/_site/users/mal"
-                 "name" "Malcolm Sparks"}}
-               body)))
+
+        response
+
+        (when-not (= (get-in response [:ring.response/headers "content-type"])
+                     "application/json")
+          (throw (ex-info "Unexpected content-type"
+                          {:content-type (get-in response [:ring.response/headers "content-type"])})))
+
+        ;; Ensure mutation worked
+        (let [db (xt/db *crux-node*)]
+          (is (= {:crux.db/id "https://example.org/persons/mal" :name "Malcolm Sparks"}
+                 (xt/entity db "https://example.org/persons/mal"))))
+
+        (let [body (json/read-value (:ring.response/body response))]
+          (is (= {"data"
+                  {"addPerson"
+                   {"id" "https://example.org/persons/mal"
+                    "name" "Malcolm Sparks"}}}
+                 body))
+          ;;body
+          ))
 
       ))
-  ((t/join-fixtures [with-crux with-handler])
+
+#_((t/join-fixtures [with-crux with-handler])
    mutation
- ))
+ )
+
+(deftest mutation-test
+  (mutation))
 
 
 #_(parser/parse "mutation { addPerson { name }}")
@@ -318,64 +334,3 @@ type Mutation {
 }
 "
   ))
-
-
-;; Unit tests for args-to-entity
-#_(do
-  (let [field
-        {:juxt.grab.alpha.graphql/name "putPerson",
-         :juxt.grab.alpha.graphql/arguments-definition
-         [{:juxt.grab.alpha.graphql/name "id",
-           :juxt.grab.alpha.graphql/type-ref {:juxt.grab.alpha.graphql/name "ID"},
-           :juxt.grab.alpha.graphql/directives
-           [{:juxt.grab.alpha.graphql/name "site",
-             :juxt.grab.alpha.graphql/arguments {"a" "crux.db/id"}}],
-           :juxt.grab.alpha.schema/directives-by-name
-           {"site" {:juxt.grab.alpha.graphql/arguments {"a" "crux.db/id"}}}}
-          {:juxt.grab.alpha.graphql/name "name",
-           :juxt.grab.alpha.graphql/type-ref
-           {:juxt.grab.alpha.graphql/non-null-type
-            {:juxt.grab.alpha.graphql/name "String"}}}
-          {:juxt.grab.alpha.graphql/name "personalEmail",
-           :juxt.grab.alpha.graphql/type-ref
-           {:juxt.grab.alpha.graphql/name "String"},
-           :juxt.grab.alpha.graphql/directives
-           [{:juxt.grab.alpha.graphql/name "site",
-             :juxt.grab.alpha.graphql/arguments {"a" "juxt.home/personal-email"}}],
-           :juxt.grab.alpha.schema/directives-by-name
-           {"site"
-            {:juxt.grab.alpha.graphql/arguments {"a" "juxt.home/personal-email"}}}}
-          {:juxt.grab.alpha.graphql/name "companyEmail",
-           :juxt.grab.alpha.graphql/type-ref
-           {:juxt.grab.alpha.graphql/name "String"},
-           :juxt.grab.alpha.graphql/directives
-           [{:juxt.grab.alpha.graphql/name "site",
-             :juxt.grab.alpha.graphql/arguments {"a" "juxt.home/company-email"}}],
-           :juxt.grab.alpha.schema/directives-by-name
-           {"site"
-            {:juxt.grab.alpha.graphql/arguments {"a" "juxt.home/company-email"}}}}
-          {:juxt.grab.alpha.graphql/name "code",
-           :juxt.grab.alpha.graphql/type-ref
-           {:juxt.grab.alpha.graphql/name "String"},
-           :juxt.grab.alpha.graphql/directives
-           [{:juxt.grab.alpha.graphql/name "site",
-             :juxt.grab.alpha.graphql/arguments {"a" "juxt.home/juxtcode"}}],
-           :juxt.grab.alpha.schema/directives-by-name
-           {"site" {:juxt.grab.alpha.graphql/arguments {"a" "juxt.home/juxtcode"}}}}
-          {:juxt.grab.alpha.graphql/name "relationship",
-           :juxt.grab.alpha.graphql/type-ref
-           {:juxt.grab.alpha.graphql/name "Relationship"},
-           :juxt.grab.alpha.graphql/directives
-           [{:juxt.grab.alpha.graphql/name "site",
-             :juxt.grab.alpha.graphql/arguments {"a" "juxt.home/relationship"}}],
-           :juxt.grab.alpha.schema/directives-by-name
-           {"site"
-            {:juxt.grab.alpha.graphql/arguments {"a" "juxt.home/relationship"}}}}],
-         :juxt.grab.alpha.graphql/type-ref
-         {:juxt.grab.alpha.graphql/name "Person"}}
-
-        argument-values
-        {"name" "Malcolm"}]
-
-    (args-to-entity argument-values field)
-    ))
