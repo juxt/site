@@ -487,6 +487,36 @@
           (error! "Server response:" status (str/trim body))
           (message! "Request id:" (get headers "site-request-id")))))))
 
+(defn put-graphql
+  "Put a GraphQL schema"
+  [opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [base-uri file path]
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
+        (:options opts)]
+
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+    (when-not file (error-and-usage! "GraphQL schema file required" opts))
+    (when-not (.isFile (io/file file)) (error-and-exit! 1 "GraphQL schema file must be a file"))
+    (when-not path (error-and-usage! "Path required" opts))
+
+    (let [{:keys [status headers body]}
+          (curl/put
+           (format "%s%s" base-uri path)
+           {:headers {"authorization" (format "Bearer %s" access-token)
+                      "content-type" "application/graphql"}
+            :body (cond-> (slurp (io/file file))
+                    base-uri (str/replace "{{base-uri}}" base-uri))
+            :throw false})]
+      (cond
+        (= status 204)
+        (message! (format "GraphQL schema uploaded"))
+
+        :else
+        (do
+          (error! "Server response:" status (str/trim body))
+          (message! "Request id:" (get headers "site-request-id")))))))
+
 (defn put-redirect
   "Put a redirect"
   [opts]
@@ -1009,6 +1039,12 @@
      :cli-options [["-n" "--name NAME" "Trigger name"]
                    ["-t" "--trigger FILE" "Trigger file"]]
      :delegate put-trigger}]
+
+   ["put-graphql"
+    {:description (:doc (meta #'put-graphql))
+     :cli-options [["-f" "--file FILE" "GraphQL schema file"]
+                   ["-p" "--path PATH" "The destination path after the base-uri"]]
+     :delegate put-graphql}]
 
    ["put-redirect"
     {:description (:doc (meta #'put-redirect))
