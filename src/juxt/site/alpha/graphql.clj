@@ -225,11 +225,14 @@
               e))))))))
 
 (defn plain-text-error-message [error]
-  (str (:message error)
-       " [" (->> (dissoc error :message)
-                 sort
-                 (map (fn [[k v]] (format "%s=%s" (name k) v)))
-                 (str/join ", ")) "]"))
+  (let [line (some-> error :location :line inc)]
+    (str
+     (when line (format "%4d: " line))
+     (:message error)
+     " [" (->> (dissoc error :message)
+               sort
+               (map (fn [[k v]] (format "%s=%s" (name k) v)))
+               (str/join ", ")) "]")))
 
 (defn put-error-text-body [req]
   (log/tracef "put-error-text-body: %d errors" (count (::errors req)))
@@ -238,7 +241,8 @@
     (->>
      (for [error (::errors req)]
        (cond-> (str \tab (plain-text-error-message error))
-         (:location error) (str " (line " (-> error :location :row inc) ")")))
+         ;;(:location error) (str " (line " (-> error :location :line) ")")
+         ))
      (into ["Schema compilation errors"])
      (str/join (System/lineSeparator)))
     (:ring.response/body req) (:ring.response/body req)
