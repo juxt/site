@@ -27,7 +27,7 @@
 
 (t/use-fixtures :each with-crux with-handler)
 
-(deftest graphql-test
+(defn graphql []
   (submit-and-await!
    [[:crux.tx/put access-all-areas]
     [:crux.tx/put
@@ -82,6 +82,8 @@
              [{"id" "https://example.org/_site/users/alx"}
               {"id" "https://example.org/_site/users/mal"}]}} (json/read-value (:ring.response/body r))))))
 
+(deftest graphql-test
+  (graphql))
 
 #_((t/join-fixtures [with-crux with-handler])
  (fn []
