@@ -95,7 +95,7 @@
           (get site-args "a")
           (let [att (get site-args "a")
                 val (get object-value (keyword att))]
-            (if (= field-kind :object)
+            (if (= field-kind 'OBJECT)
               (lookup-entity val)
               val))
 
