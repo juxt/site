@@ -30,9 +30,6 @@
 
 (defn process-template-model [template-model {::site/keys [db] :as req}]
   ;; A template model can be a stored query.
-
-
-
   (let [f (cond
             ;; If a symbol, it is expected to be a resolvable internal function
             ;; (to support basic templates built on the request and internal
