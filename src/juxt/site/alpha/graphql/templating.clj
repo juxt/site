@@ -48,6 +48,7 @@
                     (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]}))))]
             (document/compile-document document schema))
           (catch Exception e
+            (log/error e "Error parsing or compiling GraphQL query")
             (let [errors (:errors (ex-data e))]
               (throw
                (ex-info
