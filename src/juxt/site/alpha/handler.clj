@@ -450,7 +450,6 @@
        {::site/uri uri
         ::site/resource-provider ::requests-cache
         ::http/methods #{:get :head :options}
-        ::site/template-model request-to-show
         ::http/representations
         (remove nil? [(when (or (nil? suffix) (= suffix ".json"))
                         (debug/json-representation-of-request req request-to-show))
