@@ -35,9 +35,7 @@
   (reduce
    (fn [acc arg-def]
      (let [generator-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "gen"])
-           kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])
-           arg-type-ref (::g/type-ref arg-def)
-           ]
+           kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])]
        (cond
          (::g/name arg-def)
          (let [val (or (get args (::g/name arg-def))
