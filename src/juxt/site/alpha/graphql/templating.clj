@@ -45,7 +45,7 @@
                 (try
                   (parser/parse graphql-query)
                   (catch Exception e
-                    (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]}))))]
+                    (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]} e))))]
             (document/compile-document document schema))
           (catch Exception e
             (log/error e "Error parsing or compiling GraphQL query")
