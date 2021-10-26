@@ -77,11 +77,8 @@
   a :ring.response/body entry."
   [{::site/keys [db selected-representation] :as req} template]
 
-  (let [template-models
-        (map first
-             (xt/q db '{:find [tm]
-                        :where [[e ::site/template-model tm]]
-                        :in [e]} (:crux.db/id selected-representation)))
+  (let [template-models (::site/template-model selected-representation)
+        template-models (if (sequential? template-models) template-models [template-models])
 
         processed-template-models
         (for [tm template-models]
