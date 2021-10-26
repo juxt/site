@@ -57,9 +57,6 @@
     :field-resolver
     (fn [{:keys [object-type object-value field-name argument-values] :as field-resolver-args}]
 
-      (when (= "putPerson" field-name)
-        (def field-resolver-args field-resolver-args))
-
       (let [types-by-name (::schema/types-by-name schema)
             field (get-in object-type [::schema/fields-by-name field-name])
             site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
@@ -72,7 +69,6 @@
         (cond
           mutation?
           (let [object-to-put (args-to-entity argument-values field)]
-            (def object-to-put object-to-put)
             (xt/await-tx
              crux-node
              (xt/submit-tx
@@ -82,10 +78,12 @@
 
           (get site-args "q")
           (let [object-id (:crux.db/id object-value)
+                _ (log/tracef "q is %s" (pr-str (get site-args "q")))
                 q (assoc
                    (to-xt-query (get site-args "q"))
                    :in (vec (cond->> (map symbol (keys argument-values))
                               object-id (concat ['object]))))
+                _ (log/tracef "query is %s" (pr-str q))
                 results (for [[e] (apply
                                    xt/q db q (cond->> (vals argument-values)
                                                object-id (concat [object-id])))]
