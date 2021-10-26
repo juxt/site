@@ -68,6 +68,9 @@
                 "Template model entity not found in database"
                 {:template-model template-model})))
 
+            (map? template-model)
+            (fn [_] template-model)
+
             :else
             (throw (ex-info "Unsupported form of template-model" {:type (type template-model)})))]
     (f req)))
