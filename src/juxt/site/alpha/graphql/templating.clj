@@ -52,10 +52,10 @@
             (let [errors (:errors (ex-data e))]
               (throw
                (ex-info
-                "Error parsing or compiling GraphQL query"
+                "Error parsing or compiling GraphQL query for template model"
                 (into
                  req
-                 (cond-> {:ring.response/status 400}
+                 (cond-> {:ring.response/status 500}
                    (seq errors) (assoc ::errors errors)))
                 e)))))]
 
