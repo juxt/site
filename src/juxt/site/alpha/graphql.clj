@@ -24,10 +24,7 @@
    (fn [x]
      (cond-> x
        (and (map? x) (:keyword x))
-       (-> (get :keyword) keyword)
-
-       (and (map? x) (::g/name x))
-       (-> (get ::g/name) symbol)))
+       (-> (get :keyword) keyword)))
    query))
 
 (defn generate-value [{:keys [type pathPrefix] :as m}]
