@@ -504,7 +504,8 @@
           (curl/put
            (format "%s%s" base-uri path)
            {:headers {"authorization" (format "Bearer %s" access-token)
-                      "content-type" "application/graphql"}
+                      "content-type" "application/graphql"
+                      "accept" "text/plain"}
             :body (cond-> (slurp (io/file file))
                     base-uri (str/replace "{{base-uri}}" base-uri))
             :throw false})]
