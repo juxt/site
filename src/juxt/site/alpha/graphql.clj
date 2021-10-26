@@ -157,6 +157,7 @@
           (catch Exception e
             (log/error e "Error parsing or compiling GraphQL query")
             (let [errors (:errors (ex-data e))]
+              (log/errorf "Errors %s" (pr-str errors))
               (throw
                (ex-info
                 "Error parsing or compiling GraphQL query"
