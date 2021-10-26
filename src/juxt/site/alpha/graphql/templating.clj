@@ -16,7 +16,7 @@
 (alias 'grab (create-ns 'juxt.grab.alpha))
 
 (defn template-model
-  [{::site/keys [db]
+  [{::site/keys [crux-node db]
     ::pass/keys [subject] :as req}
    {graphql-schema-id ::site/graphql-schema
     :as stored-document-entity}]
@@ -62,4 +62,4 @@
     (assert graphql-query)
     (log/debugf "Executing GraphQL query for template: %s" graphql-query)
     ;; TODO: Check for errors
-    (:data (graphql/query schema document nil db subject))))
+    (:data (graphql/query schema document nil crux-node db subject))))
