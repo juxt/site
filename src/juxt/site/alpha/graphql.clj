@@ -161,16 +161,7 @@
                    (seq errors) (assoc ::errors errors)))
                 e)))))
 
-        ;; TODO: If JSON, get operationName and use it here
-        results (query schema document operation-name crux-node db subject)
-
-        ;; Map to application/json
-        results (postwalk
-                  (fn [x]
-                    (cond-> x
-                      (and (vector? x) (= :kind (first x)))
-                      (update 1 (comp str/upper-case #(str/replace % "-" "_") name))))
-                  results)]
+        results (query schema document operation-name crux-node db subject)]
 
     (-> req
         (assoc
