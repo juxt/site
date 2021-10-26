@@ -284,4 +284,6 @@
   {:query (str (:ring.request/query req))})
 
 (defn unauthorized-template-model [req]
-  {:uri (::site/uri req)})
+  {:redirect (str
+              (:ring.request/path req)
+              (when-let [query (:ring.request/query req)] (str "?" query)))})
