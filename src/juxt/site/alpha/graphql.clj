@@ -37,10 +37,15 @@
      (let [generator-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "gen"])
            kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])]
        (cond
-         (::g/name arg-def)
+         (::g/name arg-def) ; is it a singular (not a NON_NULL or LIST)
          (let [val (or (get args (::g/name arg-def))
                        ;; TODO: default value?
-                       (generate-value generator-args))]
+                       (generate-value generator-args))
+               ;; Change a symbol value into a string
+
+               ;; We don't want symbols in XT entities, because this leaks the
+               ;; form-plane into the data-plane!
+               val (cond-> val (symbol? val) str)]
            (cond-> acc
              (some? val) (assoc (keyword (or kw (::g/name arg-def))) val)))
          :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
