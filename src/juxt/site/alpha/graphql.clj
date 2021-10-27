@@ -81,6 +81,11 @@
               [[:crux.tx/put object-to-put]]))
             object-to-put)
 
+          ;; Direct lookup - useful query roots
+          (get site-args "e")
+          (let [att (get site-args "e")]
+            (lookup-entity att))
+
           (get site-args "q")
           (let [object-id (:crux.db/id object-value)
                 _ (log/tracef "q is %s" (pr-str (get site-args "q")))
