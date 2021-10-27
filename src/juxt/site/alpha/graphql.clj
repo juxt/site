@@ -4,6 +4,7 @@
   (:require
    [juxt.grab.alpha.schema :as schema]
    [juxt.grab.alpha.document :as document]
+   [jsonista.core :as json]
    [juxt.grab.alpha.execution :refer [execute-request]]
    [juxt.grab.alpha.parser :as parser]
    [jsonista.core :as json]
@@ -189,7 +190,7 @@
      crux-node
      (xt/submit-tx
       crux-node
-      [[:crux.tx/put (assoc resource ::grab/schema schema)]]))))
+      [[:crux.tx/put (assoc resource ::grab/schema schema ::http/body (.getBytes schema-str))]]))))
 
 (defn put-handler [{::site/keys [uri db crux-node] :as req}]
   (let [schema-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
@@ -340,12 +341,23 @@
                  {:ring.response/status 500})
                 e)))))))))
 
-(defn stored-document-post-handler [_]
+(defn stored-document-post-handler
+  [{::site/keys [crux-node db resource]
+    ::pass/keys [subject]
+    :as req}]
   ;; Look up GraphQL document from resource
-  ;; Get operationName from form of received representation
-  ;; Call GraphQL
-  ;; Convert results to JSON
-  (throw (ex-info "TODO" {})))
+  (let [schema-id (::site/graphql-schema resource)
+        schema (some-> (when schema-id (xt/entity db schema-id)) ::grab/schema)
+        ;; TODO: This should be pre-parsed against schema
+        document-str (String. (::http/body resource) "UTF-8")
+        document (document/compile-document (parser/parse document-str) schema)
+        results (query schema document nil
+                       nil ;; for crux-node, so we prevent get updates
+                       db
+                       subject)]
+    (-> req
+        (assoc-in [:ring.response/headers "content-type"] "application/json")
+        (assoc :ring.response/body (json/write-value-as-bytes results)))))
 
 (defn text-plain-representation-body [{::site/keys [db] :as req}]
   (let [lookup (fn [id] (xt/entity db id))]
@@ -353,6 +365,11 @@
 
 (defn text-html-template-model [{::site/keys [resource selected-representation db] :as req}]
   (let [original-resource (if-let [variant-of (::site/variant-of resource)] (xt/entity db variant-of) resource)
-        charset (get-in selected-representation [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
-    {:document (String. (::http/body original-resource) charset)
-     :endpoint (:juxt.site.alpha/graphql-schema resource)}))
+        endpoint (:juxt.site.alpha/graphql-schema original-resource)
+        schema-resource (xt/entity db endpoint)
+        schema-str (String. (some-> schema-resource ::http/body))
+        ]
+    {:document (String. (::http/body original-resource) "UTF-8")
+     :endpoint endpoint
+     :schema-str schema-str
+     :form {:action (:crux.db/id original-resource)}}))
