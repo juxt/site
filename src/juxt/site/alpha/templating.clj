@@ -83,6 +83,11 @@
   (let [template-models (::site/template-model selected-representation)
         template-models (if (sequential? template-models) template-models [template-models])
 
+        ;; TODO: We should strongly consider reverting to a single template
+        ;; model, now that we have GraphQL. Having the option for multiple
+        ;; template models over-complicates the modelling. For example, we want
+        ;; to put into a resource the GraphQL operation-name to call on the
+        ;; GraphQL.
         processed-template-models
         (for [tm template-models]
           (process-template-model tm req))
