@@ -371,9 +371,7 @@
   (let [lookup (fn [id] (xt/entity db id))]
     (-> req ::site/selected-representation ::site/variant-of lookup ::http/body (String. "utf-8"))))
 
-
-
-(defn text-html-template-model [{::site/keys [resource selected-representation db] :as req}]
+(defn text-html-template-model [{::site/keys [resource db]}]
   (let [original-resource (if-let [variant-of (::site/variant-of resource)] (xt/entity db variant-of) resource)
         endpoint (:juxt.site.alpha/graphql-schema original-resource)
         schema-resource (xt/entity db endpoint)
