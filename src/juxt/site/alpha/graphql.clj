@@ -351,7 +351,8 @@
   (let [lookup (fn [id] (xt/entity db id))]
     (-> req ::site/selected-representation ::site/variant-of lookup ::http/body (String. "utf-8"))))
 
-(defn text-html-template-model [{::site/keys [resource selected-representation] :as req}]
-  (let [charset (get-in selected-representation [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
-    {:document (String. (::http/body resource) charset)
+(defn text-html-template-model [{::site/keys [resource selected-representation db] :as req}]
+  (let [original-resource (if-let [variant-of (::site/variant-of resource)] (xt/entity db variant-of) resource)
+        charset (get-in selected-representation [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
+    {:document (String. (::http/body original-resource) charset)
      :endpoint (:juxt.site.alpha/graphql-schema resource)}))
