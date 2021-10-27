@@ -16,8 +16,9 @@ async function fetchGraphQlSchema(fetcher: import("graphiql").Fetcher) {
   return schema;
 }
 
+const queryParams = new URLSearchParams(window.location.search);
+
 const graphQLFetcher: import("graphiql").Fetcher = async (graphQLParams) => {
-  const queryParams = new URLSearchParams(window.location.search);
   const endpoint = queryParams.get('url') ?? '/_site/graphql';
   const data = await fetch(
     endpoint,
@@ -35,7 +36,8 @@ const graphQLFetcher: import("graphiql").Fetcher = async (graphQLParams) => {
 }
 
 const App = () => {
-  const [query, setQuery] = useState<string | undefined>();
+  const queryString = queryParams.get('q') ?? '';
+  const [query, setQuery] = useState<string | undefined>(queryString);
   const [schema, setSchema] = useState<import("graphql").GraphQLSchema>();
   const [explorerIsOpen, setExplorerIsOpen] = useState(true);
 
