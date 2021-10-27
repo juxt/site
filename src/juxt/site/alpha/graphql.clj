@@ -2,6 +2,7 @@
 
 (ns juxt.site.alpha.graphql
   (:require
+   [ring.util.codec :refer [form-decode]]
    [juxt.grab.alpha.schema :as schema]
    [juxt.grab.alpha.document :as document]
    [jsonista.core :as json]
@@ -342,16 +343,23 @@
                 e)))))))))
 
 (defn stored-document-post-handler
-  [{::site/keys [crux-node db resource]
+  [{::site/keys [crux-node db resource received-representation]
     ::pass/keys [subject]
     :as req}]
+
+  (assert (.startsWith (::http/content-type received-representation)
+                       "application/x-www-form-urlencoded"))
+
   ;; Look up GraphQL document from resource
-  (let [schema-id (::site/graphql-schema resource)
+  (let [posted-body (slurp (::http/body received-representation))
+        form (form-decode posted-body)
+        operation-name (get form "operationName")
+        schema-id (::site/graphql-schema resource)
         schema (some-> (when schema-id (xt/entity db schema-id)) ::grab/schema)
         ;; TODO: This should be pre-parsed against schema
         document-str (String. (::http/body resource) "UTF-8")
         document (document/compile-document (parser/parse document-str) schema)
-        results (query schema document nil
+        results (query schema document operation-name
                        nil ;; for crux-node, so we prevent get updates
                        db
                        subject)]
@@ -363,13 +371,21 @@
   (let [lookup (fn [id] (xt/entity db id))]
     (-> req ::site/selected-representation ::site/variant-of lookup ::http/body (String. "utf-8"))))
 
+
+
 (defn text-html-template-model [{::site/keys [resource selected-representation db] :as req}]
   (let [original-resource (if-let [variant-of (::site/variant-of resource)] (xt/entity db variant-of) resource)
         endpoint (:juxt.site.alpha/graphql-schema original-resource)
         schema-resource (xt/entity db endpoint)
+        schema (some-> schema-resource ::grab/schema)
         schema-str (String. (some-> schema-resource ::http/body))
-        ]
-    {:document (String. (::http/body original-resource) "UTF-8")
-     :endpoint endpoint
-     :schema-str schema-str
-     :form {:action (:crux.db/id original-resource)}}))
+        document-str (String. (::http/body original-resource) "UTF-8")
+        document (document/compile-document (parser/parse document-str) schema)
+        operation-names (->> (:juxt.grab.alpha.document/operations document)
+                             (filter #(= (::g/operation-type %) :query))
+                             (map ::g/name))]
+    {"document" (String. (::http/body original-resource) "UTF-8")
+     "endpoint" endpoint
+     "operationNames" operation-names
+     "schemaString" schema-str
+     "form" {"action" (:crux.db/id original-resource)}}))
