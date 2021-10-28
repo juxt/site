@@ -1,8 +1,9 @@
 ;; Set up a resource which is configured to accept a PUT of a GraphQL schema (in
 ;; GraphQL SDL format)
 {:crux.db/id "{{base-uri}}/_site/graphql"
- :juxt.http.alpha/methods #{:post :put :options}
- :juxt.http.alpha/acceptable "application/graphql"
+ :juxt.http.alpha/methods #{:get :head :post :put :options}
+ :juxt.http.alpha/acceptable-on-put "application/graphql"
+ :juxt.http.alpha/acceptable-on-post "application/json"
 
  :juxt.site.alpha/access-control-allow-origins
  {#regex "http://localhost:\\p{Digit}+"
