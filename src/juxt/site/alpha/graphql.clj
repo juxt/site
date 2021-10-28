@@ -8,12 +8,11 @@
    [jsonista.core :as json]
    [juxt.grab.alpha.execution :refer [execute-request]]
    [juxt.grab.alpha.parser :as parser]
-   [jsonista.core :as json]
    [clojure.string :as str]
    [crux.api :as xt]
    [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk]]
-   [crux.api :as xt]))
+   [clojure.edn :as edn]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -22,14 +21,19 @@
 (alias 'g (create-ns 'juxt.grab.alpha.graphql))
 
 (defn to-xt-query [query]
-  (postwalk
-   (fn [x]
-     (cond-> x
-       (and (map? x) (:keyword x))
-       (-> (get :keyword) keyword)
-       (and (map? x) (:set x))
-       (-> (get :set) set)))
-   query))
+  (let [result
+        (postwalk
+         (fn [x]
+           (cond-> x
+             (and (map? x) (:keyword x))
+             (-> (get :keyword) keyword)
+             (and (map? x) (:set x))
+             (-> (get :set) set)
+             (and (map? x) (:edn x))
+             (-> (get :edn) edn/read-string)
+             ))
+         query)]
+    result))
 
 (defn generate-value [{:keys [type pathPrefix] :as m}]
   (when type
@@ -90,16 +94,17 @@
 
           (get site-args "q")
           (let [object-id (:crux.db/id object-value)
-                _ (log/tracef "q is %s" (pr-str (get site-args "q")))
                 q (assoc
                    (to-xt-query (get site-args "q"))
                    :in (vec (cond->> (map symbol (keys argument-values))
                               object-id (concat ['object]))))
-                _ (log/tracef "query is %s" (pr-str q))
                 results (for [[e] (apply
                                    xt/q db q (cond->> (vals argument-values)
                                                object-id (concat [object-id])))]
                           (xt/entity db e))]
+
+            (log/tracef "GraphQL results is %s" results)
+
             ;; If this isn't a list type, take the first
             (cond-> results
               (not (-> field ::g/type-ref ::g/list-type)) first))
@@ -245,7 +250,6 @@
                (str/join ", ")) "]")))
 
 (defn put-error-text-body [req]
-  (log/tracef "put-error-text-body: %d errors" (count (::errors req)))
   (cond
     (::errors req)
     (->>
@@ -264,7 +268,6 @@
     :errors (::errors req)}))
 
 (defn post-error-text-body [req]
-  (log/tracef "put-error-text-body: %d errors" (count (::errors req)))
   (->>
    (for [error (::errors req)]
      (cond-> (str \tab (:error error))
