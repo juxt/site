@@ -80,6 +80,19 @@ Start the Site server:
 $ site/bin/site-server
 ----
 
+=== Start multiple instances of the server
+
+If you require multiple Site servers to coexist on the same machine, you can start site passing a different configuration file as follows:
+
+----
+$ SITE_CONFIG=/absolute/path/custom-site-config.edn site/bin/site-server
+----
+
+In this case please be sure to change the configuration so ports are different and XTDB files are stored in a separate folder than the ones specified in the example configuration file. You'll also need to specify Site host:port when using site commands, for example:
+
+----
+$ SITE_BASE_URI=http://localhost:5509 site/bin/site get-token -u admin
+----
 
 === Bootstrap
 
@@ -132,16 +145,21 @@ Install the superuser role:
 site> (put-superuser-role!)
 ----
 
-Finally, create a superuser.
+Finally, create a superuser. If you have `pass` installed, this will fetch the password directly:
 
 ----
 site> (put-superuser! "admin" "Administrator")
 ----
 
-Replace `"admin"` and `"Administrator"` with your own username and full name.
+NOTE: We recommend that you generate a password with `pass`.
 
-NOTE: We recommend that you generate a password with `pass`, but if you haven't
-done so, you can add a password as a final argument to `put-superuser!`.
+If you don't have `pass` installed, you can add a password as a final argument to `put-superuser!`.
+
+----
+site> (put-superuser! "admin" "Administrator" "admin")
+----
+
+Replace `"admin"`, `"Administrator"` and `"admin"` with your own username, full name and password respectively.
 
 Quit the REPL, for example, with `Ctrl-C` or by typing `:repl/quit`.
 
