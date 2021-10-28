@@ -27,7 +27,8 @@
   https://github.com/juxt/aero for details."
   []
   (log/infof "Configuration profile: %s" (name profile))
-  (let [config-file (io/file (System/getProperty "user.home") ".config/site/config.edn")]
+  (let [config-file (or (io/file (System/getProperty "site.config"))
+                        (io/file (System/getProperty "user.home") ".config/site/config.edn"))]
     (when-not (.exists config-file)
       (log/error (str "Configuration file does not exist: " (.getAbsolutePath config-file)))
       (throw (ex-info
