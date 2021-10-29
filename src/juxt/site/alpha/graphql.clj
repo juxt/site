@@ -98,15 +98,24 @@
                    (to-xt-query (get site-args "q"))
                    :in (vec (cond->> (map symbol (keys argument-values))
                               object-id (concat ['object]))))
-                results (for [[e] (apply
-                                   xt/q db q (cond->> (vals argument-values)
-                                               object-id (concat [object-id])))]
-                          (xt/entity db e))]
 
-            (log/tracef "GraphQL results is %s" results)
+                results
+                (try
+                  (apply
+                   xt/q db q (cond->> (vals argument-values)
+                               object-id (concat [object-id])))
+                  (catch Exception e
+                    (throw (ex-info "Failure when running XT query"
+                                    {:query q}
+                                    e))))
+
+                result-entities (for [[e] results]
+                                  (xt/entity db e))]
+
+            (log/tracef "GraphQL results is %s" result-entities)
 
             ;; If this isn't a list type, take the first
-            (cond-> results
+            (cond-> result-entities
               (not (-> field ::g/type-ref ::g/list-type)) first))
 
           (get site-args "a")
