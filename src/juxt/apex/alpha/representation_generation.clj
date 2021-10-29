@@ -80,10 +80,13 @@
         resource-state
         (or
          (when query
-           (cond->> (x/q db query)
-             extract-first-projection? (map first)
-             extract-entry (map #(get % extract-entry))
-             singular-result? first))
+           (try
+             (cond->> (x/q db query)
+               extract-first-projection? (map first)
+               extract-entry (map #(get % extract-entry))
+               singular-result? first)
+             (catch Exception e
+               (throw (ex-info "Failure during XT query" {:query query} e)))))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
          ;; filter out the http metadata?
