@@ -11,7 +11,7 @@
 
 (def system nil)
 
-(def profile :prod)
+(def profile (or (keyword (System/getenv "PROFILE")) :prod))
 
 (let [lock (Object.)]
   (defn- load-namespaces
