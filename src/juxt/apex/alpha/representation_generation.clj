@@ -86,7 +86,7 @@
                extract-entry (map #(get % extract-entry))
                singular-result? first)
              (catch Exception e
-               (throw (ex-info "Failure during XT query" {:query query} e)))))
+               (throw (ex-info "Failure during XTDB query" {:query query} e)))))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
          ;; filter out the http metadata?

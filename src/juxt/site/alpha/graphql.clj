@@ -105,7 +105,7 @@
                    xt/q db q (cond->> (vals argument-values)
                                object-id (concat [object-id])))
                   (catch Exception e
-                    (throw (ex-info "Failure when running XT query"
+                    (throw (ex-info "Failure when running XTDB query"
                                     {:query q}
                                     e))))
 
