@@ -12,6 +12,12 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'rfc7230 (create-ns 'juxt.reap.alpha.rfc7230))
 
+(def whitelisted-nses
+  #{"juxt.site.alpha"
+    "juxt.pass.alpha"
+    "ring.request"
+    "ring.response"})
+
 ;; Representations of a 'request', useful for debugging
 (defn json-representation-of-request [req request-to-show]
   {::http/content-type "application/json"
@@ -21,6 +27,8 @@
    (fn [req]
      (-> (sorted-map)
          (into request-to-show)
+         (->> (filter (fn [[k v]]
+                        (contains? whitelisted-nses (namespace k)))))
          json/write-value-as-string
          (str "\r\n")
          (.getBytes)))
