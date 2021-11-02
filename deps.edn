@@ -13,6 +13,9 @@
         pro.juxt.crux/crux-rocksdb {:mvn/version "1.18.0"}
         pro.juxt.crux/crux-lucene {:mvn/version "1.18.0"}
 
+        ;; Tick
+        tick/tick {:mvn/version "0.5.0-RC4"}
+
         ;; Jetty
         ring/ring-jetty-adapter {:mvn/version "1.9.1"}
 
