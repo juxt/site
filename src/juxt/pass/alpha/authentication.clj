@@ -226,7 +226,7 @@
   roles and other credentials. The resource can be used to determine the
   particular Protection Space that it is part of, and the appropriate
   authentication scheme(s) for accessing the resource."
-  [{::site/keys [db] :as req}]
+  [{::site/keys [db base-uri] :as req}]
   ;; TODO: This might be where we also add the 'on-behalf-of' info
   (let [{access-token "access_token"}
         (some-> req
@@ -257,7 +257,7 @@
                     #"([^:]*):([^:]*)"
                     (String. (.decode (java.util.Base64/getDecoder) token68)))
 
-                   [user pwhash] (lookup-user db username)]
+                   [user pwhash] (lookup-user db base-uri username)]
 
                (when (and password pwhash (password/check password pwhash))
                  {::pass/user user
