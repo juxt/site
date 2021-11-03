@@ -853,7 +853,8 @@
                (map first)
                (filter #(str/starts-with? % base-uri)))
 
-          _ (log/infof "Triggers are %s" (pr-str triggers))
+          _ (when (not-empty triggers)
+              (log/infof "Triggers are %s" (pr-str triggers)))
 
           request-context
           {'subject subject
