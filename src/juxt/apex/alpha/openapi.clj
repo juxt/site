@@ -183,7 +183,7 @@
           'resource resource
           ;; might change to 'action' at
           ;; this point
-          'request (select-keys req [:ring.request/method :ring.request/path])
+          'request (select-keys req [:ring.request/method :ring.request/path ::site/base-uri])
           'environment {}
           'new-state new-resource-state})
 
@@ -446,7 +446,7 @@
        ::http/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.0.2"}
        ::site/put-fn put-openapi}))
 
-   (let [openapis (filter (comp util/starts-with-base-uri? first)
+   (let [openapis (filter (comp #(str/starts-with? % base-uri) first)
                           (x/q db '{:find [openapi-uri openapi]
                                     :where [[openapi-uri ::apex/openapi openapi]]}))
          matches

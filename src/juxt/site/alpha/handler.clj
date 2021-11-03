@@ -785,7 +785,7 @@
                      [:ring.request/headers :ring.request/method :ring.request/path
                       :ring.request/query :ring.request/protocol :ring.request/remote-addr
                       :ring.request/scheme :ring.request/server-name :ring.request/server-post
-                      :ring.request/ssl-client-cert])
+                      :ring.request/ssl-client-cert ::site/base-uri])
            'representation (dissoc resource ::http/body ::http/content)
            'environment {}}
 
@@ -842,16 +842,16 @@
   ;; Site-specific step: Check for any observers and 'run' them TODO:
   ;; Perhaps effects need to run against happy and sad paths - i.e. errors
   ;; - this should really be in a 'finally' block.
-  (fn [{::site/keys [crux-node] ::pass/keys [subject] :as req}]
+  (fn [{::site/keys [crux-node base-uri] ::pass/keys [subject] :as req}]
 
     (let [db (x/db crux-node) ; latest post-method db
           result (h req)
 
           triggers
-          (->>(x/q db '{:find [rule]
-                        :where [[rule ::site/type "Trigger"]]})
-              (map first)
-              (filter util/starts-with-base-uri?))
+          (->> (x/q db '{:find [rule]
+                         :where [[rule ::site/type "Trigger"]]})
+               (map first)
+               (filter #(str/starts-with? % base-uri)))
 
           _ (log/infof "Triggers are %s" (pr-str triggers))
 

@@ -6,7 +6,8 @@
    [clojure.tools.logging :as log]
    [crux.api :as crux]
    [juxt.site.alpha.util :as util]
-   [juxt.site.alpha.rules :as rules]))
+   [juxt.site.alpha.rules :as rules]
+   [clojure.string :as str]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
@@ -25,7 +26,7 @@
   ;; Map across each rule in the system (we can memoize later for
   ;; performance).
 
-  (let [
+  (let [base-uri (get-in request-context ['request ::site/base-uri])
         ;; TODO: But we should go through all policies, bring in their
         ;; attributes to merge into the target, then for each rule in the
         ;; policy... the apply rule-combining algo...
@@ -33,7 +34,7 @@
         rules (->> (crux/q db '{:find [rule]
                                 :where [[rule ::site/type "Rule"]]})
                    (map first)
-                   (filter util/starts-with-base-uri?))
+                   (filter #(str/starts-with? % base-uri)))
 
         ;;_ (log/debugf "Rules to match are %s" (pr-str rules))
 

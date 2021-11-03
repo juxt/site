@@ -8,9 +8,6 @@
 
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn starts-with-base-uri? [s]
-  (str/starts-with? s (::site/base-uri (config))))
-
 (defn assoc-when-some [m k v]
   (cond-> m v (assoc k v)))
 
