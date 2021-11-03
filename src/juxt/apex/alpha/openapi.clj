@@ -86,6 +86,30 @@
   ;; determine whether it is allowed in.
   received-representation)
 
+(defn pick-validation-failures
+  [{::jinx/keys [errors keyword schema valid? subschemas instance property] :as validation}]
+  (let [valid? (or (:valid? validation)
+                  (::jinx/valid? validation))
+        subschemas (or (:subschemas validation)
+                       (::jinx/subschemas validation))
+        instance (or (:instance validation)
+                     (::jinx/instance validation))]
+    (->> (cond
+           (and (not valid?)
+                (not-empty subschemas))
+           (->> (mapv pick-validation-failures subschemas)
+                (filterv some?)
+                (reduce concat))
+
+           (and (not valid?)
+                (empty? subschemas))
+           {:errors (map :message errors)
+            :property property
+            :schema schema
+            :keyword keyword
+            :instance instance
+            :valid? valid?}))))
+
 (defmethod received-body->resource-state "application/json"
   [{::site/keys [received-representation resource db] :as req}]
   (let [schema (get-in resource [::apex/operation "requestBody" "content"
@@ -114,6 +138,7 @@
               "Schema validation failed"
               (-> req
                   (into {:ring.response/status 400
+                         :ring.response/body (pick-validation-failures validation)
                          ::jinx/validation-results validation})))))
 
         validation (-> validation

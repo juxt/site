@@ -30,7 +30,8 @@
    [juxt.site.alpha.templating :as templating]
    juxt.site.alpha.selmer
    [juxt.site.alpha.triggers :as triggers]
-   [juxt.site.alpha.rules :as rules])
+   [juxt.site.alpha.rules :as rules]
+   [cheshire.core :as json])
   (:import (java.net URI)))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -1078,7 +1079,7 @@
       (h req)
       (catch clojure.lang.ExceptionInfo e
 
-        (let [{:ring.response/keys [status] :as ex-data} (ex-data e)]
+        (let [{:ring.response/keys [status body] :as ex-data} (ex-data e)]
 
           (log/tracef "status %s" status)
 
@@ -1119,6 +1120,11 @@
                    (some-> (negotiate-representation req error-representations)
                            ;; Content-Location is not appropriate for errors.
                            (dissoc ::http/content-location)))
+                 (when body
+                   (let [json-body (json/encode body)]
+                     {::http/content-type "application/json"
+                      ::http/content-length (count json-body)
+                      ::http/content json-body}))
                  (let [content (str (status-message status) "\r\n")]
                    {::http/content-type "text/plain;charset=utf-8"
                     ::http/content-length (count content)
