@@ -8,7 +8,6 @@
    [crux.api :as x]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.rfc7235 :as rfc7235]
-   [juxt.site.alpha.main :refer [config]]
    [ring.util.codec :refer [form-decode url-decode]]
    [ring.middleware.cookies :refer [cookies-request cookies-response]]))
 
@@ -101,12 +100,11 @@
 
 (defn lookup-user
   "Return a vector of user, pwhash"
-  [db username]
+  [db base-uri username]
   (when-not (and username (re-matches #"[\p{Alnum}-_]+" username))
     (throw (ex-info "Username not valid format" {})))
 
-  (let [{:juxt.site.alpha/keys [base-uri]} (config)
-        fq-username (str base-uri "/_site/users/" username)
+  (let [fq-username (str base-uri "/_site/users/" username)
         users (x/q db '{:find [r pwhash]
                         :where [[r ::site/type "User"]
                                 [r :crux.db/id fq-username]
@@ -122,7 +120,7 @@
     (first users)))
 
 (defn login-response
-  [{::site/keys [received-representation db resource start-date uri]
+  [{::site/keys [received-representation db resource start-date uri base-uri]
     :as req}]
 
   ;; Check grant_type of posted-representation
@@ -132,7 +130,7 @@
   (let [posted-body (String. (::http/body received-representation))
         form (form-decode posted-body)
         username (get form "user")
-        [user pwhash] (lookup-user db username)
+        [user pwhash] (lookup-user db base-uri username)
         password (get form "password")
         redirect (some-> (get form "_redirect") url-decode)]
     (or

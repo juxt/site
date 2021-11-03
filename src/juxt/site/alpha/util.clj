@@ -3,7 +3,6 @@
 (ns juxt.site.alpha.util
   (:require
    [clojure.string :as str]
-   [juxt.site.alpha.main :refer [config]]
    [taoensso.nippy.utils :refer [freezable?]]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
