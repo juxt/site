@@ -150,16 +150,27 @@
 ;; Start import at 00:35
 
 (defn resources-from-stream [in]
-  (let [record (edn/read {:eof :eof :readers {'juxt.site/base64 base64-reader}} in)]
-    (when (not= record :eof)
-      (cons record (lazy-seq (resources-from-stream in))))))
+  (let [record (try
+                 (edn/read
+                  {:eof :eof :readers {'juxt.site/base64 base64-reader}}
+                  in)
+                 (catch Exception e
+                   (prn "oh")))]
+    (cond
+      (nil? record)
+      (lazy-seq (resources-from-stream in))
+      (not= record :eof)
+      (cons record (lazy-seq (resources-from-stream in)))
+      :else
+      nil)))
 
 (defn import-resources []
   (let [node (crux-node)
         in (java.io.PushbackReader. (io/reader (io/input-stream (io/file "import/resources.edn"))))]
     (doseq [rec (resources-from-stream in)]
       (println "Importing record" (:crux.db/id rec))
-      (x/submit-tx node [[:crux.tx/put rec]]))
+      (when (:crux.db/id rec)
+        (x/submit-tx node [[:crux.tx/put rec]])))
     (x/sync node)
     (println "Import finished.")))
 
