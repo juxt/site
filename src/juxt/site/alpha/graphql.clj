@@ -136,6 +136,10 @@
           (let [f (force (get object-value field-name))]
             (if (fn? f) (f argument-values) f))
 
+          ;; If the key is 'id', we assume it should be translated to xt/id
+          (= "id" field-name)
+          (get object-value :crux.db/id)
+
           ;; Or simply try to extract the keyword
           (contains? object-value (keyword field-name))
           (get object-value (keyword field-name))
