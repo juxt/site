@@ -62,19 +62,19 @@
 
 (defn process-xt-results
   [field results]
-  (cond-> results
+  (if (-> field ::g/type-ref ::g/list-type)
+    results
     ;; If this isn't a list type, take the first
-    (not (-> field ::g/type-ref ::g/list-type)) first))
+    (first results)))
 
 (defn infer-query
-  [db field]
-  (let [type (-> field ::g/type-ref ::g/list-type ::g/name)
-        default-query '{:find [e]
+  [db type]
+  (let [default-query '{:find [e]
                         :in [type]
                         :where [[e :juxt.site.alpha/type type]]}
         results (for [[e] (xt/q db default-query type)]
                   (xt/entity db e))]
-    (process-xt-results field results)))
+    (or results (throw (ex-info "No resolver found for " type)))))
 
 (defn query [schema document operation-name crux-node db subject]
   (execute-request
@@ -126,10 +126,8 @@
 
                 result-entities (for [[e] results]
                                   (xt/entity db e))]
-
             (log/tracef "GraphQL results is %s" result-entities)
-
-            (process-xt-results field results))
+            (process-xt-results field result-entities))
 
           (get site-args "a")
           (let [att (get site-args "a")
@@ -157,8 +155,11 @@
           (contains? object-value (keyword field-name))
           (get object-value (keyword field-name))
 
+          (-> field ::g/type-ref ::g/list-type ::g/name)
+          (infer-query db (-> field ::g/type-ref ::g/list-type ::g/name))
+
           :else
-          (infer-query db field))))}))
+          (throw (ex-info "TODO" field-name)))))}))
 
 (defn post-handler [{::site/keys [uri crux-node db]
                      ::pass/keys [subject]
