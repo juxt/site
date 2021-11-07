@@ -58,7 +58,7 @@
                 (= ::http/content (first x)) (str (subs (second x) 0 80) "…")
                 :else (format "(%d bytes)" (count (second x))))]
              x))
-   (x/entity (db) (str/trim id))))
+   (x/entity (db) id)))
 
 (defn put! [& ms]
   (->>

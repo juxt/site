@@ -9,6 +9,7 @@
    [juxt.grab.alpha.execution :refer [execute-request]]
    [juxt.grab.alpha.parser :as parser]
    [clojure.string :as str]
+   [clojure.set :refer [rename-keys]]
    [crux.api :as xt]
    [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk]]
@@ -20,8 +21,25 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'g (create-ns 'juxt.grab.alpha.graphql))
 
-(defn to-xt-query [query]
-  (let [result
+(def default-query '{:find [e]
+                     :in [[type]]
+                     :where [[e :juxt.site/type type]]})
+
+(defn assoc-some
+  "Associates a key with a value in a map, if and only if the value is not nil."
+  ([m k v]
+   (if (or (nil? v) (false? v)) m (assoc m k v)))
+  ([m k v & kvs]
+   (reduce (fn [m [k v]] (assoc-some m k v))
+           (assoc-some m k v)
+           (partition 2 kvs))))
+
+(defn to-xt-query [args values]
+  (let [query (rename-keys
+               (or (get args "q") default-query)
+               ;; probably should do camelcase to kabab
+               {:order :order-by})
+        result
         (postwalk
          (fn [x]
            (cond-> x
@@ -30,9 +48,36 @@
              (and (map? x) (:set x))
              (-> (get :set) set)
              (and (map? x) (:edn x))
-             (-> (get :edn) edn/read-string)
-             ))
-         query)]
+             (-> (get :edn) edn/read-string)))
+         query)
+        #_#_order (try
+                (edn/read-string (get values "orderBy"))
+                (catch Exception e
+                  (prn "Invalid order, must be edn readable"
+                       {:input (get values "orderBy")})))
+        limit (get values "limit")
+        offset (get values "offset")
+        search-terms (get values "searchTerms")
+        search-where-clauses
+        (and (every? seq (vals search-terms))
+             (apply concat
+                    (for [[key val] search-terms
+                          :let [key-symbol (symbol key)
+                                val (re-pattern (str "(?i)"  val))]]
+                      [['e key key-symbol]
+                       [`(re-find ~val ~key-symbol)]])))
+        result (assoc-some
+                result
+                :where (and search-where-clauses
+                            (vec (concat (:where result) search-where-clauses)))
+                ;; xt does limit before search which means we can't limit or
+                ;; offset if we're also trying to search....
+                :limit (when (and (not search-terms)
+                                  (pos-int? limit))
+                         limit)
+                :offset (when (and (not search-terms)
+                                   (pos-int? offset))
+                          offset))]
     result))
 
 (defn generate-value [{:keys [type pathPrefix]}]
@@ -66,14 +111,26 @@
     ;; If this isn't a list type, take the first
     (first results)))
 
+(defn limit-results
+  "Needs to be done when we can't use xt's built in limit/offset"
+  [args results]
+  (let [result-count (count results)
+        limit (get args "limit" result-count)]
+    (if (or (get args "searchTerms") (> result-count limit))
+      (take limit (drop (get args "offset" 0) results))
+      results)))
+
 (defn infer-query
-  [db type]
-  (let [default-query '{:find [e]
-                        :in [type]
-                        :where [[e :juxt.site.alpha/type type]]}
-        results (for [[e] (xt/q db default-query type)]
+  [db field query args]
+  (let [type (-> field
+                 ::g/type-ref
+                 ::g/list-type
+                 ::g/name)
+        limited-results (limit-results args (xt/q db query [type]))
+        results (for [[e] limited-results]
                   (xt/entity db e))]
-    (or results (throw (ex-info "No resolver found for " type)))))
+    (or (process-xt-results field results)
+        (throw (ex-info "No resolver found for " type)))))
 
 (defn protected-lookup [e subject db]
   (let [lookup #(xt/entity db %)
@@ -116,6 +173,9 @@
     :document document
     :operation-name operation-name
     :variable-values variable-values
+    :abstract-type-resolver
+    (fn [{:keys [object-value]}]
+      (:juxt.site/type object-value))
     :field-resolver
     (fn [{:keys [object-type object-value field-name argument-values] :as field-resolver-args}]
 
@@ -126,6 +186,7 @@
             mutation? (=
                        (get-in schema [::schema/root-operation-type-names :mutation])
                        (::g/name object-type))]
+
         (cond
           mutation?
           (let [object-to-put (args-to-entity argument-values field)]
@@ -143,32 +204,27 @@
 
           (get site-args "q")
           (let [object-id (:crux.db/id object-value)
+                arg-keys (fn [m] (remove #{"limit" "offset" "orderBy"} (keys m)))
                 q (assoc
-                   (to-xt-query (get site-args "q"))
-                   :in (vec (cond->> (map symbol (keys argument-values))
+                   (to-xt-query site-args argument-values)
+                   :in (vec (cond->> (map symbol (arg-keys argument-values))
                               object-id (concat ['object]))))
-
-                _ (log/tracef
-                   "XT query is %s, args are %s"
-                   (pr-str q)
-                   (cond->> (vals argument-values)
-                     object-id (concat [object-id])))
-
+                query-args (cond->> (vals argument-values)
+                             object-id (concat [object-id]))
                 results
                 (try
-                  (apply
-                   xt/q db q (cond->> (vals argument-values)
-                               object-id (concat [object-id])))
+                  (xt/q db q (first query-args))
                   (catch Exception e
                     (throw (ex-info "Failure when running XTDB query"
-                                    {:query q}
+                                    {:message (ex-message e)
+                                     :query q
+                                     :args query-args}
                                     e))))
-
-                result-entities
-                (for [[e] results]
-                  (protected-lookup e subject db))]
-
-            (log/tracef "GraphQL results is %s" (seq result-entities))
+                limited-results (limit-results argument-values results)
+                result-entities (for [[e] limited-results]
+                                  (assoc (protected-lookup e subject db)
+                                         :juxt.site/query q))]
+            (log/tracef "GraphQL results is %s" result-entities)
             (process-xt-results field result-entities))
 
           (get site-args "a")
@@ -200,13 +256,27 @@
 
           ;; Or simply try to extract the keyword
           (contains? object-value (keyword field-name))
-          (get object-value (keyword field-name))
+          (let [result (get object-value (keyword field-name))]
+            (if (-> field ::g/type-ref ::g/list-type)
+              (limit-results argument-values result)
+              result))
 
           (-> field ::g/type-ref ::g/list-type ::g/name)
-          (infer-query db (-> field ::g/type-ref ::g/list-type ::g/name))
+          (infer-query db
+                       field
+                       (to-xt-query site-args argument-values)
+                       argument-values)
+
+          (get argument-values "id")
+          (xt/entity db (get argument-values "id"))
+
+          (and (get site-args "aggregate")
+               (get site-args "type"))
+          (case (get site-args "aggregate")
+            "count" (count (xt/q db (to-xt-query site-args argument-values) [(get site-args "type")])))
 
           :else
-          (throw (ex-info "TODO" field-name)))))}))
+          (throw (ex-info "TODO: Add Resolver" field-resolver-args)))))}))
 
 (defn post-handler [{::site/keys [uri crux-node db]
                      ::pass/keys [subject]

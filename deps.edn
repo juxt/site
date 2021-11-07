@@ -12,6 +12,7 @@
         pro.juxt.crux/crux-core {:mvn/version "1.18.0"}
         pro.juxt.crux/crux-rocksdb {:mvn/version "1.18.0"}
         pro.juxt.crux/crux-lucene {:mvn/version "1.18.0"}
+        pro.juxt.crux/crux-http-server {:mvn/version "1.18.0"}
 
         ;; Jetty
         ring/ring-jetty-adapter {:mvn/version "1.9.1"}
