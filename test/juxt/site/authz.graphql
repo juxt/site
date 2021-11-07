@@ -1,0 +1,11 @@
+schema {
+  query: Query
+}
+
+type Query {
+  thing: Thing @site(e: "https://example.org/thing")
+}
+
+type Thing {
+  secret: String
+}
