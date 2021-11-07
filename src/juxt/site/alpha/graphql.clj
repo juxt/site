@@ -76,6 +76,28 @@
                   (xt/entity db e))]
     (process-xt-results field results)))
 
+(defn protected-lookup [e subject db]
+  (let [lookup #(xt/entity db %)
+        ent (lookup e)]
+    (if-let [ent-ns (::pass/namespace ent)]
+      (let [rules (some-> ent-ns lookup ::pass/rules)
+            acls (->>
+                  (xt/q
+                   db
+                   {:find ['(pull ?acl [*])]
+                    :where '[[?acl ::pass/type "ACL"]
+                             (check ?acl ?subject ?e)]
+                    :rules rules
+                    :in '[?subject ?e]}
+                   subject e)
+                  (map first))]
+        (when (seq acls)
+          ;; TODO: Also use the ACL to infer when/whether to select-keys
+          ent))
+
+      ;; Return unprotected ent
+      ent)))
+
 (defn query [schema document operation-name crux-node db subject]
   (execute-request
    {:schema schema
@@ -104,8 +126,8 @@
 
           ;; Direct lookup - useful query roots
           (get site-args "e")
-          (let [att (get site-args "e")]
-            (lookup-entity att))
+          (let [e (get site-args "e")]
+            (protected-lookup e subject db))
 
           (get site-args "q")
           (let [object-id (:crux.db/id object-value)
@@ -124,8 +146,9 @@
                                     {:query q}
                                     e))))
 
-                result-entities (for [[e] results]
-                                  (xt/entity db e))]
+                result-entities
+                (for [[e] results]
+                  (protected-lookup e subject db))]
 
             (log/tracef "GraphQL results is %s" result-entities)
 
@@ -135,11 +158,14 @@
           (let [att (get site-args "a")
                 val (get object-value (keyword att))]
             (if (= field-kind 'OBJECT)
-              (lookup-entity val)
+              (protected-lookup val subject db)
               val))
 
+          ;; The use of a resolver should be a privileged operation, since it
+          ;; has the potential to bypass access control.
           (get site-args "resolver")
           (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
+            ;; Resolvers need to do their own access control
             (resolver (assoc field-resolver-args ::pass/subject subject :db db)))
 
           ;; Another strategy is to see if the field indexes the
@@ -184,13 +210,14 @@
                                                     (dissoc :juxt.pass.alpha/request-context)))))
         document
         (try
-          (let [document
-                (try
-                  (parser/parse document-str)
-                  (catch Exception e
-                    (log/error e "Error parsing GraphQL query")
-                    (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]}))))]
-            (document/compile-document document schema))
+          (parser/parse document-str)
+          (catch Exception e
+            (log/error e "Error parsing GraphQL query")
+            (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]}))))
+
+        compiled-document
+        (try
+          (document/compile-document document schema)
           (catch Exception e
             (log/error e "Error parsing or compiling GraphQL query")
             (let [errors (:errors (ex-data e))]
@@ -204,7 +231,7 @@
                    (seq errors) (assoc ::errors errors)))
                 e)))))
 
-        results (query schema document operation-name crux-node db subject)]
+        results (query schema compiled-document operation-name crux-node db subject)]
 
     (-> req
         (assoc
@@ -213,13 +240,16 @@
          (json/write-value-as-string results))
         (update :ring.response/headers assoc "content-type" "application/json"))))
 
-(defn put-schema [crux-node resource schema-str]
+(defn schema-resource [resource schema-str]
   (let [schema (schema/compile-schema (parser/parse schema-str))]
-    (xt/await-tx
-     crux-node
-     (xt/submit-tx
-      crux-node
-      [[:crux.tx/put (assoc resource ::grab/schema schema ::http/body (.getBytes schema-str))]]))))
+    (assoc resource ::grab/schema schema ::http/body (.getBytes schema-str))))
+
+(defn put-schema [crux-node resource schema-str]
+  (xt/await-tx
+   crux-node
+   (xt/submit-tx
+    crux-node
+    [[:crux.tx/put (schema-resource resource schema-str)]])))
 
 (defn put-handler [{::site/keys [uri db crux-node] :as req}]
   (let [schema-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
