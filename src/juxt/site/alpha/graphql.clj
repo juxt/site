@@ -62,12 +62,19 @@
         (and (every? seq (vals search-terms))
              (apply concat
                     (for [[key val] search-terms
-                          :let [key-symbol (symbol key)
-                                val (re-pattern (str "(?i)"  val))]]
-                      [['e key key-symbol]
-                       [`(re-find ~val ~key-symbol)]])))
+                          :let [key-symbol (keyword key)
+                                val (str/join " "
+                                              (map (fn [s] (str s "*"))
+                                                   (str/split val #" ")))
+                                _ (def val val)]]
+                      [[`(~(symbol "text-search")
+                          ~key-symbol
+                          ~val)
+                        '[[e v s]]]])))
         result (assoc-some
                 result
+                :find (and search-terms '[e v s])
+                :order-by (and search-terms '[[s :desc]])
                 :where (and search-where-clauses
                             (vec (concat (:where result) search-where-clauses)))
                 ;; xt does limit before search which means we can't limit or
@@ -111,27 +118,6 @@
     ;; If this isn't a list type, take the first
     (first results)))
 
-(defn limit-results
-  "Needs to be done when we can't use xt's built in limit/offset"
-  [args results]
-  (let [result-count (count results)
-        limit (get args "limit" result-count)]
-    (if (or (get args "searchTerms") (> result-count limit))
-      (take limit (drop (get args "offset" 0) results))
-      results)))
-
-(defn infer-query
-  [db field query args]
-  (let [type (-> field
-                 ::g/type-ref
-                 ::g/list-type
-                 ::g/name)
-        limited-results (limit-results args (xt/q db query [type]))
-        results (for [[e] limited-results]
-                  (xt/entity db e))]
-    (or (process-xt-results field results)
-        (throw (ex-info "No resolver found for " type)))))
-
 (defn protected-lookup [e subject db]
   (let [lookup #(xt/entity db %)
         ent (lookup e)]
@@ -155,6 +141,33 @@
 
       ;; Return unprotected ent
       ent)))
+
+(defn limit-results
+  "Needs to be done when we can't use xt's built in limit/offset"
+  [args results]
+  (let [result-count (count results)
+        limit (get args "limit" result-count)]
+    (if (or (get args "searchTerms") (> result-count limit))
+      (take limit (drop (get args "offset" 0) results))
+      results)))
+
+(defn pull-entities
+  [db subject results query]
+  (for [[e _ score?] results]
+    (assoc-some (protected-lookup e subject db)
+                :luceneScore (and (number? score?) score?)
+                :xtQuery (pr-str query))))
+
+(defn infer-query
+  [db subject field query args]
+  (let [type (-> field
+                 ::g/type-ref
+                 ::g/list-type
+                 ::g/name)
+        limited-results (limit-results args (xt/q db query [type]))
+        results (pull-entities db subject limited-results query)]
+    (or (process-xt-results field results)
+        (throw (ex-info "No resolver found for " type)))))
 
 (defn traverse [object-value atts subject db]
   (if (seq atts)
@@ -221,9 +234,7 @@
                                      :args query-args}
                                     e))))
                 limited-results (limit-results argument-values results)
-                result-entities (for [[e] limited-results]
-                                  (assoc (protected-lookup e subject db)
-                                         :juxt.site/query q))]
+                result-entities (pull-entities db subject limited-results q)]
             (log/tracef "GraphQL results is %s" result-entities)
             (process-xt-results field result-entities))
 
@@ -263,6 +274,7 @@
 
           (-> field ::g/type-ref ::g/list-type ::g/name)
           (infer-query db
+                       subject
                        field
                        (to-xt-query site-args argument-values)
                        argument-values)
