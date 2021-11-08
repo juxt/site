@@ -64,13 +64,22 @@
         ;; internal Nippy function. This is provided by later versions of XT, so
         ;; we can remove this entry once an upgrade has been achieved.
         pro.juxt.clojars-mirrors.com.taoensso/nippy {:mvn/version "3.1.1"}
+
+
         }
 
  :aliases
  {:dev
   {:extra-paths ["dev" "test"]
+   :extra-deps { ;; Convenience libraries made available during development
+                tick/tick {:mvn/version "0.5.0-RC4"}
+
+                org.clojure/test.check {:mvn/version "0.9.0"}
+                org.clojure/alpha.spec {:git/url "https://github.com/clojure/spec-alpha2.git"
+                                        :sha "c087ded910b3532a938b37e853df79fc3b9c48c1"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
-              "-Dclojure.server.site={:port,50505,:accept,juxt.site.alpha.repl-server/repl}"]}
+              "-Dclojure.server.site={:port,50505,:accept,juxt.site.alpha.repl-server/repl}"
+              "-Dclojure.spec.check-asserts=true"]}
 
   :test
   {:extra-paths ["dev" "test"]
