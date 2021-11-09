@@ -65,8 +65,7 @@
                           :let [key-symbol (keyword key)
                                 val (str/join " "
                                               (map (fn [s] (str s "*"))
-                                                   (str/split val #" ")))
-                                _ (def val val)]]
+                                                   (str/split val #" ")))]]
                       [[`(~(symbol "text-search")
                           ~key-symbol
                           ~val)
@@ -79,11 +78,8 @@
                             (vec (concat (:where result) search-where-clauses)))
                 ;; xt does limit before search which means we can't limit or
                 ;; offset if we're also trying to search....
-                :limit (when (and (not search-terms)
-                                  (pos-int? limit))
-                         limit)
-                :offset (when (and (not search-terms)
-                                   (pos-int? offset))
+                :limit limit
+                :offset (when (pos-int? offset)
                           offset))]
     result))
 
@@ -164,8 +160,7 @@
                  ::g/type-ref
                  ::g/list-type
                  ::g/name)
-        limited-results (limit-results args (xt/q db query [type]))
-        results (pull-entities db subject limited-results query)]
+        results (pull-entities db (xt/q db query [type]) query)]
     (or (process-xt-results field results)
         (throw (ex-info "No resolver found for " type)))))
 
