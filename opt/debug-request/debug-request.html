@@ -1,5 +1,40 @@
 <body>
-  <h1>Debug request</h1>
+  <h1>Site Request Information</h1>
+
+  <p>This is a dump of information gathered for a <strong><tt>{{ ring..request/method|name|upper }}</tt></strong> request that was made to <tt>{{ juxt..site..alpha/uri }}</tt> at <tt>{{ juxt..site..alpha/date|date:"yyyy-MM-dd HH:mm:ss" }}</tt>.<p>
+  <p>After {{ juxt..site..alpha/duration-millis }}ms a response was returned with the status code {{ ring..response/status }}.</p>
+
+  {% if juxt..site..alpha/error %}
+  <h2>Error</h2>
+  <div>
+    <code>{{ juxt..site..alpha/error }}</code>
+
+  {% if juxt..site..alpha/error-stack-trace %}
+  <pre>
+{% for el in juxt..site..alpha/error-stack-trace %}{{ el }}
+{% endfor %}
+  </pre>
+  {% endif %}
+  </div>
+  {% endif %}
+
+  <h2>Summary</h2>
+
+  <table>
+    <tbody>
+      <tr>
+        <td>Status</td><td><tt>{{ ring..response/status }}</tt></td>
+      </tr>
+      <tr>
+        <td>Date</td><td><tt>{{ juxt..site..alpha/date }}</tt></td>
+      </tr>
+      <tr>
+        <td>URI</td><td><tt>{{ juxt..site..alpha/uri }}</tt></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>All data</h2>
 
   {% debug %}
 
