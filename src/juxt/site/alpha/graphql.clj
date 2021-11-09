@@ -283,7 +283,7 @@
             "count" (count (xt/q db (to-xt-query site-args argument-values) [(get site-args "type")])))
 
           :else
-          (throw (ex-info "TODO: Add Resolver" field-resolver-args)))))}))
+          (or (get site-args "defaultValue") ""))))}))
 
 (defn post-handler [{::site/keys [uri crux-node db]
                      ::pass/keys [subject]
