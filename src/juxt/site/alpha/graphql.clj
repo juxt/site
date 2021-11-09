@@ -175,6 +175,25 @@
               subject db)
     object-value))
 
+(defn await-tx
+  [crux-node tx]
+  (def tx tx)
+  (xt/await-tx
+   crux-node
+   (xt/submit-tx
+    crux-node
+    [tx])))
+
+(defn xt-delete
+  [id]
+  [:crux.tx/delete id])
+
+(defn xt-put
+  [object]
+  (and (nil? (:crux.db/id object))
+       (throw (ex-info "Trying to put object without xt id" {:object object})))
+  [:crux.tx/put object])
+
 (defn query [schema document operation-name variable-values crux-node db subject]
   (execute-request
    {:schema schema
@@ -197,13 +216,28 @@
 
         (cond
           mutation?
-          (let [object-to-put (args-to-entity argument-values field)]
-            (xt/await-tx
-             crux-node
-             (xt/submit-tx
-              crux-node
-              [[:crux.tx/put object-to-put]]))
-            object-to-put)
+          (let [action (or (get site-args "mutation") "put")]
+            (case action
+              "delete"
+              (let [id (get argument-values "id")
+                    _validate-id (or id (throw (ex-info "Delete mutations need an 'id' key"
+                                                        {:arg-values argument-values})))]
+                (await-tx crux-node (xt-delete id)))
+              "put"
+              (let [object-to-put (args-to-entity argument-values field)
+                    type (-> field ::g/type-ref ::g/name)
+                    _validate-type (and (nil? type)
+                                        (throw (ex-info "Couldn't infer type" {:field field})))
+                    object-to-put
+                    (assoc object-to-put
+                           :crux.db/id (or (:crux.db/id object-to-put)
+                                           (:id object-to-put)
+                                           (generate-value
+                                            {:type true
+                                             :pathPrefix type}))
+                           :juxt.site/type type)]
+                (await-tx crux-node (xt-put object-to-put))
+                object-to-put)))
 
           ;; Direct lookup - useful query roots
           (get site-args "e")
