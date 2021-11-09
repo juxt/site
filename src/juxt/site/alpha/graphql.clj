@@ -14,7 +14,8 @@
    [crux.api :as xt]
    [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk]]
-   [clojure.edn :as edn]))
+   [clojure.edn :as edn]
+   [tick.core :as t]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -204,7 +205,15 @@
             field-kind (-> field ::g/type-ref ::g/name types-by-name ::g/kind)
             mutation? (=
                        (get-in schema [::schema/root-operation-type-names :mutation])
-                       (::g/name object-type))]
+                       (::g/name object-type))
+            db (if (and (not mutation?)
+                        (get argument-values "asOf"))
+                 (xt/db crux-node (-> argument-values
+                                      (get "asOf")
+                                      t/date-time
+                                      t/inst))
+                 db)
+            lookup-entity (fn [id] (xt/entity db id))]
 
         (cond
           mutation?
