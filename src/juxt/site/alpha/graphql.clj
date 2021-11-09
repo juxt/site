@@ -51,8 +51,9 @@
         limit (get values "limit")
         offset (get values "offset")
         search-terms (get values "searchTerms")
+        search? (not (every? empty? (vals search-terms)))
         search-where-clauses
-        (and (every? seq (vals search-terms))
+        (and search?
              (apply concat
                     (for [[key val] search-terms
                           :let [key-symbol (keyword key)
@@ -65,8 +66,8 @@
                         '[[e v s]]]])))
         result (assoc-some
                 result
-                :find (and search-terms '[e v s])
-                :order-by (and search-terms '[[s :desc]])
+                :find (and search? '[e v s])
+                :order-by (and search? '[[s :desc]])
                 :where (and search-where-clauses
                             (vec (concat (:where result) search-where-clauses)))
                 ;; xt does limit before search which means we can't limit or
@@ -80,25 +81,51 @@
   (when type
     (str pathPrefix (java.util.UUID/randomUUID))))
 
-(defn args-to-entity [args field]
-  (reduce
-   (fn [acc arg-def]
-     (let [generator-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "gen"])
-           kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])]
-       (cond
-         (::g/name arg-def) ; is it a singular (not a NON_NULL or LIST)
-         (let [val (or (get args (::g/name arg-def))
-                       (generate-value generator-args))
-               ;; Change a symbol value into a string
+(defn scalar? [arg-name]
+  (#{"int" "float" "string" "boolean" "id"} (str/lower-case arg-name)))
 
-               ;; We don't want symbols in XT entities, because this leaks the
-               ;; form-plane into the data-plane!
-               val (cond-> val (symbol? val) str)]
-           (cond-> acc
-             (some? val) (assoc (keyword (or kw (::g/name arg-def))) val)))
-         :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
-   {}
-   (::g/arguments-definition field)))
+(defn args-to-entity
+  ([args field] (args-to-entity args field nil))
+  ([args field old-value]
+   (let [entity
+         (reduce
+          (fn [acc arg-def]
+            (let [generator-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "gen"])
+                  kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])
+                  arg-name (::g/name arg-def)
+                  type-ref (::g/type-ref arg-def)
+                  arg-type (or (::g/name type-ref)
+                               (-> type-ref ::g/non-null-type ::g/name))]
+              (cond
+                arg-type ; is it a singular (not a LIST)
+                (let [val (or (get args (::g/name arg-def))
+                              ;; TODO: default value?
+                              (generate-value generator-args))
+                      ;; Change a symbol value into a string
+
+                      ;; We don't want symbols in XT entities, because this leaks the
+                      ;; form-plane into the data-plane!
+                      val (cond-> val (symbol? val) str)]
+                  (cond
+                    (or kw (scalar? arg-type)) (assoc acc (keyword (or kw arg-name)) val)
+                    :else (merge acc val)))
+                :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
+          (or old-value {})
+          (::g/arguments-definition field))
+         type (-> field ::g/type-ref ::g/name)
+         _validate-type (and (nil? type)
+                             (throw (ex-info "Couldn't infer type" {:field field})))]
+     (-> entity
+         (assoc
+          :crux.db/id (or
+                       (:crux.db/id old-value)
+                       (:crux.db/id entity)
+                       (:id entity)
+                       (generate-value
+                        {:type true
+                         :pathPrefix type}))
+          :juxt.site/type type)
+         (dissoc :id)))))
 
 (defn process-xt-results
   [field results]
@@ -170,7 +197,6 @@
 
 (defn await-tx
   [crux-node tx]
-  (def tx tx)
   (xt/await-tx
    crux-node
    (xt/submit-tx
@@ -197,8 +223,8 @@
     (fn [{:keys [object-value]}]
       (:juxt.site/type object-value))
     :field-resolver
-    (fn [{:keys [object-type object-value field-name argument-values] :as field-resolver-args}]
-
+    (fn [{:keys [object-type object-value field-name argument-values]
+          :as field-resolver-args}]
       (let [types-by-name (::schema/types-by-name schema)
             field (get-in object-type [::schema/fields-by-name field-name])
             site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
@@ -217,26 +243,24 @@
 
         (cond
           mutation?
-          (let [action (or (get site-args "mutation") "put")]
+          (let [action (or (get site-args "mutation") "put")
+                validate-id! (fn [args]
+                               (let [id (get args "id")]
+                                 (or id (throw (ex-info "Delete mutations need an 'id' key"
+                                                        {:arg-values argument-values})))))]
             (case action
               "delete"
-              (let [id (get argument-values "id")
-                    _validate-id (or id (throw (ex-info "Delete mutations need an 'id' key"
-                                                        {:arg-values argument-values})))]
-                (await-tx crux-node (xt-delete id)))
+              (let [id (validate-id! argument-values)]
+                (await-tx crux-node (xt-delete id))
+                (lookup-entity id))
               "put"
-              (let [object-to-put (args-to-entity argument-values field)
-                    type (-> field ::g/type-ref ::g/name)
-                    _validate-type (and (nil? type)
-                                        (throw (ex-info "Couldn't infer type" {:field field})))
-                    object-to-put
-                    (assoc object-to-put
-                           :crux.db/id (or (:crux.db/id object-to-put)
-                                           (:id object-to-put)
-                                           (generate-value
-                                            {:type true
-                                             :pathPrefix type}))
-                           :juxt.site/type type)]
+              (let [object-to-put (args-to-entity argument-values field nil)]
+                (await-tx crux-node (xt-put object-to-put))
+                object-to-put)
+              "update"
+              (let [id (validate-id! argument-values)
+                    old-value (lookup-entity id)
+                    object-to-put (args-to-entity argument-values field old-value)]
                 (await-tx crux-node (xt-put object-to-put))
                 object-to-put)))
 
