@@ -8,6 +8,7 @@
    [jsonista.core :as json]
    [juxt.grab.alpha.execution :refer [execute-request]]
    [juxt.grab.alpha.parser :as parser]
+   [juxt.site.alpha.util :refer [assoc-some]]
    [clojure.string :as str]
    [clojure.set :refer [rename-keys]]
    [crux.api :as xt]
@@ -24,15 +25,6 @@
 (def default-query '{:find [e]
                      :in [[type]]
                      :where [[e :juxt.site/type type]]})
-
-(defn assoc-some
-  "Associates a key with a value in a map, if and only if the value is not nil."
-  ([m k v]
-   (if (or (nil? v) (false? v)) m (assoc m k v)))
-  ([m k v & kvs]
-   (reduce (fn [m [k v]] (assoc-some m k v))
-           (assoc-some m k v)
-           (partition 2 kvs))))
 
 (defn to-xt-query [args values]
   (let [query (rename-keys
