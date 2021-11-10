@@ -1,7 +1,7 @@
 <body>
-  <h1>Site Request Information</h1>
+  <h1>Site: Request Data</h1>
 
-  <p>This is a dump of information gathered for a <strong><tt>{{ ring..request/method|name|upper }}</tt></strong> request that was made to <tt>{{ juxt..site..alpha/uri }}</tt> at <tt>{{ juxt..site..alpha/date|date:"yyyy-MM-dd HH:mm:ss" }}</tt>.<p>
+  <p>This is a dump of data gathered for a <strong><tt>{{ ring..request/method|name|upper }}</tt></strong> request that was made to <tt>{{ juxt..site..alpha/uri }}</tt> at <tt>{{ juxt..site..alpha/date|date:"yyyy-MM-dd HH:mm:ss" }}</tt>.<p>
   <p>After {{ juxt..site..alpha/duration-millis }}ms a response was returned with the status code {{ ring..response/status }}.</p>
 
   {% if juxt..site..alpha/error %}
