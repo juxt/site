@@ -16,7 +16,7 @@
 (alias 'grab (create-ns 'juxt.grab.alpha))
 
 (defn template-model
-  [{::site/keys [crux-node db resource]
+  [{::site/keys [crux-node db resource selected-representation]
     ::pass/keys [subject] :as req}
    {graphql-schema-id ::site/graphql-schema
     :as stored-document-entity}]
@@ -26,7 +26,7 @@
   (let [graphql-query-bytes (::http/body stored-document-entity)
         _ (assert graphql-query-bytes (pr-str stored-document-entity))
 
-        operation-name (:juxt.site.alpha/graphql-operation-name resource)
+        operation-name (:juxt.site.alpha/graphql-operation-name selected-representation)
 
         graphql-query (String. graphql-query-bytes "UTF-8")
 
