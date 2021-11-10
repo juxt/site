@@ -64,4 +64,4 @@
     (assert graphql-query)
     (log/debugf "Executing GraphQL query for template: %s" graphql-query)
     ;; TODO: How to communicate back if there are any errors? Throw an exception?
-    (:data (graphql/query schema document operation-name crux-node db subject))))
+    (:data (graphql/query schema document operation-name {} crux-node db subject))))

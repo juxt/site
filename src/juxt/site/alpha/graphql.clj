@@ -35,7 +35,7 @@
          query)]
     result))
 
-(defn generate-value [{:keys [type pathPrefix] :as m}]
+(defn generate-value [{:keys [type pathPrefix]}]
   (when type
     (str pathPrefix (java.util.UUID/randomUUID))))
 
@@ -92,7 +92,9 @@
                   (map first))]
         (when (seq acls)
           ;; TODO: Also use the ACL to infer when/whether to select-keys
-          ent))
+          ;;(select-keys ent (apply concat (map :keys acls)))
+          ent
+          ))
 
       ;; Return unprotected ent
       ent)))
@@ -251,7 +253,7 @@
                    (seq errors) (assoc ::errors errors)))
                 e)))))
 
-        results (query schema compiled-document operation-name crux-node db subject)]
+        results (query schema compiled-document operation-name {} crux-node db subject)]
 
     (-> req
         (assoc
@@ -436,6 +438,7 @@
         document-str (String. (::http/body resource) "UTF-8")
         document (document/compile-document (parser/parse document-str) schema)
         results (query schema document operation-name
+                       {}
                        nil ;; for crux-node, so we prevent get updates
                        db
                        subject)]
