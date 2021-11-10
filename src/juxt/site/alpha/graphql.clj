@@ -97,11 +97,23 @@
       ;; Return unprotected ent
       ent)))
 
-(defn query [schema document operation-name crux-node db subject]
+(defn traverse [object-value atts subject db]
+  (if (seq atts)
+    (traverse (get
+               (if (string? object-value)
+                 (protected-lookup object-value subject db)
+                 object-value)
+               (keyword (first atts)))
+              (rest atts)
+              subject db)
+    object-value))
+
+(defn query [schema document operation-name variable-values crux-node db subject]
   (execute-request
    {:schema schema
     :document document
     :operation-name operation-name
+    :variable-values variable-values
     :field-resolver
     (fn [{:keys [object-type object-value field-name argument-values] :as field-resolver-args}]
 
@@ -109,7 +121,6 @@
             field (get-in object-type [::schema/fields-by-name field-name])
             site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
             field-kind (-> field ::g/type-ref ::g/name types-by-name ::g/kind)
-            lookup-entity (fn [id] (xt/entity db id))
             mutation? (=
                        (get-in schema [::schema/root-operation-type-names :mutation])
                        (::g/name object-type))]
@@ -135,6 +146,12 @@
                    :in (vec (cond->> (map symbol (keys argument-values))
                               object-id (concat ['object]))))
 
+                _ (log/tracef
+                   "XT query is %s, args are %s"
+                   (pr-str q)
+                   (cond->> (vals argument-values)
+                     object-id (concat [object-id])))
+
                 results
                 (try
                   (apply
@@ -149,12 +166,14 @@
                 (for [[e] results]
                   (protected-lookup e subject db))]
 
-            (log/tracef "GraphQL results is %s" result-entities)
+            (log/tracef "GraphQL results is %s" (seq result-entities))
             (process-xt-results field result-entities))
 
           (get site-args "a")
           (let [att (get site-args "a")
-                val (get object-value (keyword att))]
+                val (if (vector? att)
+                      (traverse object-value att subject db)
+                      (get object-value (keyword att)))]
             (if (= field-kind 'OBJECT)
               (protected-lookup val subject db)
               val))
