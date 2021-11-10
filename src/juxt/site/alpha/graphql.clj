@@ -272,7 +272,7 @@
     (try
       (put-schema crux-node resource schema-str)
       (assoc req :ring.response/status 204)
-      (catch clojure.lang.ExceptionInfo e
+      (catch Exception e
         (let [errors (:errors (ex-data e))]
           (if (seq errors)
             (do
