@@ -155,7 +155,7 @@
                   {:eof :eof :readers {'juxt.site/base64 base64-reader}}
                   in)
                  (catch Exception e
-                   (prn "oh")))]
+                   (prn (.getMessage e))))]
     (cond
       (nil? record)
       (lazy-seq (resources-from-stream in))
