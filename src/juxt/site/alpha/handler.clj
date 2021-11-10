@@ -1098,13 +1098,15 @@
   "Return a collection of errors with their messages and causes"
   [e]
   (let [cause (.getCause e)]
-    (cond->
-        {:message (.getMessage e)
-         :stack (.getStackTrace e)}
-        (and
-         (instance? clojure.lang.ExceptionInfo e)
-         (nil? (::site/start-date (ex-data e)))) (assoc :ex-data (ex-data e))
-        cause (assoc :cause (errors-with-causes cause)))))
+    (cons
+     (cond->
+         {:message (.getMessage e)
+          :stack-trace (.getStackTrace e)}
+       (and
+        (instance? clojure.lang.ExceptionInfo e)
+        (nil? (::site/start-date (ex-data e))))
+       (assoc :ex-data (ex-data e)))
+     (when cause (errors-with-causes cause)))))
 
 (defn put-error-representation
   "If method is PUT"
@@ -1205,8 +1207,7 @@
       req
       {:ring.response/status 500
        :ring.response/body default-body
-       ::site/error (.getMessage e)
-       ::site/error-stack-trace (.getStackTrace e)
+       ::site/errors (errors-with-causes e)
        ::site/selected-representation
        {::http/content-type "text/plain;charset=utf-8"
         ::http/content-length (count default-body)

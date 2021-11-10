@@ -4,18 +4,24 @@
   <p>This is a dump of data gathered for a <strong><tt>{{ ring..request/method|name|upper }}</tt></strong> request that was made to <tt>{{ juxt..site..alpha/uri }}</tt> at <tt>{{ juxt..site..alpha/date|date:"yyyy-MM-dd HH:mm:ss" }}</tt>.<p>
   <p>After {{ juxt..site..alpha/duration-millis }}ms a response was returned with the status code {{ ring..response/status }}.</p>
 
-  {% if juxt..site..alpha/error %}
-  <h2>Error</h2>
+  {% if juxt..site..alpha/errors %}
+  <h2>Error traces</h2>
+  {% for error in juxt..site..alpha/errors %}
   <div>
-    <code>{{ juxt..site..alpha/error }}</code>
-
-  {% if juxt..site..alpha/error-stack-trace %}
-  <pre>
-{% for el in juxt..site..alpha/error-stack-trace %}{{ el }}
-{% endfor %}
-  </pre>
-  {% endif %}
+    <dl>
+          <dt>Message</dt>
+          <dd><code>{{ error.message }}</code></dd>
+          {% if error.ex-data %}
+          <dt>Data</dt>
+          <dl><code>{{ error.ex-data }}</code></dl>
+          {% endif %}
+          <dt>Stack</dt>
+          <dd><pre>
+{% for el in error.stack-trace %}{{ el }}
+{% endfor %}</pre></dd>
+    </dl>
   </div>
+  {% endfor %}
   {% endif %}
 
   <h2>Summary</h2>
