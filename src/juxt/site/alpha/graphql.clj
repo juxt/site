@@ -47,7 +47,6 @@
        (cond
          (::g/name arg-def) ; is it a singular (not a NON_NULL or LIST)
          (let [val (or (get args (::g/name arg-def))
-                       ;; TODO: default value?
                        (generate-value generator-args))
                ;; Change a symbol value into a string
 
