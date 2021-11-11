@@ -190,22 +190,42 @@
               (.putNextEntry (java.util.zip.ZipEntry. "resources.edn")))]
     (java.io.OutputStreamWriter. zos)))
 
+(defn apply-uri-mappings [mapping]
+  (fn [ent]
+    ;; Create a regex pattern which detects anything as a mapping key
+    (let [pat (re-pattern (str/join "|" (map #(format "\\Q%s\\E" %) (keys mapping))))]
+      (postwalk
+       (fn [s]
+         (cond-> s
+           (string? s)
+           (str/replace pat (fn [x] (get mapping x)))))
+       ent))))
+
+(comment
+  (export-resources
+   {:pred (fn [x] (or (= (:juxt.home/type x) "Person")))
+    :filename "/home/mal/Sync/persons.edn"
+    :uri-mapping {"http://localhost:2021"
+                  "https://home.juxt.site"}}))
+
 (defn export-resources
   "Export all resources to a file."
   ([]
    (export-resources {}))
-  ([{:keys [out pred filename]}]
+  ([{:keys [out pred filename uri-mapping]}]
    (let [out (or out
                  (when filename (io/output-stream (io/file filename)))
                  (get-zipped-output-stream))
-         pred (or pred some?)encoder (java.util.Base64/getEncoder)
+         pred (or pred some?)
+         encoder (java.util.Base64/getEncoder)
          resources
          (->> (q '{:find [(pull e [*])]
                    :where [[e :crux.db/id]]})
               (map first)
               (filter #(not= (::site/type %) "Request"))
               (filter pred)
-              (sort-by str))]
+              (map (apply-uri-mappings uri-mapping))
+              (sort-by :crux.db/id))]
 
      (defmethod print-method (type (byte-array [])) [x writer]
        (.write writer "#juxt.site/base64")
