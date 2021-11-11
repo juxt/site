@@ -164,15 +164,17 @@
       :else
       nil)))
 
-(defn import-resources []
-  (let [node (crux-node)
-        in (java.io.PushbackReader. (io/reader (io/input-stream (io/file "import/resources.edn"))))]
-    (doseq [rec (resources-from-stream in)]
-      (println "Importing record" (:crux.db/id rec))
-      (when (:crux.db/id rec)
-        (x/submit-tx node [[:crux.tx/put rec]])))
-    (x/sync node)
-    (println "Import finished.")))
+(defn import-resources
+  ([] (import-resources "import/resources.edn"))
+  ([filename]
+   (let [node (crux-node)
+         in (java.io.PushbackReader. (io/reader (io/input-stream (io/file filename))))]
+     (doseq [rec (resources-from-stream in)]
+       (println "Importing record" (:crux.db/id rec))
+       (when (:crux.db/id rec)
+         (x/submit-tx node [[:crux.tx/put rec]])))
+     (x/sync node)
+     (println "Import finished."))))
 
 (defn validate-resource-line [s]
   (edn/read-string
