@@ -174,24 +174,33 @@
     (x/sync node)
     (println "Import finished.")))
 
+(defn validate-resource-line [s]
+  (edn/read-string
+   {:eof :eof :readers {'juxt.site/base64 base64-reader}}
+   s))
+
+(defn get-zipped-output-stream []
+  (let [zos (doto
+                (-> (str (now-id) ".edn.zip")
+                    io/file
+                    io/output-stream
+                    java.util.zip.ZipOutputStream.)
+              (.putNextEntry (java.util.zip.ZipEntry. "resources.edn")))]
+    (java.io.OutputStreamWriter. zos)))
+
 (defn export-resources
   "Export all resources to a file."
   ([]
-   (let [zos (doto
-                 (-> (str (now-id) ".edn.zip")
-                     io/file
-                     io/output-stream
-                     java.util.zip.ZipOutputStream.)
-                 (.putNextEntry (java.util.zip.ZipEntry. "resources.edn")))
-         out (java.io.OutputStreamWriter. zos)]
-     (export-resources out)))
-  ([out]
-   (let [encoder (java.util.Base64/getEncoder)
+   (export-resources {}))
+  ([{:keys [out pred]}]
+   (let [out (or out (get-zipped-output-stream))
+         pred (or pred some?)encoder (java.util.Base64/getEncoder)
          resources
          (->> (q '{:find [(pull e [*])]
                    :where [[e :crux.db/id]]})
               (map first)
               (filter #(not= (::site/type %) "Request"))
+              (filter pred)
               (sort-by str))]
 
      (defmethod print-method (type (byte-array [])) [x writer]
@@ -200,9 +209,18 @@
 
      (with-open [w (io/writer out)]
        (doseq [batch (partition-all 100 (map vector (range) resources))]
-         (doseq [[_ e] batch]
-           (.write w (pr-str e))
-           (.write w (System/lineSeparator)))
+         (doseq [[_ ent] batch]
+           (let [line (pr-str ent)]
+             ;; Test the line can be read
+             (try
+               (validate-resource-line line)
+               (catch Exception e
+                 (throw
+                  (ex-info
+                   (format "Serialization of entity '%s' will not be readable" (:crux.db/id ent))
+                   {:crux.db/id (:crux.db/id ent)} e))))
+             (.write w line)
+             (.write w (System/lineSeparator))))
          (let [n (inc (first (last batch)))
                total (count resources)
                pct (float (/ (* 100 n) total))]
