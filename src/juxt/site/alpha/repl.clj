@@ -194,8 +194,10 @@
   "Export all resources to a file."
   ([]
    (export-resources {}))
-  ([{:keys [out pred]}]
-   (let [out (or out (get-zipped-output-stream))
+  ([{:keys [out pred filename]}]
+   (let [out (or out
+                 (when filename (io/output-stream (io/file filename)))
+                 (get-zipped-output-stream))
          pred (or pred some?)encoder (java.util.Base64/getEncoder)
          resources
          (->> (q '{:find [(pull e [*])]
