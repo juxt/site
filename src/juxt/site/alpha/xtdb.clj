@@ -1,6 +1,6 @@
 ;; Copyright © 2021, JUXT LTD.
 
-(ns juxt.site.alpha.crux)
+(ns juxt.site.alpha.xtdb)
 
 (defn inline-clj-pred [f & args]
   (apply (eval f) (vec args)))

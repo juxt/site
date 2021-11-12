@@ -8,7 +8,7 @@
    [juxt.site.alpha.graphql :as graphql]
    [juxt.grab.alpha.document :as document]
    [juxt.grab.alpha.parser :as parser]
-   [crux.api :as xt]))
+   [xtdb.api :as xt]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -16,7 +16,7 @@
 (alias 'grab (create-ns 'juxt.grab.alpha))
 
 (defn template-model
-  [{::site/keys [crux-node db resource selected-representation]
+  [{::site/keys [xt-node db resource selected-representation]
     ::pass/keys [subject] :as req}
    {graphql-schema-id ::site/graphql-schema
     :as stored-document-entity}]
@@ -65,4 +65,4 @@
     (assert graphql-query)
     (log/debugf "Executing GraphQL query for template: %s" graphql-query)
     ;; TODO: How to communicate back if there are any errors? Throw an exception?
-    (:data (graphql/query schema document operation-name variables crux-node db subject))))
+    (:data (graphql/query schema document operation-name variables xt-node db subject))))

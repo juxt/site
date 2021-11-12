@@ -4,11 +4,11 @@
   (:require
    [clojure.test :refer [deftest is are testing] :as t]
    [clojure.tools.logging :as log]
-   [crux.api :as x]
+   [xtdb.api :as x]
    [jsonista.core :as json]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
-   [juxt.test.util :refer [with-crux with-handler submit-and-await!
-                           *crux-node* *handler*
+   [juxt.test.util :refer [with-xt with-handler submit-and-await!
+                           *xt-node* *handler*
                            access-all-areas access-all-apis]])
   (:import
    (java.io ByteArrayInputStream)))
@@ -18,13 +18,13 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(t/use-fixtures :each with-crux with-handler)
+(t/use-fixtures :each with-xt with-handler)
 
 (deftest put-test
   (submit-and-await!
-   [[:crux.tx/put access-all-apis]
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
+   [[:xtdb.api/put access-all-apis]
+    [:xtdb.api/put
+     {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
       {"servers" [{"url" ""}]
@@ -48,9 +48,9 @@
             :ring.request/headers
             {"content-length" (str (count body))
              "content-type" "application/json"}})
-        db (x/db *crux-node*)]
+        db (x/db *xt-node*)]
 
-    (is (= {:a/name "foo", :crux.db/id "https://example.org/things/foo"}
+    (is (= {:a/name "foo", :xt/id "https://example.org/things/foo"}
            (->
             (x/entity db "https://example.org/things/foo")
             (dissoc ::site/request))))))
@@ -59,9 +59,9 @@
 
 (deftest two-path-parameter-path-preferred-test
   (submit-and-await!
-   [[:crux.tx/put access-all-apis]
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
+   [[:xtdb.api/put access-all-apis]
+    [:xtdb.api/put
+     {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
       {"servers" [{"url" ""}]
@@ -102,7 +102,7 @@
             :ring.request/headers
             {"content-length" (str (count body))
              "content-type" "application/json"}})
-        db (x/db *crux-node*)]
+        db (x/db *xt-node*)]
     (is (= "putAB"
            (get-in r [::site/resource ::apex/operation "operationId"])))))
 
@@ -112,9 +112,9 @@
   ;; preserved. This test tests an edge case where we want a path parameter to contain a /.
   (log/trace "")
   (submit-and-await!
-   [[:crux.tx/put access-all-apis]
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
+   [[:xtdb.api/put access-all-apis]
+    [:xtdb.api/put
+     {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
       {"servers" [{"url" ""}]
@@ -158,20 +158,20 @@
             :ring.request/headers
             {"content-length" (str (count body))
              "content-type" "application/json"}})
-        db (x/db *crux-node*)]
+        db (x/db *xt-node*)]
     (is (= "/things/{a}" (get-in r [::site/resource :juxt.apex.alpha/openapi-path])))
     (is (= {:name "zip",
             :juxt/code "ABC/DEF",
-            :crux.db/id "https://example.org/things/ABC%2FDEF"}
+            :xt/id "https://example.org/things/ABC%2FDEF"}
            (->
             (x/entity db (str "https://example.org" path))
             (dissoc ::site/request))))))
 
 (deftest if-modified-since-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/test.png"
+   [[:xtdb.api/put access-all-areas]
+    [:xtdb.api/put
+     {:xt/id "https://example.org/test.png"
       ::http/last-modified #inst "2020-03-01"
       ::http/content-type "image/png"
       ::http/methods #{:get}}]])
@@ -193,9 +193,9 @@
 
 (deftest if-none-match-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/test.png"
+   [[:xtdb.api/put access-all-areas]
+    [:xtdb.api/put
+     {:xt/id "https://example.org/test.png"
       ::http/etag "\"abc\""
       ::http/content-type "image/png"
       ::http/methods #{:get :head :options}}]])
@@ -218,7 +218,7 @@
 ;; 3.1: If-Match
 (deftest if-match-wildcard-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]])
+   [[:xtdb.api/put access-all-areas]])
   (is (= 412
          (:ring.response/status
           (let [body "Hello"]
@@ -233,9 +233,9 @@
 
 (defn if-match-run [if-match]
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/test.png"
+   [[:xtdb.api/put access-all-areas]
+    [:xtdb.api/put
+     {:xt/id "https://example.org/test.png"
       ::site/type "StaticRepresentation"
       ::http/etag "\"abc\""
       ::http/content-type "image/png"
@@ -263,8 +263,8 @@
 
 (deftest redirect-test
   (submit-and-await!
-    [[:crux.tx/put
-      {:crux.db/id "https://example.org/"
+    [[:xtdb.api/put
+      {:xt/id "https://example.org/"
        ::site/type "Redirect"
        ::site/location "/test.html"}]])
 
@@ -276,10 +276,10 @@
 
 (deftest content-negotiation-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+   [[:xtdb.api/put access-all-areas]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/report"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/report"
       ::http/methods #{:get :head :options}
       ::http/representations
       #{{::http/content-type "text/html;charset=utf-8"
@@ -314,20 +314,20 @@
 
 (deftest variants-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+   [[:xtdb.api/put access-all-areas]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/report"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/report"
       ::http/methods #{:get :head :options}}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/report.html"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/report.html"
       ::site/variant-of "https://example.org/report"
       ::http/content-type "text/html;charset=utf-8"
       ::http/content "<h1>Latest sales figures</h1>"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/report.txt"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/report.txt"
       ::site/variant-of "https://example.org/report"
       ::http/content-type "text/plain;charset=utf-8"
       ::http/content "Latest sales figures"}]])
@@ -356,39 +356,39 @@
           :ring.request/headers {"accept" "image/png"}})]
     (is (= 406 (:ring.response/status response)))))
 
-#_((t/join-fixtures [with-crux with-handler])
+#_((t/join-fixtures [with-xt with-handler])
  (fn []
    (submit-and-await!
-    [ ;;[:crux.tx/put access-all-areas]
-     [:crux.tx/put
-      {:crux.db/id "https://example.org/sensitive-report.html"
+    [ ;;[:xtdb.api/put access-all-areas]
+     [:xtdb.api/put
+      {:xt/id "https://example.org/sensitive-report.html"
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "Latest sales figures"
        ::http/methods #{:get :head :options}}]
 
-     [:crux.tx/put
-      {:crux.db/id "https://example.org/401.html"
+     [:xtdb.api/put
+      {:xt/id "https://example.org/401.html"
        ::site/type "ErrorRepresentation"
        ::http/status #{401 403}
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "<h1>Unauthorized or Forbidden</h1>"}]
 
-     [:crux.tx/put
-      {:crux.db/id "https://example.org/401.txt"
+     [:xtdb.api/put
+      {:xt/id "https://example.org/401.txt"
        ::site/type "ErrorRepresentation"
        ::http/status #{401}
        ::http/content-type "text/plain;charset=utf-8"
        ::http/content "Unauthorized"}]
 
-     [:crux.tx/put
-      {:crux.db/id "https://example.org/406.html"
+     [:xtdb.api/put
+      {:xt/id "https://example.org/406.html"
        ::site/type "ErrorRepresentation"
        ::http/status #{406}
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "<h1>Unacceptable</h1>"
        ::http/methods #{:get :head :options}}]])
 
-   (let [db (x/db *crux-node*)]
+   (let [db (x/db *xt-node*)]
      (x/q db '{:find [er]
                :where [[er ::site/type "ErrorRepresentation"]
                        [er ::http/status 403]]}))
@@ -398,12 +398,12 @@
      :ring.request/path "/sensitive-report.html"
      :ring.request/headers {"accept" "text/html"}})))
 
-#_((t/join-fixtures [with-crux with-handler])
+#_((t/join-fixtures [with-xt with-handler])
  (fn []
    (submit-and-await!
-    [[:crux.tx/put access-all-areas]
-     [:crux.tx/put
-      {:crux.db/id "https://example.org/report.html"
+    [[:xtdb.api/put access-all-areas]
+     [:xtdb.api/put
+      {:xt/id "https://example.org/report.html"
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "Latest figures"
        ::http/methods #{:get :head :options}
@@ -427,10 +427,10 @@
 
 #_(deftest app-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+   [[:xtdb.api/put access-all-areas]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/view/index.html"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/view/index.html"
       ::http/methods #{:get}
       ::http/content-type "text/html;charset=utf-8"
       ::http/content "<h1>Hello!</h1>"}]])

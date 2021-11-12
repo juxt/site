@@ -30,7 +30,7 @@
        :strs [id username name email roles auth-scheme]
        :where [[:subject :juxt.pass.alpha/user user]
                [:subject :juxt.pass.alpha/auth-scheme auth-scheme]
-               [user :crux.db/id id]
+               [user :xt/id id]
                [user :juxt.pass.alpha/username username]
                [user :name name]
                [user :email email]
@@ -463,9 +463,9 @@
     :type "object"
     :description
     "The unique identifier of the document in the database. This is maps
-    directly to the crux.db/id attribute."
+    directly to the xt/id attribute."
     :required ["id"]
-    :juxt.jinx.alpha/keyword-mappings {"id" "crux.db/id"}
+    :juxt.jinx.alpha/keyword-mappings {"id" "xt/id"}
     :properties
     {"id" {:type "string" :format "uri-reference"}}}
 

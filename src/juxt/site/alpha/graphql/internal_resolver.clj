@@ -2,7 +2,7 @@
 
 (ns juxt.site.alpha.graphql.internal-resolver
   (:require [clojure.tools.logging :as log]
-            [crux.api :as x]))
+            [xtdb.api :as x]))
 
 (alias 'pass (create-ns 'juxt.pass.alpha))
 

@@ -3,9 +3,9 @@
 (ns juxt.site.authz-test
   (:require
    [clojure.test :refer [deftest is are testing] :as t]
-   [crux.api :as x]
-   [juxt.test.util :refer [with-crux with-handler submit-and-await!
-                           *crux-node* *handler*
+   [xtdb.api :as x]
+   [juxt.test.util :refer [with-xt with-handler submit-and-await!
+                           *xt-node* *handler*
                            access-all-areas access-all-apis]]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -13,23 +13,23 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(t/use-fixtures :each with-crux)
+(t/use-fixtures :each with-xt)
 
 ;; We'll borrow terms and definitions from Google's Zanzibar system.
 ;; 3.2.3 Check Evaluation
 (deftest authorization-test []
   (submit-and-await!
    [
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/users/jon"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/users/jon"
       :role "https://example.org/roles/patient"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/users/mal"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/users/mal"
       :role "https://example.org/roles/patient"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/jon/heart-rate"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/jon/heart-rate"
       :doc "https://www.hl7.org/fhir/observation-example-heart-rate.json.html"
       :hl7.fhir/resource-type :observation
 
@@ -53,8 +53,8 @@
                  :system "http://unitsofmeasure.org"
                  :code "/min"}}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/mal/heart-rate"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/mal/heart-rate"
       :doc "https://www.hl7.org/fhir/observation-example-heart-rate.json.html"
       :hl7.fhir/resource-type :observation
 
@@ -82,25 +82,25 @@
     ;; owner and a document. For now we'll model the tuple as a separate XT
     ;; entity although in future we might use relations that are in the object
     ;; rather than define new ones in the ACL.
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/jon-can-see-his-own-report.acl"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/jon-can-see-his-own-report.acl"
       ::pass/entity "https://example.org/jon/heart-rate"
       ::pass/owner "https://example.org/users/jon"}]
 
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/mal-can-see-his-own-report.acl"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/mal-can-see-his-own-report.acl"
       ::pass/entity "https://example.org/mal/heart-rate"
       ::pass/owner "https://example.org/users/mal"}]
 
     ;; Bob is Jon's doctor
-    [:crux.tx/put
-     {:crux.db/id "https://example.org//users/bob"
+    [:xtdb.api/put
+     {:xt/id "https://example.org//users/bob"
       :name "Dr. Bob Smith"
       :role "https://example.org/roles/doctor"}]
 
     ;; Here is an ACL that represents Jon's consent that Bob can read vital signs
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/bob-is-jon-doctor.acl"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/bob-is-jon-doctor.acl"
       ::site/type "Consent"
       ::pass/granted-by "https://example.org/users/jon"
       ::pass/entity "https://example.org/jon/heart-rate"
@@ -112,12 +112,12 @@
 
     ;; Carl is another doctor, but Jon doesn't want this doctor accessing his
     ;; medical information.
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/users/carl"
+    [:xtdb.api/put
+     {:xt/id "https://example.org/users/carl"
       :name "Dr. Carl Lector"
       :role "https://example.org/roles/doctor"}]])
 
-  (let [db (x/db *crux-node*)
+  (let [db (x/db *xt-node*)
         check
         ;; "Authorization checks take the form of “does user U have relation R
         ;; to object O?”"

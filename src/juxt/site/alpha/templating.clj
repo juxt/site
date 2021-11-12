@@ -6,7 +6,7 @@
    [clojure.walk :refer [postwalk]]
    [juxt.site.alpha.graphql.templating :as graphql-templating]
    [clojure.tools.logging :as log]
-   [crux.api :as xt]))
+   [xtdb.api :as xt]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 
@@ -94,7 +94,7 @@
 
         combined-template-model
         (->> processed-template-models
-             (map #(dissoc % :crux.db/id))
+             (map #(dissoc % :xt/id))
              (apply merge-with
                     (fn [a b] (concat (if (sequential? a) a [a])
                                       (if (sequential? b) b [b])))))]

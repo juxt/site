@@ -5,7 +5,7 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.walk :refer [postwalk]]
-   [crux.api :as x]
+   [xtdb.api :as x]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
    [clojure.java.shell :as sh]
@@ -41,11 +41,11 @@
                      (:name m) (:arglists m) (:doc m))))
   :ok)
 
-(defn crux-node []
-  (:juxt.site.alpha.db/crux-node main/system))
+(defn xt-node []
+  (:juxt.site.alpha.db/xt-node main/system))
 
 (defn db []
-  (x/db (crux-node)))
+  (x/db (xt-node)))
 
 (defn e [id]
   (postwalk
@@ -63,10 +63,10 @@
 (defn put! [& ms]
   (->>
    (x/submit-tx
-    (crux-node)
+    (xt-node)
     (for [m ms]
-      [:crux.tx/put m]))
-   (x/await-tx (crux-node))))
+      [:xtdb.api/put m]))
+   (x/await-tx (xt-node))))
 
 (defn grep [re coll]
   (filter #(re-matches (re-pattern re) %) coll))
@@ -74,18 +74,18 @@
 (defn rm! [& ids]
   (->>
    (x/submit-tx
-    (crux-node)
+    (xt-node)
     (for [id ids]
-      [:crux.tx/delete id]))
-   (x/await-tx (crux-node))))
+      [:xtdb.api/delete id]))
+   (x/await-tx (xt-node))))
 
 (defn evict! [& ids]
   (->>
    (x/submit-tx
-    (crux-node)
+    (xt-node)
     (for [id ids]
-      [:crux.tx/evict id]))
-   (x/await-tx (crux-node))))
+      [:xtdb.api/evict id]))
+   (x/await-tx (xt-node))))
 
 (defn q [query & args]
   (apply x/q (db) query args))
@@ -109,15 +109,15 @@
 (defn ls
   "List Site resources"
   ([]
-   (->> (q '{:find [(pull e [:crux.db/id ::site/type])]
-             :where [[e :crux.db/id]]})
+   (->> (q '{:find [(pull e [:xt/id ::site/type])]
+             :where [[e :xt/id]]})
         (map first)
         (filter #(not= (::site/type %) "Request"))
-        (map :crux.db/id)
+        (map :xt/id)
         (sort-by str)))
   ([pat]
    (->> (q '{:find [e]
-             :where [[e :crux.db/id]
+             :where [[e :xt/id]
                      [(str e) id]
                      [(re-seq pat id) match]
                      [(some? match)]]
@@ -129,7 +129,7 @@
 (defn ls-type
   [t]
   (->> (q '{:find [e]
-            :where [[e :crux.db/id]
+            :where [[e :xt/id]
                     [e ::site/type t]]
             :in [t]} t)
        (map first)
@@ -167,12 +167,12 @@
 (defn import-resources
   ([] (import-resources "import/resources.edn"))
   ([filename]
-   (let [node (crux-node)
+   (let [node (xt-node)
          in (java.io.PushbackReader. (io/reader (io/input-stream (io/file filename))))]
      (doseq [rec (resources-from-stream in)]
-       (println "Importing record" (:crux.db/id rec))
-       (when (:crux.db/id rec)
-         (x/submit-tx node [[:crux.tx/put rec]])))
+       (println "Importing record" (:xt/id rec))
+       (when (:xt/id rec)
+         (x/submit-tx node [[:xtdb.api/put rec]])))
      (x/sync node)
      (println "Import finished."))))
 
@@ -220,12 +220,12 @@
          encoder (java.util.Base64/getEncoder)
          resources
          (->> (q '{:find [(pull e [*])]
-                   :where [[e :crux.db/id]]})
+                   :where [[e :xt/id]]})
               (map first)
               (filter #(not= (::site/type %) "Request"))
               (filter pred)
               (map (apply-uri-mappings uri-mapping))
-              (sort-by :crux.db/id))]
+              (sort-by :xt/id))]
 
      (defmethod print-method (type (byte-array [])) [x writer]
        (.write writer "#juxt.site/base64")
@@ -241,8 +241,8 @@
                (catch Exception e
                  (throw
                   (ex-info
-                   (format "Serialization of entity '%s' will not be readable" (:crux.db/id ent))
-                   {:crux.db/id (:crux.db/id ent)} e))))
+                   (format "Serialization of entity '%s' will not be readable" (:xt/id ent))
+                   {:xt/id (:xt/id ent)} e))))
              (.write w line)
              (.write w (System/lineSeparator))))
          (let [n (inc (first (last batch)))
@@ -257,7 +257,7 @@
 (defn cat-type
   [t]
   (->> (q '{:find [(pull e [*])]
-            :where [[e :crux.db/id]
+            :where [[e :xt/id]
                     [e ::site/type t]]
             :in [t]} t)
        (map first)
@@ -325,8 +325,8 @@
   ([opts]
    (let [{::site/keys [base-uri]} opts
          _ (assert base-uri)
-         db (x/db (crux-node))]
-     [;; Awaiting a fix to https://github.com/juxt/crux/issues/1480
+         db (x/db (xt-node))]
+     [;; Awaiting a fix to https://github.com/juxt/xtdb/issues/1480
       #_{:complete? (and
                    (x/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
                    (x/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
@@ -371,7 +371,7 @@
 (defn put-site-api! []
   (let [config (config)]
     (init/put-site-api!
-     (crux-node)
+     (xt-node)
      (as-> "juxt/site/alpha/openapi.edn" %
        (io/resource %)
        (slurp %)
@@ -387,16 +387,16 @@
 
 (defn put-auth-resources! []
   (let [config (config)
-        crux-node (crux-node)]
-    (init/put-openid-token-endpoint! crux-node config)
-    (init/put-login-endpoint! crux-node config)
-    (init/put-logout-endpoint! crux-node config)
+        xt-node (xt-node)]
+    (init/put-openid-token-endpoint! xt-node config)
+    (init/put-login-endpoint! xt-node config)
+    (init/put-logout-endpoint! xt-node config)
     (status (steps config))))
 
 (defn put-superuser-role! []
   (let [config (config)
-        crux-node (crux-node)]
-    (init/put-superuser-role! crux-node config)
+        xt-node (xt-node)]
+    (init/put-superuser-role! xt-node config)
     (status (steps config))))
 
 (defn get-password [pass-name]
@@ -413,9 +413,9 @@
      (println (ansi/red "Password required!"))))
   ([username fullname password]
    (let [config (config)
-         crux-node (crux-node)]
+         xt-node (xt-node)]
      (init/put-superuser!
-      crux-node
+      xt-node
       {:username username
        :fullname fullname
        :password password}
@@ -424,19 +424,19 @@
 
 (defn allow-public-access-to-public-resources! []
   (let [config (config)
-        crux-node (crux-node)]
-    (init/allow-public-access-to-public-resources! crux-node config)))
+        xt-node (xt-node)]
+    (init/allow-public-access-to-public-resources! xt-node config)))
 
 (defn put-site-txfns! []
   (let [config (config)
-        crux-node (crux-node)]
-    (init/put-site-txfns! crux-node config)
+        xt-node (xt-node)]
+    (init/put-site-txfns! xt-node config)
     (status)))
 
 (defn reset-password! [username password]
   (let [user (str (::site/base-uri (config))  "/_site/users/" username)]
     (put!
-     {:crux.db/id (str user "/password")
+     {:xt/id (str user "/password")
       ::site/type "Password"
       ::http/methods #{:post}
       ::pass/user user

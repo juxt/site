@@ -3,7 +3,7 @@
 (ns juxt.site.alpha.debug
   (:require
    [jsonista.core :as json]
-   [crux.api :as x]))
+   [xtdb.api :as x]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))

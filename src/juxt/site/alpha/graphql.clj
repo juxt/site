@@ -11,7 +11,7 @@
    [juxt.site.alpha.util :refer [assoc-some]]
    [clojure.string :as str]
    [clojure.set :refer [rename-keys]]
-   [crux.api :as xt]
+   [xtdb.api :as xt]
    [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk]]
    [clojure.edn :as edn]
@@ -117,9 +117,9 @@
                              (throw (ex-info "Couldn't infer type" {:field field})))]
      (-> entity
          (assoc
-          :crux.db/id (or
-                       (:crux.db/id old-value)
-                       (:crux.db/id entity)
+          :xt/id (or
+                       (:xt/id old-value)
+                       (:xt/id entity)
                        (:id entity)
                        (generate-value
                         {:type true
@@ -172,7 +172,7 @@
   (for [[e _ score?] results]
     (assoc-some (protected-lookup e subject db)
                 :luceneScore (and (number? score?) score?)
-                :xtQuery (pr-str query))))
+                :xtQuery (and query (pr-str query)))))
 
 (defn infer-query
   [db subject field query args]
@@ -196,24 +196,24 @@
     object-value))
 
 (defn await-tx
-  [crux-node tx]
+  [xt-node tx]
   (xt/await-tx
-   crux-node
+   xt-node
    (xt/submit-tx
-    crux-node
+    xt-node
     [tx])))
 
 (defn xt-delete
   [id]
-  [:crux.tx/delete id])
+  [:xtdb.api/delete id])
 
 (defn xt-put
   [object]
-  (and (nil? (:crux.db/id object))
+  (and (nil? (:xt/id object))
        (throw (ex-info "Trying to put object without xt id" {:object object})))
-  [:crux.tx/put object])
+  [:xtdb.api/put object])
 
-(defn query [schema document operation-name variable-values crux-node db subject]
+(defn query [schema document operation-name variable-values xt-node db subject]
   (execute-request
    {:schema schema
     :document document
@@ -235,7 +235,7 @@
                        (::g/name object-type))
             db (if (and (not mutation?)
                         (get argument-values "asOf"))
-                 (xt/db crux-node (-> argument-values
+                 (xt/db xt-node (-> argument-values
                                       (get "asOf")
                                       t/date-time
                                       t/inst))
@@ -252,18 +252,24 @@
             (case action
               "delete"
               (let [id (validate-id! argument-values)]
-                (await-tx crux-node (xt-delete id))
+                (await-tx xt-node (xt-delete id))
                 (lookup-entity id))
               "put"
               (let [object-to-put (args-to-entity argument-values field nil)]
-                (await-tx crux-node (xt-put object-to-put))
+                (await-tx xt-node (xt-put object-to-put))
                 object-to-put)
               "update"
               (let [id (validate-id! argument-values)
                     old-value (lookup-entity id)
                     object-to-put (args-to-entity argument-values field old-value)]
-                (await-tx crux-node (xt-put object-to-put))
+                (await-tx xt-node (xt-put object-to-put))
                 object-to-put)))
+
+          (get site-args "filter")
+          (cond
+            (= "ids" (ffirst argument-values))
+            (map lookup-entity (get argument-values "ids"))
+            :else (throw (ex-message "That filter is not implemented yet")))
 
           ;; Direct lookup - useful query roots
           (get site-args "e")
@@ -271,7 +277,7 @@
             (protected-lookup e subject db))
 
           (get site-args "q")
-          (let [object-id (:crux.db/id object-value)
+          (let [object-id (:xt/id object-value)
                 arg-keys (fn [m] (remove #{"limit" "offset" "orderBy"} (keys m)))
                 q (assoc
                    (to-xt-query site-args argument-values)
@@ -336,7 +342,7 @@
 
           ;; If the key is 'id', we assume it should be translated to xt/id
           (= "id" field-name)
-          (get object-value :crux.db/id)
+          (get object-value :xt/id)
 
           ;; Or simply try to extract the keyword
           (contains? object-value (keyword field-name))
@@ -363,7 +369,7 @@
           :else
           (or (get site-args "defaultValue") ""))))}))
 
-(defn post-handler [{::site/keys [uri crux-node db]
+(defn post-handler [{::site/keys [uri xt-node db]
                      ::pass/keys [subject]
                      :as req}]
 
@@ -408,7 +414,7 @@
 
         results
         (juxt.site.alpha.graphql/query
-         schema compiled-document operation-name variables crux-node db subject)]
+         schema compiled-document operation-name variables xt-node db subject)]
 
     (-> req
         (assoc
@@ -421,14 +427,14 @@
   (let [schema (schema/compile-schema (parser/parse schema-str))]
     (assoc resource ::grab/schema schema ::http/body (.getBytes schema-str))))
 
-(defn put-schema [crux-node resource schema-str]
+(defn put-schema [xt-node resource schema-str]
   (xt/await-tx
-   crux-node
+   xt-node
    (xt/submit-tx
-    crux-node
-    [[:crux.tx/put (schema-resource resource schema-str)]])))
+    xt-node
+    [[:xtdb.api/put (schema-resource resource schema-str)]])))
 
-(defn put-handler [{::site/keys [uri db crux-node] :as req}]
+(defn put-handler [{::site/keys [uri db xt-node] :as req}]
   (let [schema-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
         _ (when-not schema-str
@@ -445,7 +451,7 @@
       (throw (ex-info "GraphQL resource not configured" {:uri uri})))
 
     (try
-      (put-schema crux-node resource schema-str)
+      (put-schema xt-node resource schema-str)
       (assoc req :ring.response/status 204)
       (catch Exception e
         (let [errors (:errors (ex-data e))]
@@ -513,7 +519,7 @@
       (cond-> error
         location (assoc :location location)))}))
 
-(defn stored-document-put-handler [{::site/keys [uri db crux-node] :as req}]
+(defn stored-document-put-handler [{::site/keys [uri db xt-node] :as req}]
   (let [document-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
         _ (when-not document-str
@@ -547,10 +553,10 @@
                         (parser/parse document-str)
                         schema)]
           (xt/await-tx
-           crux-node
+           xt-node
            (xt/submit-tx
-            crux-node
-            [[:crux.tx/put (assoc resource ::grab/document document)]])))
+            xt-node
+            [[:xtdb.api/put (assoc resource ::grab/document document)]])))
 
         (assoc req :ring.response/status 204)
 
@@ -576,7 +582,7 @@
                 e)))))))))
 
 (defn stored-document-post-handler
-  [{::site/keys [crux-node db resource received-representation]
+  [{::site/keys [xt-node db resource received-representation]
     ::pass/keys [subject]
     :as req}]
 
@@ -594,7 +600,7 @@
         document (document/compile-document (parser/parse document-str) schema)
         results (query schema document operation-name
                        {}
-                       nil ;; for crux-node, so we prevent get updates
+                       nil ;; for xt-node, so we prevent get updates
                        db
                        subject)]
     (-> req
@@ -620,4 +626,4 @@
      "endpoint" endpoint
      "operationNames" operation-names
      "schemaString" schema-str
-     "form" {"action" (:crux.db/id original-resource)}}))
+     "form" {"action" (:xt/id original-resource)}}))

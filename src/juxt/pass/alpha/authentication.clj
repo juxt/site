@@ -5,7 +5,7 @@
    [jsonista.core :as json]
    [clojure.tools.logging :as log]
    [crypto.password.bcrypt :as password]
-   [crux.api :as x]
+   [xtdb.api :as x]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.rfc7235 :as rfc7235]
    [ring.util.codec :refer [form-decode url-decode]]

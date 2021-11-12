@@ -2,10 +2,10 @@
 
 (ns juxt.site.template-test
   (:require
-   [crux.api :as x]
+   [xtdb.api :as x]
    [clojure.test :refer [deftest is are testing] :as t]
-   [juxt.test.util :refer [with-crux with-handler submit-and-await!
-                           *crux-node* *handler*
+   [juxt.test.util :refer [with-xt with-handler submit-and-await!
+                           *xt-node* *handler*
                            access-all-areas access-all-apis]]))
 
 ;; Site templates can be defined as a resource which references a Template
@@ -21,22 +21,22 @@
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(t/use-fixtures :each with-crux with-handler)
+(t/use-fixtures :each with-xt with-handler)
 
 (comment
   (deftest simple-template-test
     (submit-and-await!
-     [[:crux.tx/put access-all-areas]
+     [[:xtdb.api/put access-all-areas]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/templates/fruits.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/templates/fruits.html"
         ::http/methods #{:get :head :options}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "Fruits"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/fruits.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/fruits.html"
         ::http/methods #{:get :head :options}
         ::site/template "https://example.org/templates/fruits.html"}]])
 
@@ -47,21 +47,21 @@
 
   (deftest single-template-model-test
     (submit-and-await!
-     [[:crux.tx/put access-all-areas]
+     [[:xtdb.api/put access-all-areas]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/templates/fruits.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/templates/fruits.html"
         ::http/methods #{:get :head :options}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/template-models/fruits"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/template-models/fruits"
         :fruits ["apple" "orange" "banana"]}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/fruits.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/fruits.html"
         ::http/methods #{:get :head :options}
         ::site/template "https://example.org/templates/fruits.html"
         ::site/template-model "https://example.org/template-models/fruits"}]])
@@ -76,25 +76,25 @@
   ;; query over a single schema (perhaps created via schema-stitching)
   (deftest multiple-template-models-test
     (submit-and-await!
-     [[:crux.tx/put access-all-areas]
+     [[:xtdb.api/put access-all-areas]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/templates/fruits.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/templates/fruits.html"
         ::http/methods #{:get :head :options}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/template-models/fruits-a"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/template-models/fruits-a"
         :fruits ["apple" "orange" "banana"]}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/template-models/fruits-b"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/template-models/fruits-b"
         :fruits ["strawberry" "kiwi" "pineapple"]}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/fruits.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/fruits.html"
         ::http/methods #{:get :head :options}
         ::site/template "https://example.org/templates/fruits.html"
         ::site/template-model ["https://example.org/template-models/fruits-a"
@@ -108,43 +108,43 @@
 
   (deftest template-model-as-query-test
     (submit-and-await!
-     [[:crux.tx/put access-all-areas]
+     [[:xtdb.api/put access-all-areas]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/templates/fruits.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/templates/fruits.html"
         ::http/methods #{:get :head :options}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/apple"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/apple"
         :type "Fruit"
         :name "apple"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/orange"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/orange"
         :type "Fruit"
         :name "orange"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/banana"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/banana"
         :type "Fruit"
         :name "banana"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/template-models/fruits-a-query"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/template-models/fruits-a-query"
         :fruits {::site/query '{:find [nm]
                                 :where [[e :type "Fruit"]
                                         [e :name nm]]}
                  ::site/extract-first-projection? true}}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/template-models/fruits-b"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/template-models/fruits-b"
         :fruits ["strawberry" "kiwi" "pineapple"]}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/fruits.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/fruits.html"
         ::http/methods #{:get :head :options}
         ::site/template "https://example.org/templates/fruits.html"
         ::site/template-model ["https://example.org/template-models/fruits-a-query"
@@ -159,24 +159,24 @@
 
   (deftest template-inclusion-test
     (submit-and-await!
-     [[:crux.tx/put access-all-areas]
+     [[:xtdb.api/put access-all-areas]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/templates/outer.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/templates/outer.html"
         ::http/methods #{:get :head :options}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "outer {% include \"https://example.org/templates/inner.html\" %}"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/templates/inner.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/templates/inner.html"
         ::http/methods #{:get :head :options}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "inner"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/index.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/index.html"
         ::http/methods #{:get :head :options}
         ::site/template "https://example.org/templates/outer.html"}]])
 
@@ -193,24 +193,24 @@
   ;; support this case by adding :selmer.util/custom-resource-path
   (deftest template-inclusion-with-custom-resource-path-test
     (submit-and-await!
-     [[:crux.tx/put access-all-areas]
+     [[:xtdb.api/put access-all-areas]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/templates/outer.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/templates/outer.html"
         ::http/methods #{:get :head :options}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "outer {% include \"inner.html\" %}"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/templates/inner.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/templates/inner.html"
         ::http/methods #{:get :head :options}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "inner"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/index.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/index.html"
         ::http/methods #{:get :head :options}
         ::site/template "https://example.org/templates/outer.html"
         :selmer.util/custom-resource-path "https://example.org/templates/"}]])
@@ -225,48 +225,48 @@
   ;; works together.
   (deftest combination-test
     (submit-and-await!
-     [[:crux.tx/put access-all-areas]
+     [[:xtdb.api/put access-all-areas]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/apple"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/apple"
         :type "Fruit"
         :name "apple"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/orange"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/orange"
         :type "Fruit"
         :name "orange"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/banana"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/banana"
         :type "Fruit"
         :name "banana"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/template-models/fruits-a-query"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/template-models/fruits-a-query"
         :fruits {::site/query '{:find [nm] :where [[e :type "Fruit"][e :name nm]]}
                  ::site/extract-first-projection? true}}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/template-models/fruits-b"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/template-models/fruits-b"
         :fruits ["strawberry" "kiwi" "pineapple"]}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/templates/inner.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/templates/inner.html"
         ::http/methods #{:get :head :options}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "{% for f in fruits %} * {{f}}{% endfor %}"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/templates/outer.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/templates/outer.html"
         ::http/methods #{:get :head :options}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "outer{% include \"inner.html\" %}"}]
 
-      [:crux.tx/put
-       {:crux.db/id "https://example.org/fruits.html"
+      [:xtdb.api/put
+       {:xt/id "https://example.org/fruits.html"
         ::http/methods #{:get :head :options}
         ::site/template "https://example.org/templates/outer.html"
         ::site/template-model ["https://example.org/template-models/fruits-a-query"

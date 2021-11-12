@@ -5,7 +5,7 @@
    [clojure.java.io :as io]
    [clojure.pprint :refer [pprint]]
    [clojure.walk :refer [postwalk]]
-   [crux.api :as x]
+   [xtdb.api :as x]
    [hiccup.page :as hp]
    [json-html.core :refer [edn->html]]
    [jsonista.core :as json]
@@ -53,9 +53,9 @@
   (let [param-defs
         (get-in resource [::apex/operation "parameters"])
 
-        db (x/with-tx db [[:crux.tx/put
+        db (x/with-tx db [[:xtdb.api/put
                            (-> subject
-                               (assoc :crux.db/id :subject)
+                               (assoc :xt/id :subject)
                                util/->freezeable)]])
 
         query-params (when-let [query-param-defs
@@ -125,7 +125,7 @@
 
             (= (get config "type") "table")
             (if (seq resource-state)
-              (let [fields (distinct (concat [:crux.db/id]
+              (let [fields (distinct (concat [:xt/id]
                                              (keys (first resource-state))))]
                 [:table {:style "border: 1px solid #888; border-collapse: collapse;"}
                  [:thead
@@ -147,7 +147,7 @@
               [:p "No results"])
 
             :else
-            (let [fields (distinct (concat [:crux.db/id] (keys resource-state)))]
+            (let [fields (distinct (concat [:xt/id] (keys resource-state)))]
               [:dl
                (for [field fields
                      :let [val (get resource-state field)]]

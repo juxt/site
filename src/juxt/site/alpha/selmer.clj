@@ -3,7 +3,7 @@
 (ns juxt.site.alpha.selmer
   (:require
    [clojure.tools.logging :as log]
-   [crux.api :as x]
+   [xtdb.api :as x]
    [selmer.parser :as selmer]
    selmer.filters
    selmer.tags)
@@ -58,11 +58,11 @@
         custom-resource-path (:selmer.util/custom-resource-path selected-representation)]
 
     (try
-      (log/tracef "Render template: %s" (:crux.db/id template))
+      (log/tracef "Render template: %s" (:xt/id template))
       (let [body
             (binding [*db* db]
               (selmer/render-file
-               (java.net.URL. nil (:crux.db/id template) ush)
+               (java.net.URL. nil (:xt/id template) ush)
                template-model
                (cond-> {:url-stream-handler ush}
                  custom-resource-path
