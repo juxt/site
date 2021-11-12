@@ -225,6 +225,7 @@
     :field-resolver
     (fn [{:keys [object-type object-value field-name argument-values]
           :as field-resolver-args}]
+
       (let [types-by-name (::schema/types-by-name schema)
             field (get-in object-type [::schema/fields-by-name field-name])
             site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
@@ -289,7 +290,7 @@
                                     e))))
                 limited-results (limit-results argument-values results)
                 result-entities (pull-entities db subject limited-results q)]
-            (log/tracef "GraphQL results is %s" result-entities)
+            ;;(log/tracef "GraphQL results is %s" (seq result-entities))
             (process-xt-results field result-entities))
 
           (get site-args "a")
@@ -369,24 +370,22 @@
   (let [schema (some-> (xt/entity db uri) ::grab/schema)
         body (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
-        [document-str operation-name]
+        {query "query"
+         operation-name "operationName"
+         variables "variables"}
         (case (some-> req ::site/received-representation ::http/content-type)
-          "application/json"
-          (let [json (some-> body json/read-value)]
-            [(get json "query") (get json "operationName")])
-
-          "application/graphql"
-          [body nil]
+          "application/json" (some-> body json/read-value)
+          "application/graphql" {"query" body}
 
           (throw (ex-info (format "Unknown content type for GraphQL request: %s" (some-> req ::site/received-representation ::http/content-type)) req)))
 
-        _ (when (nil? document-str)
+        _ (when (nil? query)
             (throw (ex-info "Nil GraphQL query" (-> req
                                                     (update-in [::site/resource] dissoc ::grab/schema)
                                                     (dissoc :juxt.pass.alpha/request-context)))))
         document
         (try
-          (parser/parse document-str)
+          (parser/parse query)
           (catch Exception e
             (log/error e "Error parsing GraphQL query")
             (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]}))))
@@ -407,7 +406,9 @@
                    (seq errors) (assoc ::errors errors)))
                 e)))))
 
-        results (query schema compiled-document operation-name {} crux-node db subject)]
+        results
+        (juxt.site.alpha.graphql/query
+         schema compiled-document operation-name variables crux-node db subject)]
 
     (-> req
         (assoc

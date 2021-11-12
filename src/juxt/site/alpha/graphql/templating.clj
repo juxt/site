@@ -27,6 +27,7 @@
         _ (assert graphql-query-bytes (pr-str stored-document-entity))
 
         operation-name (:juxt.site.alpha/graphql-operation-name selected-representation)
+        variables (get selected-representation :juxt.site.alpha/graphql-variables {})
 
         graphql-query (String. graphql-query-bytes "UTF-8")
 
@@ -64,4 +65,4 @@
     (assert graphql-query)
     (log/debugf "Executing GraphQL query for template: %s" graphql-query)
     ;; TODO: How to communicate back if there are any errors? Throw an exception?
-    (:data (graphql/query schema document operation-name {} crux-node db subject))))
+    (:data (graphql/query schema document operation-name variables crux-node db subject))))
