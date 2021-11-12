@@ -23,13 +23,20 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'g (create-ns 'juxt.grab.alpha.graphql))
 
-(def default-query '{:find [e]
-                     :in [[type]]
-                     :where [[e :juxt.site/type type]]})
+(defn default-query
+  [field-or-type]
+  (let [type (or (-> field-or-type
+                     ::g/type-ref
+                     ::g/list-type
+                     ::g/name)
+                 field-or-type)]
+    {:find ['e]
+     :where [['e :juxt.site/type type]]}))
 
-(defn to-xt-query [args values]
+(defn to-xt-query [field-or-type args values]
   (let [query (rename-keys
-               (or (get args "q") default-query)
+               (or (get args "q")
+                   (default-query field-or-type))
                ;; probably should do camelcase to kabab
                {:order :order-by})
         result
@@ -180,7 +187,7 @@
                  ::g/type-ref
                  ::g/list-type
                  ::g/name)
-        results (pull-entities db subject (xt/q db query [type]) query)]
+        results (pull-entities db subject (xt/q db query type) query)]
     (or (process-xt-results field results)
         (throw (ex-info "No resolver found for " type)))))
 
@@ -279,20 +286,22 @@
           (get site-args "q")
           (let [object-id (:xt/id object-value)
                 arg-keys (fn [m] (remove #{"limit" "offset" "orderBy"} (keys m)))
+                in (cond->> (map symbol (arg-keys argument-values))
+                     object-id (concat ['object]))
                 q (assoc
-                   (to-xt-query site-args argument-values)
-                   :in (vec (cond->> (map symbol (arg-keys argument-values))
-                              object-id (concat ['object]))))
+                   (to-xt-query field site-args argument-values)
+                   :in (if (second in) [in] (vec in)))
                 query-args (cond->> (vals argument-values)
                              object-id (concat [object-id]))
+                args (if (second query-args) query-args (first query-args))
                 results
                 (try
-                  (xt/q db q (first query-args))
+                  (xt/q db q args)
                   (catch Exception e
                     (throw (ex-info "Failure when running XTDB query"
                                     {:message (ex-message e)
-                                     :query q
-                                     :args query-args}
+                                     :query (pr-str q)
+                                     :args args}
                                     e))))
                 limited-results (limit-results argument-values results)
                 result-entities (pull-entities db subject limited-results q)]
@@ -355,7 +364,7 @@
           (infer-query db
                        subject
                        field
-                       (to-xt-query site-args argument-values)
+                       (to-xt-query field site-args argument-values)
                        argument-values)
 
           (get argument-values "id")
@@ -364,7 +373,7 @@
           (and (get site-args "aggregate")
                (get site-args "type"))
           (case (get site-args "aggregate")
-            "count" (count (xt/q db (to-xt-query site-args argument-values) [(get site-args "type")])))
+            "count" (count (xt/q db (to-xt-query (get site-args "type") site-args argument-values))))
 
           :else
           (or (get site-args "defaultValue") ""))))}))
