@@ -703,7 +703,8 @@
       (= status 400)
       (do
         (error! "Server response:" status)
-        (when body (println (str/trim body))))
+        (when body (println (str/trim body)))
+        (message! "Request id:" (get headers "site-request-id")))
 
       (= status 401)
       (do
@@ -711,6 +712,11 @@
         (message! "Is your access-token valid?")
         (message! "To get a new access token, use the get-token sub-command")
         (message! "Request id:" (get headers "site-request-id")))
+
+      (= status 200)
+      (do
+        (message! (format "Asset uploaded: %s" path))
+        (message! "Server response:" status (str/trim body)))
 
       (= status 201)
       (message! (format "Asset created: %s" path))
