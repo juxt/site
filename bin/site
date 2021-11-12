@@ -488,7 +488,7 @@
           (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn put-graphql
-  "Put a GraphQL schema"
+  "Put a GraphQL document"
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri file path]
@@ -511,7 +511,7 @@
             :throw false})]
       (cond
         (= status 204)
-        (message! (format "GraphQL schema uploaded"))
+        (message! (format "GraphQL document uploaded"))
 
         :else
         (do
