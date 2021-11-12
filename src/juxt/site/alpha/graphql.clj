@@ -301,12 +301,30 @@
               (protected-lookup val subject db)
               val))
 
-          ;; The use of a resolver should be a privileged operation, since it
+          ;; The registration of a resolver should be a privileged operation, since it
           ;; has the potential to bypass access control.
           (get site-args "resolver")
           (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
             ;; Resolvers need to do their own access control
             (resolver (assoc field-resolver-args ::pass/subject subject :db db)))
+
+          ;; A function whose input is the result of a GraphqL 'sub' query,
+          ;; propagating the same subject and under the exact same access
+          ;; control policy. This allows the function to declare its necessary
+          ;; inputs as a query.
+          ;;
+          ;; In addition, a function's results may be memoized, with each result
+          ;; stored in XTDB which acts as a large persistent memoization
+          ;; cache. For this reason, the function must be pure. The function
+          ;; must take a single map which contains the results of the sub-query
+          ;; and any argument values (which would also be used as variable
+          ;; values in the GraphQL sub-query which computes the other input
+          ;; argument).
+          ;;
+          ;; Once this feature is working, replace it with a call to a lambda or
+          ;; similarly sandboxed execution environment.
+          (get site-args "function")
+          (throw (ex-info "Feature not yet supported" {}))
 
           ;; Another strategy is to see if the field indexes the
           ;; object-value. This strategy allows for delays to be used to prevent
