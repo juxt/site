@@ -180,7 +180,7 @@
                  ::g/type-ref
                  ::g/list-type
                  ::g/name)
-        results (pull-entities db (xt/q db query [type]) query)]
+        results (pull-entities db subject (xt/q db query [type]) query)]
     (or (process-xt-results field results)
         (throw (ex-info "No resolver found for " type)))))
 
