@@ -8,21 +8,21 @@
  :juxt.site.alpha.unix-pass/password-prefix "site/local/"
 
  :ig/system
- {:juxt.site.alpha.db/crux-node
-  {:crux/tx-log
-   {:kv-store {:crux/module crux.rocksdb/->kv-store
+ {:juxt.site.alpha.db/xt-node
+  {:xtdb/tx-log
+   {:kv-store {:xtdb/module xtdb.rocksdb/->kv-store
                :db-dir #join [#env HOME "/.local/share/site/db/txes"]}}
 
-   :crux/document-store
-   {:kv-store {:crux/module crux.rocksdb/->kv-store
+   :xtdb/document-store
+   {:kv-store {:xtdb/module xtdb.rocksdb/->kv-store
                :db-dir #join [#env HOME "/.local/share/site/db/docs"]}}
 
-   :crux/index-store
-   {:kv-store {:crux/module crux.rocksdb/->kv-store
+   :xtdb/index-store
+   {:kv-store {:xtdb/module xtdb.rocksdb/->kv-store
                :db-dir #join [#env HOME "/.local/share/site/db/idxs"]}}}
 
   :juxt.site.alpha.server/server
-  {:juxt.site.alpha/crux-node #ig/ref :juxt.site.alpha.db/crux-node
+  {:juxt.site.alpha/xt-node #ig/ref :juxt.site.alpha.db/xt-node
    :juxt.site.alpha/port 2021
 
    ;; Really, this is the canoncial-uri prefix where /_site exists.

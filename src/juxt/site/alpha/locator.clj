@@ -3,7 +3,7 @@
 (ns juxt.site.alpha.locator
   (:require
    [clojure.tools.logging :as log]
-   [crux.api :as x]))
+   [xtdb.api :as x]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -31,7 +31,7 @@
          (ex-info
           "Multiple resource locators returned from query that match URI"
           (into req
-                {::locators (map :crux.db/id locators)}))))
+                {::locators (map :xt/id locators)}))))
 
       (let [[e grps] (first locators)
             {typ ::site/type :as locator} (x/entity db e)]
@@ -61,7 +61,7 @@
 
 (comment
   (put!
-   {:crux.db/id "http://localhost:2021/ui/app.html"
+   {:xt/id "http://localhost:2021/ui/app.html"
     ::site/type "AppRoutes"
     ::site/pattern (re-pattern "http://localhost:2021/ui/.*")
     ::pass/classification "PUBLIC"

@@ -3,7 +3,7 @@
 (ns juxt.site.alpha.graphql-resolver
   (:require
    [juxt.site.alpha.repl :as repl]
-   [crux.api :as xt]
+   [xtdb.api :as xt]
    [clojure.set :as set]
    [clojure.java.shell :as sh]
    [juxt.site.alpha.main :as main]
@@ -42,17 +42,17 @@
                           :juxt.site.alpha/port])}))
      "database"
      (fn [_]
-       (let [node (:juxt.site.alpha.db/crux-node system)
+       (let [node (:juxt.site.alpha.db/xt-node system)
              status (xt/status node)]
          (merge
           (set/rename-keys
            status
-           {:crux.version/version "version"
-            :crux.version/revision "revision"
-            :crux.index/index-version "indexVersion"
-            :crux.kv/kv-store "kvStore"
-            :crux.kv/estimate-num-keys "estimateNumKeys"
-            :crux.kv/size "kvSize"})
+           {:xtdb.version/version "version"
+            :xtdb.version/revision "revision"
+            :xtdb.index/index-version "indexVersion"
+            :xtdb.kv/kv-store "kvStore"
+            :xtdb.kv/estimate-num-keys "estimateNumKeys"
+            :xtdb.kv/size "kvSize"})
           {"attributeStats"
            (fn [_]
              (for [[name frequency] (xt/attribute-stats node)]
@@ -64,9 +64,9 @@
      ;; TODO: Push these into JMX and pull JMX mbeans into GraphQL
      ;; TODO: Suggest to jms he does the same with XT
      "status"
-     {"txLogAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/tx-log :kv-store :db-dir])))
-      "docStoreAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/document-store :kv-store :db-dir])))
-      "indexStoreAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/crux-node :crux/index-store :kv-store :db-dir])))}
+     {"txLogAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/xt-node :xtdb/tx-log :kv-store :db-dir])))
+      "docStoreAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/xt-node :xtdb/document-store :kv-store :db-dir])))
+      "indexStoreAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/xt-node :xtdb/index-store :kv-store :db-dir])))}
 
 
      "requests"
@@ -75,7 +75,7 @@
 
       "summaries"
       (fn [_]
-        (for [{:keys [crux.db/id ring.response/status juxt.site.alpha/date]}
+        (for [{:keys [xt/id ring.response/status juxt.site.alpha/date]}
               (seq cache/requests-cache)]
           {"id" id
            "status" status
@@ -86,6 +86,6 @@
                    (cache/find
                     cache/requests-cache
                     (re-pattern (str "/_site/requests/" search)))
-                   {:crux.db/id "id"
+                   {:xt/id "id"
                     :ring.response/status "status"
                     :juxt.site.alpha/date "date"}))}}))

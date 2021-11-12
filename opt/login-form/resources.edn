@@ -1,28 +1,28 @@
-{:crux.db/id "{{base-uri}}/secret"
+{:xt/id "{{base-uri}}/secret"
  :juxt.http.alpha/methods #{:get :head :options}
  :juxt.http.alpha/content-type "text/plain;charset=utf-8"
  :juxt.http.alpha/content "This is the secret word: bananas\r\n"}
 
 ;; TODO: We also need a rule to allow access to the secret, if authenticated.
 
-{:crux.db/id "{{base-uri}}/_site/errors/unauthorized"
+{:xt/id "{{base-uri}}/_site/errors/unauthorized"
  :juxt.site.alpha/type "ErrorResource"
  :ring.response/status 401}
 
-{:crux.db/id "{{base-uri}}/_site/login.html"
+{:xt/id "{{base-uri}}/_site/login.html"
  :juxt.http.alpha/methods #{:get :head :options}
  :juxt.site.alpha/type "TemplatedRepresentation"
  :juxt.site.alpha/template "{{base-uri}}/_site/templates/login.html"
  :juxt.site.alpha/template-model juxt.pass.alpha.authentication/login-template-model}
 
-{:crux.db/id "{{base-uri}}/_site/errors/unauthorized.html"
+{:xt/id "{{base-uri}}/_site/errors/unauthorized.html"
  :juxt.http.alpha/methods #{:get :head :options}
  :juxt.site.alpha/variant-of "{{base-uri}}/_site/errors/unauthorized"
  :juxt.site.alpha/type "TemplatedRepresentation"
  :juxt.site.alpha/template "{{base-uri}}/_site/templates/unauthorized.html"
  :juxt.site.alpha/template-model juxt.pass.alpha.authentication/unauthorized-template-model}
 
-{:crux.db/id "{{base-uri}}/_site/rules/unauthorized-html-resource",
+{:xt/id "{{base-uri}}/_site/rules/unauthorized-html-resource",
  :juxt.site.alpha/description "The unauthorized HTML page must be accessible by all"
  :juxt.site.alpha/type "Rule"
  :juxt.pass.alpha/effect :juxt.pass.alpha/allow

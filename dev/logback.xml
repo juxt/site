@@ -92,10 +92,10 @@
   <logger name="juxt" level="ALL">
     <appender-ref ref="APP_LOG_FILE" />
   </logger>
-  <logger name="crux" level="INFO">
+  <logger name="xt" level="INFO">
     <appender-ref ref="APP_LOG_FILE" />
   </logger>
-  <logger name="crux.query" level="INFO">
+  <logger name="xt.query" level="INFO">
     <appender-ref ref="APP_LOG_FILE" />
   </logger>
 

@@ -4,7 +4,7 @@
   (:require
    [clojure.walk :refer [postwalk-replace]]
    [clojure.tools.logging :as log]
-   [crux.api :as crux]
+   [xtdb.api :as xt]
    [juxt.site.alpha.rules :as rules]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -30,7 +30,7 @@
         ;; policy... the apply rule-combining algo...
 
         rules (map first
-                   (crux/q db '{:find [rule]
+                   (xt/q db '{:find [rule]
                                 :where [[rule ::site/type "Rule"]]}))
 
         ;;_  (log/debugf "Rules to match are %s" (pr-str rules))

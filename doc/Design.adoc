@@ -45,22 +45,22 @@ for diagnostic purposes.
 
 === Resources
 
-In Site, Web resources are Crux entities.
+In Site, Web resources are XT entities.
 
 Since a resource is identified by a URI, we use its URI (or at least its path)
-to identify the Crux entity too.
+to identify the XT entity too.
 
 [source,clojure]
 ----
-{:crux.db/id "https://my.site/hello"}
+{:xt/id "https://my.site/hello"}
 ----
 
-The resource's state is stored in the Crux entity's attributes, or in other Crux
+The resource's state is stored in the XT entity's attributes, or in other XT
 entities it may reference.
 
 [source,clojure]
 ----
-{:crux.db/id "https://my.site/hello"
+{:xt/id "https://my.site/hello"
  :message-today "Hello World!"}
 ----
 
@@ -70,7 +70,7 @@ configuration, such as the methods allowed on the resource.
 
 [source,clojure]
 ----
-{:crux.db/id "https://my.site/hello"
+{:xt/id "https://my.site/hello"
  :message-today "Hello World!"
  :juxt.spin.alpha/methods #{:get :head :options}}
 ----
@@ -80,9 +80,9 @@ https://tools.ietf.org/html/rfc7231#section-2[Section 2 of RFC 7231].
 
 === Representations
 
-Representations are Clojure maps. You can either store these as Crux entities
+Representations are Clojure maps. You can either store these as XT entities
 too (for example, if the current representations are likely to change
-often). But usually, you can store them with the resource's Crux entity, shown
+often). But usually, you can store them with the resource's XT entity, shown
 in <<ex-hello-world>>.
 
 [[ex-hello-world]]
@@ -97,7 +97,7 @@ payload ahead-of-time.
 ----
 (alias 'http (create-ns 'juxt.http.alpha))
 
-{:crux.db/id "https://my.site/hello"
+{:xt/id "https://my.site/hello"
  :message-today "Hello World!"
  ::http/methods #{:get :head :options}
  ::http/representations

@@ -25,4 +25,4 @@
              true (str (java.util.UUID/randomUUID)))]
 
     (openapi/put-resource-state
-     req (assoc resource-state :crux.db/id id))))
+     req (assoc resource-state :xt/id id))))

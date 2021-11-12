@@ -9,7 +9,7 @@
 
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defmethod ig/init-key ::server [_ {::site/keys [crux-node port base-uri dynamic?] :as opts}]
+(defmethod ig/init-key ::server [_ {::site/keys [xt-node port base-uri dynamic?] :as opts}]
   (log/infof "Starting Jetty server on port %d" port)
   (run-jetty
    ;; Dynamic mode helps in development where performance is less critical than

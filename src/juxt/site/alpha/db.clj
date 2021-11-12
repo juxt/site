@@ -2,14 +2,14 @@
 
 (ns juxt.site.alpha.db
   (:require
-   [crux.api :as crux]
+   [xtdb.api :as xtdb]
    [integrant.core :as ig]
    [clojure.tools.logging :as log]))
 
-(defmethod ig/init-key ::crux-node [_ crux-opts]
-  (log/info "Starting Crux node")
-  (crux/start-node crux-opts))
+(defmethod ig/init-key ::xt-node [_ xtdb-opts]
+  (log/info "Starting XT node")
+  (xtdb/start-node xtdb-opts))
 
-(defmethod ig/halt-key! ::crux-node [_ node]
+(defmethod ig/halt-key! ::xt-node [_ node]
   (.close node)
-  (log/info "Closed Crux node"))
+  (log/info "Closed XT node"))

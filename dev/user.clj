@@ -8,7 +8,7 @@
    [clojure.tools.logging :as log]
    [juxt.site.alpha.repl :refer :all]
    [integrant.core :as ig]
-   [crux.api :as x]))
+   [xtdb.api :as x]))
 
 (apply require clojure.main/repl-requires)
 
