@@ -214,10 +214,10 @@
   [:xtdb.api/delete id])
 
 (defn xt-put
-  [object]
+  [object valid-from]
   (and (nil? (:xt/id object))
        (throw (ex-info "Trying to put object without xt id" {:object object})))
-  [:xtdb.api/put object])
+  [:xtdb.api/put object valid-from])
 
 (defn query [schema document operation-name variable-values xt-node db subject]
   (execute-request
@@ -242,9 +242,9 @@
             db (if (and (not mutation?)
                         (get argument-values "asOf"))
                  (xt/db xt-node (-> argument-values
-                                      (get "asOf")
-                                      t/date-time
-                                      t/inst))
+                                    (get "asOf")
+                                    t/date-time
+                                    t/inst))
                  db)
             lookup-entity (fn [id] (xt/entity db id))]
 
@@ -255,20 +255,29 @@
                                (let [id (get args "id")]
                                  (or id (throw (ex-info "Delete mutations need an 'id' key"
                                                         {:arg-values argument-values})))))]
+            (log/tracef "action is %s" action)
             (case action
               "delete"
               (let [id (validate-id! argument-values)]
                 (await-tx xt-node (xt-delete id))
+                ;; TODO: Allow an argument to correspond to valid-time, via
+                ;; @site(a: "xtdb.api/valid-time").
                 (lookup-entity id))
               "put"
-              (let [object-to-put (args-to-entity argument-values field nil)]
-                (await-tx xt-node (xt-put object-to-put))
+              (let [object-to-put (args-to-entity argument-values field nil)
+                    valid-time (some-> object-to-put :xtdb.api/valid-time
+                                       (java.time.Instant/parse)
+                                       (java.util.Date/from))]
+                (await-tx xt-node (xt-put (dissoc object-to-put :xtdb.api/valid-time) valid-time))
                 object-to-put)
               "update"
               (let [id (validate-id! argument-values)
                     old-value (lookup-entity id)
-                    object-to-put (args-to-entity argument-values field old-value)]
-                (await-tx xt-node (xt-put object-to-put))
+                    object-to-put (args-to-entity argument-values field old-value)
+                    valid-time (some-> object-to-put :xtdb.api/valid-time
+                                       (java.time.Instant/parse)
+                                       (java.util.Date/from))]
+                (await-tx xt-node (xt-put (dissoc object-to-put :xtdb.api/valid-time) valid-time))
                 object-to-put)))
 
           (get site-args "filter")
