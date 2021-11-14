@@ -65,7 +65,8 @@
    (x/submit-tx
     (xt-node)
     (for [m ms]
-      [:xtdb.api/put m]))
+      (let [vt (:xtdb.api/valid-time m)]
+        [:xtdb.api/put (dissoc m :xtdb.api/valid-time) vt])))
    (x/await-tx (xt-node))))
 
 (defn grep [re coll]
