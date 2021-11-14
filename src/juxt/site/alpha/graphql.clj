@@ -130,8 +130,7 @@
                        (:id entity)
                        (generate-value
                         {:type true
-                         :pathPrefix type}))
-          :juxt.site/type type)
+                         :pathPrefix type})))
          (dissoc :id)))))
 
 (defn process-xt-results
