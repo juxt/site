@@ -92,8 +92,8 @@
   (#{"int" "float" "string" "boolean" "id"} (str/lower-case arg-name)))
 
 (defn args-to-entity
-  ([args field] (args-to-entity args field nil))
-  ([args field old-value]
+  ([args field site-args] (args-to-entity args field site-args nil))
+  ([args field site-args old-value]
    (let [entity
          (reduce
           (fn [acc arg-def]
@@ -104,7 +104,7 @@
                   arg-type (or (::g/name type-ref)
                                (-> type-ref ::g/non-null-type ::g/name))]
               (cond
-                arg-type ; is it a singular (not a LIST)
+                arg-type                ; is it a singular (not a LIST)
                 (let [val (or (get args (::g/name arg-def))
                               ;; TODO: default value?
                               (generate-value generator-args))
@@ -122,16 +122,20 @@
          type (-> field ::g/type-ref ::g/name)
          _validate-type (and (nil? type)
                              (throw (ex-info "Couldn't infer type" {:field field})))]
-     (-> entity
-         (assoc
-          :xt/id (or
-                       (:xt/id old-value)
-                       (:xt/id entity)
-                       (:id entity)
-                       (generate-value
-                        {:type true
-                         :pathPrefix type})))
-         (dissoc :id)))))
+     (cond-> entity
+       true (assoc
+             :xt/id (or
+                     (:xt/id old-value)
+                     (:xt/id entity)
+                     (:id entity)
+                     (generate-value
+                      {:type true
+                       :pathPrefix type})))
+       (:id entity) (dissoc :id)
+
+       ;; This is special argument that adds Site specific attributes
+       (get site-args "methods")
+       (assoc ::http/methods (set (map (comp keyword str/lower-case) (get site-args "methods"))))))))
 
 (defn process-xt-results
   [field results]
@@ -269,13 +273,13 @@
                 ;; @site(a: "xtdb.api/valid-time").
                 (lookup-entity id))
               "put"
-              (let [object (args-to-entity argument-values field nil)]
+              (let [object (args-to-entity argument-values field site-args nil)]
                 (put-object! xt-node object)
                 object)
               "update"
               (let [id (validate-id! argument-values)
                     old-value (lookup-entity id)
-                    object (args-to-entity argument-values field old-value)]
+                    object (args-to-entity argument-values field site-args old-value)]
                 (put-object! xt-node object)
                 object)))
 
