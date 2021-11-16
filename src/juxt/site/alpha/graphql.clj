@@ -116,6 +116,25 @@
                   (cond
                     (or kw (scalar? arg-type)) (assoc acc (keyword (or kw arg-name)) val)
                     :else (merge acc val)))
+
+                ;; Is it a list? Then put in as a vector
+                (::g/list-type type-ref)
+                (let [val (or (get args (::g/name arg-def))
+                              ;; TODO: default value?
+                              (generate-value generator-args))
+                      ;; Change a symbol value into a string
+
+                      ;; We don't want symbols in XT entities, because this leaks the
+                      ;; form-plane into the data-plane!
+                      val (cond-> val (symbol? val) str)
+
+                      list-type (get-in type-ref [::g/list-type ::g/name])]
+                  (case list-type
+                    ;; of Strings?
+                    "String" (assoc acc (keyword (or kw arg-name)) val)
+                    (throw (ex-info "Unsupported list-type" {:arg-def arg-def
+                                                             :list-type list-type}))))
+
                 :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
           (or old-value {})
           (::g/arguments-definition field))
