@@ -88,27 +88,31 @@
 
 (defn pick-validation-failures
   [{::jinx/keys [errors keyword schema valid? subschemas instance property] :as validation}]
-  (let [valid? (or (:valid? validation)
-                  (::jinx/valid? validation))
-        subschemas (or (:subschemas validation)
-                       (::jinx/subschemas validation))
-        instance (or (:instance validation)
-                     (::jinx/instance validation))]
-    (->> (cond
-           (and (not valid?)
-                (not-empty subschemas))
-           (->> (mapv pick-validation-failures subschemas)
-                (filterv some?)
-                (reduce concat))
+  (cond
+    (and (not valid?)
+         (not-empty subschemas))
+    (let [subschema-failures
+          (->> (mapv pick-validation-failures subschemas)
+               (filterv some?)
+               (reduce concat))]
+      {:errors errors
+       :property property
+       :schema schema
+       :keyword keyword
+       :instance instance
+       :valid? valid?
+       :required (get schema "required")
+       :subschemas subschema-failures})
 
-           (and (not valid?)
-                (empty? subschemas))
-           {:errors (map :message errors)
-            :property property
-            :schema schema
-            :keyword keyword
-            :instance instance
-            :valid? valid?}))))
+    (and (not valid?)
+         (empty? subschemas))
+    {:errors errors
+     :property property
+     :schema schema
+     :keyword keyword
+     :instance instance
+     :valid? valid?
+     :required (get schema "required")}))
 
 (defmethod received-body->resource-state "application/json"
   [{::site/keys [received-representation resource db] :as req}]
