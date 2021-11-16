@@ -150,6 +150,7 @@
                      (generate-value
                       {:type true
                        :pathPrefix type})))
+       (nil? (:juxt.site/type entity)) (assoc :juxt.site/type type)
        (:id entity) (dissoc :id)
 
        ;; This is special argument that adds Site specific attributes
