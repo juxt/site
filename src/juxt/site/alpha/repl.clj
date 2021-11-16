@@ -220,13 +220,13 @@
          pred (or pred some?)
          encoder (java.util.Base64/getEncoder)
          resources
-         (->> (q '{:find [(pull e [*])]
-                   :where [[e :xt/id]]})
-              (map first)
-              (filter #(not= (::site/type %) "Request"))
-              (filter pred)
-              (map (apply-uri-mappings uri-mapping))
-              (sort-by :xt/id))]
+         (cond->> (q '{:find [(pull e [*])]
+                       :where [[e :xt/id]]})
+           true (map first)
+           true (filter #(not= (::site/type %) "Request"))
+           pred (filter pred)
+           uri-mapping (map (apply-uri-mappings uri-mapping))
+           true (sort-by :xt/id))]
 
      (defmethod print-method (type (byte-array [])) [x writer]
        (.write writer "#juxt.site/base64")
@@ -237,7 +237,7 @@
          (doseq [[_ ent] batch]
            (let [line (pr-str ent)]
              ;; Test the line can be read
-             (try
+             #_(try
                (validate-resource-line line)
                (catch Exception e
                  (throw
