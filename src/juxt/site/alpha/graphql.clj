@@ -106,7 +106,7 @@
                                (-> type-ref ::g/non-null-type ::g/name))]
               (cond
                 arg-type                ; is it a singular (not a LIST)
-                (let [val (or (get args (name key))
+                (let [val (or (get args arg-name)
                               ;; TODO: default value?
                               (generate-value generator-args))
                       ;; Change a symbol value into a string
