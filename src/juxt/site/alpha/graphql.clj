@@ -100,12 +100,13 @@
             (let [generator-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "gen"])
                   kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])
                   arg-name (::g/name arg-def)
+                  key (keyword (or kw arg-name))
                   type-ref (::g/type-ref arg-def)
                   arg-type (or (::g/name type-ref)
                                (-> type-ref ::g/non-null-type ::g/name))]
               (cond
                 arg-type                ; is it a singular (not a LIST)
-                (let [val (or (get args (::g/name arg-def))
+                (let [val (or (get args (name key))
                               ;; TODO: default value?
                               (generate-value generator-args))
                       ;; Change a symbol value into a string
@@ -114,12 +115,12 @@
                       ;; form-plane into the data-plane!
                       val (cond-> val (symbol? val) str)]
                   (cond
-                    (or kw (scalar? arg-type)) (assoc acc (keyword (or kw arg-name)) val)
+                    (or kw (scalar? arg-type)) (assoc-some acc key val)
                     :else (merge acc val)))
 
                 ;; Is it a list? Then put in as a vector
                 (::g/list-type type-ref)
-                (let [val (or (get args (::g/name arg-def))
+                (let [val (or (get args (name key))
                               ;; TODO: default value?
                               (generate-value generator-args))
                       ;; Change a symbol value into a string
@@ -129,9 +130,9 @@
                       val (cond-> val (symbol? val) str)
 
                       list-type (get-in type-ref [::g/list-type ::g/name])]
-                  (case list-type
-                    ;; of Strings?
-                    "String" (assoc acc (keyword (or kw arg-name)) val)
+                  (cond
+                    (scalar? list-type) (assoc-some acc key val)
+                    :else
                     (throw (ex-info "Unsupported list-type" {:arg-def arg-def
                                                              :list-type list-type}))))
 
