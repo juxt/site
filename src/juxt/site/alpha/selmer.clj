@@ -34,17 +34,6 @@
              "em" [:safe (str "<em>" (second x) "</em>")])
            (str x))))
 
-(selmer.filters/add-filter!
- :days
- (fn [x] (when x (.toDays (java.time.Duration/parse "PT600H")))))
-
-(selmer.filters/add-filter!
- :decode
- (fn [x] (case x
-           "GB-ENG" "England & Wales"
-           "DE" "Germany"
-           x)))
-
 (defn xt-template-loader [db]
   (proxy [java.net.URLStreamHandler] []
     (openConnection [url]
