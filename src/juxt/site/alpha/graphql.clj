@@ -42,19 +42,17 @@
         result
         (postwalk
          (fn [x]
-           (cond-> x
-             (and (map? x) (:keyword x))
-             (-> (get :keyword) keyword)
-             (and (map? x) (:set x))
-             (-> (get :set) set)
-             (and (map? x) (:edn x))
-             (-> (get :edn) edn/read-string)))
+           (try
+             (cond-> x
+               (and (map? x) (:keyword x))
+               (-> (get :keyword) keyword)
+               (and (map? x) (:set x))
+               (-> (get :set) set)
+               (and (map? x) (:edn x))
+               (-> (get :edn) edn/read-string))
+             (catch Exception e
+               (throw (ex-info "Error in q site arg" {:x x} e)))))
          query)
-        #_#_order (try
-                (edn/read-string (get values "orderBy"))
-                (catch Exception e
-                  (prn "Invalid order, must be edn readable"
-                       {:input (get values "orderBy")})))
         limit (get values "limit")
         offset (get values "offset")
         search-terms (get values "searchTerms")
@@ -413,8 +411,13 @@
 (defn post-handler [{::site/keys [uri xt-node db]
                      ::pass/keys [subject]
                      :as req}]
-
   (let [schema (some-> (xt/entity db uri) ::grab/schema)
+        _validate-schema (and (nil? schema)
+                              (let [msg (str "Schema does not exist at " uri ". Are you deploying it correctly?")]
+                                (throw (ex-info
+                                        msg
+                                        (into req {:ring.response/status 400
+                                                   ::errors [msg]})))))
         body (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
         {query "query"
