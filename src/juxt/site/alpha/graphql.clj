@@ -6,6 +6,7 @@
    [selmer.parser :as selmer]
    [juxt.grab.alpha.schema :as schema]
    [juxt.grab.alpha.document :as document]
+   [juxt.site.alpha.typesense :as typesense]
    [jsonista.core :as json]
    [juxt.grab.alpha.execution :refer [execute-request]]
    [juxt.grab.alpha.parser :as parser]
