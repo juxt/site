@@ -52,7 +52,7 @@
         sys (ig/init system-config)]
     (log/infof "Configuration: %s" (pr-str system-config))
 
-    (log/info "System started and ready...")
+    (log/warn "System started and ready...")
     (log/trace "TRACE on")
     (Thread/setDefaultUncaughtExceptionHandler
      (reify Thread$UncaughtExceptionHandler

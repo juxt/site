@@ -6,7 +6,6 @@
    [selmer.parser :as selmer]
    [juxt.grab.alpha.schema :as schema]
    [juxt.grab.alpha.document :as document]
-   [juxt.site.alpha.typesense :as typesense]
    [jsonista.core :as json]
    [juxt.grab.alpha.execution :refer [execute-request]]
    [juxt.grab.alpha.parser :as parser]
@@ -17,6 +16,7 @@
    [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk keywordize-keys]]
    [clojure.edn :as edn]
+   [juxt.site.alpha.typesense :as typesense]
    [tick.core :as t]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
@@ -83,7 +83,8 @@
                (and (map? x) (:edn x))
                (-> (get :edn)
                    (selmer/render {"type" type-k
-                                   "object-id" (:xt/id object-value)})
+                                   "object-id" (:xt/id object-value)
+                                   "args" values})
                    edn/read-string)
                (= 'type x)
                ((constantly type-k)))
@@ -133,8 +134,11 @@
 (defn scalar? [arg-name types-by-name]
   (= (get-in types-by-name [arg-name ::g/kind]) 'SCALAR))
 
+(defn enum? [arg-name types-by-name]
+  (= (get-in types-by-name [arg-name ::g/kind]) 'ENUM))
+
 (defn- args-to-entity
-  [{:keys [argument-values schema field base-uri site-args type-k]}]
+  [{:keys [argument-values schema field base-uri site-args type-k subject]}]
   (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
   (let [args argument-values
         types-by-name (:juxt.grab.alpha.schema/types-by-name schema)
@@ -239,6 +243,7 @@
                      {:type "UUID"
                       :pathPrefix type}
                      {})))
+      subject (assoc :_siteSubject (::pass/username subject))
       (nil? (type-k entity)) (assoc type-k type)
       (:id entity) (dissoc :id)
       transform (transform args)
@@ -280,13 +285,19 @@
         :else
         (first results)))))
 
+(defn assoc-valid-time
+  [entity db]
+  (assoc entity :_siteValidTime
+         (some-> db
+                 (xt/entity-tx (:xt/id entity))
+                 ::xt/valid-time
+                 t/instant
+                 .toString)))
+
 (defn protected-lookup [e subject db]
   (let [lookup #(xt/entity db %)
         ent (some-> (lookup e)
-                    (assoc :_siteValidTime
-                           (str (t/instant
-                                 (::xt/valid-time
-                                  (xt/entity-tx db e))))))]
+                    (assoc-valid-time db))]
     (if-let [ent-ns (::pass/namespace ent)]
       (let [rules (some-> ent-ns lookup ::pass/rules)
             acls (->>
@@ -381,14 +392,16 @@
       (= "String" type-name)
       ""
       :else
-      nil)))
+      (do
+        (log/debugf "defaulting to nil, type-ref is %s" type-ref)
+        nil))))
 
 (defn perform-mutation!
-  [{:keys [argument-values site-args xt-node lookup-entity field-kind] :as opts}]
+  [{:keys [argument-values site-args xt-node lookup-entity field-kind subject] :as opts}]
   (let [action (or (get site-args "mutation") "put")
         validate-id! (fn [args]
                        (let [id (get args "id")]
-                         (or id (throw (ex-info "Delete mutations need an 'id' key"
+                         (or id (throw (ex-info "This mutation needs an 'id' key"
                                                 {:arg-values argument-values})))))
         bulk-mutation (= 'LIST field-kind)]
     (case action
@@ -407,9 +420,29 @@
           (put-objects! xt-node [tx])
           tx))
       "update"
-      (let [new-entity (args-to-entity opts)
-            old-entity (some-> new-entity :xt/id lookup-entity)
-            new-entity (merge old-entity new-entity)]
+      (when (seq(get argument-values "id"))
+        (let [new-entity (args-to-entity opts)
+              old-entity (some-> new-entity :xt/id lookup-entity)
+              new-entity (merge old-entity new-entity)]
+          (put-objects! xt-node [new-entity])
+          new-entity))
+      "rollback"
+      (let [as-of (try
+                    (let [str (get argument-values "asOf")]
+                      (def str str)
+                      (if (str/ends-with? str "Z")
+                        (-> str t/inst)
+                        (-> str
+                            (t/parse-date-time
+                             (t/formatter :iso-local-date-time))
+                            t/inst)))
+                    (catch Exception e
+                      (throw (ex-info "rollback mutations need a valid asOf argument"
+                                      {:args argument-values}
+                                      e))))
+            db (xt/db xt-node as-of)
+            id (validate-id! argument-values)
+            new-entity (protected-lookup id subject db)]
         (put-objects! xt-node [new-entity])
         new-entity))))
 
@@ -461,7 +494,7 @@
                    db)
               object-id (:xt/id object-value)
               ;; TODO: Protected lookup please!
-              lookup-entity (fn [id] (xt/entity db id))
+              lookup-entity (fn [id] (protected-lookup id subject db))
               opts {:site-args site-args
                     :xt-node xt-node
                     :schema schema
@@ -490,12 +523,17 @@
                             :desc)
                     process-history-item
                     (fn [{::xt/keys [valid-time doc]}]
-                      (assoc doc :_siteValidTime valid-time))]
+                      (assoc doc :_siteValidTime (t/instant valid-time)))]
                 (with-open [history (xt/open-entity-history db id order {:with-docs? true})]
                   (->> history
                        (iterator-seq)
+                       (drop offset)
+                       (take limit)
                        (map process-history-item))))
               (throw (ex-info "History queries must have an id argument" {})))
+
+            (get site-args "typesenseConfig")
+            (typesense/ts-search site-args argument-values)
 
             (get site-args "filter")
             (cond
@@ -511,7 +549,17 @@
                                     subject db)))
 
             (get site-args "q")
-            (let [object-id (:xt/id object-value)
+            (let [db (if-let [t (:_siteValidTime object-value)]
+                       (try
+                         (xt/db xt-node (-> t
+                                            t/instant
+                                            (t/>> (t/new-duration 1 :seconds))
+                                            t/inst))
+                         (catch Exception e
+                           (prn "Can't parse valid time" e)
+                           db))
+                       db)
+                  object-id (:xt/id object-value)
                   arg-keys (fn [m] (remove #{"limit" "offset" "orderBy"} (keys m)))
                   in (cond->> (map symbol (arg-keys argument-values))
                        object-id (concat ['object]))
@@ -541,6 +589,17 @@
               ;;(log/tracef "GraphQL results is %s" (seq result-entities))
 
               (process-xt-results field result-entities))
+
+            (get site-args "itemForId")
+            (let [item-key (keyword (get site-args "itemForId"))
+                  query {:find ['e]
+                         :where [['e type-k (field->type field)]
+                                 ['e item-key (get argument-values "id")]]}
+                  results (xt/q db query)
+                  result-entities (cond->> (pull-entities db subject results query)
+                                    (get site-args "a")
+                                    (map (keyword (get site-args "a"))))]
+              (vec (process-xt-results field result-entities)))
 
             (get site-args "a")
             (let [att (get site-args "a")
@@ -623,7 +682,7 @@
             ;; Another strategy is to see if the field indexes the
             ;; object-value. This strategy allows for delays to be used to prevent
             ;; computing field values that aren't resolved.
-            (contains? object-value field-name)
+            (and (map? object-value) (contains? object-value field-name))
             (let [f (force (get object-value field-name))]
               (if (fn? f) (f argument-values) f))
 
@@ -632,22 +691,36 @@
             (get object-value :xt/id)
 
             ;; Or simply try to extract the keyword
-            (contains? object-value (keyword field-name))
+            (and (map? object-value)
+                 (or
+                  ;; schema specifies this field is on the object
+                  (get-in field [::schema/directives-by-name "onObject"])
+                  (contains? object-value (keyword field-name))))
             (let [result (get object-value (keyword field-name))]
-              (if (-> field ::g/type-ref list-type?)
+              (cond
+                (-> field ::g/type-ref list-type?)
                 (limit-results argument-values result)
+                ;; TODO validate enum (enum? (field->type field) types-by-name)
+                :else
                 result))
 
+            (get argument-values "id")
+            (lookup-entity (get argument-values "id"))
+
+            (get argument-values "ids")
+            (let [ids (get argument-values "ids")]
+              (if (vector? ids)
+                (map lookup-entity ids)
+                (throw (ex-info "ids argument must be a list" {:ids ids}))))
+
             (and (field->type field)
-                 (not (scalar? (field->type field) types-by-name)))
+                 (not (scalar? (field->type field) types-by-name))
+                 (not (enum? (field->type field) types-by-name)))
             (infer-query db
                          subject
                          field
                          (to-xt-query opts)
                          argument-values)
-
-            (get argument-values "id")
-            (xt/entity db (get argument-values "id"))
 
             (and (get site-args "aggregate")
                  (get site-args "type"))
@@ -656,8 +729,7 @@
                        (xt/q
                         db (to-xt-query opts))))
 
-            :else
-            (default-for-type (::g/type-ref field)))))})))
+            :else nil)))})))
 
 (defn common-variables
   "Return the common 'built-in' variables that are bound always bound."

@@ -155,8 +155,6 @@
   (let [decoder (java.util.Base64/getDecoder)]
     (.decode decoder form)))
 
-;; Start import at 00:35
-
 (defn resources-from-stream [in]
   (let [record (try
                  (edn/read

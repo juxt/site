@@ -1,0 +1,113 @@
+<!-- Logback Configuration. See http://logback.qos.ch/ -->
+<!-- Adapted from https://github.com/stuartsierra/log.dev/blob/master/resources/logback.xml -->
+<!-- <configuration scan="true" scanPeriod="1 seconds"> -->
+<configuration scan="true">
+
+   <!-- Console (STDOUT) output. -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+
+    <!-- Only print log messages at level WARN or higher. -->
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>WARN</level>
+    </filter>
+
+    <!-- Default encoder is ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
+    <encoder>
+      <!-- two-line layout suitable for a terminal -->
+      <pattern>%date{HH:mm:ss.SSS} %-5level %logger %n%msg%n</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+
+  <!-- The output file configuration for log/all.log -->
+  <appender name="ALL_LOG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+
+    <!-- Default encoder is ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
+    <encoder>
+      <pattern>%date{HH:mm:ss.SSS} %-5level %logger{25}: %msg %X thread=%thread%n</pattern>
+    </encoder>
+
+    <!-- Default location of log file is log/all.log -->
+    <file>log/all.log</file>
+
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <!-- Roll over log files daily -->
+      <fileNamePattern>log/all.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+
+      <!-- And start a new file every 64 MB -->
+      <maxFileSize>64 MB</maxFileSize>
+
+      <!-- Keep at most 15 days of history -->
+      <maxHistory>15</maxHistory>
+
+      <!-- Up to a maximum of 512 MB -->
+      <totalSizeCap>512MB</totalSizeCap>
+
+      <!-- Ensure short-lived processes still clean up old logs -->
+      <cleanHistoryOnStart>true</cleanHistoryOnStart>
+    </rollingPolicy>
+  </appender>
+
+
+  <!-- The output file configuration for log/app.log -->
+  <appender name="APP_LOG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+
+    <!-- Default encoder is ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
+    <encoder>
+      <pattern>%date{ISO8601} %-5level %logger{25}: %msg [%X thread=%thread]%n</pattern>
+    </encoder>
+
+    <!-- Default location of log file is log/app.log -->
+    <file>log/app.log</file>
+
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <!-- Roll over log files daily -->
+      <fileNamePattern>log/app.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+
+      <!-- And start a new file every 64 MB -->
+      <maxFileSize>64 MB</maxFileSize>
+
+      <!-- Keep at most 15 days of history -->
+      <maxHistory>15</maxHistory>
+
+      <!-- Up to a maximum of 512 MB -->
+      <totalSizeCap>512MB</totalSizeCap>
+
+      <!-- Ensure short-lived processes still clean up old logs -->
+      <cleanHistoryOnStart>true</cleanHistoryOnStart>
+    </rollingPolicy>
+  </appender>
+
+  <!-- Root log level is "ALL", meaning all log levels are emitted. -->
+  <root level="WARN">
+
+    <!-- Send all log messages to console (filtered to INFO) -->
+    <appender-ref ref="CONSOLE" />
+
+    <!-- Send all log messages to log/all.log -->
+    <appender-ref ref="ALL_LOG_FILE" />
+  </root>
+
+  <logger name="juxt" level="WARN">
+    <appender-ref ref="APP_LOG_FILE" />
+  </logger>
+  <logger name="xt" level="WARN">
+    <appender-ref ref="APP_LOG_FILE" />
+  </logger>
+  <logger name="xt.query" level="WARN">
+    <appender-ref ref="APP_LOG_FILE" />
+  </logger>
+
+  <!-- If you have a REPL or interactive shell with a logger named
+       'user' or 'dev', send those messages to log/app.log too. -->
+  <logger name="user" level="WARN">
+    <appender-ref ref="APP_LOG_FILE" />
+  </logger>
+
+  <!-- Make java.util.logging more efficient at disabled levels.
+       See http://logback.qos.ch/manual/configuration.html#LevelChangePropagator -->
+  <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+    <resetJUL>true</resetJUL>
+  </contextListener>
+</configuration>
