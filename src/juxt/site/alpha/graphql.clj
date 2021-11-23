@@ -424,7 +424,6 @@
 (defn post-handler [{::site/keys [uri xt-node db base-uri]
                      ::pass/keys [subject]
                      :as req}]
-  (log/tracef "post-handler; keys is %s" (pr-str (keys req)))
   (let [schema (some-> (xt/entity db uri) ::grab/schema)
         _validate-schema (and (nil? schema)
                               (let [msg (str "Schema does not exist at " uri ". Are you deploying it correctly?")]

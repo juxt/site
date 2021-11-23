@@ -598,40 +598,37 @@
              (receive-representation req)
              (assoc ::site/request request-id))
         req (assoc req ::site/received-representation rep)
-        post-fn (::site/post-fn resource)]
+        post-fn (::site/post-fn resource)
+        post
+        (cond
+          (fn? post-fn) post-fn
 
-    (log/tracef "post-fn is %s, type %s" post-fn (type post-fn))
+          (symbol? post-fn)
+          (try
+            (or
+             (requiring-resolve post-fn)
+             (throw (ex-info (format "Requiring resolve of %s returned nil" post-fn) {:post-fn post-fn})))
+            (catch Exception e
+              (throw
+               (ex-info
+                (format "post-fn '%s' is not resolvable" post-fn)
+                {::post-fn post-fn}
+                e))))
 
-    (let [post
-          (cond
-            (fn? post-fn) post-fn
+          (nil? post-fn)
+          (throw
+           (ex-info
+            "Resource allows POST but doesn't have a post-fn function"
+            (into req {:ring.response/status 500})))
 
-            (symbol? post-fn)
-            (try
-              (or
-               (requiring-resolve post-fn)
-               (throw (ex-info (format "Requiring resolve of %s returned nil" post-fn) {:post-fn post-fn})))
-              (catch Exception e
-                (throw
-                 (ex-info
-                  (format "post-fn '%s' is not resolvable" post-fn)
-                  {::post-fn post-fn}
-                  e))))
+          :else
+          (throw
+           (ex-info
+            (format "post-fn is neither a function or a symbol, but type '%s'" (type post-fn))
+            (into req {:ring.response/status 500}))))]
 
-            (nil? post-fn)
-            (throw
-             (ex-info
-              "Resource allows POST but doesn't have a post-fn function"
-              (into req {:ring.response/status 500})))
-
-            :else
-            (throw
-             (ex-info
-              (format "post-fn is neither a function or a symbol, but type '%s'" (type post-fn))
-              (into req {:ring.response/status 500}))))]
-
-      (assert post)
-      (post req))))
+    (assert post)
+    (post req)))
 
 (defn PUT [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
