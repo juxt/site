@@ -1195,10 +1195,14 @@
                   ;; Content-Location is not appropriate for errors.
                   (dissoc ::http/content-location)))))))
 
-(defn respond-internal-error [req e]
+(defn respond-internal-error [{::site/keys [request-id] :as req} e]
   (log/error e (str "Internal Error: " (.getMessage e)))
   ;; TODO: We should allow an ErrorResource for 500 errors
-  (let [default-body "Internal Server Error\r\n"]
+  (let [default-body
+        (str "<body>\r\n"
+             (cond-> "<h1>Internal Server Error</h1>\r\n"
+               request-id (str (format "<p><a href=\"%s\" target=\"_site_error\">%s</a></p>\r\n" request-id "Error")))
+             "</body>\r\n")]
     (respond
      (into
       req
@@ -1206,7 +1210,7 @@
        :ring.response/body default-body
        ::site/errors (errors-with-causes e)
        ::site/selected-representation
-       {::http/content-type "text/plain;charset=utf-8"
+       {::http/content-type "text/html;charset=utf-8"
         ::http/content-length (count default-body)
         :ring.response/body default-body}
        }))))
@@ -1215,19 +1219,21 @@
   "Respond with the given error"
   [req e]
 
-  (let [{:ring.request/keys [method]} req
+  (let [{:ring.request/keys [method] ::site/keys [request-id]} req
         {:ring.response/keys [status] :as ex-data} (ex-data e)
 
         site-exception? (some? (::site/start-date ex-data))
 
-        representation (or
-                        (when (= method :put) (put-error-representation req e))
-                        (when (= method :post) (post-error-representation req e))
-                        (error-resource-representation req e)
-                        (let [content (str (status-message status) "\r\n")]
-                          {::http/content-type "text/plain;charset=utf-8"
-                           ::http/content-length (count content)
-                           ::http/content content}))]
+        representation
+        (or
+         (when (= method :put) (put-error-representation req e))
+         (when (= method :post) (post-error-representation req e))
+         (error-resource-representation req e)
+         (let [content (cond-> (str (status-message status) "\r\n")
+                         request-id (str (format "<a href=\"%s\" target=\"_site_error\">%s</a>\r\n" request-id "Error")))]
+           {::http/content-type "text/html;charset=utf-8"
+            ::http/content-length (count content)
+            ::http/content content}))]
 
     (log/tracef "error-representation: %s" (pr-str representation))
 
