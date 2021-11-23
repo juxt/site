@@ -8,6 +8,7 @@
    [juxt.site.alpha.graphql :as graphql]
    [juxt.grab.alpha.document :as document]
    [juxt.grab.alpha.parser :as parser]
+   [ring.util.codec :refer [form-decode]]
    [xtdb.api :as xt]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
@@ -66,3 +67,53 @@
     (log/debugf "Executing GraphQL query for template: %s" graphql-query)
     ;; TODO: How to communicate back if there are any errors? Throw an exception?
     (:data (graphql/query schema document operation-name variables xt-node db subject))))
+
+
+(defn post-handler [{::site/keys [db resource xt-node]
+                     ::pass/keys [subject]
+                     :as req}]
+  (let [variables (-> req
+                      :juxt.site.alpha/received-representation
+                      :juxt.http.alpha/body
+                      (String.)
+                      form-decode)
+        graphql-query (String. (:juxt.http.alpha/body (xt/entity db (::site/template-model resource))))
+        operation-name (get variables "operationName")
+        graphql-schema-entity (xt/entity db (::site/graphql-schema resource))
+        schema (::grab/schema graphql-schema-entity)]
+
+    (try
+      ;; TODO: Obviously we should pre-parse, pre-compile and pre-validate GraphQL queries!
+      (let [document (parser/parse graphql-query)
+            compiled-document (document/compile-document document schema)
+            ]
+
+        (assoc req
+               :ring.response/status 200
+               :ring.response/headers {"content-type" "text/plain;charset=utf-8"}
+               :ring.response/body
+               (format "TODO: Handle this POST! %s"
+                       (with-out-str
+                         (clojure.pprint/pprint
+                          {#_#_:resource resource
+                           #_#_:request (String. (:juxt.http.alpha/body (xt/entity db (::site/template-model resource))))
+                           :graphql-query graphql-query
+                           :operation-name operation-name
+                           :variables variables
+                           :schema schema
+                           :document document
+                           :compiled-document compiled-document
+                           #_:graphql-result #_(graphql/query schema document operation-name variables xt-node db subject)
+                           })))))
+
+      (catch Exception e
+        (let [errors (:errors (ex-data e))]
+          (log/errorf e "Error parsing or compiling GraphQL query: %s" (seq errors))
+          (throw
+           (ex-info
+            "Error parsing or compiling GraphQL query for template model"
+            (into
+             req
+             (cond-> {:ring.response/status 500}
+               (seq errors) (assoc ::errors errors)))
+            e)))))))
