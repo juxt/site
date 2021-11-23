@@ -3,6 +3,7 @@
 (ns juxt.site.alpha.graphql
   (:require
    [ring.util.codec :refer [form-decode]]
+   [selmer.parser :as selmer]
    [juxt.grab.alpha.schema :as schema]
    [juxt.grab.alpha.document :as document]
    [jsonista.core :as json]
@@ -82,9 +83,16 @@
                           offset))]
     result))
 
-(defn generate-value [{:keys [type pathPrefix]}]
+(defn generate-value [{:keys [type pathPrefix template] :as gen-args} args]
   (when type
-    (str pathPrefix (java.util.UUID/randomUUID))))
+    (cond
+      (= (name type) "UUID")
+      (str pathPrefix (java.util.UUID/randomUUID))
+      (= (name type) "TEMPLATE")
+      (selmer/render template args)
+      :else
+      (throw (ex-info "Unrecognised type specified when generating attribute value"
+                      {:gen-args gen-args :args args})))))
 
 (defn scalar? [arg-name]
   (#{"int" "float" "string" "boolean" "id"} (str/lower-case arg-name)))
@@ -106,7 +114,7 @@
                 arg-type                ; is it a singular (not a LIST)
                 (let [val (or (get args arg-name)
                               ;; TODO: default value?
-                              (generate-value generator-args))
+                              (generate-value generator-args args))
                       ;; Change a symbol value into a string
 
                       ;; We don't want symbols in XT entities, because this leaks the
@@ -120,7 +128,7 @@
                 (::g/list-type type-ref)
                 (let [val (or (get args (name key))
                               ;; TODO: default value?
-                              (generate-value generator-args))
+                              (generate-value generator-args args))
                       ;; Change a symbol value into a string
 
                       ;; We don't want symbols in XT entities, because this leaks the
