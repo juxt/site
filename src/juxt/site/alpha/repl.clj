@@ -153,7 +153,8 @@
 (defn resources-from-stream [in]
   (let [record (try
                  (edn/read
-                  {:eof :eof :readers {'juxt.site/base64 base64-reader}}
+                  {:eof :eof :readers {'juxt.site/base64 base64-reader
+                                       'regex #(re-pattern %)}}
                   in)
                  (catch Exception e
                    (prn (.getMessage e))))]
