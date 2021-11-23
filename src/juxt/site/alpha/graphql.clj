@@ -145,10 +145,11 @@
              :xt/id (or
                      (:xt/id old-value)
                      (:xt/id entity)
-                     (:id entity)
-                     (generate-value
-                      {:type true
-                       :pathPrefix type})))
+                     #_(:id entity)
+                     #_(generate-value
+                      {:type "UUID"
+                       :pathPrefix type}
+                      {})))
        (nil? (:juxt.site/type entity)) (assoc :juxt.site/type type)
        (:id entity) (dissoc :id)
 
