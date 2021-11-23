@@ -97,9 +97,9 @@
 (defn scalar? [arg-name]
   (#{"int" "float" "string" "boolean" "id"} (str/lower-case arg-name)))
 
-(defn args-to-entity
-  ([args field site-args] (args-to-entity args field site-args nil))
-  ([args field site-args old-value]
+(defn- args-to-entity
+  ([args field base-uri site-args] (args-to-entity args field base-uri site-args nil))
+  ([args field base-uri site-args old-value]
    (let [entity
          (reduce
           (fn [acc arg-def]
@@ -110,6 +110,7 @@
                   type-ref (::g/type-ref arg-def)
                   arg-type (or (::g/name type-ref)
                                (-> type-ref ::g/non-null-type ::g/name))]
+              (log/tracef "type-ref for %s: %s (%s)" arg-name arg-type (type arg-type))
               (cond
                 arg-type                ; is it a singular (not a LIST)
                 (let [val (or (get args arg-name)
@@ -119,7 +120,10 @@
 
                       ;; We don't want symbols in XT entities, because this leaks the
                       ;; form-plane into the data-plane!
-                      val (cond-> val (symbol? val) str)]
+                      val (cond-> val
+                            (and (string? val) (= arg-type "ID"))
+                            (str val (selmer/render val {"base-uri" base-uri}))
+                            (symbol? val) str)]
                   (cond
                     (or kw (scalar? arg-type)) (assoc-some acc key val)
                     :else (merge acc val)))
@@ -257,7 +261,7 @@
                            (java.util.Date/from))]
     (await-tx xt-node (xt-put (dissoc object :xtdb.api/valid-time) valid-time))))
 
-(defn query [schema document operation-name variable-values xt-node db subject]
+(defn query [schema document operation-name variable-values xt-node db {:keys [subject base-uri]}]
   (execute-request
    {:schema schema
     :document document
@@ -301,13 +305,13 @@
                 ;; @site(a: "xtdb.api/valid-time").
                 (lookup-entity id))
               "put"
-              (let [object (args-to-entity argument-values field site-args nil)]
+              (let [object (args-to-entity argument-values field base-uri site-args nil)]
                 (put-object! xt-node object)
                 object)
               "update"
               (let [id (validate-id! argument-values)
                     old-value (lookup-entity id)
-                    object (args-to-entity argument-values field site-args old-value)]
+                    object (args-to-entity argument-values field base-uri site-args old-value)]
                 (put-object! xt-node object)
                 object)))
 
@@ -417,9 +421,10 @@
           :else
           (or (get site-args "defaultValue") ""))))}))
 
-(defn post-handler [{::site/keys [uri xt-node db]
+(defn post-handler [{::site/keys [uri xt-node db base-uri]
                      ::pass/keys [subject]
                      :as req}]
+  (log/tracef "post-handler; keys is %s" (pr-str (keys req)))
   (let [schema (some-> (xt/entity db uri) ::grab/schema)
         _validate-schema (and (nil? schema)
                               (let [msg (str "Schema does not exist at " uri ". Are you deploying it correctly?")]
@@ -467,7 +472,8 @@
 
         results
         (juxt.site.alpha.graphql/query
-         schema compiled-document operation-name variables xt-node db subject)]
+         schema compiled-document operation-name variables xt-node
+         db {:subject subject :base-uri base-uri})]
 
     (-> req
         (assoc
@@ -635,7 +641,7 @@
                 e)))))))))
 
 (defn stored-document-post-handler
-  [{::site/keys [xt-node db resource received-representation]
+  [{::site/keys [xt-node db resource received-representation base-uri]
     ::pass/keys [subject]
     :as req}]
 
@@ -655,7 +661,7 @@
                        {}
                        nil ;; for xt-node, so we prevent get updates
                        db
-                       subject)]
+                       {:subject subject :base-uri base-uri})]
     (-> req
         (assoc-in [:ring.response/headers "content-type"] "application/json")
         (assoc :ring.response/body (json/write-value-as-bytes results)))))
