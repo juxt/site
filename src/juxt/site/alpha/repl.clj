@@ -34,6 +34,9 @@
 (defn system []
   main/system)
 
+(defn base-uri []
+  (::site/base-uri (config)))
+
 (defn help []
   (doseq [[_ v] (sort (ns-publics 'juxt.site.alpha.repl))
           :let [m (meta v)]]
