@@ -110,7 +110,6 @@
                   type-ref (::g/type-ref arg-def)
                   arg-type (or (::g/name type-ref)
                                (-> type-ref ::g/non-null-type ::g/name))]
-              (log/tracef "type-ref for %s: %s (%s)" arg-name arg-type (type arg-type))
               (cond
                 arg-type                ; is it a singular (not a LIST)
                 (let [val (or (get args arg-name)
@@ -122,7 +121,8 @@
                       ;; form-plane into the data-plane!
                       val (cond-> val
                             (and (string? val) (= arg-type "ID"))
-                            (str val (selmer/render val {"base-uri" base-uri}))
+                            (selmer/render {"base-uri" base-uri})
+
                             (symbol? val) str)]
                   (cond
                     (or kw (scalar? arg-type)) (assoc-some acc key val)
@@ -157,11 +157,11 @@
              :xt/id (or
                      (:xt/id old-value)
                      (:xt/id entity)
-                     #_(:id entity)
-                     #_(generate-value
-                      {:type "UUID"
-                       :pathPrefix type}
-                      {})))
+                     (:id entity)
+                     (generate-value
+                        {:type "UUID"
+                         :pathPrefix type}
+                        {})))
        (nil? (:juxt.site/type entity)) (assoc :juxt.site/type type)
        (:id entity) (dissoc :id)
 
