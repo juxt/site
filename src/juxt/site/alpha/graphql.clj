@@ -103,30 +103,46 @@
    (let [entity
          (reduce
           (fn [acc arg-def]
-            (let [generator-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "gen"])
+            (let [site-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments])
+                  generator-args (get site-args "gen")
+                  transform-sym (some-> site-args (get "transform") symbol)
+                  transform (when transform-sym (requiring-resolve transform-sym))
                   kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])
                   arg-name (::g/name arg-def)
                   key (keyword (or kw arg-name))
                   type-ref (::g/type-ref arg-def)
                   arg-type (or (::g/name type-ref)
                                (-> type-ref ::g/non-null-type ::g/name))]
+
+              (when (and transform-sym (not transform))
+                (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
+
+              (when transform
+                (log/tracef "transform is %s" transform))
+
               (cond
                 arg-type                ; is it a singular (not a LIST)
-                (let [val (or (get args arg-name)
-                              ;; TODO: default value?
-                              (generate-value generator-args args))
-                      ;; Change a symbol value into a string
+                (let [value (or (get args arg-name)
+                                (generate-value generator-args args))
+                      value
+                      (cond-> value
+                        ;; We don't want symbols in XT entities, because this leaks the
+                        ;; form-plane into the data-plane!
+                        (symbol? value) str
 
-                      ;; We don't want symbols in XT entities, because this leaks the
-                      ;; form-plane into the data-plane!
-                      val (cond-> val
-                            (and (string? val) (= arg-type "ID"))
-                            (selmer/render {"base-uri" base-uri})
+                        ;; Replace base-uri in string-template, only for an ID
+                        ;; since we should be careful not to tamper with other
+                        ;; values.
+                        (and (string? value) (= arg-type "ID"))
+                        (selmer/render {"base-uri" base-uri})
 
-                            (symbol? val) str)]
+                        ;; Transform value
+                        transform transform
+
+                        )]
                   (cond
-                    (or kw (scalar? arg-type)) (assoc-some acc key val)
-                    :else (merge acc val)))
+                    (or kw (scalar? arg-type)) (assoc-some acc key value)
+                    :else (merge acc value)))
 
                 ;; Is it a list? Then put in as a vector
                 (::g/list-type type-ref)
@@ -159,9 +175,9 @@
                      (:xt/id entity)
                      (:id entity)
                      (generate-value
-                        {:type "UUID"
-                         :pathPrefix type}
-                        {})))
+                      {:type "UUID"
+                       :pathPrefix type}
+                      {})))
        (nil? (:juxt.site/type entity)) (assoc :juxt.site/type type)
        (:id entity) (dissoc :id)
 
