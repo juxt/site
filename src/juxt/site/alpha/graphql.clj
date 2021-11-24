@@ -100,7 +100,13 @@
 (defn- args-to-entity
   ([args field base-uri site-args] (args-to-entity args field base-uri site-args nil))
   ([args field base-uri site-args old-value]
-   (let [entity
+   (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
+   (let [transform-sym (some-> site-args (get "transform") symbol)
+         transform (when transform-sym (requiring-resolve transform-sym))
+         _  (when (and transform-sym (not transform))
+              (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
+
+         entity
          (reduce
           (fn [acc arg-def]
             (let [site-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments])
@@ -180,10 +186,13 @@
                       {})))
        (nil? (:juxt.site/type entity)) (assoc :juxt.site/type type)
        (:id entity) (dissoc :id)
+       transform (transform args)
 
        ;; This is special argument that adds Site specific attributes
        (get site-args "methods")
-       (assoc ::http/methods (set (map (comp keyword str/lower-case) (get site-args "methods"))))))))
+       (assoc ::http/methods (set (map (comp keyword str/lower-case) (get site-args "methods"))))
+
+       ))))
 
 (defn process-xt-results
   [field results]
