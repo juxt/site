@@ -61,7 +61,7 @@
         ;; REPL highlighting
         mvxcvi/puget {:mvn/version "1.3.1"}
 
-	;; Time 
+	;; Time
         tick/tick {:mvn/version "0.5.0-RC4"}
 
         ;; Removing AWS means we now need a direct dependency on this jar for an
@@ -70,12 +70,15 @@
         pro.juxt.clojars-mirrors.com.taoensso/nippy {:mvn/version "3.1.1"}
 
 
+        ;; Required for Slack integration
+        org.julienxx/clj-slack {:mvn/version "0.6.3"}
+        lt.tokenmill/timewords {:mvn/version "0.5.0"}
         }
 
  :aliases
  {:dev
   {:extra-paths ["dev" "test"]
-   :extra-deps { ;; Convenience libraries made available during development 
+   :extra-deps { ;; Convenience libraries made available during development
                 org.clojure/test.check {:mvn/version "0.9.0"}
                 org.clojure/alpha.spec {:git/url "https://github.com/clojure/spec-alpha2.git"
                                         :sha "c087ded910b3532a938b37e853df79fc3b9c48c1"}}
