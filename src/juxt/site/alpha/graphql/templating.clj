@@ -40,8 +40,6 @@
 
         _ (assert schema (str "GraphQL schema entity does not have a current schema"))
 
-        _ (log/tracef "GraphQL query is %s" graphql-query)
-
         document
         (try
           ;; TODO: Obviously we should pre-parse, pre-compile and pre-validate GraphQL queries!
@@ -68,31 +66,46 @@
     ;; TODO: How to communicate back if there are any errors? Throw an exception?
     (:data (graphql/query schema document operation-name variables xt-node db subject))))
 
-
 (defn post-handler [{::site/keys [db resource xt-node]
                      ::pass/keys [subject]
                      :as req}]
-  (let [variables (-> req
-                      :juxt.site.alpha/received-representation
-                      :juxt.http.alpha/body
-                      (String.)
-                      form-decode)
-        graphql-query (String. (:juxt.http.alpha/body (xt/entity db (::site/template-model resource))))
+
+  (let [input-body-as-string
+        (-> req :juxt.site.alpha/received-representation
+            :juxt.http.alpha/body
+            (String.))
+        variables (form-decode input-body-as-string)
+        document-resource-id (::site/template-model resource) ; pages.edn
+        document-resource (xt/entity db document-resource-id)
+        graphql-query (String. (:juxt.http.alpha/body document-resource))
         operation-name (get variables "operationName")
-        graphql-schema-entity (xt/entity db (::site/graphql-schema resource))
+        graphql-schema-id (::site/graphql-schema document-resource)
+        graphql-schema-entity (xt/entity db graphql-schema-id)
         schema (::grab/schema graphql-schema-entity)]
 
     (try
       ;; TODO: Obviously we should pre-parse, pre-compile and pre-validate GraphQL queries!
       (let [document (parser/parse graphql-query)
-            compiled-document (document/compile-document document schema)
-            ]
+            compiled-document
+            (try
+              (document/compile-document document schema)
+              (catch Exception e
+                (log/errorf "document is %s" document)
+                (throw e)))
+
+            result (graphql/query schema compiled-document operation-name variables xt-node db {:subject subject})
+            {:keys [id name]} (get-in result [:data :addPerson])]
 
         (assoc req
                :ring.response/status 200
-               :ring.response/headers {"content-type" "text/plain;charset=utf-8"}
+               :ring.response/headers {"content-type" "text/html;charset=utf-8"}
                :ring.response/body
-               (format "TODO: Handle this POST! %s"
+               (format "<p>Thank you for letting us know about <a href=\"%s\">%s</a></p><pre>%s</pre>"
+                       id
+                       name
+                       (pr-str result))
+
+               #_(format "TODO: Handle this POST! %s"
                        (with-out-str
                          (clojure.pprint/pprint
                           {#_#_:resource resource
@@ -100,10 +113,10 @@
                            :graphql-query graphql-query
                            :operation-name operation-name
                            :variables variables
-                           :schema schema
-                           :document document
+                           ;;:schema schema
+                           ;;:document document
                            :compiled-document compiled-document
-                           #_:graphql-result #_(graphql/query schema document operation-name variables xt-node db subject)
+                           :graphql-result result
                            })))))
 
       (catch Exception e
