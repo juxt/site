@@ -253,13 +253,15 @@
 
 (defn traverse [object-value atts subject db]
   (if (seq atts)
-    (traverse (get
-               (if (string? object-value)
-                 (protected-lookup object-value subject db)
-                 object-value)
-               (keyword (first atts)))
-              (rest atts)
-              subject db)
+    (let [next-object-value
+          (get
+           (cond-> object-value
+             (string? object-value)
+             (protected-lookup subject db))
+           (keyword (first atts)))]
+      (traverse next-object-value
+                (rest atts)
+                subject db))
     object-value))
 
 (defn await-tx
@@ -346,7 +348,7 @@
             (map lookup-entity (get argument-values "ids"))
             :else (throw (ex-message "That filter is not implemented yet")))
 
-          ;; Direct lookup - useful query roots
+          ;; Direct lookup - useful for query roots
           (get site-args "e")
           (let [e (get site-args "e")]
             (protected-lookup e subject db))
