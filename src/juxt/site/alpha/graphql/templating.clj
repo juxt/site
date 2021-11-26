@@ -41,30 +41,32 @@
         _ (assert schema (str "GraphQL schema entity does not have a current schema"))
 
         document
-        (try
-          ;; TODO: Obviously we should pre-parse, pre-compile and pre-validate GraphQL queries!
-          (let [document
-                (try
-                  (parser/parse graphql-query)
-                  (catch Exception e
-                    (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]} e))))]
-            (document/compile-document document schema))
-          (catch Exception e
-            (let [errors (:errors (ex-data e))]
-              (log/errorf e "Error parsing or compiling GraphQL query: %s" (seq errors))
-              (throw
-               (ex-info
-                "Error parsing or compiling GraphQL query for template model"
-                (into
-                 req
-                 (cond-> {:ring.response/status 500}
-                   (seq errors) (assoc ::errors errors)))
-                e)))))]
+        ;; TODO: Obviously we should pre-parse, pre-compile and pre-validate GraphQL queries!
+        (let [document
+              (try
+                (parser/parse graphql-query)
+                (catch Exception e
+                  (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]} e))))]
+          (try
+            (document/compile-document document schema)
+            (catch Exception e
+              (let [errors (:errors (ex-data e))]
+                (log/errorf e "Error compiling GraphQL query: %s" (seq errors))
+                (throw
+                 (ex-info
+                  "Error parsing or compiling GraphQL query for template model"
+                  (into
+                   req
+                   (cond-> {:ring.response/status 500}
+                     (seq errors) (assoc ::errors errors)))
+                  e))))))]
 
     (assert graphql-query)
-    (log/debugf "Executing GraphQL query for template: %s" graphql-query)
+    #_(log/debugf "Executing GraphQL query for template: %s" graphql-query)
     ;; TODO: How to communicate back if there are any errors? Throw an exception?
-    (:data (graphql/query schema document operation-name variables xt-node db subject))))
+    (let [results (graphql/query schema document operation-name variables xt-node db {:subject subject})]
+      #_(log/debugf "Results are %s" (pr-str results))
+      (:data results))))
 
 (defn post-handler [{::site/keys [db resource xt-node]
                      ::pass/keys [subject]
