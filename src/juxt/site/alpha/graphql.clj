@@ -304,7 +304,10 @@
       (let [types-by-name (::schema/types-by-name schema)
             field (get-in object-type [::schema/fields-by-name field-name])
             site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
-            field-kind (-> field ::g/type-ref ::g/name types-by-name ::g/kind)
+            field-kind (or
+                        (-> field ::g/type-ref ::g/name types-by-name ::g/kind)
+                        (when (-> field ::g/type-ref ::g/list-type) 'LIST)
+                        (when (-> field ::g/type-ref ::g/non-null-type) 'NON_NULL))
             mutation? (=
                        (get-in schema [::schema/root-operation-type-names :mutation])
                        (::g/name object-type))
@@ -386,6 +389,15 @@
             (if (= field-kind 'OBJECT)
               (protected-lookup val subject db)
               val))
+
+          (get site-args "each")
+          (let [att (get site-args "each")
+                val (if (vector? att)
+                      (traverse object-value att subject db)
+                      (get object-value (keyword att)))]
+            (if (= field-kind 'LIST)
+              (map #(protected-lookup % subject db) val)
+              (throw (ex-info "Can only used 'each' on a LIST type" {:field-kind field-kind}))))
 
           ;; The registration of a resolver should be a privileged operation, since it
           ;; has the potential to bypass access control.
