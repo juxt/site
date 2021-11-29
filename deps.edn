@@ -69,9 +69,7 @@
         ;; we can remove this entry once an upgrade has been achieved.
         pro.juxt.clojars-mirrors.com.taoensso/nippy {:mvn/version "3.1.1"}
 
-
         ;; Required for Slack integration
-        org.julienxx/clj-slack {:mvn/version "0.6.3"}
         lt.tokenmill/timewords {:mvn/version "0.5.0"}
         }
 
