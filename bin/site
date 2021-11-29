@@ -681,7 +681,8 @@
 
   (message! "Uploading file to" (str base-uri path))
 
-  (let [variant-of (get-in opts [:options :variant-of])
+  (let [variant-of (some-> (get-in opts [:options :resource])
+                           (str/replace "{{base-uri}}" base-uri))
         classification (get-in opts [:options :classification])
         dialect (get-in opts [:options :dialect])
         {:keys [status headers body]}
@@ -1111,7 +1112,7 @@
                    ["-t" "--type MIME_TYPE" "The content-type"]
                    ["-e" "--encoding ENCODING" "The content-encoding (optional)"]
                    ["-l" "--language LANGUAGE" "The content-language (optional)"]
-                   ["-v" "--variant-of CLASSIFICATION" "The resource for which this asset is a variant of"]
+                   ["-r" "--resource URI" "The resource for which this asset is a variant of"]
                    ["-c" "--classification CLASSIFICATION" "The classification (e.g PUBLIC, RESTRICTED) applied to resource"]]
      :delegate put-asset}]
 
