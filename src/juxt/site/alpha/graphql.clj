@@ -94,14 +94,15 @@
       (throw (ex-info "Unrecognised type specified when generating attribute value"
                       {:gen-args gen-args :args args})))))
 
-(defn scalar? [arg-name]
-  (#{"int" "float" "string" "boolean" "id"} (str/lower-case arg-name)))
+(defn scalar? [arg-name types-by-name]
+  (= (get-in types-by-name [arg-name ::g/kind]) 'SCALAR))
 
 (defn- args-to-entity
-  ([args field base-uri site-args] (args-to-entity args field base-uri site-args nil))
-  ([args field base-uri site-args old-value]
+  ([args schema field base-uri site-args] (args-to-entity args schema field base-uri site-args nil))
+  ([args schema field base-uri site-args old-value]
    (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
-   (let [transform-sym (some-> site-args (get "transform") symbol)
+   (let [types-by-name (:juxt.grab.alpha.schema/types-by-name schema)
+         transform-sym (some-> site-args (get "transform") symbol)
          transform (when transform-sym (requiring-resolve transform-sym))
          _  (when (and transform-sym (not transform))
               (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
@@ -143,12 +144,23 @@
                         (selmer/render {"base-uri" base-uri})
 
                         ;; Transform value
-                        transform transform
+                        transform transform)]
 
-                        )]
                   (cond
-                    (or kw (scalar? arg-type)) (assoc-some acc key value)
-                    :else (merge acc value)))
+                    (or kw (scalar? arg-type types-by-name))
+                    (assoc-some acc key value)
+
+                    :else
+                    (try
+                      (merge acc value)
+                      (catch Exception e
+                        (throw
+                         (ex-info
+                          "Cannot merge value into acc"
+                          {:acc acc
+                           :arg-type arg-type
+                           :value value}
+                          e))))))
 
                 ;; Is it a list? Then put in as a vector
                 (::g/list-type type-ref)
@@ -163,7 +175,7 @@
 
                       list-type (get-in type-ref [::g/list-type ::g/name])]
                   (cond
-                    (scalar? list-type) (assoc-some acc key val)
+                    (scalar? list-type types-by-name) (assoc-some acc key val)
                     :else
                     (throw (ex-info "Unsupported list-type" {:arg-def arg-def
                                                              :list-type list-type}))))
@@ -343,13 +355,13 @@
                   ;; @site(a: "xtdb.api/valid-time").
                   (lookup-entity id))
                 "put"
-                (let [object (args-to-entity argument-values field base-uri site-args nil)]
+                (let [object (args-to-entity argument-values schema field base-uri site-args nil)]
                   (put-object! xt-node object)
                   object)
                 "update"
                 (let [id (validate-id! argument-values)
                       old-value (lookup-entity id)
-                      object (args-to-entity argument-values field base-uri site-args old-value)]
+                      object (args-to-entity argument-values schema field base-uri site-args old-value)]
                   (put-object! xt-node object)
                   object)))
 
