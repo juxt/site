@@ -24,12 +24,31 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'g (create-ns 'juxt.grab.alpha.graphql))
 
+(defn field->type
+  [field]
+  (or
+   (-> field
+       ::g/type-ref
+       ::g/non-null-type
+       ::g/list-type
+       ::g/name)
+   (-> field
+       ::g/type-ref
+       ::g/non-null-type
+       ::g/list-type
+       ::g/non-null-type
+       ::g/name)
+   (-> field
+       ::g/type-ref
+       ::g/list-type
+       ::g/name)
+   (-> field
+       ::g/type-ref
+       ::g/name)))
+
 (defn default-query
   [field-or-type]
-  (let [type (or (-> field-or-type
-                     ::g/type-ref
-                     ::g/list-type
-                     ::g/name)
+  (let [type (or (field->type field-or-type)
                  field-or-type)]
     {:find ['e]
      :where [['e :juxt.site/type type]]}))
@@ -208,10 +227,19 @@
 
 (defn process-xt-results
   [field results]
-  (if (-> field ::g/type-ref ::g/list-type)
-    results
-    ;; If this isn't a list type, take the first
-    (first results)))
+  (let [type-ref (::g/type-ref field)]
+    (if-let [type (::g/non-null-type type-ref)]
+      (cond
+        (::g/list-type type)
+        (or results [])
+        :else
+        (first results))
+      (cond
+        (::g/list-type type-ref)
+        results
+        ;; If this isn't a list type, take the first
+        :else
+        (first results)))))
 
 (defn protected-lookup [e subject db]
   (let [lookup #(xt/entity db %)
@@ -242,9 +270,10 @@
   [args results]
   (let [result-count (count results)
         limit (get args "limit" result-count)]
-    (if (or (get args "searchTerms") (> result-count limit))
-      (take limit (drop (get args "offset" 0) results))
-      results)))
+    (flatten
+     (if (or (get args "searchTerms") (> result-count limit))
+       (take limit (drop (get args "offset" 0) results))
+       results))))
 
 (defn pull-entities
   [db subject results query]
@@ -255,10 +284,7 @@
 
 (defn infer-query
   [db subject field query args]
-  (let [type (-> field
-                 ::g/type-ref
-                 ::g/list-type
-                 ::g/name)
+  (let [type (field->type field)
         results (pull-entities db subject (xt/q db query type) query)]
     (or (process-xt-results field results)
         (throw (ex-info "No resolver found for " type)))))
@@ -300,7 +326,20 @@
                            (java.util.Date/from))]
     (await-tx xt-node (xt-put (dissoc object :xtdb.api/valid-time) valid-time))))
 
-
+(defn default-for-type
+  [type-ref]
+  (let [type-name (::g/name type-ref)]
+    (cond
+      (or
+       (-> type-ref ::g/non-null-type ::g/list-type)
+       (::g/list-type type-ref))
+      []
+      (= "String" type-name)
+      ""
+      :else
+      (do
+        (prn "defaulting to nil, type-ref is " type-ref)
+        nil))))
 
 (defn query [schema document operation-name variable-values xt-node db {:keys [subject base-uri]}]
   (let [type-k
@@ -462,7 +501,8 @@
                 (limit-results argument-values result)
                 result))
 
-            (-> field ::g/type-ref ::g/list-type ::g/name)
+            (and (field->type field)
+                 (not (scalar? (field->type field) types-by-name)))
             (infer-query db
                          subject
                          field
@@ -478,7 +518,7 @@
               "count" (count (xt/q db (to-xt-query (get site-args "type") site-args argument-values))))
 
             :else
-            (or (get site-args "defaultValue") ""))))})))
+            (default-for-type (::g/type-ref field)))))})))
 
 (defn post-handler [{::site/keys [uri xt-node db base-uri]
                      ::pass/keys [subject]
