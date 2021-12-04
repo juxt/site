@@ -405,6 +405,25 @@
                   (put-object! xt-node object)
                   object)))
 
+            (get site-args "history")
+            (if-let [id (get argument-values "id")]
+              (let [limit (get argument-values "limit" 10)
+                    offset (get argument-values "offset" 0)
+                    order (case (get site-args "history")
+                            "desc" :desc
+                            "asc" :asc
+                            :desc)
+                    process-history-item
+                    (fn [{::xt/keys [valid-time doc]}]
+                      (assoc doc :xtValidTime valid-time))]
+                (with-open [history (xt/open-entity-history db id order {:with-docs? true})]
+                  (->> history
+                       (iterator-seq)
+                       (drop offset)
+                       (take limit)
+                       (map process-history-item))))
+              (throw (ex-message "History queries must have an id argument")))
+
             (get site-args "filter")
             (cond
               (= "ids" (ffirst argument-values))
