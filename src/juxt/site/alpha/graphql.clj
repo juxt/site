@@ -47,16 +47,16 @@
        ::g/name)))
 
 (defn default-query
-  [field-or-type]
+  [field-or-type type-k]
   (let [type (or (field->type field-or-type)
                  field-or-type)]
     {:find ['e]
-     :where [['e :juxt.site/type type]]}))
+     :where [['e type-k type]]}))
 
-(defn to-xt-query [field-or-type args values]
+(defn to-xt-query [field-or-type args values type-k]
   (let [query (rename-keys
                (or (get args "q")
-                   (default-query field-or-type))
+                   (default-query field-or-type type-k))
                ;; probably should do camelcase to kabab
                {:order :order-by})
         result
@@ -117,8 +117,9 @@
   (= (get-in types-by-name [arg-name ::g/kind]) 'SCALAR))
 
 (defn- args-to-entity
-  ([args schema field base-uri site-args] (args-to-entity args schema field base-uri site-args nil))
-  ([args schema field base-uri site-args old-value]
+  ([args schema field base-uri site-args type-k]
+   (args-to-entity args schema field base-uri site-args type-k nil))
+  ([args schema field base-uri site-args type-k old-value]
    (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
    (let [types-by-name (:juxt.grab.alpha.schema/types-by-name schema)
          transform-sym (some-> site-args (get "transform") symbol)
@@ -215,7 +216,7 @@
                       {:type "UUID"
                        :pathPrefix type}
                       {})))
-       (nil? (:juxt.site/type entity)) (assoc :juxt.site/type type)
+       (nil? (type-k entity)) (assoc type-k type)
        (:id entity) (dissoc :id)
        transform (transform args)
 
@@ -397,13 +398,15 @@
                   ;; @site(a: "xtdb.api/valid-time").
                   (lookup-entity id))
                 "put"
-                (let [object (args-to-entity argument-values schema field base-uri site-args nil)]
+                (let [object (args-to-entity
+                              argument-values schema field base-uri site-args type-k)]
                   (put-object! xt-node object)
                   object)
                 "update"
                 (let [id (validate-id! argument-values)
                       old-value (lookup-entity id)
-                      object (args-to-entity argument-values schema field base-uri site-args old-value)]
+                      object (args-to-entity
+                              argument-values schema field base-uri site-args type-k old-value)]
                   (put-object! xt-node object)
                   object)))
 
@@ -435,7 +438,9 @@
             ;; Direct lookup - useful for query roots
             (get site-args "e")
             (let [e (get site-args "e")]
-              (protected-lookup e subject db))
+              (or (protected-lookup e subject db)
+                  (protected-lookup (get argument-values e)
+                                    subject db)))
 
             (get site-args "q")
             (let [object-id (:xt/id object-value)
@@ -443,7 +448,7 @@
                   in (cond->> (map symbol (arg-keys argument-values))
                        object-id (concat ['object]))
                   q (assoc
-                     (to-xt-query field site-args argument-values)
+                     (to-xt-query field site-args argument-values type-k)
                      :in (if (second in) [in] (vec in)))
                   query-args (cond->> (vals argument-values)
                                object-id (concat [object-id]))
@@ -611,7 +616,7 @@
             (infer-query db
                          subject
                          field
-                         (to-xt-query field site-args argument-values)
+                         (to-xt-query field site-args argument-values type-k)
                          argument-values)
 
             (get argument-values "id")
@@ -620,7 +625,10 @@
             (and (get site-args "aggregate")
                  (get site-args "type"))
             (case (get site-args "aggregate")
-              "count" (count (xt/q db (to-xt-query (get site-args "type") site-args argument-values))))
+              "count" (count
+                       (xt/q
+                        db (to-xt-query
+                            (get site-args "type") site-args argument-values type-k))))
 
             :else
             (default-for-type (::g/type-ref field)))))})))
