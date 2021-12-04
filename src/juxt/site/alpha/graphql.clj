@@ -377,6 +377,7 @@
                                       t/date-time
                                       t/inst))
                    db)
+              object-id (:xt/id object-value)
               lookup-entity (fn [id] (xt/entity db id))]
 
           (cond
@@ -448,6 +449,22 @@
               (if (= field-kind 'OBJECT)
                 (protected-lookup val subject db)
                 val))
+
+            (get site-args "ref")
+            (let [ref (get site-args "ref")
+                  e (or
+                     (and (vector? ref) (traverse object-value ref subject db))
+                     (get object-value ref)
+                     (get object-value (keyword ref)))
+                  type (field->type field)]
+              (if e
+                (protected-lookup e subject db)
+                (map (comp (fn [e] (protected-lookup e subject db)) first)
+                     (xt/q db {:find ['e]
+                               :where [['e type-k type]
+                                       ['e (keyword ref) (or
+                                                          (get argument-values ref)
+                                                          object-id)]]}))))
 
             (get site-args "each")
             (let [att (get site-args "each")
