@@ -117,114 +117,114 @@
   (= (get-in types-by-name [arg-name ::g/kind]) 'SCALAR))
 
 (defn- args-to-entity
-  ([args schema field base-uri site-args type-k]
-   (args-to-entity args schema field base-uri site-args type-k nil))
-  ([args schema field base-uri site-args type-k old-value]
-   (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
-   (let [types-by-name (:juxt.grab.alpha.schema/types-by-name schema)
-         transform-sym (some-> site-args (get "transform") symbol)
-         transform (when transform-sym (requiring-resolve transform-sym))
-         _  (when (and transform-sym (not transform))
-              (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
+  [{:keys [argument-values schema field base-uri site-args type-k old-value] :as opts}]
+  (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
+  (let [types-by-name (:juxt.grab.alpha.schema/types-by-name schema)
+        transform-sym (some-> site-args (get "transform") symbol)
+        transform (when transform-sym (requiring-resolve transform-sym))
+        _  (when (and transform-sym (not transform))
+             (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
 
-         entity
-         (reduce
-          (fn [acc arg-def]
-            (let [site-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments])
-                  generator-args (get site-args "gen")
-                  transform-sym (some-> site-args (get "transform") symbol)
-                  transform (when transform-sym (requiring-resolve transform-sym))
-                  kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])
-                  arg-name (::g/name arg-def)
-                  key (keyword (or kw arg-name))
-                  type-ref (::g/type-ref arg-def)
-                  arg-type (or (::g/name type-ref)
-                               (-> type-ref ::g/non-null-type ::g/name))]
+        entity
+        (reduce
+         (fn [acc arg-def]
+           (let [site-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments])
+                 generator-args (get site-args "gen")
+                 transform-sym (some-> site-args (get "transform") symbol)
+                 transform (when transform-sym (requiring-resolve transform-sym))
+                 kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])
+                 arg-name (::g/name arg-def)
+                 key (keyword (or kw arg-name))
+                 type-ref (::g/type-ref arg-def)
+                 arg-type (or (::g/name type-ref)
+                              (-> type-ref ::g/non-null-type ::g/name))]
 
-              (when (and transform-sym (not transform))
-                (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
+             (when (and transform-sym (not transform))
+               (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
 
-              (when transform
-                (log/tracef "transform is %s" transform))
+             (when transform
+               (log/tracef "transform is %s" transform))
 
-              (cond
-                arg-type                ; is it a singular (not a LIST)
-                (let [value (or (get args arg-name)
-                                (generate-value generator-args args))
-                      value
-                      (cond-> value
-                        ;; We don't want symbols in XT entities, because this leaks the
-                        ;; form-plane into the data-plane!
-                        (symbol? value) str
+             (cond
+               arg-type ; is it a singular (not a LIST)
+               (let [value (or (get argument-values arg-name)
+                               (get argument-values (keyword arg-name))
+                               (generate-value generator-args argument-values))
+                     value
+                     (cond-> value
+                       ;; We don't want symbols in XT entities, because this leaks the
+                       ;; form-plane into the data-plane!
+                       (symbol? value) str
 
-                        ;; Replace base-uri in string-template, only for an ID
-                        ;; since we should be careful not to tamper with other
-                        ;; values.
-                        (and (string? value) (= arg-type "ID"))
-                        (selmer/render {"base-uri" base-uri})
+                       ;; Replace base-uri in string-template, only for an ID
+                       ;; since we should be careful not to tamper with other
+                       ;; values.
+                       (and (string? value) (= arg-type "ID"))
+                       (selmer/render {"base-uri" base-uri})
 
-                        ;; Transform value
-                        transform transform)]
+                       ;; Transform value
+                       transform transform)]
 
-                  (cond
-                    (or kw (scalar? arg-type types-by-name))
-                    (assoc-some acc key value)
+                 (cond
+                   (or kw (scalar? arg-type types-by-name))
+                   (assoc-some acc key value)
 
-                    :else
-                    (try
-                      (merge acc value)
-                      (catch Exception e
-                        (throw
-                         (ex-info
-                          "Cannot merge value into acc"
-                          {:acc acc
-                           :arg-type arg-type
-                           :value value}
-                          e))))))
+                   :else
+                   (try
+                     (merge acc value)
+                     (catch Exception e
+                       (throw
+                        (ex-info
+                         "Cannot merge value into acc"
+                         {:acc acc
+                          :arg-type arg-type
+                          :value value}
+                         e))))))
 
-                ;; Is it a list? Then put in as a vector
-                (::g/list-type type-ref)
-                (let [val (or (get args (name key))
-                              ;; TODO: default value?
-                              (generate-value generator-args args))
-                      ;; Change a symbol value into a string
+               ;; Is it a list? Then put in as a vector
+               (::g/list-type type-ref)
+               (let [val (or (get argument-values (name key))
+                             ;; TODO: default value?
+                             (generate-value generator-args argument-values))
+                     ;; Change a symbol value into a string
 
-                      ;; We don't want symbols in XT entities, because this leaks the
-                      ;; form-plane into the data-plane!
-                      val (cond-> val (symbol? val) str)
+                     ;; We don't want symbols in XT entities, because this leaks the
+                     ;; form-plane into the data-plane!
+                     val (cond-> val (symbol? val) str)
 
-                      list-type (get-in type-ref [::g/list-type ::g/name])]
-                  (cond
-                    (scalar? list-type types-by-name) (assoc-some acc key val)
-                    :else
-                    (throw (ex-info "Unsupported list-type" {:arg-def arg-def
-                                                             :list-type list-type}))))
+                     list-type (get-in type-ref [::g/list-type ::g/name])]
+                 (cond
+                   (scalar? list-type types-by-name) (assoc-some acc key val)
+                   :else
+                   (throw (ex-info "Unsupported list-type" {:arg-def arg-def
+                                                            :list-type list-type}))))
 
-                :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
-          (or old-value {})
-          (::g/arguments-definition field))
-         type (-> field ::g/type-ref ::g/name)
-         _validate-type (and (nil? type)
-                             (throw (ex-info "Couldn't infer type" {:field field})))]
-     (cond-> entity
-       true (assoc
-             :xt/id (or
-                     (:xt/id old-value)
-                     (:xt/id entity)
-                     (:id entity)
-                     (generate-value
-                      {:type "UUID"
-                       :pathPrefix type}
-                      {})))
-       (nil? (type-k entity)) (assoc type-k type)
-       (:id entity) (dissoc :id)
-       transform (transform args)
+               :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
 
-       ;; This is special argument that adds Site specific attributes
-       (get site-args "methods")
-       (assoc ::http/methods (set (map (comp keyword str/lower-case) (get site-args "methods"))))
+         (or old-value {})
+         (::g/arguments-definition field))
+        type (-> field ::g/type-ref ::g/name)
+        _validate-type (and (nil? type)
+                            (throw (ex-info "Couldn't infer type" {:field field})))]
+    (cond-> entity
+      true (assoc
+            :xt/id (or
+                    (:xt/id old-value)
+                    (:xt/id entity)
+                    (:id entity)
+                    (generate-value
+                     {:type "UUID"
+                      :pathPrefix type}
+                     {})))
+      (nil? (type-k entity)) (assoc type-k type)
+      (:id entity) (dissoc :id)
+      transform (transform argument-values)
 
-       ))))
+      ;; This is special argument that adds Site specific attributes
+      (get site-args "methods")
+      (assoc ::http/methods (set (map (comp keyword str/lower-case) (get site-args "methods"))))
+
+      )))
 
 (defn process-xt-results
   [field results]
@@ -341,6 +341,31 @@
         (prn "defaulting to nil, type-ref is " type-ref)
         nil))))
 
+(defn perform-mutation!
+  [action {:keys [argument-values xt-node lookup-entity] :as opts}]
+  (let [validate-id! (fn [args]
+                       (let [id (get args "id" (:id args))]
+                         (or id (throw (ex-info "This mutation needs an 'id' key"
+                                                {:arg-values argument-values
+                                                 :action action})))))]
+    (case action
+      "delete"
+      (let [id (validate-id! argument-values)]
+        (await-tx xt-node (xt-delete id))
+        ;; TODO: Allow an argument to correspond to valid-time, via
+        ;; @site(a: "xtdb.api/valid-time").
+        (lookup-entity id))
+      "put"
+      (let [object (args-to-entity opts)]
+        (put-object! xt-node object)
+        object)
+      "update"
+      (let [id (validate-id! argument-values)
+            old-value (lookup-entity id)
+            object (args-to-entity opts)]
+        (def object object)
+        (put-object! xt-node (merge old-value object))
+        object))))
 (defn query [schema document operation-name variable-values
              {::pass/keys [subject]
               ::site/keys [db xt-node base-uri resource]
@@ -362,276 +387,195 @@
       :field-resolver
       (fn [{:keys [object-type object-value field-name argument-values]
             :as field-resolver-args}]
-
-        (let [types-by-name (::schema/types-by-name schema)
-              field (get-in object-type [::schema/fields-by-name field-name])
-              site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
-              field-kind (or
-                          (-> field ::g/type-ref ::g/name types-by-name ::g/kind)
-                          (when (-> field ::g/type-ref ::g/list-type) 'LIST)
-                          (when (-> field ::g/type-ref ::g/non-null-type) 'NON_NULL))
-              mutation? (=
-                         (get-in schema [::schema/root-operation-type-names :mutation])
-                         (::g/name object-type))
-              db (if (and (not mutation?)
-                          (get argument-values "asOf"))
-                   (xt/db xt-node (-> argument-values
-                                      (get "asOf")
-                                      t/date-time
-                                      t/inst))
-                   db)
-              object-id (:xt/id object-value)
-              lookup-entity (fn [id] (xt/entity db id))]
-
-          (cond
-            mutation?
-            (let [action (or (get site-args "mutation") "put")
-                  validate-id! (fn [args]
-                                 (let [id (get args "id")]
-                                   (or id (throw (ex-info "Delete mutations need an 'id' key"
-                                                          {:arg-values argument-values})))))]
-              (case action
-                "delete"
-                (let [id (validate-id! argument-values)]
-                  (await-tx xt-node (xt-delete id))
-                  ;; TODO: Allow an argument to correspond to valid-time, via
-                  ;; @site(a: "xtdb.api/valid-time").
-                  (lookup-entity id))
-                "put"
-                (let [object (args-to-entity
-                              argument-values schema field base-uri site-args type-k)]
-                  (put-object! xt-node object)
-                  object)
-                "update"
-                (let [id (validate-id! argument-values)
-                      old-value (lookup-entity id)
-                      object (args-to-entity
-                              argument-values schema field base-uri site-args type-k old-value)]
-                  (put-object! xt-node object)
-                  object)))
-
-            (get site-args "history")
-            (if-let [id (get argument-values "id")]
-              (let [limit (get argument-values "limit" 10)
-                    offset (get argument-values "offset" 0)
-                    order (case (get site-args "history")
-                            "desc" :desc
-                            "asc" :asc
-                            :desc)
-                    process-history-item
-                    (fn [{::xt/keys [valid-time doc]}]
-                      (assoc doc :xtValidTime valid-time))]
-                (with-open [history (xt/open-entity-history db id order {:with-docs? true})]
-                  (->> history
-                       (iterator-seq)
-                       (drop offset)
-                       (take limit)
-                       (map process-history-item))))
-              (throw (ex-message "History queries must have an id argument")))
-
-            (get site-args "filter")
+        (let [field (get-in object-type [::schema/fields-by-name field-name])
+              types-by-name (::schema/types-by-name schema)
+                  site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
+                  field-kind (or
+                              (-> field ::g/type-ref ::g/name types-by-name ::g/kind)
+                              (when (-> field ::g/type-ref ::g/list-type) 'LIST)
+                              (when (-> field ::g/type-ref ::g/non-null-type) 'NON_NULL))
+                  mutation? (=
+                             (get-in schema [::schema/root-operation-type-names :mutation])
+                             (::g/name object-type))
+                  db (if (and (not mutation?)
+                              (get argument-values "asOf"))
+                       (xt/db xt-node (-> argument-values
+                                          (get "asOf")
+                                          t/date-time
+                                          t/inst))
+                       db)
+                  object-id (:xt/id object-value)
+                  lookup-entity (fn [id] (xt/entity db id))
+                  opts {:site-args site-args
+                        :xt-node xt-node
+                        :schema schema
+                        :field field
+                        :mutation? mutation?
+                        :base-uri base-uri
+                        :type-k type-k
+                        :argument-values argument-values
+                        :lookup-entity lookup-entity
+                        :field-resolver-args field-resolver-args
+                        :subject subject
+                        :db db}]
             (cond
-              (= "ids" (ffirst argument-values))
-              (map lookup-entity (get argument-values "ids"))
-              :else (throw (ex-message "That filter is not implemented yet")))
+              mutation? (perform-mutation! (get site-args "mutation") opts)
 
-            ;; Direct lookup - useful for query roots
-            (get site-args "e")
-            (let [e (get site-args "e")]
-              (or (protected-lookup e subject db)
-                  (protected-lookup (get argument-values e)
-                                    subject db)))
+              (get site-args "history")
+              (if-let [id (get argument-values "id")]
+                (let [limit (get argument-values "limit" 10)
+                      offset (get argument-values "offset" 0)
+                      order (case (get site-args "history")
+                              "desc" :desc
+                              "asc" :asc
+                              :desc)
+                      process-history-item
+                      (fn [{::xt/keys [valid-time doc]}]
+                        (assoc doc :xtValidTime valid-time))]
+                  (with-open [history (xt/open-entity-history db id order {:with-docs? true})]
+                    (->> history
+                         (iterator-seq)
+                         (drop offset)
+                         (take limit)
+                         (map process-history-item))))
+                (throw (ex-message "History queries must have an id argument")))
 
-            (get site-args "q")
-            (let [object-id (:xt/id object-value)
-                  arg-keys (fn [m] (remove #{"limit" "offset" "orderBy"} (keys m)))
-                  in (cond->> (map symbol (arg-keys argument-values))
-                       object-id (concat ['object]))
-                  q (assoc
-                     (to-xt-query field site-args argument-values type-k)
-                     :in (if (second in) [in] (vec in)))
-                  query-args (cond->> (vals argument-values)
-                               object-id (concat [object-id]))
-                  args (if (second query-args) query-args (first query-args))
-                  results
-                  (try
-                    (xt/q db q args)
-                    (catch Exception e
-                      (throw (ex-info "Failure when running XTDB query"
-                                      {:message (ex-message e)
-                                       :query (pr-str q)
-                                       :args args}
-                                      e))))
-                  limited-results (limit-results argument-values results)
-                  result-entities (pull-entities db subject limited-results q)]
-              ;;(log/tracef "GraphQL results is %s" (seq result-entities))
-              (process-xt-results field result-entities))
+              (get site-args "filter")
+              (cond
+                (= "ids" (ffirst argument-values))
+                (map lookup-entity (get argument-values "ids"))
+                :else (throw (ex-message "That filter is not implemented yet")))
 
-            (get site-args "a")
-            (let [att (get site-args "a")
-                  val (if (vector? att)
-                        (traverse object-value att subject db)
-                        (get object-value (keyword att)))]
-              (if (= field-kind 'OBJECT)
-                (protected-lookup val subject db)
-                val))
+              ;; Direct lookup - useful for query roots
+              (get site-args "e")
+              (let [e (get site-args "e")]
+                (or (protected-lookup e subject db)
+                    (protected-lookup (get argument-values e)
+                                      subject db)))
 
-            (get site-args "ref")
-            (let [ref (get site-args "ref")
-                  e (or
-                     (and (vector? ref) (traverse object-value ref subject db))
-                     (get object-value ref)
-                     (get object-value (keyword ref)))
-                  type (field->type field)]
-              (if e
-                (protected-lookup e subject db)
-                (map (comp (fn [e] (protected-lookup e subject db)) first)
-                     (xt/q db {:find ['e]
-                               :where [['e type-k type]
-                                       ['e (keyword ref) (or
-                                                          (get argument-values ref)
-                                                          object-id)]]}))))
+              (get site-args "q")
+              (let [object-id (:xt/id object-value)
+                    arg-keys (fn [m] (remove #{"limit" "offset" "orderBy"} (keys m)))
+                    in (cond->> (map symbol (arg-keys argument-values))
+                         object-id (concat ['object]))
+                    q (assoc
+                       (to-xt-query field site-args argument-values type-k)
+                       :in (if (second in) [in] (vec in)))
+                    query-args (cond->> (vals argument-values)
+                                 object-id (concat [object-id]))
+                    args (if (second query-args) query-args (first query-args))
+                    results
+                    (try
+                      (xt/q db q args)
+                      (catch Exception e
+                        (throw (ex-info "Failure when running XTDB query"
+                                        {:message (ex-message e)
+                                         :query (pr-str q)
+                                         :args args}
+                                        e))))
+                    limited-results (limit-results argument-values results)
+                    result-entities (pull-entities db subject limited-results q)]
+                ;;(log/tracef "GraphQL results is %s" (seq result-entities))
+                (process-xt-results field result-entities))
 
-            (get site-args "each")
-            (let [att (get site-args "each")
-                  val (if (vector? att)
-                        (traverse object-value att subject db)
-                        (get object-value (keyword att)))]
-              (if (= field-kind 'LIST)
-                (map #(protected-lookup % subject db) val)
-                (throw (ex-info "Can only used 'each' on a LIST type" {:field-kind field-kind}))))
+              (get site-args "a")
+              (let [att (get site-args "a")
+                    val (if (vector? att)
+                          (traverse object-value att subject db)
+                          (get object-value (keyword att)))]
+                (if (= field-kind 'OBJECT)
+                  (protected-lookup val subject db)
+                  val))
 
-            ;; The registration of a resolver should be a privileged operation, since it
-            ;; has the potential to bypass access control.
-            (get site-args "resolver")
-            (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
-              ;; Resolvers need to do their own access control
-              (resolver (assoc field-resolver-args ::pass/subject subject :db db)))
+              (get site-args "ref")
+              (let [ref (get site-args "ref")
+                    e (or
+                       (and (vector? ref) (traverse object-value ref subject db))
+                       (get object-value ref)
+                       (get object-value (keyword ref)))
+                    type (field->type field)]
+                (if e
+                  (protected-lookup e subject db)
+                  (map (comp (fn [e] (protected-lookup e subject db)) first)
+                       (xt/q db {:find ['e]
+                                 :where [['e type-k type]
+                                         ['e (keyword ref) (or
+                                                            (get argument-values ref)
+                                                            object-id)]]}))))
 
-            ;; A function whose input is the result of a GraphqL 'sub' query,
-            ;; propagating the same subject and under the exact same access
-            ;; control policy. This allows the function to declare its necessary
-            ;; inputs as a query.
-            ;;
-            ;; In addition, a function's results may be memoized, with each result
-            ;; stored in XTDB which acts as a large persistent memoization
-            ;; cache. For this reason, the function must be pure. The function
-            ;; must take a single map which contains the results of the sub-query
-            ;; and any argument values (which would also be used as variable
-            ;; values in the GraphQL sub-query which computes the other input
-            ;; argument).
-            ;;
-            ;; Once this feature is working, replace it with a call to a lambda or
-            ;; similarly sandboxed execution environment.
-            (get site-args "function")
-            (throw (ex-info "Feature not yet supported" {}))
+              (get site-args "each")
+              (let [att (get site-args "each")
+                    val (if (vector? att)
+                          (traverse object-value att subject db)
+                          (get object-value (keyword att)))]
+                (if (= field-kind 'LIST)
+                  (map #(protected-lookup % subject db) val)
+                  (throw (ex-info "Can only used 'each' on a LIST type" {:field-kind field-kind}))))
 
-            (get site-args "subQuery")
-            (let [sub-query (get site-args "subQuery")
+              ;; The registration of a resolver should be a privileged operation, since it
+              ;; has the potential to bypass access control.
+              (get site-args "resolver")
+              (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
+                ;; Resolvers need to do their own access control
+                (resolver (assoc field-resolver-args ::pass/subject subject :db db)))
 
-                  _ (when-not (:query sub-query)
-                      (throw (ex-info "subQuery must have a query key" {:sub-query sub-query})))
+              ;; A function whose input is the result of a GraphqL 'sub' query,
+              ;; propagating the same subject and under the exact same access
+              ;; control policy. This allows the function to declare its necessary
+              ;; inputs as a query.
+              ;;
+              ;; In addition, a function's results may be memoized, with each result
+              ;; stored in XTDB which acts as a large persistent memoization
+              ;; cache. For this reason, the function must be pure. The function
+              ;; must take a single map which contains the results of the sub-query
+              ;; and any argument values (which would also be used as variable
+              ;; values in the GraphQL sub-query which computes the other input
+              ;; argument).
+              ;;
+              ;; Once this feature is working, replace it with a call to a lambda or
+              ;; similarly sandboxed execution environment.
+              (get site-args "function")
+              (throw (ex-info "Feature not yet supported" {}))
 
-                  expanded-sub-query
-                  (postwalk
-                   (fn [x]
-                     (cond
-                       (and (map? x) (contains? x :a))
-                       (get object-value (keyword (get x :a)))
-                       :else x))
-                   sub-query)
+              ;; Another strategy is to see if the field indexes the
+              ;; object-value. This strategy allows for delays to be used to prevent
+              ;; computing field values that aren't resolved.
+              (contains? object-value field-name)
+              (let [f (force (get object-value field-name))]
+                (if (fn? f) (f argument-values) f))
 
-                  document (:query expanded-sub-query)]
+              ;; If the key is 'id', we assume it should be translated to xt/id
+              (= "id" field-name)
+              (get object-value :xt/id)
 
-              (when document
-                (let [compiled-document
-                      (document/compile-document (parser/parse document) schema)
+              ;; Or simply try to extract the keyword
+              (contains? object-value (keyword field-name))
+              (let [result (get object-value (keyword field-name))]
+                (if (-> field ::g/type-ref ::g/list-type)
+                  (limit-results argument-values result)
+                  result))
 
-                      ;; We have the variable names in InputValue
-                      ;; format, which parses as keywords. We must
-                      ;; convert to string keys before calling the query.
-                      ;;variables (reduce-kv (fn [acc k v] (assoc acc (name k) v)) {} (:variables expanded-sub-query))
+              (and (field->type field)
+                   (not (scalar? (field->type field) types-by-name)))
+              (infer-query db
+                           subject
+                           field
+                           (to-xt-query field site-args argument-values type-k)
+                           argument-values)
 
-                      ;; TODO: Replace this map with the Site resource, to get
-                      ;; variables from there.
-                      ;; TODO: Could also get the namespace prefix of these
-                      ;; variables as they exist in the resource by specifying in
-                      ;; the subQuery config.
-                      variables {"juxtcode" (get resource :juxtcode)}
+              (get argument-values "id")
+              (xt/entity db (get argument-values "id"))
 
-                      ;; TODO: We need to source dynamic variables from query-string
+              (and (get site-args "aggregate")
+                   (get site-args "type"))
+              (case (get site-args "aggregate")
+                "count" (count
+                         (xt/q
+                          db (to-xt-query
+                              (get site-args "type") site-args argument-values type-k))))
 
-                      result (try
-                               (log/tracef "Executing subQuery %s with operationName '%s'" document nil)
-                               (query schema compiled-document
-                                      nil #_operation-name
-                                      variables
-                                      req)
-                               (catch Exception e
-                                 (throw (ex-info "Failed to run subquery" {:document document} e))
-                                 ))]
-
-                  (if-let [errors (seq (:errors result))]
-                    (throw (ex-info "Errors in subquery" {:errors errors}))
-                    ;; Encode as JSON for now, because we don't have dynamic schema
-                    ;; TODO: Add coercion support to custom scalars
-                    (json/write-value-as-string (:data result))
-                    )))
-
-              #_(throw (ex-info "expanded-sub-query" {:expanded-sub-query (pr-str expanded-sub-query)}))
-              #_(throw
-                 (ex-info "TODO: subQuery"
-                          {:sub-query (get site-args "subQuery")
-                           :sub-query-str (pr-str (get site-args "subQuery"))
-                           :expanded-sub-query expanded-sub-query
-                           :expanded-sub-query-str (pr-str expanded-sub-query)
-                           :schema (some? (:schema field-resolver-args))
-                           :object-value object-value
-                           :keys (keys field-resolver-args)
-                           :result result
-                           }))
-              )
-
-
-            ;; Another strategy is to see if the field indexes the
-            ;; object-value. This strategy allows for delays to be used to prevent
-            ;; computing field values that aren't resolved.
-            (contains? object-value field-name)
-            (let [f (force (get object-value field-name))]
-              (if (fn? f) (f argument-values) f))
-
-            ;; If the key is 'id', we assume it should be translated to xt/id
-            (= "id" field-name)
-            (get object-value :xt/id)
-
-            ;; Or simply try to extract the keyword
-            (contains? object-value (keyword field-name))
-            (let [result (get object-value (keyword field-name))]
-              (if (-> field ::g/type-ref ::g/list-type)
-                (limit-results argument-values result)
-                result))
-
-            (and (field->type field)
-                 (not (scalar? (field->type field) types-by-name)))
-            (infer-query db
-                         subject
-                         field
-                         (to-xt-query field site-args argument-values type-k)
-                         argument-values)
-
-            (get argument-values "id")
-            (xt/entity db (get argument-values "id"))
-
-            (and (get site-args "aggregate")
-                 (get site-args "type"))
-            (case (get site-args "aggregate")
-              "count" (count
-                       (xt/q
-                        db (to-xt-query
-                            (get site-args "type") site-args argument-values type-k))))
-
-            :else
-            (default-for-type (::g/type-ref field)))))})))
+              :else
+              (default-for-type (::g/type-ref field))))))})))
 
 (defn post-handler [{::site/keys [uri xt-node db base-uri]
                      ::pass/keys [subject]

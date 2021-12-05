@@ -20,7 +20,8 @@
    [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.init :as init]
    [clojure.string :as str]
-   [juxt.grab.alpha.parser :as parser])
+   [juxt.grab.alpha.parser :as parser]
+   [xtdb.api :as xt])
   (:import (java.util Date)))
 
 (alias 'dave (create-ns 'juxt.dave.alpha))
@@ -482,3 +483,7 @@
         schema (:juxt.grab.alpha/schema (e (format "%s/_site/graphql" (::site/base-uri config))))
         document (graphql.document/compile-document (graphql.parser/parse q) schema)]
     (graphql/query schema document nil (db))))
+
+(defn history
+  [{:keys [eid order docs?] :or {order :desc docs? true}}]
+  (xt/entity-history (db) eid order {:with-docs? docs?}))
