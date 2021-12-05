@@ -270,10 +270,9 @@
   [args results]
   (let [result-count (count results)
         limit (get args "limit" result-count)]
-    (flatten
-     (if (or (get args "searchTerms") (> result-count limit))
-       (take limit (drop (get args "offset" 0) results))
-       results))))
+    (if (or (get args "searchTerms") (> result-count limit))
+      (take limit (drop (get args "offset" 0) results))
+      results)))
 
 (defn pull-entities
   [db subject results query]
