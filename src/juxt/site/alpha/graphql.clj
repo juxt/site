@@ -534,10 +534,14 @@
                      (cond
                        (and (map? x) (contains? x :a))
                        (get object-value (keyword (get x :a)))
+                       (and (map? x) (contains? x :e))
+                       (some-> x :e (protected-lookup subject db) :juxt.http.alpha/body (String.))
                        :else x))
                    sub-query)
 
-                  document (:query expanded-sub-query)]
+                  document (:query expanded-sub-query)
+
+                  operation-name (:operationName expanded-sub-query)]
 
               (when document
                 (let [compiled-document
@@ -558,9 +562,9 @@
                       ;; TODO: We need to source dynamic variables from query-string
 
                       result (try
-                               (log/tracef "Executing subQuery %s with operationName '%s'" document nil)
+                               (log/tracef "Executing subQuery (count %d bytes) with operationName '%s'" (count document) operation-name)
                                (query schema compiled-document
-                                      nil #_operation-name
+                                      operation-name
                                       variables
                                       req)
                                (catch Exception e
