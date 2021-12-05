@@ -8,6 +8,7 @@
    [juxt.grab.alpha.document :as document]
    [jsonista.core :as json]
    [juxt.grab.alpha.execution :refer [execute-request]]
+   [org.httpkit.client :as httpc]
    [juxt.grab.alpha.parser :as parser]
    [juxt.site.alpha.util :refer [assoc-some]]
    [clojure.string :as str]
@@ -244,7 +245,10 @@
 
 (defn protected-lookup [e subject db]
   (let [lookup #(xt/entity db %)
-        ent (lookup e)]
+        ent (some-> (lookup e)
+                    (assoc :xtValidTime
+                           (with-open [history (xt/open-entity-history db e :desc)]
+                             (str (t/instant (::xt/valid-time (first (iterator-seq history))))))))]
     (if-let [ent-ns (::pass/namespace ent)]
       (let [rules (some-> ent-ns lookup ::pass/rules)
             acls (->>
@@ -366,6 +370,38 @@
         (def object object)
         (put-object! xt-node (merge old-value object))
         object))))
+
+(defn run-lambda!
+  [lambda-opts {:keys [mutation? field-name argument-values subject db] :as opts}]
+  (let [uri (get lambda-opts "uri")
+        to-resolve (get lambda-opts "resolve")
+        resolved (when to-resolve
+                   (for [[k arg-k] to-resolve
+                         :let [e (get argument-values arg-k)
+                               resolved (protected-lookup e subject db)]
+                         :when resolved]
+                     {k (rename-keys resolved {:xt/id :id})}))
+        res
+        @(httpc/post uri {:timeout 2000
+                          :body (json/write-value-as-bytes
+                                 {:field-name field-name
+                                  :arguments (apply merge
+                                                    argument-values
+                                                    resolved)})})
+        body (json/read-value (:body res) json/keyword-keys-object-mapper)
+        errors (or (:error body) (:message body))]
+
+    (cond
+      errors
+      (throw (ex-info (str "Error in lambda call: " errors) body))
+      mutation?
+      (perform-mutation! (get lambda-opts "mutation")
+                         (assoc opts :argument-values body))
+      :else
+      (rename-keys
+       body
+       {:id :xt/id}))))
+
 (defn query [schema document operation-name variable-values
              {::pass/keys [subject]
               ::site/keys [db xt-node base-uri resource]
@@ -388,6 +424,7 @@
       (fn [{:keys [object-type object-value field-name argument-values]
             :as field-resolver-args}]
         (let [field (get-in object-type [::schema/fields-by-name field-name])
+              lambda (get-in field [::schema/directives-by-name "lambda" ::g/arguments])
               types-by-name (::schema/types-by-name schema)
                   site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
                   field-kind (or
@@ -418,6 +455,8 @@
                         :field-resolver-args field-resolver-args
                         :subject subject
                         :db db}]
+          (if lambda
+            (run-lambda! lambda opts)
             (cond
               mutation? (perform-mutation! (get site-args "mutation") opts)
 
