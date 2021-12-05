@@ -6,8 +6,7 @@
    [xtdb.api :as x]
    [selmer.parser :as selmer]
    selmer.filters
-   selmer.tags)
-  (:import (java.net URL)))
+   selmer.tags))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
