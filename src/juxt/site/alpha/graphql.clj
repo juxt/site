@@ -117,114 +117,111 @@
   (= (get-in types-by-name [arg-name ::g/kind]) 'SCALAR))
 
 (defn- args-to-entity
-  ([args schema field base-uri site-args type-k]
-   (args-to-entity args schema field base-uri site-args type-k nil))
-  ([args schema field base-uri site-args type-k old-value]
-   (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
-   (let [types-by-name (:juxt.grab.alpha.schema/types-by-name schema)
-         transform-sym (some-> site-args (get "transform") symbol)
-         transform (when transform-sym (requiring-resolve transform-sym))
-         _  (when (and transform-sym (not transform))
-              (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
+  [args schema field base-uri site-args type-k]
+  (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
+  (let [types-by-name (:juxt.grab.alpha.schema/types-by-name schema)
+        transform-sym (some-> site-args (get "transform") symbol)
+        transform (when transform-sym (requiring-resolve transform-sym))
+        _  (when (and transform-sym (not transform))
+             (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
 
-         entity
-         (reduce
-          (fn [acc arg-def]
-            (let [site-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments])
-                  generator-args (get site-args "gen")
-                  transform-sym (some-> site-args (get "transform") symbol)
-                  transform (when transform-sym (requiring-resolve transform-sym))
-                  kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])
-                  arg-name (::g/name arg-def)
-                  key (keyword (or kw arg-name))
-                  type-ref (::g/type-ref arg-def)
-                  arg-type (or (::g/name type-ref)
-                               (-> type-ref ::g/non-null-type ::g/name))]
+        entity
+        (reduce
+         (fn [acc arg-def]
+           (let [site-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments])
+                 generator-args (get site-args "gen")
+                 transform-sym (some-> site-args (get "transform") symbol)
+                 transform (when transform-sym (requiring-resolve transform-sym))
+                 kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])
+                 arg-name (::g/name arg-def)
+                 key (keyword (or kw arg-name))
+                 type-ref (::g/type-ref arg-def)
+                 arg-type (or (::g/name type-ref)
+                              (-> type-ref ::g/non-null-type ::g/name))]
 
-              (when (and transform-sym (not transform))
-                (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
+             (when (and transform-sym (not transform))
+               (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
 
-              (when transform
-                (log/tracef "transform is %s" transform))
+             (when transform
+               (log/tracef "transform is %s" transform))
 
-              (cond
-                arg-type                ; is it a singular (not a LIST)
-                (let [value (or (get args arg-name)
-                                (generate-value generator-args args))
-                      value
-                      (cond-> value
-                        ;; We don't want symbols in XT entities, because this leaks the
-                        ;; form-plane into the data-plane!
-                        (symbol? value) str
+             (cond
+               arg-type                ; is it a singular (not a LIST)
+               (let [value (or (get args arg-name)
+                               (generate-value generator-args args))
+                     value
+                     (cond-> value
+                       ;; We don't want symbols in XT entities, because this leaks the
+                       ;; form-plane into the data-plane!
+                       (symbol? value) str
 
-                        ;; Replace base-uri in string-template, only for an ID
-                        ;; since we should be careful not to tamper with other
-                        ;; values.
-                        (and (string? value) (= arg-type "ID"))
-                        (selmer/render {"base-uri" base-uri})
+                       ;; Replace base-uri in string-template, only for an ID
+                       ;; since we should be careful not to tamper with other
+                       ;; values.
+                       (and (string? value) (= arg-type "ID"))
+                       (selmer/render {"base-uri" base-uri})
 
-                        ;; Transform value
-                        transform transform)]
+                       ;; Transform value
+                       transform transform)]
 
-                  (cond
-                    (or kw (scalar? arg-type types-by-name))
-                    (assoc-some acc key value)
+                 (cond
+                   (or kw (scalar? arg-type types-by-name))
+                   (assoc-some acc key value)
 
-                    :else
-                    (try
-                      (merge acc value)
-                      (catch Exception e
-                        (throw
-                         (ex-info
-                          "Cannot merge value into acc"
-                          {:acc acc
-                           :arg-type arg-type
-                           :value value}
-                          e))))))
+                   :else
+                   (try
+                     (merge acc value)
+                     (catch Exception e
+                       (throw
+                        (ex-info
+                         "Cannot merge value into acc"
+                         {:acc acc
+                          :arg-type arg-type
+                          :value value}
+                         e))))))
 
-                ;; Is it a list? Then put in as a vector
-                (::g/list-type type-ref)
-                (let [val (or (get args (name key))
-                              ;; TODO: default value?
-                              (generate-value generator-args args))
-                      ;; Change a symbol value into a string
+               ;; Is it a list? Then put in as a vector
+               (::g/list-type type-ref)
+               (let [val (or (get args (name key))
+                             ;; TODO: default value?
+                             (generate-value generator-args args))
+                     ;; Change a symbol value into a string
 
-                      ;; We don't want symbols in XT entities, because this leaks the
-                      ;; form-plane into the data-plane!
-                      val (cond-> val (symbol? val) str)
+                     ;; We don't want symbols in XT entities, because this leaks the
+                     ;; form-plane into the data-plane!
+                     val (cond-> val (symbol? val) str)
 
-                      list-type (get-in type-ref [::g/list-type ::g/name])]
-                  (cond
-                    (scalar? list-type types-by-name) (assoc-some acc key val)
-                    :else
-                    (throw (ex-info "Unsupported list-type" {:arg-def arg-def
-                                                             :list-type list-type}))))
+                     list-type (get-in type-ref [::g/list-type ::g/name])]
+                 (cond
+                   (scalar? list-type types-by-name) (assoc-some acc key val)
+                   :else
+                   (throw (ex-info "Unsupported list-type" {:arg-def arg-def
+                                                            :list-type list-type}))))
 
-                :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
-          (or old-value {})
-          (::g/arguments-definition field))
-         type (-> field ::g/type-ref ::g/name)
-         _validate-type (and (nil? type)
-                             (throw (ex-info "Couldn't infer type" {:field field})))]
-     (cond-> entity
-       true (assoc
-             :xt/id (or
-                     (:xt/id old-value)
-                     (:xt/id entity)
-                     (:id entity)
-                     (generate-value
-                      {:type "UUID"
-                       :pathPrefix type}
-                      {})))
-       (nil? (type-k entity)) (assoc type-k type)
-       (:id entity) (dissoc :id)
-       transform (transform args)
+               :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
+         {}
+         (::g/arguments-definition field))
+        type (-> field ::g/type-ref ::g/name)
+        _validate-type (and (nil? type)
+                            (throw (ex-info "Couldn't infer type" {:field field})))]
+    (cond-> entity
+      true (assoc
+            :xt/id (or
+                    (:xt/id entity)
+                    (:id entity)
+                    (generate-value
+                     {:type "UUID"
+                      :pathPrefix type}
+                     {})))
+      (nil? (type-k entity)) (assoc type-k type)
+      (:id entity) (dissoc :id)
+      transform (transform args)
 
-       ;; This is special argument that adds Site specific attributes
-       (get site-args "methods")
-       (assoc ::http/methods (set (map (comp keyword str/lower-case) (get site-args "methods"))))
+      ;; This is special argument that adds Site specific attributes
+      (get site-args "methods")
+      (assoc ::http/methods (set (map (comp keyword str/lower-case) (get site-args "methods"))))
 
-       ))))
+      )))
 
 (defn process-xt-results
   [field results]
@@ -381,6 +378,7 @@
                                       t/inst))
                    db)
               object-id (:xt/id object-value)
+              ;; TODO: Protected lookup please!
               lookup-entity (fn [id] (xt/entity db id))]
 
           (cond
@@ -398,17 +396,15 @@
                   ;; @site(a: "xtdb.api/valid-time").
                   (lookup-entity id))
                 "put"
-                (let [object (args-to-entity
-                              argument-values schema field base-uri site-args type-k)]
+                (let [object (args-to-entity argument-values schema field base-uri site-args type-k)]
                   (put-object! xt-node object)
                   object)
                 "update"
-                (let [id (validate-id! argument-values)
-                      old-value (lookup-entity id)
-                      object (args-to-entity
-                              argument-values schema field base-uri site-args type-k old-value)]
-                  (put-object! xt-node object)
-                  object)))
+                (let [new-entity (args-to-entity argument-values schema field base-uri site-args type-k)
+                      old-entity (some-> new-entity :xt/id lookup-entity)
+                      new-entity (merge old-entity new-entity)]
+                  (put-object! xt-node new-entity)
+                  new-entity)))
 
             (get site-args "history")
             (if-let [id (get argument-values "id")]
