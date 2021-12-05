@@ -77,7 +77,9 @@
                        (document/compile-document schema))
           subject :me]
       (->
-       (graphql/query schema document "TestQuery" {} *xt-node* db subject)
+       (graphql/query schema document "TestQuery" {} {::site/xt-node *xt-node*
+                                                      ::site/db db
+                                                      ::pass/subject subject})
        (get-in [:data :thing :secret])))))
 
 

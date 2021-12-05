@@ -341,7 +341,10 @@
         (prn "defaulting to nil, type-ref is " type-ref)
         nil))))
 
-(defn query [schema document operation-name variable-values xt-node db {:keys [subject base-uri]}]
+(defn query [schema document operation-name variable-values
+             {::pass/keys [subject]
+              ::site/keys [db xt-node base-uri resource]
+              :as req}]
   (let [type-k
         (or
          (some-> schema :juxt.grab.alpha.schema/directives (get "site") ::g/arguments (get "type") keyword)
@@ -519,6 +522,73 @@
             (get site-args "function")
             (throw (ex-info "Feature not yet supported" {}))
 
+            (get site-args "subQuery")
+            (let [sub-query (get site-args "subQuery")
+
+                  _ (when-not (:query sub-query)
+                      (throw (ex-info "subQuery must have a query key" {:sub-query sub-query})))
+
+                  expanded-sub-query
+                  (postwalk
+                   (fn [x]
+                     (cond
+                       (and (map? x) (contains? x :a))
+                       (get object-value (keyword (get x :a)))
+                       :else x))
+                   sub-query)
+
+                  document (:query expanded-sub-query)]
+
+              (when document
+                (let [compiled-document
+                      (document/compile-document (parser/parse document) schema)
+
+                      ;; We have the variable names in InputValue
+                      ;; format, which parses as keywords. We must
+                      ;; convert to string keys before calling the query.
+                      ;;variables (reduce-kv (fn [acc k v] (assoc acc (name k) v)) {} (:variables expanded-sub-query))
+
+                      ;; TODO: Replace this map with the Site resource, to get
+                      ;; variables from there.
+                      ;; TODO: Could also get the namespace prefix of these
+                      ;; variables as they exist in the resource by specifying in
+                      ;; the subQuery config.
+                      variables {"juxtcode" (get resource :juxtcode)}
+
+                      ;; TODO: We need to source dynamic variables from query-string
+
+                      result (try
+                               (log/tracef "Executing subQuery %s with operationName '%s'" document nil)
+                               (query schema compiled-document
+                                      nil #_operation-name
+                                      variables
+                                      req)
+                               (catch Exception e
+                                 (throw (ex-info "Failed to run subquery" {:document document} e))
+                                 ))]
+
+                  (if-let [errors (seq (:errors result))]
+                    (throw (ex-info "Errors in subquery" {:errors errors}))
+                    ;; Encode as JSON for now, because we don't have dynamic schema
+                    ;; TODO: Add coercion support to custom scalars
+                    (json/write-value-as-string (:data result))
+                    )))
+
+              #_(throw (ex-info "expanded-sub-query" {:expanded-sub-query (pr-str expanded-sub-query)}))
+              #_(throw
+                 (ex-info "TODO: subQuery"
+                          {:sub-query (get site-args "subQuery")
+                           :sub-query-str (pr-str (get site-args "subQuery"))
+                           :expanded-sub-query expanded-sub-query
+                           :expanded-sub-query-str (pr-str expanded-sub-query)
+                           :schema (some? (:schema field-resolver-args))
+                           :object-value object-value
+                           :keys (keys field-resolver-args)
+                           :result result
+                           }))
+              )
+
+
             ;; Another strategy is to see if the field indexes the
             ;; object-value. This strategy allows for delays to be used to prevent
             ;; computing field values that aren't resolved.
@@ -606,8 +676,7 @@
 
         results
         (juxt.site.alpha.graphql/query
-         schema compiled-document operation-name variables xt-node
-         db {:subject subject :base-uri base-uri})]
+         schema compiled-document operation-name variables req)]
 
     (-> req
         (assoc
@@ -794,8 +863,7 @@
         results (query schema document operation-name
                        {}
                        nil ;; for xt-node, so we prevent get updates
-                       db
-                       {:subject subject :base-uri base-uri})]
+                       req)]
     (-> req
         (assoc-in [:ring.response/headers "content-type"] "application/json")
         (assoc :ring.response/body (json/write-value-as-bytes results)))))

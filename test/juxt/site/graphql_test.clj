@@ -146,7 +146,7 @@
          query "{ allUsers { id  name email roles { name } } }"
          document (document/compile-document (parser/parse query) schema)]
 
-     (graphql/query schema document nil (x/db *xt-node*)))))
+     (graphql/query schema document nil {} {::site/db (x/db *xt-node*)}))))
 
 
 (defn add-body [m s ct]

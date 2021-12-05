@@ -467,7 +467,7 @@
   (let [config (config)
         schema (:juxt.grab.alpha/schema (e (format "/_site/graphql" (::site/base-uri config))))
         document (graphql.document/compile-document (graphql.parser/parse (slurp (io/file "opt/graphql/graphiql-introspection-query.graphql"))) schema)]
-    (graphql/query schema document "IntrospectionQuery" (db))))
+    (graphql/query schema document "IntrospectionQuery" {} {::site/db (db)})))
 
 (defn g [q]
   ;; When developing the schema, this might help rapid development, however,
