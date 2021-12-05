@@ -38,10 +38,10 @@
 (defn xt-template-loader [db]
   (proxy [java.net.URLStreamHandler] []
     (openConnection [url]
-      (log/tracef "Open connection: url=%s" url)
+;;      (log/tracef "Open connection: url=%s" url)
       (proxy [java.net.URLConnection] [url]
         (getInputStream []
-          (log/tracef "Loading template: url=%s" url)
+;;          (log/tracef "Loading template: url=%s" url)
           (let [res (x/entity db (str url))]
             (java.io.ByteArrayInputStream.
              (cond
@@ -59,7 +59,7 @@
         custom-resource-path (:selmer.util/custom-resource-path selected-representation)]
 
     (try
-      (log/tracef "Render template: %s" (:xt/id template))
+;;      (log/tracef "Render template: %s" (:xt/id template))
       (let [body
             (binding [*db* db]
               (selmer/render-file
