@@ -15,10 +15,12 @@
 
 (selmer/cache-off!)
 
-(selmer/add-tag!
-   :sitedebug
-   (fn [args context-map tag-config]
-     (selmer.tags/prettify-edn context-map)))
+(selmer.filters/add-filter!
+ :pretty
+ (fn [x]
+   ;; prettify-edn already does escaping on content so we're OK to declare this
+   ;; output as safe
+   [:safe (selmer.tags/prettify-edn x)]))
 
 (def ^:dynamic *db* nil)
 

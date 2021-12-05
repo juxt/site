@@ -13,7 +13,7 @@
           <dd><code>{{ error.message }}</code></dd>
           {% if error.ex-data %}
           <dt>Data</dt>
-          <dl><code>{{ error.ex-data }}</code></dl>
+          <dl>{{ error.ex-data|pretty }}</dl>
           {% endif %}
           <dt>Stack</dt>
           <dd><pre>
