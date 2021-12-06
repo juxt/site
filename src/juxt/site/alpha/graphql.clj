@@ -867,10 +867,7 @@
         ;; TODO: This should be pre-parsed against schema
         document-str (String. (::http/body resource) "UTF-8")
         document (document/compile-document (parser/parse document-str) schema)
-        results (query schema document operation-name
-                       {}
-                       nil ;; for xt-node, so we prevent get updates
-                       req)]
+        results (query schema document operation-name {} req)]
     (-> req
         (assoc-in [:ring.response/headers "content-type"] "application/json")
         (assoc :ring.response/body (json/write-value-as-bytes results)))))
