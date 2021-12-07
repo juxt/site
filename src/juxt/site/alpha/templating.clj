@@ -78,16 +78,15 @@
 (defn render-template
   "Methods should return a modified request (first arg), typically associated
   a :ring.response/body entry."
-  [{::site/keys [db selected-representation] :as req} template]
+  [{::site/keys [resource selected-representation] :as req} template]
 
-  (let [template-models (::site/template-model selected-representation)
+  (let [template-models (or (::site/template-model selected-representation)
+                            (::site/template-model resource))
         template-models (if (sequential? template-models) template-models [template-models])
 
         ;; TODO: We should strongly consider reverting to a single template
         ;; model, now that we have GraphQL. Having the option for multiple
-        ;; template models over-complicates the modelling. For example, we want
-        ;; to put into a resource the GraphQL operation-name to call on the
-        ;; GraphQL.
+        ;; template models over-complicates the modelling.
         processed-template-models
         (for [tm template-models]
           (process-template-model tm req))
