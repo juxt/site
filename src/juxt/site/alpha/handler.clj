@@ -460,7 +460,7 @@
    ;; OpenAPI, and exist in Xtdb, simultaneously.
    (openapi/locate-resource db uri req)
 
-   ;; Is it in Xtdb?
+   ;; Is it in XTDB?
    (when-let [r (x/entity db uri)]
      (cond-> (assoc r ::site/resource-provider ::db)
        (= (get r ::site/type) "StaticRepresentation")
