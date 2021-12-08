@@ -508,6 +508,18 @@
               ;; Resolvers need to do their own access control
               (resolver (assoc field-resolver-args ::pass/subject subject :db db)))
 
+            (get site-args "siteResolver")
+            (let [resolver
+                  (case (get site-args "siteResolver")
+                    "allQueryParams"
+                    (requiring-resolve 'juxt.site.alpha.graphql.internal-resolver/query-parameters)
+                    "queryParam"
+                    (requiring-resolve 'juxt.site.alpha.graphql.internal-resolver/query-parameter)
+                    "queryString"
+                    (requiring-resolve 'juxt.site.alpha.graphql.internal-resolver/query-string)
+                    (throw (ex-info "No such built-in resolver" {:site-resolver (get site-args "siteResolver")})))]
+              (resolver (assoc field-resolver-args ::site/request-context req)))
+
             ;; A function whose input is the result of a GraphqL 'sub' query,
             ;; propagating the same subject and under the exact same access
             ;; control policy. This allows the function to declare its necessary
