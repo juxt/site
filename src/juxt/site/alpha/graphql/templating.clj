@@ -106,10 +106,23 @@
             :juxt.http.alpha/body
             (String.))
         form (form-decode input-body-as-string)
-        document-resource-id (::site/template-model resource) ; pages.edn
-        document-resource (xt/entity db document-resource-id)
-        graphql-query (String. (:juxt.http.alpha/body document-resource))
+
+        document-resource-uri
+        (or
+         (get form "queryUri")
+         ;; Currently the resource can have a 'string' template model which
+         ;; refers to a GraphQL. This design is somewhat arbitary and may change
+         ;; future.
+         (when (string? (::site/template-model resource))
+           (::site/template-model resource)))
+
+        document-resource (when document-resource-uri (xt/entity db document-resource-uri))
+
+        graphql-query (when (:juxt.http.alpha/body document-resource)
+                        (String. (:juxt.http.alpha/body document-resource)))
+
         operation-name (get form "operationName")
+
         graphql-schema-id (::site/graphql-schema document-resource)
         graphql-schema-entity (xt/entity db graphql-schema-id)
         schema (::grab/schema graphql-schema-entity)]
