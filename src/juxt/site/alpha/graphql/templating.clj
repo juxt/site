@@ -11,7 +11,8 @@
    [clojure.walk :refer [postwalk prewalk]]
    [ring.util.codec :refer [form-decode]]
    [selmer.parser :as selmer]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   [clojure.string :as str]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -85,17 +86,23 @@
            (cond
              (and (map? x) (contains? x :_siteTemplateModel))
              (let [siteTemplateModel (json/read-value (:_siteTemplateModel x))]
+               ;; I there is a special _siteTemplateModel, we process the trees
+               ;; of all its siblings, replacing any variable reference ('{{
+               ;; foo.bar }}') with the value in the template model. We also
+               ;; look for tables.
                (reduce-kv
                 (fn [acc k v]
                   (cond-> acc
                     (not= k :_siteTemplateModel)
                     (assoc k (postwalk
-                              (fn [s] (if (string? s)
+                              (fn [s] (if (and (string? s) (str/index-of s "{{"))
                                         (selmer/render s siteTemplateModel)
                                         s)) v))))
                 x x))
              :else x))
          data)))))
+
+
 
 (defn post-handler [{::site/keys [db resource xt-node]
                      ::pass/keys [subject]
