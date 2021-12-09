@@ -46,10 +46,12 @@
                 (throw
                  (ex-info
                   (format "template-model fn '%s' not resolveable" template-model)
-                  {:template-model template-model}))))
+                  {:template-model template-model}
+                  e))))
 
             ;; It can also be an id of an entity in the database which contains
-            ;; metadata, e.g. for a GraphQL query.
+            ;; metadata, e.g. for a GraphQL query. TODO: This is smelly
+            ;; coupling, why should a String imply a reference to a GraphQL doc?
             (string? template-model)
             ;; This is treated as a reference to another entity
             (if-let [template-model-entity (xt/entity db template-model)]
