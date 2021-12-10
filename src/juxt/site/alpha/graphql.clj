@@ -170,7 +170,7 @@
 
                    :else
                    (try
-                     (merge acc value)
+                     (assoc acc key value)
                      (catch Exception e
                        (throw
                         (ex-info
