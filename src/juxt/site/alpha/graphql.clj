@@ -380,9 +380,7 @@
       (= "String" type-name)
       ""
       :else
-      (do
-        (log/debugf "defaulting to nil, type-ref is %s" type-ref)
-        nil))))
+      nil)))
 
 (defn perform-mutation!
   [{:keys [argument-values site-args xt-node lookup-entity field-kind] :as opts}]
@@ -495,8 +493,6 @@
                 (with-open [history (xt/open-entity-history db id order {:with-docs? true})]
                   (->> history
                        (iterator-seq)
-                       (drop offset)
-                       (take limit)
                        (map process-history-item))))
               (throw (ex-info "History queries must have an id argument" {})))
 
