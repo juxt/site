@@ -34,10 +34,14 @@
                         (:juxt.site.alpha/graphql-operation-name selected-representation)
                         (:juxt.site.alpha/graphql-operation-name resource))
 
-        variables (or
-                   (:juxt.site.alpha/graphql-variables selected-representation)
-                   (:juxt.site.alpha/graphql-variables resource)
-                   {})
+        variables (merge
+                   ;; The currently logged in user is so commonly needed, it is
+                   ;; automatically bound.
+                   {"username" (-> subject ::pass/username)}
+                   (or
+                    (:juxt.site.alpha/graphql-variables selected-representation)
+                    (:juxt.site.alpha/graphql-variables resource)
+                    {}))
 
         graphql-query (String. graphql-query-bytes "UTF-8")
 
