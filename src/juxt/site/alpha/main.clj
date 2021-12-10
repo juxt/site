@@ -54,6 +54,10 @@
 
     (log/info "System started and ready...")
     (log/trace "TRACE on")
+    (Thread/setDefaultUncaughtExceptionHandler
+     (reify Thread$UncaughtExceptionHandler
+       (uncaughtException [_ thread throwable]
+         (throw (ex-info "Default Exception caught:" throwable)))))
 
     (.addShutdownHook
      (Runtime/getRuntime)
