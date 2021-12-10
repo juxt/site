@@ -35,3 +35,6 @@
 
 (defn query-parameter [args]
   (get (form args) (-> args :argument-values (get "name"))))
+
+(defn constant [args]
+  (some-> args :argument-values (get "value")))

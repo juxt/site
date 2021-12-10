@@ -517,6 +517,8 @@
                     (requiring-resolve 'juxt.site.alpha.graphql.internal-resolver/query-parameter)
                     "queryString"
                     (requiring-resolve 'juxt.site.alpha.graphql.internal-resolver/query-string)
+                    "constant"
+                    (requiring-resolve 'juxt.site.alpha.graphql.internal-resolver/constant)
                     (throw (ex-info "No such built-in resolver" {:site-resolver (get site-args "siteResolver")})))]
               (resolver (assoc field-resolver-args ::site/request-context req)))
 
