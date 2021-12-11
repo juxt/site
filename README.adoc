@@ -80,6 +80,10 @@ Start the Site server:
 $ site/bin/site-server
 ----
 
+NOTE: Alternatively, if you're familiar with Clojure development, you can start
+the server via the `deps.edn` file and simply 'jack-in' with your editor or IDE
+as normal.
+
 === Start multiple instances of the server
 
 If you require multiple Site servers to coexist on the same machine, you can start site passing a different configuration file as follows:
@@ -94,11 +98,16 @@ In this case please be sure to change the configuration so ports are different a
 $ SITE_BASE_URI=http://localhost:5509 site/bin/site get-token -u admin
 ----
 
-=== Bootstrap
+=== The REPL
 
-Bootstrap the new system by adding the minimum resources that are required to allow remote access.
+If you've run Site via your development environment and 'jacked-in' you'll
+already have a REPL. Proceed to the next step.
 
-We'll be using ncat (`ncat`), but you can replace `ncat` with `telnet`, or `ncat`, depending on what's available for your system.
+If you're running Site with `site/bin/site-server`, you'll need to connect a
+terminal to Site to access the REPL. You can do this via port 50505, which is a
+socket REPL that Site starts by default.
+
+How you connect to this port is up to you. One way is via `ncat`, but you can replace `ncat` with `telnet`, or `netcat`, depending on what's available for your system.
 
 [NOTE]
 --
@@ -109,13 +118,24 @@ $ sudo pacman -Sy nmap
 ----
 --
 
-REPL-in to the server
-
-TIP: Prefix the command with `rlwrap` if you have it installed.
-
 ----
 $ ncat localhost 50505
+----
 
+[TIP]
+--
+Prefix the command with `rlwrap` if you have it installed.
+
+----
+$ rlwrap ncat localhost 50505
+----
+--
+
+=== Bootstrap
+
+Bootstrap the new system by adding the minimum resources that are required to allow remote access.
+
+----
 Site by JUXT. Copyright (c) 2021, JUXT LTD.
 Type :repl/quit to exit
 
