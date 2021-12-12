@@ -24,11 +24,11 @@
    [juxt.reap.alpha.rfc7232 :as rfc7232]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.cache :as cache]
+   [juxt.site.alpha.conditional :as conditional]
    [juxt.site.alpha.debug :as debug]
    [juxt.site.alpha.locator :as locator]
    [juxt.site.alpha.util :as util]
-   [juxt.site.alpha.templating :as templating]
-   juxt.site.alpha.selmer
+   [juxt.site.alpha.response :as response]
    [juxt.site.alpha.triggers :as triggers]
    [juxt.site.alpha.rules :as rules])
   (:import (java.net URI)))
@@ -234,261 +234,6 @@
 
              {::http/body body})))))))
 
-(defn etag [representation]
-  (format
-   "\"%s\""
-   (subs
-    (util/hexdigest
-     (cond
-       (::http/body representation)
-       (::http/body representation)
-       (::http/content representation)
-       (.getBytes (::http/content representation)
-                  (get representation ::http/charset "UTF-8")))) 0 32)))
-
-(defn evaluate-if-match!
-  "Evaluate an If-None-Match precondition header field in the context of a
-  resource. If the precondition is found to be false, an exception is thrown
-  with ex-data containing the proper response."
-  [{::site/keys [current-representations] :as req}]
-  ;; (All quotes in this function's comments are from Section 3.2, RFC 7232,
-  ;; unless otherwise stated).
-  (when-let [header-field (reap/if-match (get-in req [:ring.request/headers "if-match"]))]
-    (log/tracef "evaluate-if-match! %s" header-field)
-    (cond
-      ;; "If the field-value is '*' …"
-      (and (map? header-field)
-           (::rfc7232/wildcard header-field)
-           (empty? current-representations))
-      ;; "… the condition is false if the origin server does not have a current
-      ;; representation for the target resource."
-      (throw
-       (ex-info
-        "If-Match precondition failed"
-        (into req {:ring.response/status 412})))
-
-      (sequential? header-field)
-      (do
-        (log/tracef "evaluate-if-match! sequential? true, header-field: %s" header-field)
-        (let [matches (for [rep current-representations
-                            :let [rep-etag (some-> (get rep ::http/etag) reap/entity-tag)]
-                            etag header-field
-                            ;; "An origin server MUST use the strong comparison function
-                            ;; when comparing entity-tags"
-                            :let [_ (log/tracef "evaluate-if-match! - compare %s with %s" etag rep-etag)]
-                            :when (rfc7232/strong-compare-match? etag rep-etag)]
-                        etag)]
-          (log/tracef "matches: %d: %s" (count matches) matches)
-          (when-not (seq matches)
-
-              ;; TODO: "unless it can be determined that the state-changing
-              ;; request has already succeeded (see Section 3.1)"
-              (throw
-               (ex-info
-                "No strong matches between if-match and current representations"
-                (into req {:ring.response/status 412})))))))))
-
-;; TODO: See Section 4.1, RFC 7232:
-;;
-(defn evaluate-if-none-match!
-  "Evaluate an If-None-Match precondition header field in the context of a
-  resource and, when applicable, the representation metadata of the selected
-  representation. If the precondition is found to be false, an exception is
-  thrown with ex-data containing the proper response."
-  [{::site/keys [selected-representation] :as req}]
-  ;; (All quotes in this function's comments are from Section 3.2, RFC 7232,
-  ;; unless otherwise stated).
-  (let [header-field (reap/if-none-match (get-in req [:ring.request/headers "if-none-match"]))]
-    (cond
-      (sequential? header-field)
-      (when-let [rep-etag (some-> (get selected-representation ::http/etag) reap/entity-tag)]
-        ;; "If the field-value is a list of entity-tags, the condition is false
-        ;; if one of the listed tags match the entity-tag of the selected
-        ;; representation."
-        (doseq [etag header-field]
-          ;; "A recipient MUST use the weak comparison function when comparing
-          ;; entity-tags …"
-          (when (rfc7232/weak-compare-match? etag rep-etag)
-            (throw
-             (if (#{:get :head} (:ring.request/method req))
-               (ex-info
-                "Not modified"
-                (into req {:ring.response/status 304
-                           ::matching-entity-tag etag}))
-               ;; "… or 412 (Precondition Failed) status code for all other
-               ;; request methods."
-               (ex-info
-                "If-None-Match precondition failed"
-                (into req {:ring.response/status 412
-                           ::matching-entity-tag etag})))))))
-
-      ;; "If-None-Match can also be used with a value of '*' …"
-      (and (map? header-field) (::rfc7232/wildcard header-field))
-      ;; "… the condition is false if the origin server has a current
-      ;; representation for the target resource."
-      (when selected-representation
-        (throw
-         (ex-info
-          "At least one representation already exists for this resource"
-          (into req
-                (if (#{:get :head} (:ring.request/method req))
-                  ;; "the origin server MUST respond with either a) the 304 (Not
-                  ;; Modified) status code if the request method is GET or HEAD
-                  ;; …"
-                  {:ring.response/status 304}
-                  ;; "… or 412 (Precondition Failed) status code for all other
-                  ;; request methods."
-                  {:ring.response/status 412}))))))))
-
-(defn evaluate-if-unmodified-since! [{::site/keys [selected-representation] :as req}]
-  (let [if-unmodified-since-date
-        (-> req
-            (get-in [:ring.request/headers "if-unmodified-since"])
-            reap/http-date
-            ::rfc7231/date)]
-    (when (.isAfter
-           (.toInstant (get selected-representation ::http/last-modified (java.util.Date.)))
-           (.toInstant if-unmodified-since-date))
-      (throw
-       (ex-info
-        "Precondition failed"
-        (into req {:ring.resposne/status 304}))))))
-
-(defn evaluate-if-modified-since! [{::site/keys [selected-representation] :as req}]
-  (let [if-modified-since-date
-        (-> req
-            (get-in [:ring.request/headers "if-modified-since"])
-            reap/http-date
-            ::rfc7231/date)]
-
-    (when-not (.isAfter
-               (.toInstant (get selected-representation ::http/last-modified (java.util.Date.)))
-               (.toInstant if-modified-since-date))
-      (throw
-       (ex-info
-        "Not modified"
-        (into req {:ring.response/status 304}))))))
-
-(defn evaluate-preconditions!
-  "Implementation of Section 6 of RFC 7232. Arguments are the (Ring) request, a
-  resource (map, typically with Spin namespaced entries, representation metadata
-  of the selected representation and the response message origination date."
-  [req]
-  ;; "… a server MUST ignore the conditional request header fields … when
-  ;; received with a request method that does not involve the selection or
-  ;; modification of a selected representation, such as CONNECT, OPTIONS, or
-  ;; TRACE." -- Section 5, RFC 7232
-  (when (not (#{:connect :options :trace} (:ring.request/method req)))
-    (if (get-in req [:ring.request/headers "if-match"])
-      ;; Step 1
-      (evaluate-if-match! req)
-      ;; Step 2
-      (when (get-in req [:ring.request/headers "if-unmodified-since"])
-        (evaluate-if-unmodified-since! req)))
-    ;; Step 3
-    (if (get-in req [:ring.request/headers "if-none-match"])
-      (evaluate-if-none-match! req)
-      ;; Step 4, else branch: if-none-match is not present
-      (when (#{:get :head} (:ring.request/method req))
-        (when (get-in req [:ring.request/headers "if-modified-since"])
-          (evaluate-if-modified-since! req))))
-    ;; (Step 5 is handled elsewhere)
-    ))
-
-(defn put-static-resource
-  "PUT a new representation of the target resource. All other representations are
-  replaced."
-  [{::site/keys [uri db received-representation start-date xt-node base-uri request-id] :as req}]
-
-  (let [existing (x/entity db uri)
-        classification (get-in req [:ring.request/headers "site-classification"])
-        variant-of (get-in req [:ring.request/headers "site-variant-of"])
-        template-dialect (get-in req [:ring.request/headers "site-template-dialect"])
-        new-rep (merge
-                 {:xt/id uri
-                  ::http/methods #{:get :head :options :put :patch}
-                  ::site/type "StaticRepresentation"}
-                 existing
-                 (cond->
-                     {::http/etag (etag received-representation)
-                      ::http/last-modified start-date
-                      ::site/request request-id}
-                   variant-of (assoc ::site/variant-of variant-of)
-                   classification (assoc ::pass/classification classification)
-                   template-dialect (assoc ::site/template-dialect (str/lower-case template-dialect)))
-                 received-representation)]
-
-    ;; Currently we cannot tell whether a submitted tx has been successful,
-    ;; see https://github.com/juxt/xtdb/issues/1480. As a workaround, we do
-    ;; the conditional checks here. In the future, we'll call into separate
-    ;; tx fns.
-    (evaluate-preconditions! req)
-
-    (->> (x/submit-tx
-          xt-node
-          [[:xtdb.api/put new-rep]])
-         (x/await-tx xt-node))
-
-    (into req {:ring.response/status (if existing 204 201)})))
-
-(defn patch-static-resource
-  [{::site/keys [received-representation] :as req}]
-  (throw (ex-info "TODO: patch" (into req {::incoming received-representation}))))
-
-(def SITE_REQUEST_ID_PATTERN #"(.*/_site/requests/\p{Alnum}+)(\.[a-z]+)?")
-
-(defn locate-resource
-  "Call each locate-resource defmethod, in a particular order, ending
-  in :default."
-  [{::site/keys [db uri base-uri] :as req}]
-  (or
-
-   ;; Is it a cached request to debug?
-   (let [[_ req-id suffix] (re-matches SITE_REQUEST_ID_PATTERN uri)]
-     (when-let [request-to-show (get cache/requests-cache req-id)]
-       (log/tracef "Found request object in cache")
-       {::site/uri uri
-        ::site/resource-provider ::requests-cache
-        ::http/methods #{:get :head :options}
-        ::http/representations
-        (remove nil? [(when (or (nil? suffix) (= suffix ".json"))
-                        (debug/json-representation-of-request req request-to-show))
-                      (when (or (nil? suffix) (= suffix ".html"))
-                        (debug/html-representation-of-request req request-to-show))])}))
-
-   ;; We call OpenAPI location here, because a resource can be defined in
-   ;; OpenAPI, and exist in Xtdb, simultaneously.
-   (openapi/locate-resource db uri req)
-
-   ;; Is it in XTDB?
-   (when-let [r (x/entity db uri)]
-     (cond-> (assoc r ::site/resource-provider ::db)
-       (= (get r ::site/type) "StaticRepresentation")
-       (assoc ::site/put-fn put-static-resource
-              ::site/patch-fn patch-static-resource)))
-
-   ;; Is it found by any resource locators registered in the database?
-   (locator/locate-with-locators db req)
-
-   ;; Is it a redirect?
-   (when-let [[r loc] (first
-                       (x/q db '{:find [r loc]
-                                 :where [[r ::site/resource uri]
-                                         [r ::site/location loc]
-                                         [r ::site/type "Redirect"]]
-                                 :in [uri]}
-                            uri))]
-     {::site/uri uri
-      ::http/methods #{:get :head :options}
-      ::site/resource-provider r
-      ::http/redirect (cond-> loc (.startsWith loc base-uri)
-                              (subs (count base-uri)))})
-
-   ;; Return a back-stop resource
-   {::site/resource-provider ::default-empty-resource
-    ::http/methods #{:get :head :options :put :post}
-    ::site/put-fn put-static-resource}))
-
 (defn merge-template-maybe
   "Some representations use a template engine to generate the payload. The
   referenced template (::site/template) may provide defaults for the
@@ -532,31 +277,11 @@
        ;; Merge in an template defaults
        (mapv #(merge-template-maybe db %))))
 
-(defn add-payload [{::site/keys [selected-representation db] :as req}]
-  (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
-        template (some->> selected-representation ::site/template (x/entity db))]
-    (cond
-      body-fn
-      (if-let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
-        (do
-          (log/debugf "Calling body-fn: %s %s" body-fn (type body-fn))
-          (assoc req :ring.response/body (f req)))
-        (throw
-         (ex-info
-          (format "body-fn cannot be resolved: %s" body-fn)
-          {:body-fn body-fn})))
-
-      template (templating/render-template req template)
-
-      content (assoc req :ring.response/body content)
-      body (assoc req :ring.response/body body)
-      :else req)))
-
 (defn GET [req]
-  (evaluate-preconditions! req)
+  (conditional/evaluate-preconditions! req)
   (-> req
       (assoc :ring.response/status 200)
-      (add-payload)))
+      (response/add-payload)))
 
 (defn post-variant [{::site/keys [xt-node db uri]
                      ::apex/keys [request-instance]
@@ -762,7 +487,7 @@
 
 (defn wrap-locate-resource [h]
   (fn [req]
-    (let [res (locate-resource req)]
+    (let [res (locator/locate-resource req)]
       (log/debugf "Resource provider: %s" (::site/resource-provider res))
       (h (assoc req ::site/resource res)))))
 
@@ -1242,7 +967,7 @@
                           ex-data
                           {::site/selected-representation representation})
           response (try
-                     (add-payload error-resource)
+                     (response/add-payload error-resource)
                      (catch Exception e
                        (respond-internal-error req e)))]
 

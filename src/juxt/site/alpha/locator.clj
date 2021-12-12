@@ -3,6 +3,10 @@
 (ns juxt.site.alpha.locator
   (:require
    [clojure.tools.logging :as log]
+   [juxt.apex.alpha.openapi :as openapi]
+   [juxt.site.alpha.debug :as debug]
+   [juxt.site.alpha.static :as static]
+   [juxt.site.alpha.cache :as cache]
    [xtdb.api :as x]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
@@ -68,3 +72,57 @@
     ::http/methods #{:get :head :options}
     ::http/content-type "text/html;charset=utf-8"
     ::http/content "<h1>App</h1>"}))
+
+(def SITE_REQUEST_ID_PATTERN #"(.*/_site/requests/\p{Alnum}+)(\.[a-z]+)?")
+
+(defn locate-resource
+  "Call each locate-resource defmethod, in a particular order, ending
+  in :default."
+  [{::site/keys [db uri base-uri] :as req}]
+  (or
+
+   ;; Is it a cached request to debug?
+   (let [[_ req-id suffix] (re-matches SITE_REQUEST_ID_PATTERN uri)]
+     (when-let [request-to-show (get cache/requests-cache req-id)]
+       (log/tracef "Found request object in cache")
+       {::site/uri uri
+        ::site/resource-provider ::requests-cache
+        ::http/methods #{:get :head :options}
+        ::http/representations
+        (remove nil? [(when (or (nil? suffix) (= suffix ".json"))
+                        (debug/json-representation-of-request req request-to-show))
+                      (when (or (nil? suffix) (= suffix ".html"))
+                        (debug/html-representation-of-request req request-to-show))])}))
+
+   ;; We call OpenAPI location here, because a resource can be defined in
+   ;; OpenAPI, and exist in Xtdb, simultaneously.
+   (openapi/locate-resource db uri req)
+
+   ;; Is it in XTDB?
+   (when-let [r (x/entity db uri)]
+     (cond-> (assoc r ::site/resource-provider ::db)
+       (= (get r ::site/type) "StaticRepresentation")
+       (assoc ::site/put-fn static/put-static-resource
+              ::site/patch-fn static/patch-static-resource)))
+
+   ;; Is it found by any resource locators registered in the database?
+   (locate-with-locators db req)
+
+   ;; Is it a redirect?
+   (when-let [[r loc] (first
+                       (x/q db '{:find [r loc]
+                                 :where [[r ::site/resource uri]
+                                         [r ::site/location loc]
+                                         [r ::site/type "Redirect"]]
+                                 :in [uri]}
+                            uri))]
+     {::site/uri uri
+      ::http/methods #{:get :head :options}
+      ::site/resource-provider r
+      ::http/redirect (cond-> loc (.startsWith loc base-uri)
+                              (subs (count base-uri)))})
+
+   ;; Return a back-stop resource
+   {::site/resource-provider ::default-empty-resource
+    ::http/methods #{:get :head :options :put :post}
+    ::site/put-fn static/put-static-resource}))

@@ -5,6 +5,7 @@
    [juxt.clojars-mirrors.nippy.v3v1v1.taoensso.nippy.utils :refer [freezable?]]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
+(alias 'http (create-ns 'juxt.http.alpha))
 
 (defn assoc-when-some [m k v]
   (cond-> m v (assoc k v)))
@@ -74,3 +75,15 @@
      (cond-> form
        (not (freezable? form))
        ((fn [_] ::site/unfreezable))))))
+
+(defn etag [representation]
+  (format
+   "\"%s\""
+   (subs
+    (hexdigest
+     (cond
+       (::http/body representation)
+       (::http/body representation)
+       (::http/content representation)
+       (.getBytes (::http/content representation)
+                  (get representation ::http/charset "UTF-8")))) 0 32)))

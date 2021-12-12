@@ -6,7 +6,6 @@
    [clojure.tools.logging :as log]
    [xtdb.api :as x]
    [jsonista.core :as json]
-   [juxt.apex.alpha.representation-generation :refer [entity-bytes-generator]]
    [juxt.jinx.alpha :as jinx]
    [juxt.jinx.alpha.api :as jinx.api]
    [juxt.jinx.alpha.vocabularies.keyword-mapping :refer [process-keyword-mappings]]
@@ -322,7 +321,7 @@
                {::http/content-type media-type
                 ;; Wait a second, if this doesn't get logged then we
                 ;; can use a 'proper' function right?
-                ::site/body-fn `entity-bytes-generator})
+                ::site/body-fn 'juxt.apex.alpha.representation-generation/entity-bytes-generator})
 
              ;; TODO: The allowed origins ought to be specified in the top-level
              ;; of the openapi document, or under the security section. This is
