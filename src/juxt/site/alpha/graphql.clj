@@ -870,12 +870,14 @@
 
 (defn graphql-query [{::site/keys [db] :as req} stored-query-id operation-name variables]
   (let [resource (xt/entity db stored-query-id)
+        _ (when-not resource (throw (ex-info "GraphQL stored query not found" {:stored-query-id stored-query-id})))
         schema-id (::site/graphql-schema resource)
         schema (some-> (when schema-id (xt/entity db schema-id)) ::grab/schema)
         ;; TODO: This should be pre-parsed against schema
-        document-str (String. (::http/body resource) "UTF-8")
-        document (document/compile-document (parser/parse document-str) schema)]
-    (query schema document operation-name variables req)))
+        document-str (some-> resource ::http/body (String. "UTF-8"))
+        document (some-> document-str parser/parse (document/compile-document schema))]
+    (when document
+      (query schema document operation-name variables req))))
 
 (defn stored-document-post-handler
   [{::site/keys [xt-node db resource received-representation base-uri]
