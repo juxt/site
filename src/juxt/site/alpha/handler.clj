@@ -484,8 +484,6 @@
       ::http/redirect (cond-> loc (.startsWith loc base-uri)
                               (subs (count base-uri)))})
 
-
-
    ;; Return a back-stop resource
    {::site/resource-provider ::default-empty-resource
     ::http/methods #{:get :head :options :put :post}
