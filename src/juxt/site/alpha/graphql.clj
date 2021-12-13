@@ -463,8 +463,14 @@
                                        :args args}
                                       e))))
                   limited-results (limit-results argument-values results)
-                  result-entities (pull-entities db subject limited-results q)]
+                  result-entities (cond->>
+                                   (pull-entities db subject limited-results q)
+                                    (get site-args "a")
+                                    (map (keyword (get site-args "a")))
+
+                                   )]
               ;;(log/tracef "GraphQL results is %s" (seq result-entities))
+
               (process-xt-results field result-entities))
 
             (get site-args "a")
