@@ -107,10 +107,13 @@
          data)))))
 
 
-
-(defn post-handler [{::site/keys [db resource xt-node]
-                     ::pass/keys [subject]
-                     :as req}]
+;; Deprecated. This has been abandoned in favour of using an OpenAPI approach,
+;; which is easier to use as a container of configuration (e.g. GraphQL
+;; operation names)
+(defn ^:deprecated
+  post-handler [{::site/keys [db resource xt-node]
+                 ::pass/keys [subject]
+                 :as req}]
 
   (let [input-body-as-string
         (-> req :juxt.site.alpha/received-representation
