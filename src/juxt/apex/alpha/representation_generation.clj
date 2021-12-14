@@ -157,7 +157,6 @@
             ;; Render the finally rendered template, with the resource state
             ;; This is fine when resource-state is a nice GraphQL result as a tree.
             ;; Not so much when it's just the XT entity.
-            (def resource-state resource-state)
             (selmer/render template-body resource-state))
 
           :else
