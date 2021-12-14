@@ -158,8 +158,7 @@
                 template-body (:ring.response/body response)
                 _ (when-not template-body
                     (throw (ex-info "Template body is nil"
-                                    {:template-resource template-resource
-                                     :response response})))]
+                                    {:template-resource template-resource})))]
             ;; Render the finally rendered template, with the resource state
             ;; This is fine when resource-state is a nice GraphQL result as a tree.
             ;; Not so much when it's just the XT entity.
