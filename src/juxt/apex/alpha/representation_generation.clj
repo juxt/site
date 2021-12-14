@@ -151,6 +151,8 @@
         (cond
           template
           (let [template-resource (locator/locate-resource (assoc req ::site/uri template))
+                _ (when-not template-resource
+                    (throw (ex-info "Failed to find template resource" {:template-uri template})))
                 template-body (:ring.response/body
                                (response/add-payload
                                 (assoc req ::site/selected-representation template-resource)))]
