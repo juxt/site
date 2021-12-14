@@ -153,9 +153,13 @@
           (let [template-resource (locator/locate-resource (assoc req ::site/uri template))
                 _ (when-not template-resource
                     (throw (ex-info "Failed to find template resource" {:template-uri template})))
-                template-body (:ring.response/body
-                               (response/add-payload
-                                (assoc req ::site/selected-representation template-resource)))]
+                response (response/add-payload
+                          (assoc req ::site/selected-representation template-resource))
+                template-body (:ring.response/body response)
+                _ (when-not template-body
+                    (throw (ex-info "Template body is nil"
+                                    {:template-resource template-resource
+                                     :response response})))]
             ;; Render the finally rendered template, with the resource state
             ;; This is fine when resource-state is a nice GraphQL result as a tree.
             ;; Not so much when it's just the XT entity.
