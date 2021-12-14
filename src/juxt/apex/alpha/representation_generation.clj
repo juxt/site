@@ -52,6 +52,8 @@
 ;; By default we output the resource state, but there may be a better rendering
 ;; of collections, which can be inferred from the schema being an array and use
 ;; the items subschema.
+
+;; This generates representations
 (defn entity-bytes-generator [{::site/keys [uri resource selected-representation db]
                                ::pass/keys [authorization subject] :as req}]
 
@@ -95,10 +97,6 @@
              (catch Exception e
                (throw (ex-info "Failure during XTDB query" {:query query} e)))))
 
-         ;; The resource-state is the entity, if found. TODO: Might want to
-         ;; filter out the http metadata?
-         (x/entity db uri)
-
          ;; Try to get the resource's state via GraphQL
          (when-let [stored-query-resource-path (get-in resource [::apex/operation "x-juxt-site-graphql-query-resource"])]
            (let [stored-query-id (if (.startsWith stored-query-resource-path "/")
@@ -123,11 +121,18 @@
                             ::data (:data result)})))
                (:data result))))
 
+         ;; The resource-state is the entity, if found. TODO: Might want to
+         ;; filter out the http metadata?
+         (x/entity db uri)
+
          ;; No resource-state, so there can be no representations, so 404.
          (throw
           (ex-info
            (str "No resource state from OpenAPI path: " (::apex/openapi-path req))
            (into req {:ring.response/status 404}))))]
+
+    ;; Now we've found the resource state, we need to generate a representation
+    ;; of it.
 
     (case (::http/content-type selected-representation)
       "application/json"
@@ -148,8 +153,11 @@
           (let [template-resource (locator/locate-resource (assoc req ::site/uri template))
                 template-body (:ring.response/body
                                (response/add-payload
-                                (assoc req
-                                       ::site/selected-representation template-resource)))]
+                                (assoc req ::site/selected-representation template-resource)))]
+            ;; Render the finally rendered template, with the resource state
+            ;; This is fine when resource-state is a nice GraphQL result as a tree.
+            ;; Not so much when it's just the XT entity.
+            (def resource-state resource-state)
             (selmer/render template-body resource-state))
 
           :else
