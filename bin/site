@@ -609,7 +609,8 @@
 
         openapi-doc (edn/read-string
                      {:readers {'juxt.site.alpha/as-str pr-str}}
-                     (slurp (io/file openapi)))
+                     (-> (slurp (io/file openapi))
+                         (str/replace "{{base-uri}}" base-uri)))
 
         {:keys [status headers body]}
         (curl/put
