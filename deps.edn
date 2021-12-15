@@ -86,10 +86,11 @@
               "-Dclojure.spec.check-asserts=true"]}
 
   :test
-  {:extra-paths ["dev" "test"]
+  {:extra-paths ["test"]
    :extra-deps
    {lambdaisland/kaocha {:mvn/version "1.0.887"}
-    lambdaisland/kaocha-junit-xml {:mvn/version "0.0.76"}}}
+    lambdaisland/kaocha-junit-xml {:mvn/version "0.0.76"}
+    nrepl/nrepl {:mvn/version "0.9.0-beta4"}}}
 
   :prod
   {:extra-paths ["prod"]

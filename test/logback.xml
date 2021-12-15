@@ -1,0 +1,21 @@
+<configuration scan="true">
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>WARN</level>
+    </filter>
+    <encoder>
+      <pattern>%date{HH:mm:ss.SSS} %-5level %logger %msg%n</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <root level="INFO"><appender-ref ref="CONSOLE"/></root>
+  <logger name="juxt" level="ALL"></logger>
+  <logger name="xt" level="INFO"></logger>
+  <logger name="xt.query" level="INFO"></logger>
+  <logger name="user" level="ALL"></logger>
+
+  <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+    <resetJUL>true</resetJUL>
+  </contextListener>
+</configuration>
