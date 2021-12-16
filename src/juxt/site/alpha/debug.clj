@@ -12,6 +12,9 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'rfc7230 (create-ns 'juxt.reap.alpha.rfc7230))
 
+(def default-object-mapper (json/object-mapper {:encoders {java.util.regex.Matcher
+                                                           (fn [mat gen] (.writeString gen (str mat)))}}))
+
 ;; Representations of a 'request', useful for debugging
 (defn json-representation-of-request [req request-to-show]
   {::http/content-type "application/json"
@@ -21,7 +24,7 @@
    (fn [req]
      (-> (sorted-map)
          (into request-to-show)
-         json/write-value-as-string
+         (json/write-value-as-string default-object-mapper)
          (str "\r\n")
          (.getBytes)))
    ;; TODO: use Cache-Control: immutable - see
