@@ -108,18 +108,19 @@
                  variables (into {}
                                  (for [[k v] (::apex/openapi-path-params resource)
                                        :when (::jinx/valid? v)]
-                                   [k (:value v)]))
-                 result (graphql/graphql-query
-                         req
-                         stored-query-id operation-name variables)]
-             (if (seq (:errors result))
-               (throw
-                (ex-info
-                 "Getting the state for the resource via GraphQL resulted in erors"
-                 (into req {:ring.response/status 500
-                            ::errors (:errors result)
-                            ::data (:data result)})))
-               (:data result))))
+                                   [k (:value v)]))]
+             (when operation-name
+               (let [result (graphql/graphql-query
+                             req
+                             stored-query-id operation-name variables)]
+                 (if (seq (:errors result))
+                   (throw
+                    (ex-info
+                     "Getting the state for the resource via GraphQL resulted in erors"
+                     (into req {:ring.response/status 500
+                                ::errors (:errors result)
+                                ::data (:data result)})))
+                   (:data result))))))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
          ;; filter out the http metadata?
