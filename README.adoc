@@ -1,5 +1,7 @@
 = Site
 
+image:https://circleci.com/gh/juxt/site/tree/master.svg?style=svg["CircleCI", link="https://circleci.com/gh/juxt/site/tree/master"]
+
 Site is a project from https://juxt.pro[JUXT] to build a Resource Server out of
 our open-source https://xtdb.com[XTDB] database.
 
