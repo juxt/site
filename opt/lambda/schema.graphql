@@ -39,6 +39,6 @@ type LambdaInstance {
   id: ID!
   lambdaInstanceType: LambdaInstanceType!
   lambdaInstanceState: LambdaInstanceState! @lambda
-  lambdaInstanceValue: String! @lambda
+  lambdaInstanceValue: String! @site(resolver: "juxt.site.lambda-test/test-resolver")
   lambda: Lambda! @site(ref: "lambdaId")
 }

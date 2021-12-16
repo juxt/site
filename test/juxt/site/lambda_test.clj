@@ -70,3 +70,6 @@
     (is (= 200 (:ring.response/status response)))
     (is (= {"data" {"lambdas" [{"name" "inc"}]}}
            (json/read-value (:ring.response/body response))))))
+
+(defn test-resolve [m]
+  (println "###" m))
