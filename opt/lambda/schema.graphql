@@ -1,0 +1,44 @@
+type Query {
+  lambdas: [Lambda]
+  @site(q: { find: [e] where: [[e {keyword: "type"} "Lambda"]]})
+  lambdaInstances: [LambdaInstance]
+  @site(q: { find: [e] where: [[e {keyword: "type"} "LambdaInstance"]]})
+}
+
+type LambdaArg {
+  id: ID!
+  name: String!
+  type: String!
+}
+
+type Lambda {
+  id: ID!
+  name: String!
+  lambdaArgs: [LambdaArg]
+  lambdaContent: String!
+  lambdaInstances: [LambdaInstance]
+  @site(q: {edn: """
+                 {:find [e]
+                  :where [[e :lambdaId "{{object-id}}"]
+                          [(get-attr e :juxt.site/type) [t]]
+                          [(= t "LambdaInstance")]]}"""})
+}
+
+enum LambdaInstanceState {
+  RUNNING
+  DONE
+  WAITING
+}
+
+enum LambdaInstanceType {
+  SYNC
+  ASYNC
+}
+
+type LambdaInstance {
+  id: ID!
+  lambdaInstanceType: LambdaInstanceType!
+  lambdaInstanceState: LambdaInstanceState! @lambda
+  lambdaInstanceValue: String! @lambda
+  lambda: Lambda! @site(ref: "lambdaId")
+}
