@@ -1,0 +1,11 @@
+.codeViewer {
+  padding: 6px 0.5rem !important;
+}
+
+.staticCodeBlock {
+  @apply font-mono rounded-lg h-full overflow-x-auto overflow-y-hidden drop-shadow-lg;
+  & span {
+    height: 100%;
+    @apply transition-all duration-150 ease-in-out;
+  }
+}

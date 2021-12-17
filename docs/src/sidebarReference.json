@@ -1,0 +1,49 @@
+{
+  "title": "API Reference",
+  "heading": true,
+  "path": "/reference",
+  "routes": [
+    {
+      "heading": true,
+      "path": "",
+      "routes": [
+        {
+          "title": "Site GraphQL",
+          "path": "/reference/graphql",
+          "routes": [
+            {
+              "title": "Site Directive",
+              "path": "/reference/graphql/site-directive"
+            },
+            {
+              "title": "Lambda Directive",
+              "path": "/reference/graphql/lambda-directive"
+            }
+          ]
+        },
+        {
+          "title": "Site CLI",
+          "path": "/reference/cli",
+          "routes": [
+            {
+              "title": "put-asset",
+              "path": "/reference/cli/put-asset"
+            },
+            {
+              "title": "put-graphql",
+              "path": "/reference/cli/put-graphql"
+            },
+            {
+              "title": "post-resources",
+              "path": "/reference/cli/post-resources"
+            },
+            {
+              "title": "put-static-site",
+              "path": "/reference/cli/put-static-site"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
