@@ -206,6 +206,10 @@ Now we can use the site tool for remote administration. Try the following:
 $ site/bin/site list-users
 ----
 
+== Docs
+
+See https://juxtsite.netlify.app/[here] for more detailed documentation.
+
 == License
 
 The MIT License (MIT)
