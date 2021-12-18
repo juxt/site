@@ -86,14 +86,19 @@
       ;; Process results to apply dynamic queries - siteTemplateModel
       (let [data (:data results)]
         (postwalk
+         ;; Deprecated because _siteTemplateModel has become an abandoned
+         ;; experiment, superceded by simply generating a template and calling
+         ;; Selmer again. However, it's a bit too early to delete the code.
          (fn [x]
            (cond
              (and (map? x) (contains? x :_siteTemplateModel))
              (let [siteTemplateModel (json/read-value (:_siteTemplateModel x))]
-               ;; I there is a special _siteTemplateModel, we process the trees
+
+               ;; If there is a special _siteTemplateModel, we process the trees
                ;; of all its siblings, replacing any variable reference ('{{
                ;; foo.bar }}') with the value in the template model. We also
                ;; look for tables.
+
                (reduce-kv
                 (fn [acc k v]
                   (cond-> acc
