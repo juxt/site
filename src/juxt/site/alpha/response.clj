@@ -3,11 +3,141 @@
 (ns juxt.site.alpha.response
   (:require
    [clojure.tools.logging :as log]
-   [xtdb.api :as xt]
-   [juxt.site.alpha.templating :as templating]))
+   [juxt.site.alpha.selmer :as selmer]
+   [clojure.walk :refer [postwalk]]
+   [juxt.site.alpha.graphql.templating :as graphql-templating]
+   [clojure.tools.logging :as log]
+   [xtdb.api :as xt]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
+(alias 'pass (create-ns 'juxt.pass.alpha))
+
+(declare add-payload)
+
+(defn xt-template-loader [req db]
+  (proxy [java.net.URLStreamHandler] []
+    (openConnection [url]
+      ;;      (log/tracef "Open connection: url=%s" url)
+      (proxy [java.net.URLConnection] [url]
+        (getInputStream []
+          ;;          (log/tracef "Loading template: url=%s" url)
+
+          (let [res (xt/entity db (str url))
+                _ (when-not res
+                    (throw (ex-info "Failed to find template resource" {:template-uri (str url)})))
+                response (add-payload
+                          (assoc req ::site/selected-representation res))
+                template-body (:ring.response/body response)
+                _ (when-not template-body
+                    (throw (ex-info "Template body is nil"
+                                    {:template (str url)
+                                     :template-resource res})))]
+
+            (cond
+              (string? template-body)
+              (java.io.ByteArrayInputStream. (.getBytes template-body))
+              (instance? java.io.InputStream template-body) template-body
+              :else (throw (ex-info "Unexpected type of template body" {:template-body-type (type template-body)})))))))))
+
+(defn expand-queries [template-model db]
+  (postwalk
+   (fn [m]
+     (cond
+       (and (map? m) (contains? m ::site/query))
+       (cond->> (xt/q db
+                       ;; TODO: Add ACL checks
+                       (::site/query m))
+
+         ;; Deprecate? Anything using this?
+         (= (::site/results m) 'first) first
+         ;; Copied from juxt.apex.alpha.representation_generation
+         (::site/extract-first-projection? m) (map first)
+         (::site/extract-entry m) (map #(get % (::site/extract-entry m)))
+         (::site/singular-result? m) first)
+       :else m))
+   template-model))
+
+(defn process-template-model [template-model {::site/keys [db] :as req}]
+  ;; A template model can be a stored query.
+  (let [f (cond
+            ;; If a symbol, it is expected to be a resolvable internal function
+            ;; (to support basic templates built on the request and internal
+            ;; Site data).
+            (symbol? template-model)
+            (try
+              (or
+               (requiring-resolve template-model)
+               (throw
+                (ex-info
+                 (format "Requiring resolve of %s returned nil" template-model)
+                 {:template-model template-model})))
+              (catch Exception e
+                (throw
+                 (ex-info
+                  (format "template-model fn '%s' not resolveable" template-model)
+                  {:template-model template-model}
+                  e))))
+
+            ;; It can also be an id of an entity in the database which contains
+            ;; metadata, e.g. for a GraphQL query. TODO: This is smelly
+            ;; coupling, why should a String imply a reference to a GraphQL doc?
+            (string? template-model)
+            ;; This is treated as a reference to another entity
+            (if-let [template-model-entity (xt/entity db template-model)]
+              (cond
+                (:juxt.site.alpha/graphql-schema template-model-entity)
+                (fn [req]
+                  (graphql-templating/template-model req template-model-entity))
+
+                :else
+                (throw
+                 (ex-info
+                  "Unsupported template-model entity"
+                  {:template-model-entity template-model-entity})))
+              (throw
+               (ex-info
+                "Template model entity not found in database"
+                {:template-model template-model})))
+
+            (map? template-model)
+            (fn [_] template-model)
+
+            :else
+            (throw (ex-info "Unsupported form of template-model" {:type (type template-model)})))]
+    (f req)))
+
+(defn render-template
+  "Methods should return a modified request (first arg), typically associated
+  a :ring.response/body entry."
+  [{::site/keys [resource selected-representation db] :as req} template]
+
+  (let [template-models (or (::site/template-model selected-representation)
+                            (::site/template-model resource))
+        template-models (if (sequential? template-models) template-models [template-models])
+
+        ;; TODO: We should strongly consider reverting to a single template
+        ;; model, now that we have GraphQL. Having the option for multiple
+        ;; template models over-complicates the modelling.
+        processed-template-models
+        (for [tm template-models]
+          (process-template-model tm req))
+
+        combined-template-model
+        (->> processed-template-models
+             (map #(dissoc % :xt/id))
+             (apply merge-with
+                    (fn [a b] (concat (if (sequential? a) a [a])
+                                      (if (sequential? b) b [b])))))]
+
+    ;; Possibly we can make this an open-for-extension thing in the future. We
+    ;; could register template dialects in the database and look them up here.
+    (case (::site/template-dialect template)
+      "selmer" (selmer/render-template
+                (assoc req ::site/template-loader (xt-template-loader req db))
+                template combined-template-model)
+      nil (throw (ex-info "No template dialect found" {}))
+      (throw (ex-info "Unsupported template dialect" {::site/template-dialect (::site/template-dialect template)})))))
 
 (defn add-payload [{::site/keys [selected-representation db] :as req}]
   (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
@@ -23,7 +153,7 @@
           (format "body-fn cannot be resolved: %s" body-fn)
           {:body-fn body-fn})))
 
-      template (templating/render-template req template)
+      template (render-template req template)
 
       content (assoc req :ring.response/body content)
       body (assoc req :ring.response/body body)

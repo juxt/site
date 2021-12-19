@@ -3,7 +3,7 @@
 (ns juxt.site.alpha.selmer
   (:require
    [clojure.tools.logging :as log]
-   [xtdb.api :as x]
+   [xtdb.api :as xt]
    [selmer.parser :as selmer]
    selmer.filters
    selmer.tags))
@@ -25,7 +25,7 @@
 
 (selmer.filters/add-filter!
  :deref
- (fn [x] (or (x/entity *db* x) x)))
+ (fn [x] (or (xt/entity *db* x) x)))
 
 (selmer.filters/add-filter!
  :render-segment
@@ -35,39 +35,24 @@
              "em" [:safe (str "<em>" (second x) "</em>")])
            (str x))))
 
-(defn xt-template-loader [db]
-  (proxy [java.net.URLStreamHandler] []
-    (openConnection [url]
-;;      (log/tracef "Open connection: url=%s" url)
-      (proxy [java.net.URLConnection] [url]
-        (getInputStream []
-;;          (log/tracef "Loading template: url=%s" url)
-          (let [res (x/entity db (str url))]
-            (java.io.ByteArrayInputStream.
-             (cond
-               (::http/content res) (.getBytes (::http/content res) (or (::http/charset res) "UTF-8"))
-               (::http/body res) (::http/body res)
-               :else (.getBytes "(template not found)")))))))))
-
-;; This is now deprecated but remains to support pre-existing use-cases
-;; Template model production should be moved out of this
+(defn render-file [template-id template-model db custom-resource-path template-loader]
+  (binding [*db* db]
+    (selmer/render-file
+     (java.net.URL. nil template-id template-loader)
+     template-model
+     (cond-> {:url-stream-handler template-loader}
+       custom-resource-path
+       (assoc :custom-resource-path custom-resource-path)))))
 
 (defn render-template
-  [{::site/keys [db selected-representation] :as req} template template-model]
+  [{::site/keys [db selected-representation template-loader] :as req} template template-model]
+  (assert template-loader)
   (let [{::site/keys []} selected-representation
-        ush (xt-template-loader db)
         custom-resource-path (:selmer.util/custom-resource-path selected-representation)]
 
     (try
-;;      (log/tracef "Render template: %s" (:xt/id template))
       (let [body
-            (binding [*db* db]
-              (selmer/render-file
-               (java.net.URL. nil (:xt/id template) ush)
-               template-model
-               (cond-> {:url-stream-handler ush}
-                 custom-resource-path
-                 (assoc :custom-resource-path custom-resource-path))))]
+            (render-file (:xt/id template) template-model db custom-resource-path template-loader)]
         (assoc req
                :ring.response/body body
                ::site/template-model template-model))

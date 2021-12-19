@@ -4,6 +4,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.pprint :refer [pprint]]
+   [juxt.site.alpha.response :as response]
    [clojure.walk :refer [postwalk]]
    [xtdb.api :as x]
    [hiccup.page :as hp]
@@ -12,14 +13,11 @@
    [juxt.apex.alpha.parameters :as parameters]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.site.alpha.graphql :as graphql]
-   [juxt.site.alpha.locator :as locator]
-   [juxt.site.alpha.response :as response]
-   [selmer.parser :as selmer]
+   [juxt.site.alpha.selmer :as selmer]
    [juxt.site.alpha.util :as util]
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]
-   [juxt.jinx.alpha :as jinx]
-   [clojure.string :as str]))
+   [juxt.jinx.alpha :as jinx]))
 
 (alias 'jinx (create-ns 'juxt.jinx.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -151,20 +149,10 @@
 
         (cond
           template
-          (let [template-resource (locator/locate-resource (assoc req ::site/uri template))
-                _ (when-not template-resource
-                    (throw (ex-info "Failed to find template resource" {:template-uri template})))
-                response (response/add-payload
-                          (assoc req ::site/selected-representation template-resource))
-                template-body (:ring.response/body response)
-                _ (when-not template-body
-                    (throw (ex-info "Template body is nil"
-                                    {:template template
-                                     :template-resource template-resource})))]
-            ;; Render the finally rendered template, with the resource state
-            ;; This is fine when resource-state is a nice GraphQL result as a tree.
-            ;; Not so much when it's just the XT entity.
-            (selmer/render template-body resource-state))
+          (selmer/render-file
+           template resource-state db
+           (get config "x-juxt-site-template-custom-resource-path")
+           (response/xt-template-loader req db))
 
           :else
           (->
@@ -222,5 +210,4 @@
 
             [:h3 "Resource state"]
             [:pre (with-out-str (pprint resource-state))])
-           (.getBytes "UTF-8"))))))
-  )
+           (.getBytes "UTF-8")))))))
