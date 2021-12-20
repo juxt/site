@@ -103,14 +103,18 @@
                  operation-name (or
                                  (get-in resource [::apex/operation "x-juxt-site-graphql-operation-name"])
                                  (get-in resource [::apex/operation "operationId"]))
-                 variables (into {}
-                                 (for [[k v] (::apex/openapi-path-params resource)
-                                       :when (::jinx/valid? v)]
-                                   [k (:value v)]))]
+                 variables
+                 (into
+                  (graphql/common-variables req)
+                  (for [[k v] (::apex/openapi-path-params resource)
+                        :when (::jinx/valid? v)]
+                    [k (:value v)]))]
              (when operation-name
                (let [result (graphql/graphql-query
                              req
                              stored-query-id operation-name variables)]
+                 ;; TODO: Need to check if the result indicates that nothing was found
+                 ;; Perhaps the test should be if all values in the :data map are nil
                  (if (seq (:errors result))
                    (throw
                     (ex-info

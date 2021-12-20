@@ -339,7 +339,7 @@
       ""
       :else
       (do
-        (prn "defaulting to nil, type-ref is " type-ref)
+        (log/debugf "defaulting to nil, type-ref is %s" type-ref)
         nil))))
 
 (defn query [schema document operation-name variable-values
@@ -657,7 +657,13 @@
             :else
             (default-for-type (::g/type-ref field)))))})))
 
-(defn post-handler [{::site/keys [uri xt-node db base-uri]
+(defn common-variables
+  "Return the common 'built-in' variables that are bound always bound."
+  [{::site/keys [uri] ::pass/keys [subject] :as req}]
+  {"siteUsername" (-> subject ::pass/username)
+   "siteUri" uri})
+
+(defn post-handler [{::site/keys [uri db]
                      ::pass/keys [subject]
                      :as req}]
   (let [schema (some-> (xt/entity db uri) ::grab/schema)
@@ -704,6 +710,10 @@
                  (cond-> {:ring.response/status 400}
                    (seq errors) (assoc ::errors errors)))
                 e)))))
+
+        variables (into
+                   (common-variables req)
+                   variables)
 
         results
         (juxt.site.alpha.graphql/query

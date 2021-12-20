@@ -20,7 +20,7 @@
 (alias 'grab (create-ns 'juxt.grab.alpha))
 
 (defn template-model
-  [{::site/keys [xt-node db resource selected-representation]
+  [{::site/keys [xt-node db resource selected-representation uri]
     ::pass/keys [subject] :as req}
    {graphql-schema-id ::site/graphql-schema
     :as stored-document-entity}]
@@ -36,8 +36,10 @@
 
         variables (merge
                    ;; The currently logged in user is so commonly needed, it is
-                   ;; automatically bound.
-                   {"username" (-> subject ::pass/username)}
+                   ;; automatically bound.  These should be the same set as
+                   ;; those in
+                   ;; juxt.apex.alpha.representation-generation/entity-bytes-generator
+                   (graphql/common-variables req)
                    (or
                     (:juxt.site.alpha/graphql-variables selected-representation)
                     (:juxt.site.alpha/graphql-variables resource)

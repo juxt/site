@@ -31,25 +31,26 @@
             (String.))
         form (form-decode input-body-as-string)
 
-        variables (into {}
-                        (concat
-                         ;; Path parameters
-                         (for [[k v] (::apex/openapi-path-params resource)
-                               :when (::jinx/valid? v)]
-                           [k (:value v)])
-                         ;; TODO: Query parameters
-                         form
-                         ))
+        variables (into
+                   (graphql/common-variables req)
+                   (concat
+                    ;; Path parameters
+                    (for [[k v] (::apex/openapi-path-params resource)
+                          :when (::jinx/valid? v)]
+                      [k (:value v)])
+                    ;; TODO: Query parameters
+                    form
+                    ))
         result (graphql/graphql-query
                 req
                 stored-query-id operation-name variables)]
 
     (if (seq (:errors result))
-          (assoc req
-                 :ring.response/status 400
-                 :ring.response/body (pr-str result))
+      (assoc req
+             :ring.response/status 400
+             :ring.response/body (pr-str result))
 
-          (assoc req
-                 :ring.response/status 303
-                 ;; TODO: Only for browsers
-                 :ring.response/headers {"location" (::site/uri req)}))))
+      (assoc req
+             :ring.response/status 303
+             ;; TODO: Only for browsers
+             :ring.response/headers {"location" (::site/uri req)}))))
