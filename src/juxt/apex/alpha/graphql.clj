@@ -3,7 +3,9 @@
 (ns juxt.apex.alpha.graphql
   (:require
    [juxt.site.alpha.graphql :as graphql]
-   [ring.util.codec :refer [form-decode]]))
+   [ring.util.codec :refer [form-decode]]
+   [juxt.apex.alpha.representation-generation :refer [entity-body]]
+   [clojure.tools.logging :as log]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -45,12 +47,28 @@
                 req
                 stored-query-id operation-name variables)]
 
+    (log/debugf
+     "Calling GraphQL at %s operation %s with variables %s yielded %s"
+     stored-query-resource-path operation-name variables (pr-str result))
+
     (if (seq (:errors result))
       (assoc req
              :ring.response/status 400
              :ring.response/body (pr-str result))
 
-      (assoc req
-             :ring.response/status 303
-             ;; TODO: Only for browsers
-             :ring.response/headers {"location" (::site/uri req)}))))
+      (if-let [ok-response (get-in resource [::apex/operation "responses" "200"])]
+        (assoc req
+               :ring.response/status 200
+               :ring.response/body
+               (entity-body
+                (assoc req
+                       ;; TODO: Negotiate the required representation from the
+                       ;; request. We're hardcoding html for now.
+                       ::site/selected-representation
+                       {::http/content-type "text/html;charset=utf-8"})
+                (:data result)))
+
+        (assoc req
+               :ring.response/status 303
+               ;; TODO: Only for browsers
+               :ring.response/headers {"location" (::site/uri req)})))))
