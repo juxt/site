@@ -198,14 +198,18 @@
                              stored-query-id operation-name variables)]
                  ;; TODO: Need to check if the result indicates that nothing was found
                  ;; Perhaps the test should be if all values in the :data map are nil
-                 (if (seq (:errors result))
+                 (when (seq (:errors result))
                    (throw
                     (ex-info
                      "Getting the state for the resource via GraphQL resulted in errors"
                      (into req {:ring.response/status 500
+                                ::stored-query-id stored-query-id
+                                ::operation-name operation-name
+                                ::variables variables
                                 ::errors (:errors result)
-                                ::data (:data result)})))
-                   (:data result))))))
+                                ::data (:data result)}))))
+
+                 (:data result)))))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
          ;; filter out the http metadata?
