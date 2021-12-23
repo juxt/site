@@ -1,11 +1,11 @@
-.PHONY: all init deploy introspect
+.PHONY: all init install introspect
 
-all:	init deploy
+all:	init install
 
 init:
 	site post-resources --file resources.edn
 
-deploy:
+install:
 	@site put-asset --file ../../src/juxt/site/alpha/site-schema.graphql --type application/graphql --path /_site/graphql
 
 introspect:

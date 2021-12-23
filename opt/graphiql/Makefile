@@ -1,4 +1,4 @@
-.PHONY: build deploy token
+.PHONY: build install token
 
 build:
 	yarn
@@ -7,5 +7,5 @@ build:
 token:
 	site -s check-token || site get-token
 
-deploy:	token
+install:	token
 	site put-static-site -d build -p _site/graphiql
