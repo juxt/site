@@ -208,6 +208,15 @@ Now we can use the site tool for remote administration. Try the following:
 $ site/bin/site list-users
 ----
 
+== Configure the expiry time for tokens
+
+By default, tokens last for an hour. That can sometimes mean they expire during
+work sessions. You can set the expiry time of new tokens via the REPL.
+
+----
+(put! (assoc (e "http://localhost:2021/_site/token")  ::pass/expires-in (* 24 3600)))
+----
+
 == License
 
 The MIT License (MIT)
