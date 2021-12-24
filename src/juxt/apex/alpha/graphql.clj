@@ -52,9 +52,12 @@
      stored-query-resource-path operation-name variables (pr-str result))
 
     (if (seq (:errors result))
-      (assoc req
-             :ring.response/status 400
-             :ring.response/body (pr-str result))
+      (throw (ex-info "Errors on GraphQL mutation"
+                      (into req {:ring.response/status 400
+                                 ::stored-query-resource-path stored-query-resource-path
+                                 ::operation-name operation-name
+                                 ::variables variables
+                                 ::result result})))
 
       (if-let [ok-response (get-in resource [::apex/operation "responses" "200"])]
         (assoc req
