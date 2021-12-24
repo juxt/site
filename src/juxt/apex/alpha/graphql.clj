@@ -13,11 +13,7 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'jinx (create-ns 'juxt.jinx.alpha))
 
-;;(-> req ::site/resource :juxt.apex.alpha/operation (get "x-juxt-site-graphql-query-resource"))
-
 (defn post-handler [req]
-  ;;  (def req req)
-
   (let [resource (::site/resource req)
         stored-query-resource-path (get-in resource [::apex/operation "x-juxt-site-graphql-query-resource"])
         stored-query-id (if (.startsWith stored-query-resource-path "/")
