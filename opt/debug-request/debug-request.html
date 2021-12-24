@@ -4,38 +4,83 @@
   <p>This is a dump of data gathered for a <strong><tt>{{ ring..request/method|name|upper }}</tt></strong> request that was made to <tt>{{ juxt..site..alpha/uri }}</tt> at <tt>{{ juxt..site..alpha/date|date:"yyyy-MM-dd HH:mm:ss" }}</tt>.<p>
   <p>After {{ juxt..site..alpha/duration-millis }}ms a response was returned with the status code {{ ring..response/status }}.</p>
 
-  {% if juxt..site..alpha/errors %}
-  <h2>Error traces</h2>
-  {% for error in juxt..site..alpha/errors %}
-  <div>
-    <dl>
-          <dt>Message</dt>
-          <dd><code>{{ error.message }}</code></dd>
-          {% if error.ex-data %}
-          <dt>Data</dt>
-          <dl>{{ error.ex-data|pretty }}</dl>
-          {% endif %}
-          <dt>Stack</dt>
-          <dd><pre>
-{% for el in error.stack-trace %}{{ el }}
-{% endfor %}</pre></dd>
-    </dl>
+  <ul>
+    <li><a href="#summary">Summary</a></li>
+    {% if juxt..site..alpha/errors %}<li><a href="#error-traces">Error Traces</a></li>{% endif %}
+    {% if juxt..apex..alpha..graphql/result %}<li><a href="#graphql-result">GraphQL Result</a></li>{% endif %}
+    <li><a href="#full-context">Full Context</a></li>
+  </ul>
+
+  <div id="summary">
+    <h2>Summary</h2>
+
+    <table>
+      <tbody>
+        <tr><td>Status</td><td><tt>{{ ring..response/status }}</tt></td></tr>
+        <tr><td>Date</td><td><tt>{{ juxt..site..alpha/date }}</tt></td></tr>
+        <tr><td>URI</td><td><tt>{{ juxt..site..alpha/uri }}</tt></td></tr>
+      </tbody>
+    </table>
   </div>
-  {% endfor %}
-  {% endif %}
 
-  <h2>Summary</h2>
+  {% if juxt..site..alpha/errors %}
+  <div id="error-traces">
+    <h2>Error Traces</h2>
+    {% for error in juxt..site..alpha/errors %}
+    <div>
+      <dl>
+        <dt>Message</dt>
+        <dd><code>{{ error.message }}</code></dd>
+        {% if error.ex-data %}
+        <dt>Data</dt>
+        <dl>{{ error.ex-data|pretty }}</dl>
+        {% endif %}
+        <dt>Stack</dt>
+        <dd><pre>
+            {% for el in error.stack-trace %}{{ el }}
+            {% endfor %}</pre></dd>
+      </dl>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
 
-  <table>
-    <tbody>
-      <tr><td>Status</td><td><tt>{{ ring..response/status }}</tt></td></tr>
-      <tr><td>Date</td><td><tt>{{ juxt..site..alpha/date }}</tt></td></tr>
-      <tr><td>URI</td><td><tt>{{ juxt..site..alpha/uri }}</tt></td></tr>
-    </tbody>
-  </table>
+  {% if juxt..apex..alpha..graphql/result %}
+  <div id="graphql-result">
+    <h2>GraphQL Result</h2>
+    <h3>Data</h3>
+    <pre>
+      {{ juxt..apex..alpha..graphql/result.data }}
+    </pre>
+    <h3>Errors</h3>
+    <pre>
+      {{ juxt..apex..alpha..graphql/result }}
+    </pre>
 
-  <h2>Full Context</h2>
+    {% for error in juxt..apex..alpha..graphql/result.errors %}
+    <div>
+      <dl>
+        <dt>Path</dt>
+        <dd>{{ error.path }}</dd>
+        <dt>Message</dt>
+        <dd>{{ error.message }}</dd>
+        <dt>Stack Trace</dt>
+        <dd>
+          {{ error.stack-trace|str }}
+          {% for line in error.stack-trace %}
+          <p>{{ line|str }}</p>
+          {% endfor %}
+        </dd>
+      </dl>
+    </div>
+    {% endfor %}
+    </table>
+    {% endif %}
+  </div>
 
-  {% debug %}
+  <div id="full-context">
+    <h2>Full Context</h2>
+    {% debug %}
+  </div>
 
 </body>
