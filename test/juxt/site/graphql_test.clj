@@ -7,6 +7,7 @@
    [juxt.grab.alpha.schema :as schema]
    [juxt.grab.alpha.document :as document]
    [juxt.grab.alpha.execution :refer [execute-request]]
+   [juxt.site.alpha.init :as init]
    [juxt.site.alpha.graphql :as graphql]
    [juxt.grab.alpha.parser :as parser]
    [clojure.test :refer [deftest is are testing] :as t]
@@ -28,14 +29,9 @@
 (t/use-fixtures :each with-xt with-handler)
 
 (defn graphql []
+  (init/put-site-api! *xt-node* {::site/base-uri "https://example.org"})
   (submit-and-await!
    [[:xtdb.api/put access-all-areas]
-    [:xtdb.api/put
-     (edn/read-string
-      {:readers {'regex #(re-pattern %)}}
-      (str/replace
-       (slurp "opt/graphql/resources.edn")
-       "{{base-uri}}" "https://example.org"))]
 
     [:xtdb.api/put
      {:xt/id "https://example.org/_site/users/mal"
@@ -50,18 +46,6 @@
       :juxt.pass.alpha/username "alx"
       :email "alx@juxt.pro"
       :name "Alex Davis"}]])
-
-  ;; Install schema (via HTTP, for accuracy)
-  (let [schema (slurp (io/resource "juxt/site/alpha/site-schema.graphql"))
-        bytes (.getBytes schema)
-
-        r (*handler*
-           {:ring.request/method :put
-            :ring.request/path "/_site/graphql"
-            :ring.request/headers {"content-length" (str (count bytes))}
-            :ring.request/body (ByteArrayInputStream. bytes)
-            })]
-    (is (= 204 (:ring.response/status r))))
 
   ;; GraphQL query (direct, for EDN)
   (let [query "{ allUsers { id } }"

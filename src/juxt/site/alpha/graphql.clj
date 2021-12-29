@@ -892,6 +892,7 @@
         ;; TODO: This should be pre-parsed against schema
         document-str (some-> resource ::http/body (String. "UTF-8"))
         document (some-> document-str parser/parse (document/compile-document schema))]
+
     (when document
       (query schema document operation-name variables req))))
 

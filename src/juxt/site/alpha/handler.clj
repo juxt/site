@@ -102,7 +102,7 @@
         "No Content-Length header found"
         (into req {:ring.response/status 411}))))
 
-    ;; Spin protects resources from PUTs that are too large. If you need to
+    ;; Protects resources from PUTs that are too large. If you need to
     ;; exceed this limitation, explicitly declare ::spin/max-content-length in
     ;; your resource.
     (when-let [max-content-length (get resource ::http/max-content-length (Math/pow 2 16))]

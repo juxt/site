@@ -15,6 +15,7 @@
    [juxt.grab.alpha.schema :as graphql.schema]
    [juxt.grab.alpha.document :as graphql.document]
    [juxt.grab.alpha.parser :as graphql.parser]
+   [selmer.parser :as selmer]
    [juxt.site.alpha.main :as main]
    [juxt.site.alpha.handler :as handler]
    [juxt.site.alpha.cache :as cache]
@@ -374,20 +375,9 @@
    (if (every? :complete? steps) :ok :incomplete)))
 
 (defn put-site-api! []
-  (let [config (config)]
-    (init/put-site-api!
-     (xt-node)
-     (as-> "juxt/site/alpha/openapi.edn" %
-       (io/resource %)
-       (slurp %)
-       (edn/read-string
-        {:readers
-         ;; Forms marked as #edn need to be encoded into a string for transfer
-         ;; as JSON and then decoded back into EDN. This is to preserve
-         ;; necessary EDN features such as symbols.
-         {'juxt.site.alpha/as-str pr-str}} %)
-       (json/write-value-as-string %))
-     config)
+  (let [config (config)
+        xt-node (xt-node)]
+    (init/put-site-api! xt-node config)
     (status (steps config))))
 
 (defn put-auth-resources! []
@@ -465,20 +455,6 @@
 
 (defn introspect-graphql []
   (let [config (config)
-        schema (:juxt.grab.alpha/schema (e (format "/_site/graphql" (::site/base-uri config))))
+        schema (:juxt.grab.alpha/schema (e (format "%s/_site/graphql" (::site/base-uri config))))
         document (graphql.document/compile-document (graphql.parser/parse (slurp (io/file "opt/graphql/graphiql-introspection-query.graphql"))) schema)]
     (graphql/query schema document "IntrospectionQuery" {} {::site/db (db)})))
-
-(defn g [q]
-  ;; When developing the schema, this might help rapid development, however,
-  ;; it's unsafe to assume it's been deployed, so use the database version of
-  ;; the schema when not developing.
-  (let [#_#_schema (-> "juxt/site/alpha/site-schema.graphql"
-                   io/resource
-                   slurp
-                   graphql.parser/parse
-                   graphql.schema/compile-schema)
-        config (config)
-        schema (:juxt.grab.alpha/schema (e (format "%s/_site/graphql" (::site/base-uri config))))
-        document (graphql.document/compile-document (graphql.parser/parse q) schema)]
-    (graphql/query schema document nil (db))))

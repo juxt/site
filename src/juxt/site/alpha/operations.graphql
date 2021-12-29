@@ -1,0 +1,8 @@
+query GetRequest($siteUri: ID) {
+  request(id: $siteUri) {
+    id
+    status
+    date
+    debug
+  }
+}

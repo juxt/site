@@ -1,9 +1,12 @@
 <body>
   <h1>Site Request</h1>
 
+{#
   <p>This is a dump of data gathered for a <strong><tt>{{ ring..request/method|name|upper }}</tt></strong> request that was made to <tt>{{ juxt..site..alpha/uri }}</tt> at <tt>{{ juxt..site..alpha/date|date:"yyyy-MM-dd HH:mm:ss" }}</tt>.<p>
   <p>After {{ juxt..site..alpha/duration-millis }}ms a response was returned with the status code {{ ring..response/status }}.</p>
+#}
 
+{#
   <ul>
     <li><a href="#summary">Summary</a></li>
     {% if juxt..site..alpha/errors %}<li><a href="#error-traces">Error Traces</a></li>{% endif %}
@@ -77,6 +80,8 @@
     </table>
     {% endif %}
   </div>
+
+  #}
 
   <div id="full-context">
     <h2>Full Context</h2>

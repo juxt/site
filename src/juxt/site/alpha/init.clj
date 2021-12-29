@@ -13,7 +13,9 @@
    [juxt.reap.alpha.combinators :as p]
    [juxt.reap.alpha.regex :as re]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
-   [juxt.site.alpha.util :as util])
+   [juxt.site.alpha.graphql :as graphql]
+   [juxt.site.alpha.util :as util]
+   [selmer.parser :as selmer])
   (:import
    (java.util Date)))
 
@@ -105,7 +107,90 @@
     ::pass/target '[[resource ::pass/classification "RESTRICTED"]]
     ::pass/effect ::pass/deny}))
 
-(defn put-site-api!
+(defn put-graphql-schema-endpoint!
+  "Initialise the resource that will host Site's GraphQL schema, as well as the
+  endpoint to post queries pertaining to the schema."
+  ;; TODO: The 'and' above indicates this resource is conflating two concerns.
+  [xt-node {::site/keys [base-uri]}]
+  (log/info "Initialising GraphQL schema endpoint")
+  ;; TODO: Establish some consistency with readers specified at various
+  ;; call-sites!
+  (put! xt-node
+
+        (as-> (io/resource "juxt/site/alpha/graphql-resources.edn") %
+          (slurp %)
+          (edn/read-string {:readers {'regex re-pattern}} %)
+          (postwalk
+           (fn [x] (cond-> x
+                     (string? x)
+                     ;; expand {{base-uri}}
+                     (selmer/render {:base-uri base-uri})))
+           %)
+          ;; TODO:
+          (graphql/schema-resource % (slurp (io/resource "juxt/site/alpha/site-schema.graphql"))))))
+
+(defn put-graphql-operations!
+  "Add GraphQL operations that provide idiomatic requests to Site's GraphQL endpoint."
+  [xt-node {::site/keys [base-uri]}]
+  (put!
+   xt-node
+   {:xt/id (str base-uri "/_site/graphql/requests/operations.graphql")
+    ::http/methods #{:get :head :put :post :options}
+    ::http/acceptable-on-put {"accept" "application/graphql"}
+    ::http/acceptable-on-post {"accept" "application/x-www-form-urlencoded"}
+    ::site/type "StaticRepresentation"
+    ::site/graphql-schema (str base-uri "/_site/graphql")
+    ::site/post-fn 'juxt.site.alpha.graphql/stored-document-post-handler
+    ::http/content-type "application/graphql"
+    ::http/body (.getBytes (slurp (io/resource "juxt/site/alpha/operations.graphql")))})
+  (put!
+   xt-node
+   {:xt/id (str base-uri "/_site/graphql/requests/operations.graphql.txt")
+    :juxt.site.alpha/variant-of (str base-uri "/_site/graphql/requests/operations.graphql")
+    :juxt.http.alpha/methods #{:get :head :options}
+    :juxt.http.alpha/content-type "text/plain;charset=utf-8"
+    :juxt.site.alpha/body-fn 'juxt.site.alpha.graphql/text-plain-representation-body}))
+
+(defn put-graphql-operations!
+  "Add GraphQL operations that provide idiomatic requests to Site's GraphQL endpoint."
+  [xt-node {::site/keys [base-uri]}]
+  (put!
+   xt-node
+   {:xt/id (str base-uri "/_site/graphql/requests/operations.graphql")
+    ::http/methods #{:get :head :put :post :options}
+    ::http/acceptable-on-put {"accept" "application/graphql"}
+    ::http/acceptable-on-post {"accept" "application/x-www-form-urlencoded"}
+    ::site/type "StaticRepresentation"
+    ::site/graphql-schema (str base-uri "/_site/graphql")
+    ::site/post-fn 'juxt.site.alpha.graphql/stored-document-post-handler
+    ::http/content-type "application/graphql"
+    ::http/body (.getBytes (slurp (io/resource "juxt/site/alpha/operations.graphql")))})
+  (put!
+   xt-node
+   {:xt/id (str base-uri "/_site/graphql/requests/operations.graphql.txt")
+    :juxt.site.alpha/variant-of (str base-uri "/_site/graphql/requests/operations.graphql")
+    :juxt.http.alpha/methods #{:get :head :options}
+    :juxt.http.alpha/content-type "text/plain;charset=utf-8"
+    :juxt.site.alpha/body-fn 'juxt.site.alpha.graphql/text-plain-representation-body}))
+
+(defn put-request-template!
+  "Add the default request template, useful for debugging."
+  [xt-node {::site/keys [base-uri]}]
+  (log/info "Installing default request template")
+  (let [body (-> "juxt/site/alpha/request-template.html"
+                 io/resource
+                 slurp
+                 (.getBytes "UTF-8"))]
+    (put!
+     xt-node
+     {:xt/id (str base-uri "/_site/templates/request.html")
+      ::site/type "StaticRepresentation"
+      ::http/methods #{:get :head :options :put}
+      ::http/content-type "text/html;charset=utf-8"
+      ::http/content-length (count body)
+      ::http/body body})))
+
+(defn put-site-openapi!
   "Add the Site API"
   [xt-node json {::site/keys [base-uri]}]
   (log/info "Installing Site API")
@@ -126,6 +211,27 @@
       :title (get-in openapi ["info" "title"])
       :version (get-in openapi ["info" "version"])
       :description (get-in openapi ["info" "description"])})))
+
+(defn put-site-api! [xt-node {::site/keys [base-uri] :as config}]
+  ;; Site API's dependencies need to be established in advance.
+  (put-graphql-schema-endpoint! xt-node config)
+  (put-graphql-operations! xt-node config)
+  (put-request-template! xt-node config)
+
+  (put-site-openapi!
+   xt-node
+   (as-> "juxt/site/alpha/openapi.edn" %
+     (io/resource %)
+     (slurp %)
+     (selmer/render % {:base-uri base-uri})
+     (edn/read-string
+      {:readers
+       ;; Forms marked as #edn need to be encoded into a string for transfer
+       ;; as JSON and then decoded back into EDN. This is to preserve
+       ;; necessary EDN features such as symbols.
+       {'juxt.site.alpha/as-str pr-str}} %)
+     (json/write-value-as-string %))
+   config))
 
 (defn put-openid-token-endpoint! [xt-node {::site/keys [base-uri]}]
   (log/info "Installing OpenID Connect token endpoint")

@@ -17,7 +17,25 @@
  :security {"developers" []}
 
  :paths
- {"/user"
+ {"/requests/{id}"
+  {:parameters
+   [{:name "id" :in "path" :required true
+     :summary "Request id"
+     :schema {:type "string" :format "[a-z0-9]+"}}]
+   :get
+   {:summary "Return data about this request"
+    :tags ["Requests"]
+    :operationId "GetRequest"
+    :x-juxt-site-graphql-query-resource "{{base-uri}}/_site/graphql/requests/operations.graphql"
+    :responses
+    {200
+     {:content
+      {"application/json" {}
+       "text/html;charset=utf-8"
+       {:x-juxt-site-template "{{base-uri}}/_site/templates/request.html"
+        :x-juxt-site-dialect "selmer"}}}}}}
+
+  "/user"
   {:get
    {:summary "Return information about the currently logged in user"
     :operationId "getUserDetails"

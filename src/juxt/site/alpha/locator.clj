@@ -80,20 +80,6 @@
   in :default."
   [{::site/keys [db uri base-uri] :as req}]
   (or
-
-   ;; Is it a cached request to debug?
-   (let [[_ req-id suffix] (re-matches SITE_REQUEST_ID_PATTERN uri)]
-     (when-let [request-to-show (get cache/requests-cache req-id)]
-       (log/tracef "Found request object in cache")
-       {::site/uri uri
-        ::site/resource-provider ::requests-cache
-        ::http/methods #{:get :head :options}
-        ::http/representations
-        (remove nil? [(when (or (nil? suffix) (= suffix ".json"))
-                        (debug/json-representation-of-request req request-to-show))
-                      (when (or (nil? suffix) (= suffix ".html"))
-                        (debug/html-representation-of-request req request-to-show))])}))
-
    ;; We call OpenAPI location here, because a resource can be defined in
    ;; OpenAPI, and exist in Xtdb, simultaneously.
    (openapi/locate-resource db uri req)
