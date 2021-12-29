@@ -14,7 +14,7 @@
 (defn read-forms [r]
   (lazy-seq
    (let [res (edn/read {:eof :eof
-                        :readers {'regex #(re-pattern %)}}
+                        :readers {'regex re-pattern}}
                        r)]
      (when-not (= res :eof)
        (cons res (read-forms r))))))
