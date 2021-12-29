@@ -131,5 +131,11 @@ type SiteRequest {
   id: ID
   status: Int
   date: String
+  requestUri: ID
+  method: String
+
+  "The GraphQL operation name called by the request"
+  operationName: String
+
   detail: JSON
 }
