@@ -72,7 +72,6 @@
      "detail" req}))
 
 (defn request [args]
-  (log/tracef "Resolving request: %s" args)
   (->site-request
    (get cache/requests-cache (get-in args [:argument-values "id"]))))
 
