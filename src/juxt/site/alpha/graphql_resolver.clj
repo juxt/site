@@ -2,17 +2,50 @@
 
 (ns juxt.site.alpha.graphql-resolver
   (:require
-   [juxt.site.alpha.repl :as repl]
-   [xtdb.api :as xt]
-   [clojure.set :as set]
    [clojure.java.shell :as sh]
-   [juxt.site.alpha.main :as main]
-   [juxt.site.alpha.cache :as cache]
+   [clojure.set :as set]
    [clojure.string :as str]
-   [clojure.tools.logging :as log]))
+   [clojure.tools.logging :as log]
+   [juxt.site.alpha.cache :as cache]
+   [juxt.site.alpha.main :as main]
+   [juxt.site.alpha.repl :as repl]
+   [ring.util.codec :refer [form-decode]]
+   [xtdb.api :as xt]))
+
+(alias 'pass (create-ns 'juxt.pass.alpha))
+(alias 'site (create-ns 'juxt.site.alpha))
 
 (defn config []
   (main/config))
+
+(defn subject [{::pass/keys [subject] :keys [db]}]
+  (let [user (xt/entity db (::pass/user subject))]
+    {"user" user
+     "authScheme" (::pass/auth-scheme subject)}))
+
+(defn query-string [args]
+  (some-> args :juxt.site.alpha/request-context :ring.request/query))
+
+(defn- form [args]
+  (let [form (some-> args :juxt.site.alpha/request-context :ring.request/query (form-decode "US-ASCII"))]
+    (if (string? form)
+      {form "true"}
+      ;; Set empty strings to "true" rather than empty-string, to enable selmer
+      ;; truthy on 'if'.
+      (reduce-kv
+       (fn [acc k v]
+         (assoc acc k (if (str/blank? v) "true" v)))
+       {}
+       form))))
+
+(defn query-parameters [args]
+  (mapv (fn [[k v]] {"name" k "value" v}) (form args)))
+
+(defn query-parameter [args]
+  (get (form args) (-> args :argument-values (get "name"))))
+
+(defn constant [args]
+  (some-> args :argument-values (get "value")))
 
 (defn df [dir]
   (when-let [out (:out (sh/sh "df" "--output=avail" dir))]
@@ -20,8 +53,7 @@
      (str/trim
       (second (str/split out #"\n"))))))
 
-(defn tx-log-avail []
-  )
+(defn tx-log-avail [])
 
 (defn git-sha []
   (let [{:keys [out err]} (sh/sh "git" "rev-parse" "HEAD")]
@@ -34,12 +66,24 @@
     {"id" (:xt/id req)
      "status" (:ring.response/status req)
      "date" (:juxt.site.alpha/date req)
-     "debug" req}))
+     "detail" req}))
 
 (defn request [args]
   (log/tracef "Resolving request: %s" args)
   (->site-request
    (get cache/requests-cache (get-in args [:argument-values "id"]))))
+
+(defn requests [_]
+  {"count"
+   (fn [_] (.size cache/requests-cache))
+
+   "summaries"
+   (fn [_]
+     (for [{:keys [xt/id ring.response/status juxt.site.alpha/date]}
+           (seq cache/requests-cache)]
+       {"id" id
+        "status" status
+        "date" (str date)}))})
 
 (defn system [_]
   (let [system (repl/system)]
@@ -81,23 +125,4 @@
       "docStoreAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/xt-node :xtdb/document-store :kv-store :db-dir])))
       "indexStoreAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/xt-node :xtdb/index-store :kv-store :db-dir])))}
 
-     "request" (fn [{:strs [id] :as args}]
-                 (->site-request
-                  (get cache/requests-cache id)))
-     "requests"
-     {"count"
-      (fn [_] (.size cache/requests-cache))
-
-      "summaries"
-      (fn [_]
-        (for [{:keys [xt/id ring.response/status juxt.site.alpha/date]}
-              (seq cache/requests-cache)]
-          {"id" id
-           "status" status
-           "date" (str date)}))
-
-      "request" (fn [{:strs [search] :as args}]
-                  (->site-request
-                   (cache/find
-                    cache/requests-cache
-                    (re-pattern (str "/_site/requests/" search)))))}}))
+     }))

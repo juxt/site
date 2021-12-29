@@ -31,10 +31,12 @@ type Query {
   """
   request(id: ID): SiteRequest @site(resolver: "juxt.site.alpha.graphql-resolver/request")
 
+  requests: SiteRequests @site(resolver: "juxt.site.alpha.graphql-resolver/requests")
+
   """
   Access the currently logged in user
   """
-  subject: SiteSubject @site(resolver: "juxt.site.alpha.graphql.internal-resolver/subject")
+  subject: SiteSubject @site(resolver: "juxt.site.alpha.graphql-resolver/subject")
 }
 
 type SiteSubject {
@@ -83,18 +85,15 @@ type SiteSystem {
   # don't use NON_NULL.
   configuration: SiteConfiguration
 
-  version: VersionDetails
-  status: StatusDetails
-  requests: SiteRequests
-
-  request(id: ID): SiteRequest
+  version: SiteVersionDetails
+  status: SiteStatusDetails
 }
 
-type VersionDetails {
+type SiteVersionDetails {
   gitSha: String
 }
 
-type StatusDetails {
+type SiteStatusDetails {
   txLogAvail: Int
   docStoreAvail: Int
   indexStoreAvail: Int
@@ -118,7 +117,6 @@ type SiteAttributeStat {
 type SiteRequests {
   count: Int
   summaries: [SiteRequestSummary]
-  request(search: String): SiteRequest
 }
 
 type SiteRequestSummary {
@@ -133,5 +131,5 @@ type SiteRequest {
   id: ID
   status: Int
   date: String
-  debug: JSON
+  detail: JSON
 }

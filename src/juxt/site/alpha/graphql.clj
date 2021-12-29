@@ -518,13 +518,13 @@
             (let [resolver
                   (case (get site-args "siteResolver")
                     "allQueryParams"
-                    (requiring-resolve 'juxt.site.alpha.graphql.internal-resolver/query-parameters)
+                    (requiring-resolve 'juxt.site.alpha.graphql-resolver/query-parameters)
                     "queryParam"
-                    (requiring-resolve 'juxt.site.alpha.graphql.internal-resolver/query-parameter)
+                    (requiring-resolve 'juxt.site.alpha.graphql-resolver/query-parameter)
                     "queryString"
-                    (requiring-resolve 'juxt.site.alpha.graphql.internal-resolver/query-string)
+                    (requiring-resolve 'juxt.site.alpha.graphql-resolver/query-string)
                     "constant"
-                    (requiring-resolve 'juxt.site.alpha.graphql.internal-resolver/constant)
+                    (requiring-resolve 'juxt.site.alpha.graphql-resolver/constant)
                     (throw (ex-info "No such built-in resolver" {:site-resolver (get site-args "siteResolver")})))]
               (resolver (assoc field-resolver-args ::site/request-context req)))
 

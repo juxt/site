@@ -3,6 +3,6 @@ query GetRequest($siteUri: ID) {
     id
     status
     date
-    debug
+    detail
   }
 }
