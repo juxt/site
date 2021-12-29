@@ -1,0 +1,9 @@
+= Swagger UI
+
+Install with
+
+----
+./install
+----
+
+After installing, navigate to https://home.test/swagger-ui/index.html?url=/_site/apis/site/openapi.json
