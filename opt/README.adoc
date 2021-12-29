@@ -4,12 +4,19 @@
 
 ----
 $ cd login-form
-$ ./deploy
+$ ./install
 ----
 
-== Debug templates
+== Swagger UI
 
 ----
-$ cd debug-request
-$ ./deploy
+$ cd swagger-ui
+$ ./install
+----
+
+== GraphiQL Console
+
+----
+$ cd graphiql
+$ make build install
 ----
