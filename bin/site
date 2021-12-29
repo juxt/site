@@ -510,8 +510,10 @@
                     base-uri (str/replace "{{base-uri}}" base-uri))
             :throw false})]
       (cond
-        (= status 204)
-        (message! (format "GraphQL document uploaded"))
+        (#{201 204} status)
+        (message! (format "GraphQL document uploaded: %s%s %s->%s %s%s"
+                          ansi/blue-font (.getName file) ansi/reset-font
+                          ansi/blue-font path ansi/reset-font))
 
         :else
         (do
