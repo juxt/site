@@ -38,8 +38,8 @@
                                      :template-resource res})))]
 
             (cond
-              (string? template-body)
-              (java.io.ByteArrayInputStream. (.getBytes template-body))
+              (string? template-body) (java.io.ByteArrayInputStream. (.getBytes template-body))
+              (bytes? template-body) (java.io.ByteArrayInputStream. template-body)
               (instance? java.io.InputStream template-body) template-body
               :else (throw (ex-info "Unexpected type of template body" {:template-body-type (type template-body)})))))))))
 
