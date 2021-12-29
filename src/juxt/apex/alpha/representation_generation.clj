@@ -8,6 +8,7 @@
    [clojure.walk :refer [postwalk]]
    [xtdb.api :as x]
    [hiccup.page :as hp]
+   selmer.parser
    [json-html.core :refer [edn->html]]
    [jsonista.core :as json]
    [juxt.apex.alpha.parameters :as parameters]
@@ -17,7 +18,8 @@
    [juxt.site.alpha.util :as util]
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]
-   [juxt.jinx.alpha :as jinx]))
+   [juxt.jinx.alpha :as jinx]
+   [clojure.string :as str]))
 
 (alias 'jinx (create-ns 'juxt.jinx.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -48,7 +50,7 @@
    input))
 
 (defn entity-body
-  [{::site/keys [selected-representation resource db] :as req}
+  [{::site/keys [selected-representation resource db base-uri] :as req}
    resource-state]
   (case (::http/content-type selected-representation)
     "application/json"
@@ -62,12 +64,24 @@
     (let [config (get-in resource [::apex/operation "responses"
                                    "200" "content"
                                    (::http/content-type selected-representation)])
-          template (get config "x-juxt-site-template")]
+          template (->
+                    (get config "x-juxt-site-template")
+                    (selmer.parser/render {:base-uri base-uri}))
 
+          ;; Push the resource-state through jsonista and back. We do this
+          ;; jsonista expands out objects like StackTraceElement[], whereas
+          ;; selmer just calls a .toString. This also makes the resource state
+          ;; going into the tempate aligned with the body of the
+          ;; application/json representation.
+          resource-state (-> resource-state
+                             json/write-value-as-bytes
+                             json/read-value)]
       (cond
         template
         (selmer/render-file
-         template resource-state db
+         template
+         resource-state
+         db
          (get config "x-juxt-site-template-custom-resource-path")
          (response/xt-template-loader req db))
 
@@ -180,6 +194,7 @@
 
          ;; Try to get the resource's state via GraphQL
          (when-let [stored-query-resource-path (get-in resource [::apex/operation "x-juxt-site-graphql-query-resource"])]
+           #_(log/tracef "GraphQL attempt: %s" stored-query-resource-path)
            (let [stored-query-id (if (.startsWith stored-query-resource-path "/")
                                    (str (:juxt.site.alpha/base-uri req) stored-query-resource-path)
                                    stored-query-resource-path)
@@ -193,9 +208,13 @@
                         :when (::jinx/valid? v)]
                     [k (:value v)]))]
              (when operation-name
+               #_(log/tracef "Trying operation: %s" operation-name)
                (let [result (graphql/graphql-query
                              req
                              stored-query-id operation-name variables)]
+
+                 #_(log/tracef "result is %s" result)
+
                  ;; TODO: Need to check if the result indicates that nothing was found
                  ;; Perhaps the test should be if all values in the :data map are nil
                  (when (seq (:errors result))
