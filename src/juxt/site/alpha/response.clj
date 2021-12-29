@@ -25,7 +25,10 @@
 
           (let [res (xt/entity db (str url))
                 _ (when-not res
-                    (throw (ex-info "Failed to find template resource" {:template-uri (str url)})))
+                    (throw
+                     (ex-info
+                      (format "Failed to find template resource: %s" (str url))
+                      {:template-uri (str url)})))
                 response (add-payload
                           (assoc req ::site/selected-representation res))
                 template-body (:ring.response/body response)
