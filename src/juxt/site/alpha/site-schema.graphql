@@ -27,6 +27,11 @@ type Query {
   system: SiteSystem @site(resolver: "juxt.site.alpha.graphql-resolver/system")
 
   """
+  Access a request
+  """
+  request(id: ID): SiteRequest @site(resolver: "juxt.site.alpha.graphql-resolver/request")
+
+  """
   Access the currently logged in user
   """
   subject: SiteSubject @site(resolver: "juxt.site.alpha.graphql.internal-resolver/subject")
@@ -81,6 +86,8 @@ type SiteSystem {
   version: VersionDetails
   status: StatusDetails
   requests: SiteRequests
+
+  request(id: ID): SiteRequest
 }
 
 type VersionDetails {
@@ -120,8 +127,11 @@ type SiteRequestSummary {
   date: String
 }
 
+scalar JSON
+
 type SiteRequest {
   id: ID
   status: Int
   date: String
+  debug: JSON
 }

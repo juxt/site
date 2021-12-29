@@ -8,7 +8,8 @@
    [clojure.java.shell :as sh]
    [juxt.site.alpha.main :as main]
    [juxt.site.alpha.cache :as cache]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [clojure.tools.logging :as log]))
 
 (defn config []
   (main/config))
@@ -27,6 +28,18 @@
     (when (seq err)
       (throw (ex-info "Failed to get git sha1 version" {})))
     (str/trim out)))
+
+(defn ->site-request [req]
+  (when req
+    {"id" (:xt/id req)
+     "status" (:ring.response/status req)
+     "date" (:juxt.site.alpha/date req)
+     "debug" req}))
+
+(defn request [args]
+  (log/tracef "Resolving request: %s" args)
+  (->site-request
+   (get cache/requests-cache (get-in args [:argument-values "id"]))))
 
 (defn system [_]
   (let [system (repl/system)]
@@ -68,7 +81,9 @@
       "docStoreAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/xt-node :xtdb/document-store :kv-store :db-dir])))
       "indexStoreAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/xt-node :xtdb/index-store :kv-store :db-dir])))}
 
-
+     "request" (fn [{:strs [id] :as args}]
+                 (->site-request
+                  (get cache/requests-cache id)))
      "requests"
      {"count"
       (fn [_] (.size cache/requests-cache))
@@ -82,10 +97,7 @@
            "date" (str date)}))
 
       "request" (fn [{:strs [search] :as args}]
-                  (set/rename-keys
+                  (->site-request
                    (cache/find
                     cache/requests-cache
-                    (re-pattern (str "/_site/requests/" search)))
-                   {:xt/id "id"
-                    :ring.response/status "status"
-                    :juxt.site.alpha/date "date"}))}}))
+                    (re-pattern (str "/_site/requests/" search)))))}}))
