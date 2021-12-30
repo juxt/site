@@ -9,7 +9,6 @@ import {
   ApolloClient,
   InMemoryCache,
   ApolloProvider,
-  useQuery,
   gql,
   createHttpLink
 } from "@apollo/client";
@@ -29,7 +28,7 @@ client
   .query({
     query: gql`
     query GetRequest {
-      request(id: "https://home.test/_site/requests/81ff3d9ed88e7440658291cc") {
+      request(id: "https://home.test/_site/requests/796b78b0d112ff1e97aea1a2") {
         id
         status
         date
@@ -38,16 +37,6 @@ client
     `
   })
   .then(result => console.log(result));
-
-const REQUEST_SUMMARY = gql`
-query GetRequestSummary {
-  request(id: "https://home.test/_site/requests/81ff3d9ed88e7440658291cc") {
-    id
-    status
-    date
-  }
-}
-`
 
 ReactDOM.render(
   <React.StrictMode>

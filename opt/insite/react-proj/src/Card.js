@@ -1,10 +1,7 @@
 /* This example requires Tailwind CSS v2.0+ */
-import { PaperClipIcon } from '@heroicons/react/solid'
-
 import {
   ApolloClient,
   InMemoryCache,
-  ApolloProvider,
   useQuery,
   gql,
   createHttpLink
@@ -21,9 +18,10 @@ const client = new ApolloClient({
 });
 
 export default function Card() {
-  const { loading, data, error } = useQuery(gql`
-  query GetRequestSummary {
-    request(id: "https://home.test/_site/requests/81ff3d9ed88e7440658291cc") {
+  const { loading, data, error } = useQuery(
+    gql`
+  query GetRequestSummary($uri: ID) {
+    request(id: $uri) {
       id
       status
       date
@@ -33,23 +31,23 @@ export default function Card() {
       detail
     }
   }
-  `)
+  `,
+    {variables: {uri: "https://home.test/_site/requests/d2d15afa4cc24049f55db79f"}});
 
   if (loading) return <p>Loading...</p>;
-  if (error) return <p>Error</p>
+  if (error) return <p>Error</p>;
 
   const rows = [
-    { title: "Method", value: data.request.method },
-    { title: "Date", value: data.request.date },
-    { title: "Operation Name", value: data.request.operationName },
-    { title: "Detail", value: JSON.stringify(data.request.detail) },
+    { title: "Method", value: data.request?.method },
+    { title: "Date", value: data.request?.date },
+    { title: "Operation Name", value: data.request?.operationName },
   ];
 
   return (
     <div className="bg-white shadow overflow-hidden sm:rounded-lg">
       <div className="px-4 py-5 sm:px-6">
-        <h3 className="text-lg leading-6 font-medium text-gray-900">{data.request.status}</h3>
-        <p className="mt-1 max-w-2xl text-sm text-gray-500">{data.request.requestUri}</p>
+        <h3 className="text-lg leading-6 font-medium text-gray-900">{data.request?.status || "Unknown"}</h3>
+        <p className="mt-1 max-w-2xl text-sm text-gray-500">{data.request?.requestUri}</p>
       </div>
       <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
         <dl className="sm:divide-y sm:divide-gray-200">
@@ -60,6 +58,12 @@ export default function Card() {
             </div>))}
         </dl>
       </div>
+      <div className="px-4 py-5 sm:px-6">
+        <h3 className="text-lg leading-6 font-medium text-gray-900">Detail</h3>
+        <div className="py-4 text-xs">
+          <pre>{JSON.stringify(data.request?.detail, null, 2)}</pre>
+        </div>
+      </div>
     </div>
-  )
+  );
 }
