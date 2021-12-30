@@ -11,7 +11,7 @@ export const siteConfig = {
     appId: '3M976T952H',
     siteId: '7b58344b-45e2-41ab-814a-867ccfb5503c',
     apiKey: 'f9096da40ca9a0639d3cf9137ab2a7bf',
-    indexName: 'site',
+    indexName: 'netlify_7b58344b-45e2-41ab-814a-867ccfb5503c_master_all',
   },
   headerIdConfig: {
     className: `anchor`,
