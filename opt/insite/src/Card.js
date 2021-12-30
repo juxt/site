@@ -39,6 +39,8 @@ const theme = {
   base0F: '#cc6633',
 };
 
+// "https://home.test/_site/requests/d2d15afa4cc24049f55db79f"
+
 export default function Card() {
   const { loading, data, error } = useQuery(
     gql`
@@ -54,7 +56,7 @@ export default function Card() {
     }
   }
   `,
-    {variables: {uri: "https://home.test/_site/requests/d2d15afa4cc24049f55db79f"}});
+    {variables: {uri: window.location.href}});
 
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error</p>;
