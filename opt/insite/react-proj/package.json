@@ -13,6 +13,7 @@
     "graphql": "^16.2.0",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
+    "react-json-tree": "^0.15.1",
     "react-scripts": "5.0.0",
     "web-vitals": "^2.1.2"
   },

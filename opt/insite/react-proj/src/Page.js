@@ -4,9 +4,10 @@ import { BellIcon, MenuIcon, XIcon } from '@heroicons/react/outline'
 import Card from './Card'
 
 const navigation = [
-  { name: 'Dashboard', href: '#', current: true },
-  { name: 'Requests', href: '#', current: false },
-  { name: 'GraphQL', href: '#', current: false },
+  { name: 'Request', href: '#', current: true },
+  { name: 'Performance', href: '#', current: false },
+  { name: 'System', href: '#', current: false },
+  { name: 'Docs', href: '#', current: false },
 ]
 
 function classNames(...classes) {
@@ -96,7 +97,7 @@ export default function Page() {
 
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-            <h1 className="text-lg leading-6 font-semibold text-gray-900">Dashboard</h1>
+            <h1 className="text-lg leading-6 font-semibold text-gray-900">Request</h1>
           </div>
         </header>
         <main>
