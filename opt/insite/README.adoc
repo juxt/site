@@ -17,7 +17,7 @@ This replaces the default template that serves URLs of the form
 The resource state is queried, as usual, using the `GetRequest` operation of
 `/_site/graphql/requests/operations.graphql`.
 
-This resource state is then injected into the `index.html`
+This resource state is then injected into the link:src/index.html[index.html].
 
 
 
