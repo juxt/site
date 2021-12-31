@@ -4,12 +4,7 @@ import './index.css';
 //import reportWebVitals from './reportWebVitals';
 import Page from './Page';
 
-const mockRequest = {
-  status: 200,
-  method: "GET",
-  requestUri: "https://home.test/index.html",
-  detail: {foo: "bar"}
-}
+const mockRequest = require('./mockRequest.json').request;
 
 ReactDOM.render(
   <div>
