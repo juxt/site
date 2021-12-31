@@ -17,9 +17,9 @@ This replaces the default template that serves URLs of the form
 The resource state is queried, as usual, using the `GetRequest` operation of
 `/_site/graphql/requests/operations.graphql`.
 
-This resource state is then injected into the link:public/index.html[index.html].
-
-
+This resource state is then injected into the `window.RESOURCE_STATE` variable
+of link:public/index.html[index.html] with Selmer, and picked up by the page's
+JavaScript.
 
 == Available Scripts
 

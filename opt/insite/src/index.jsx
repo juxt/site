@@ -13,7 +13,7 @@ const mockRequest = {
 
 ReactDOM.render(
   <div>
-    <Page request={window.SERVER_DATA || mockRequest}/>
+    <Page request={window.RESOURCE_STATE || mockRequest}/>
   </div>,
   document.getElementById('root')
 );
