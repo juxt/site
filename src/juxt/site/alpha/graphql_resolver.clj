@@ -65,11 +65,13 @@
   (when req
     {"id" (:xt/id req)
      "status" (:ring.response/status req)
-     "date" (:juxt.site.alpha/date req)
+     "date" (::site/date req)
+     "method" (str/upper-case (name (:ring.request/method req)))
+     "requestUri" (::site/uri req)
+     "operationName" (:juxt.apex.alpha.graphql/operation-name req)
      "detail" req}))
 
 (defn request [args]
-  (log/tracef "Resolving request: %s" args)
   (->site-request
    (get cache/requests-cache (get-in args [:argument-values "id"]))))
 

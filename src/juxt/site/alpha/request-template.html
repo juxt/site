@@ -1,6 +1,20 @@
 <body>
   <h1>Site Request</h1>
 
+  <div id="summary">
+    <h2>Summary</h2>
+
+    <dl>
+      <dt>Date</dt><dd><tt>{{ request.date }}</tt></dd>
+      <dt>URI</dt><dd><tt>{{ request.requestUri }}</tt></dd>
+      <dt>Method</dt><dd><tt>{{ request.method }}</tt></dd>
+      <dt>Status</dt><dd><tt>{{ request.status }}</tt></dd>
+    </dl>
+  </div>
+
+  <div id="graphql">
+  </div>
+
 {#
   <p>This is a dump of data gathered for a <strong><tt>{{ ring..request/method|name|upper }}</tt></strong> request that was made to <tt>{{ juxt..site..alpha/uri }}</tt> at <tt>{{ juxt..site..alpha/date|date:"yyyy-MM-dd HH:mm:ss" }}</tt>.<p>
   <p>After {{ juxt..site..alpha/duration-millis }}ms a response was returned with the status code {{ ring..response/status }}.</p>
@@ -13,18 +27,6 @@
     {% if juxt..apex..alpha..graphql/result %}<li><a href="#graphql-result">GraphQL Result</a></li>{% endif %}
     <li><a href="#full-context">Full Context</a></li>
   </ul>
-
-  <div id="summary">
-    <h2>Summary</h2>
-
-    <table>
-      <tbody>
-        <tr><td>Status</td><td><tt>{{ ring..response/status }}</tt></td></tr>
-        <tr><td>Date</td><td><tt>{{ juxt..site..alpha/date }}</tt></td></tr>
-        <tr><td>URI</td><td><tt>{{ juxt..site..alpha/uri }}</tt></td></tr>
-      </tbody>
-    </table>
-  </div>
 
   {% if juxt..site..alpha/errors %}
   <div id="error-traces">

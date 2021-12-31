@@ -32,7 +32,7 @@
      {:content
       {"application/json" {}
        "text/html;charset=utf-8"
-       {:x-juxt-site-template "{{base-uri}}/_site/templates/request.html"
+       {:x-juxt-site-template "{{base-uri}}/_insite/index.html"
         :x-juxt-site-dialect "selmer"}}}}}}
 
   "/user"
