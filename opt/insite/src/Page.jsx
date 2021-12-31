@@ -14,7 +14,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Page() {
+export default function Page(props) {
 
   return (
     <>
@@ -102,7 +102,7 @@ export default function Page() {
         </header>
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <Card />
+            <Card request={props.request}/>
           </div>
         </main>
       </div>

@@ -1,24 +1,6 @@
-import {
-  ApolloClient,
-  InMemoryCache,
-  useQuery,
-  gql,
-  createHttpLink
-} from "@apollo/client";
-
 import JSONTree from 'react-json-tree';
 
-const link = createHttpLink({
-  uri: 'https://home.test/_site/graphql',
-  credentials: 'include'
-});
-
-const client = new ApolloClient({
-  cache: new InMemoryCache(),
-  link,
-});
-
-const theme = {
+const jsonTreeTheme = {
   scheme: 'monokai',
   author: 'wimer hazenberg (http://www.monokai.nl)',
   base00: '#272822',
@@ -41,40 +23,21 @@ const theme = {
 
 // "https://home.test/_site/requests/d2d15afa4cc24049f55db79f"
 
-export default function Card() {
-  const { loading, data, error } = useQuery(
-    gql`
-  query GetRequestSummary($uri: ID) {
-    request(id: $uri) {
-      id
-      status
-      date
-      requestUri
-      method
-      operationName
-      detail
-    }
-  }
-  `,
-    {variables: {uri: window.location.href}});
-
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p>Error</p>;
+export default function Card({ request }) {
 
   const rows = [
-    { title: "Method", value: data.request?.method },
-    { title: "Date", value: data.request?.date },
+    { title: "Date", value: request.date },
   ];
 
   const graphQLRows = [
-    { title: "Operation Name", value: data.request?.operationName },
+    { title: "Operation Name", value: request.operationName },
   ];
 
   return (
-    <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+    <div className="card bg-white shadow overflow-hidden sm:rounded-lg">
       <div className="px-4 py-5 sm:px-6">
-        <h3 className="text-6xl font-bold text-gray-900">{data.request?.status || "000"}</h3>
-        <p className="mt-1 max-w-2xl text-sm text-gray-500">{data.request?.requestUri || "<Request URI>"}</p>
+        <p className="mt-1 max-w-sm text-sm">{request.method} <a className="underline text-blue-800 hover:text-blue-600" href={ request.requestUri }>{request.requestUri}</a></p>
+        <h3 className="text-6xl font-bold text-gray-900">{request.status || "000"}</h3>
       </div>
       <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
         <dl className="sm:divide-y sm:divide-gray-200">
@@ -86,7 +49,7 @@ export default function Card() {
         </dl>
       </div>
       <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
-        <h3 className="sm:px-6 text-lg leading-6 font-medium text-gray-900">GraphQL</h3>
+        <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">GraphQL</h3>
         <dl className="sm:divide-y sm:divide-gray-200">
           {graphQLRows.map(({ title, value }) => (
             <div key={title} className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -96,9 +59,9 @@ export default function Card() {
         </dl>
       </div>
       <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
-        <h3 className="sm:px-6 text-lg leading-6 font-medium text-gray-900">Detail</h3>
+        <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">Detail</h3>
         <div className="sm:px-6 text-xs">
-          <JSONTree data={data.request?.detail} theme={theme} />
+          <JSONTree data={request.detail} theme={jsonTreeTheme} />
         </div>
       </div>
     </div>
