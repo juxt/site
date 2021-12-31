@@ -20,3 +20,10 @@ $ ./install
 $ cd graphiql
 $ make build install
 ----
+
+== InSite
+
+----
+$ cd insite
+$ make build install
+----
