@@ -1,4 +1,4 @@
-.PHONY: all install
+.PHONY: all build install
 
 build:
 	npm run build
