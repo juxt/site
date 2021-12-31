@@ -21,8 +21,6 @@ const jsonTreeTheme = {
   base0F: '#cc6633',
 };
 
-// "https://home.test/_site/requests/d2d15afa4cc24049f55db79f"
-
 export default function Card({ request }) {
 
   const rows = [
@@ -39,6 +37,7 @@ export default function Card({ request }) {
         <p className="mt-1 max-w-sm text-sm">{request.method} <a className="underline text-blue-800 hover:text-blue-600" href={ request.requestUri }>{request.requestUri}</a></p>
         <h3 className="text-6xl font-bold text-gray-900">{request.status || "000"}</h3>
       </div>
+
       <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
         <dl className="sm:divide-y sm:divide-gray-200">
           {rows.map(({ title, value }) => (
@@ -48,6 +47,7 @@ export default function Card({ request }) {
             </div>))}
         </dl>
       </div>
+
       <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
         <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">GraphQL</h3>
         <dl className="sm:divide-y sm:divide-gray-200">
@@ -58,6 +58,7 @@ export default function Card({ request }) {
             </div>))}
         </dl>
       </div>
+
       <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
         <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">Detail</h3>
         <div className="sm:px-6 text-xs">
