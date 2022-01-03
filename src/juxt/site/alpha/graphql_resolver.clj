@@ -14,6 +14,7 @@
 
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
+(alias 'grab (create-ns 'juxt.grab.alpha))
 
 (defn config []
   (main/config))
@@ -61,19 +62,12 @@
       (throw (ex-info "Failed to get git sha1 version" {})))
     (str/trim out)))
 
-(defn ->site-request [req]
-  (when req
-    {"id" (:xt/id req)
-     "status" (:ring.response/status req)
-     "date" (::site/date req)
-     "method" (str/upper-case (name (:ring.request/method req)))
-     "requestUri" (::site/uri req)
-     "operationName" (:juxt.apex.alpha.graphql/operation-name req)
-     "detail" req}))
-
 (defn request [args]
-  (->site-request
-   (get cache/requests-cache (get-in args [:argument-values "id"]))))
+  (let [req (get cache/requests-cache (get-in args [:argument-values "id"]))]
+    (assoc req :_detail req)))
+
+(defn stack-trace [args]
+  (some->> args :object-value :stack-trace (map bean)))
 
 (defn requests [_]
   {"count"
@@ -128,3 +122,27 @@
       "indexStoreAvail" (fn [_] (df (get-in (config) [:ig/system :juxt.site.alpha.db/xt-node :xtdb/index-store :kv-store :db-dir])))}
 
      }))
+
+(defn extract-errors [args]
+  (some->>
+   args
+   :object-value
+   :juxt.site.alpha/errors
+   (map (fn [error]
+          (let [ex-data (:ex-data error)
+                graphql-type-name (::site/graphql-type ex-data "SiteGeneralError")]
+            (into
+             (into error {::site/graphql-type graphql-type-name})
+             (case graphql-type-name
+               "SiteGraphqlExecutionError"
+               (select-keys ex-data [::site/graphql-stored-query-resource-path
+                                     ::site/graphql-operation-name
+                                     ::site/graphql-variables
+                                     ::grab/errors])
+               )))))))
+
+(defn graphql-errors [args]
+  (for [error (some-> args :object-value ::grab/errors)]
+    (-> error
+        (assoc :stack-trace (get-in error [:extensions :stack-trace]))
+        (update :extensions dissoc :stack-trace))))

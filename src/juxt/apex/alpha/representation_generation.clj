@@ -221,12 +221,11 @@
                    (throw
                     (ex-info
                      "Getting the state for the resource via GraphQL resulted in errors"
-                     (into req {:ring.response/status 500
-                                ::stored-query-id stored-query-id
-                                ::operation-name operation-name
-                                ::variables variables
-                                ::errors (:errors result)
-                                ::data (:data result)}))))
+                     {::stored-query-id stored-query-id
+                      ::operation-name operation-name
+                      ::variables variables
+                      ::errors (:errors result)
+                      ::data (:data result)})))
 
                  (:data result)))))
 

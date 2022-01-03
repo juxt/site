@@ -48,6 +48,43 @@ export default function Card({ request }) {
         </dl>
       </div>
 
+      {/*
+      <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
+        <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">Errors</h3>
+
+        {request.errors.map(({ message, stackTrace, exData }) => (
+          <div key={message} className="py-4 sm:py-5 sm:px-6">
+            <p className="text-sm font-medium py-4">{message}</p>
+            <div>
+              <table className="table-auto text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-left">Class</th>
+                    <th className="text-left">Method</th>
+                    <th className="text-left">File</th>
+                    <th className="text-left">Line</th>
+                  </tr>
+                </thead>
+                <tbody>
+                {stackTrace.map(({methodName, fileName, lineNumber, className}) => (
+                  <tr>
+                    <td>{className}</td>
+                    <td>{methodName}</td>
+                    <td>{fileName}</td>
+                    <td>{lineNumber}</td>
+                  </tr>
+                ))}
+                </tbody>
+              </table>
+            </div>
+            {exData ?
+             <div className="text-xs font-medium text-gray-500">
+              <JSONTree data={exData} theme={jsonTreeTheme} sortObjectKeys={true} hideRoot={true}  />
+             </div> : <div/>}
+          </div>))}
+      </div>
+       */}
+
       <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
         <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">GraphQL</h3>
         <dl className="sm:divide-y sm:divide-gray-200">
@@ -60,9 +97,9 @@ export default function Card({ request }) {
       </div>
 
       <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
-        <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">Detail</h3>
+        <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">All Data</h3>
         <div className="sm:px-6 text-xs">
-          <JSONTree data={request.detail} theme={jsonTreeTheme} />
+          <JSONTree data={request} theme={jsonTreeTheme} sortObjectKeys={true} hideRoot={true}  />
         </div>
       </div>
     </div>

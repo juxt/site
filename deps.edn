@@ -32,9 +32,9 @@
         #_{:local/root "../pick"}
 
         juxt/grab
-        {:git/url "https://github.com/juxt/grab.git"
-         :sha "8c0b521e3be8ec8b4e11d1d60536ed7b989da80a"
-         ;;:local/root "../grab"
+        {;;:git/url "https://github.com/juxt/grab.git"
+         ;;:sha "8c0b521e3be8ec8b4e11d1d60536ed7b989da80a"
+         :local/root "../grab"
          }
 
         ;; JSON Schema support functions

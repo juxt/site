@@ -342,6 +342,10 @@
         (log/debugf "defaulting to nil, type-ref is %s" type-ref)
         nil))))
 
+
+;; TODO: Need something (in grab) that will coerce to a list
+;;(-> object-value :stack-trace seqable?)
+
 (defn query [schema document operation-name variable-values
              {::pass/keys [subject]
               ::site/keys [db xt-node base-uri resource]
@@ -363,6 +367,10 @@
       :field-resolver
       (fn [{:keys [object-type object-value field-name argument-values]
             :as field-resolver-args}]
+
+        #_(when (= "SiteError" (get-in object-type [::g/name]))
+          (def object-value object-value)
+          )
 
         (let [types-by-name (::schema/types-by-name schema)
               field (get-in object-type [::schema/fields-by-name field-name])
@@ -480,6 +488,7 @@
                         (get object-value (keyword att)))]
               (if (= field-kind 'OBJECT)
                 (protected-lookup val subject db)
+                ;; TODO: check for lists
                 val))
 
             (get site-args "ref")

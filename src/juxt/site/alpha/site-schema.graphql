@@ -1,4 +1,6 @@
-schema {
+schema
+@site(type: "juxt.site.alpha/graphql-type")
+{
   query: Query
 }
 
@@ -129,13 +131,63 @@ scalar JSON
 
 type SiteRequest {
   id: ID
-  status: Int
-  date: String
-  requestUri: ID
-  method: String
-
+  method: String @site(a: "ring.request/method")
+  requestUri: ID @site(a: "juxt.site.alpha/uri")
+  date: String @site(a: "juxt.site.alpha/date")
+  requestHeaders: JSON @site(a: "ring.request/headers")
   "The GraphQL operation name called by the request"
-  operationName: String
+  operationName: String @site(a: "juxt.apex.alpha.graphql/operation-name")
 
-  detail: JSON
+  status: Int @site(a: "ring.response/status")
+
+  errors: [SiteError] @site(resolver: "juxt.site.alpha.graphql-resolver/extract-errors")
+  #@site(a: "juxt.site.alpha/errors" transform: "juxt.site.alpha.graphql-resolver/->graphql-error")
+
+  _detail: JSON
+}
+
+interface SiteError {
+  message: String
+  stackTrace: [SiteStackTraceElement]
+  exData: JSON
+}
+
+type SiteGeneralError implements SiteError {
+  message: String @site(a: "message")
+  stackTrace: [SiteStackTraceElement] @site(resolver: "juxt.site.alpha.graphql-resolver/stack-trace")
+  exData: JSON @site(a: "ex-data")
+}
+
+type SiteGraphqlExecutionError implements SiteError {
+  message: String @site(a: "message")
+  stackTrace: [SiteStackTraceElement] @site(resolver: "juxt.site.alpha.graphql-resolver/stack-trace")
+  exData: JSON @site(a: "ex-data")
+
+  storedQueryResourcePath: String @site(a: "juxt.site.alpha/graphql-stored-query-resource-path")
+  operationName: String @site(a: "juxt.site.alpha/graphql-operation-name")
+  variables: JSON @site(a: "juxt.site.alpha/graphql-variables")
+  fieldErrors: [SiteGraphqlFieldError] @site(resolver: "juxt.site.alpha.graphql-resolver/graphql-errors")
+}
+
+# Essentially, a String or an Int
+scalar SiteGraphqlPathElement
+
+type SiteGraphqlFieldError {
+  message: String
+  locations: [SiteGraphqlLocation]
+  path: [SiteGraphqlPathElement] @site(a: "path")
+  stackTrace: [SiteStackTraceElement] @site(resolver: "juxt.site.alpha.graphql-resolver/stack-trace")
+  extensions: JSON
+}
+
+type SiteGraphqlLocation {
+  line: Int
+  column: Int
+}
+
+type SiteStackTraceElement {
+  methodName: String
+  fileName: String
+  lineNumber: Int
+  className: String
 }
