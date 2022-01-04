@@ -1,0 +1,11 @@
+query GetRequestSummary($uri: ID!) {
+  request(id: $uri) {
+    id
+    status
+    date
+    requestUri
+    method
+    operationName
+    detail
+  }
+}

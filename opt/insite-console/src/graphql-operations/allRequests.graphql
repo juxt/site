@@ -1,0 +1,9 @@
+query allRequests {
+  requests {
+    summaries {
+      date
+      id
+      status
+    }
+  }
+}

@@ -80,6 +80,14 @@
            :contents (xt/entity db uri)})]
     (concat openapis graphqls)))
 
+(defn paginate
+  [items {:keys [argument-values]}]
+  (let [limit (get argument-values "limit" 1000)
+        offset (get argument-values "offset" 0)]
+    (some->> (seq items)
+             (drop offset)
+             (take limit))))
+
 (defn request [args]
   (let [req (get cache/requests-cache (get-in args [:argument-values "id"]))]
     (assoc req :_detail req)))
@@ -87,16 +95,18 @@
 (defn stack-trace [args]
   (some->> args :object-value :stack-trace (map bean)))
 
-(defn requests [_]
+(defn requests [args]
   {"count"
    (fn [_] (.size cache/requests-cache))
 
    "summaries"
    (fn [_]
      (for [{:keys [xt/id ring.response/status juxt.site.alpha/date]}
-           (seq cache/requests-cache)]
+           (paginate (remove #(= "/_site/graphql" (:ring.request/path %))
+                             cache/requests-cache) args)]
        {"id" id
         "status" status
+        "details" (->site-request (get cache/requests-cache id))
         "date" (str date)}))})
 
 (defn system [_]

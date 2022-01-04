@@ -67,6 +67,7 @@
 
       (if-let [ok-response (get-in resource [::apex/operation "responses" "200"])]
         (assoc req
+               ::operation-name operation-name
                :ring.response/status 200
                :ring.response/body
                (entity-body
