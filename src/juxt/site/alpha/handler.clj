@@ -979,6 +979,11 @@
                           (dissoc req ::site/request-context)
                           ;; For the error itself
                           {::site/selected-representation representation})
+
+          error-resource (assoc
+                          error-resource
+                          ::site/status-message (status-message (:ring.response/status error-resource)))
+
           response (try
                      (response/add-payload error-resource)
                      (catch Exception e

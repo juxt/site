@@ -136,9 +136,13 @@ type SiteRequest {
   date: String @site(a: "juxt.site.alpha/date")
   requestHeaders: JSON @site(a: "ring.request/headers")
   "The GraphQL operation name called by the request"
-  operationName: String @site(a: "juxt.apex.alpha.graphql/operation-name")
+
+  graphqlStoredQueryResourcePath: String @site(a: "juxt.site.alpha/graphql-stored-query-resource-path")
+  graphqlOperationName: String @site(a: "juxt.site.alpha/graphql-operation-name")
+  graphqlVariables: JSON @site(a: "juxt.site.alpha/graphql-variables")
 
   status: Int @site(a: "ring.response/status")
+  statusMessage: String @site(a: "juxt.site.alpha/status-message")
 
   errors: [SiteError] @site(resolver: "juxt.site.alpha.graphql-resolver/extract-errors")
   #@site(a: "juxt.site.alpha/errors" transform: "juxt.site.alpha.graphql-resolver/->graphql-error")
@@ -176,7 +180,7 @@ type SiteGraphqlFieldError {
   message: String
   locations: [SiteGraphqlLocation]
   path: [SiteGraphqlPathElement] @site(a: "path")
-  stackTrace: [SiteStackTraceElement] @site(resolver: "juxt.site.alpha.graphql-resolver/stack-trace")
+  stackTrace: JSON @site(a: ["extensions" "stack-trace"])
   extensions: JSON
 }
 

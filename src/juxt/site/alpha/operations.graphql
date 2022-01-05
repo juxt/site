@@ -2,6 +2,7 @@ query GetRequest($siteUri: ID) {
   request(id: $siteUri) {
     id
     status
+    statusMessage
     date
     requestUri
     method
@@ -29,6 +30,7 @@ query GetRequest($siteUri: ID) {
           locations { line column }
           path
           extensions
+          stackTrace
         }
       }
     }
