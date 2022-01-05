@@ -220,7 +220,7 @@
                  (when (seq (:errors result))
                    (throw
                     (ex-info
-                     "Getting the state for the resource via GraphQL resulted in errors"
+                     (format "Getting the state for the resource via GraphQL resulted in %d errors" (count (:errors result)))
                      {::stored-query-id stored-query-id
                       ::operation-name operation-name
                       ::variables variables
