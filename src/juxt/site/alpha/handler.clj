@@ -1256,7 +1256,7 @@
    wrap-method-not-allowed?
 
    ;; Custom middleware for Site
-   wrap-triggers
+   #_wrap-triggers
 
    ;; Create initial response
    wrap-initialize-response
