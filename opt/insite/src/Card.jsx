@@ -50,95 +50,98 @@ export default function Card({ request }) {
         </dl>
       </div>
 
-      <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
-        <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">Errors</h3>
+      {request.errors ?
+       <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
+         <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">Errors</h3>
 
-        {request.errors.map(({ message, stackTrace, exData, __typename, ...error }) => (
-          <div key={message} className="py-4 sm:py-5 sm:px-6">
-            <p className="text-sm font-medium py-4">{message}</p>
-            <div>
-              <ul className="text-xs">
-                {stackTrace.map(({methodName, fileName, lineNumber, className}) => (
-                  <li>{"at " + className + "." + methodName + "(" + fileName + ":" + lineNumber + ")"}</li>
-                  ))}
-              </ul>
-            </div>
-
-            {exData ?
-             <div className="py-4">
-               <div>
-                 <h4>
-                   Exception Data
-                 </h4>
-               </div>
-               <div className="text-xs font-medium text-gray-500">
-               <JSONTree data={exData} theme={jsonTreeTheme} sortObjectKeys={true} hideRoot={true}  />
-               </div></div> :
-             <div/>}
-
-            {__typename == "SiteGraphqlExecutionError" ?
-             <div className="py-4">
-               <h4>
-                 GraphQL field errors
-               </h4>
-                 <div className="py-2">
-                   <table className="table-auto text-xs w-full">
-                     <thead>
-                       <tr>
-                         <th className="text-left">Path</th>
-                         <th className="text-left">Message</th>
-                         <th className="text-left">Stack trace</th>
-                       </tr>
-                     </thead>
-                     <tbody>
-                       {error.fieldErrors.map(({ path, message, extensions, stackTrace }) => (
-                         <tr>
-                           <td>{path}</td>
-                           <td>{message}</td>
-                           <td><ul className="text-xs">
-                {stackTrace?.map(({methodName, fileName, lineNumber, className}) => (
-                  <li>{"at " + className + "." + methodName + "(" + fileName + ":" + lineNumber + ")"}</li>
-                  ))}
-                               </ul>
-                           </td>
-                         </tr>
-                       ))}
-                     </tbody>
-                   </table>
-                 </div>
+         {request.errors.map(({ message, stackTrace, exData, __typename, ...error }) => (
+           <div key={message} className="py-4 sm:py-5 sm:px-6">
+             <p className="text-sm font-medium py-4">{message}</p>
+             <div>
+               <ul className="text-xs">
+                 {stackTrace.map(({methodName, fileName, lineNumber, className}) => (
+                   <li>{"at " + className + "." + methodName + "(" + fileName + ":" + lineNumber + ")"}</li>
+                 ))}
+               </ul>
              </div>
-             : <div/>}
+
+             {exData ?
+              <div className="py-4">
+                <div>
+                  <h4>
+                    Exception Data
+                  </h4>
+                </div>
+                <div className="text-xs font-medium text-gray-500">
+                  <JSONTree data={exData} theme={jsonTreeTheme} sortObjectKeys={true} hideRoot={true}  />
+                </div></div> :
+              <div/>}
+
+             {__typename == "SiteGraphqlExecutionError" ?
+              <div className="py-4">
+                <h4>
+                  GraphQL field errors
+                </h4>
+                <div className="py-2">
+                  <table className="table-auto text-xs w-full">
+                    <thead>
+                      <tr>
+                        <th className="text-left">Path</th>
+                        <th className="text-left">Message</th>
+                        <th className="text-left">Stack trace</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {error.fieldErrors?.map(({ path, message, extensions, stackTrace }) => (
+                        <tr>
+                          <td>{path}</td>
+                          <td>{message}</td>
+                          <td><ul className="text-xs">
+                    {stackTrace?.map(({methodName, fileName, lineNumber, className}) => (
+                      <li>{"at " + className + "." + methodName + "(" + fileName + ":" + lineNumber + ")"}</li>
+                    ))}
+                  </ul>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              : <div/>}
 
 
-          </div>))}
-      </div>
+           </div>))}
+       </div> : <div/>}
 
-      <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
-        <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">
-          GraphQL
-        </h3>
-        <dl className="sm:divide-y sm:divide-gray-200">
-          <div key="query" className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-            <dt className="text-sm font-medium text-gray-500">Query</dt>
-            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{request.graphqlStoredQueryResourcePath}</dd>
-          </div>
-          <div key="opname" className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-            <dt className="text-sm font-medium text-gray-500">Operation Name</dt>
-            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{request.graphqlOperationName}</dd>
-          </div>
-          <div key="opname" className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-            <dt className="text-sm font-medium text-gray-500">Variables</dt>
-            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-              <JSONTree data={request.graphqlVariables} theme={jsonTreeTheme} sortObjectKeys={true} hideRoot={true}  />
-            </dd>
-            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-              <pre>
-                {JSON.stringify(request.graphqlVariables,null,2)}
-              </pre>
-            </dd>
-          </div>
-        </dl>
-      </div>
+      {request.graphqlStoredQueryResourcePath ?
+       <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
+         <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">
+           GraphQL
+         </h3>
+         <dl className="sm:divide-y sm:divide-gray-200">
+           <div key="query" className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+             <dt className="text-sm font-medium text-gray-500">Query</dt>
+             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{request.graphqlStoredQueryResourcePath}</dd>
+           </div>
+           <div key="opname" className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+             <dt className="text-sm font-medium text-gray-500">Operation Name</dt>
+             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{request.graphqlOperationName}</dd>
+           </div>
+           <div key="opname" className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+             <dt className="text-sm font-medium text-gray-500">Variables</dt>
+             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+               <JSONTree data={request.graphqlVariables} theme={jsonTreeTheme} sortObjectKeys={true} hideRoot={true}  />
+             </dd>
+             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+               <pre>
+                 {JSON.stringify(request.graphqlVariables,null,2)}
+               </pre>
+             </dd>
+           </div>
+         </dl>
+       </div>
+       : <div/>}
 
       <div className="border-t border-gray-200 px-4 py-5 sm:px-0">
         <h3 className="sm:px-6 text-lg leading-6 font-bold text-gray-900">All Data</h3>
