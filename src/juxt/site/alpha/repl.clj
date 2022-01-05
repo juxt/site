@@ -64,6 +64,9 @@
              x))
    (xt/entity (db) id)))
 
+(defn hist [id]
+  (xt/entity-history (db) id :asc {:with-docs? true}))
+
 (defn put! [& ms]
   (->>
    (xt/submit-tx
