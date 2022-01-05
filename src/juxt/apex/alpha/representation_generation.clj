@@ -19,6 +19,7 @@
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]
    [juxt.jinx.alpha :as jinx]
+   [juxt.jinx.alpha.jsonpointer :refer [json-pointer]]
    [clojure.string :as str]))
 
 (alias 'jinx (create-ns 'juxt.jinx.alpha))
@@ -218,6 +219,7 @@
                  ;; TODO: Need to check if the result indicates that nothing was found
                  ;; Perhaps the test should be if all values in the :data map are nil
                  (when (seq (:errors result))
+                   (log/trace (first (:errors result)))
                    (throw
                     (ex-info
                      (format "Getting the state for the resource via GraphQL resulted in %d errors" (count (:errors result)))
@@ -227,7 +229,17 @@
                       ::errors (:errors result)
                       ::data (:data result)})))
 
-                 (:data result)))))
+                 ;; Ensure that the data contains something
+                 (try
+                   (when-let [check (get-in resource [::apex/operation "x-juxt-site-data-exists-if"])]
+                     ;; TODO: It would be better for jinx to provide a version
+                     ;; of json-pointer that didn't throw exceptions.
+                     (json-pointer (:data result) check))
+                   (:data result)
+                   (catch clojure.lang.ExceptionInfo e
+                     ;; Escape and result in a 404
+                     nil))
+                 ))))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
          ;; filter out the http metadata?
