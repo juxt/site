@@ -1006,7 +1006,7 @@
         ;; request (which is more recent), predominates but a catcher can always
         ;; override aspects, such as the ring.response/status.
 
-        (log/tracef e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
+        #_(log/tracef e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
 
         (let [ex-data (ex-data e)
               req (or (::site/request-context ex-data) req)
