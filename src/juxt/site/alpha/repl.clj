@@ -292,6 +292,13 @@
     cache/requests-cache
     (re-pattern (str "/_site/requests/" s)))))
 
+(defn recent
+  ([] (recent 5))
+  ([n]
+   (map (juxt ::site/request-id ::site/date ::site/uri :ring.request/method :ring.response/status)
+        (cache/recent cache/requests-cache n))
+   ))
+
 (defn requests-cache []
   cache/requests-cache)
 
