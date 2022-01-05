@@ -129,11 +129,15 @@ type SiteRequestSummary {
 
 scalar JSON
 
+# https://www.npmjs.com/package/graphql-iso-date
+# 2007-12-03T10:15:30Z
+scalar DateTime
+
 type SiteRequest {
   id: ID
   method: String @site(a: "ring.request/method")
   requestUri: ID @site(a: "juxt.site.alpha/uri")
-  date: String @site(a: "juxt.site.alpha/date")
+  date: DateTime @site(a: "juxt.site.alpha/date")
   requestHeaders: JSON @site(a: "ring.request/headers")
   "The GraphQL operation name called by the request"
 
