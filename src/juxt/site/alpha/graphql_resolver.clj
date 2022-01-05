@@ -71,6 +71,24 @@
      "operationName" (:juxt.apex.alpha.graphql/operation-name req)
      "detail" req}))
 
+(defn apis [{:keys [db]}]
+  (let [openapis
+        (for [[uri api] (xt/q
+                         db '{:find [openapi-uri openapi]
+                              :where [[openapi-uri :juxt.apex.alpha/openapi openapi]]})]
+          {:xt/id uri
+           :type "OPENAPI"
+           :contents api})
+        graphql-apis
+        (map first (xt/q db '{:find [uri]
+                              :where [[uri :juxt.grab.alpha/schema]]}))
+        graphqls
+        (for [uri graphql-apis]
+          {:xt/id uri
+           :type "GRAPHQL"
+           :contents (xt/entity db uri)})]
+    (concat openapis graphqls)))
+
 (defn request [args]
   (->site-request
    (get cache/requests-cache (get-in args [:argument-values "id"]))))

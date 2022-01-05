@@ -36,7 +36,24 @@ type Query {
   """
   Access the currently logged in user
   """
-  subject: SiteSubject @site(resolver: "juxt.site.alpha.graphql-resolver/subject")
+  subject: SiteSubject
+    @site(resolver: "juxt.site.alpha.graphql-resolver/subject")
+
+  """
+  See the available openapi and graphql APIs in the system
+  """
+  apis: [Api] @site(resolver: "juxt.site.alpha.graphql-resolver/apis")
+}
+
+enum ApiType {
+  GRAPHQL
+  OPENAPI
+}
+
+type Api {
+  id: ID!
+  type: ApiType!
+  contents: JSON!
 }
 
 type SiteSubject {
