@@ -139,6 +139,7 @@
                                      ::site/graphql-operation-name
                                      ::site/graphql-variables
                                      ::grab/errors])
+               {}
                )))))))
 
 (defn graphql-errors [args]

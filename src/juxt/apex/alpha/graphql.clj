@@ -64,6 +64,7 @@
                     ::site/graphql-operation-name operation-name
                     ::site/graphql-variables variables})}))
 
+
       (if-let [ok-response (get-in resource [::apex/operation "responses" "200"])]
         (assoc req
                :ring.response/status 200
