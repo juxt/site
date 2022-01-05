@@ -93,14 +93,14 @@
             (throw
              (ex-info
               "Bad content length"
-              (into req {:ring.response/status 400})
+              {::site/request-context (assoc req :ring.response/status 400)}
               e))))]
 
     (when (nil? content-length)
       (throw
        (ex-info
         "No Content-Length header found"
-        (into req {:ring.response/status 411}))))
+        {::site/request-context (assoc req :ring.response/status 411)})))
 
     ;; Protects resources from PUTs that are too large. If you need to
     ;; exceed this limitation, explicitly declare ::spin/max-content-length in
@@ -110,13 +110,13 @@
         (throw
          (ex-info
           "Payload too large"
-          (into req {:ring.response/status 413})))))
+          {::site/request-context (assoc req :ring.response/status 413)}))))
 
     (when-not (:ring.request/body req)
       (throw
        (ex-info
         "No body in request"
-        (into req {:ring.response/status 400}))))
+        {::site/request-context (assoc req :ring.response/status 400)})))
 
     (let [decoded-representation
           (decode-maybe
@@ -154,10 +154,9 @@
               (throw
                (ex-info
                 "The content-type of the request payload is not supported by the resource"
-                (into req
-                      {:ring.response/status 415
-                       ::acceptable acceptable
-                       ::content-type (get request-rep "content-type")})))
+                {::acceptable acceptable
+                 ::content-type (get request-rep "content-type")
+                 ::site/request-context (assoc req :ring.response/status 415)}))
 
               (and
                (= "text" (get-in request-rep [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/type]))
@@ -166,17 +165,17 @@
               (throw
                (ex-info
                 "The Content-Type header in the request is a text type and is required to specify its charset as a media-type parameter"
-                (into req {:ring.response/status 415
-                           ::acceptable acceptable
-                           ::content-type (get request-rep "content-type")})))
+                {::acceptable acceptable
+                 ::content-type (get request-rep "content-type")
+                 ::site/request-context (assoc req :ring.response/status 415)}))
 
               (= (:juxt.pick.alpha/charset-qvalue request-rep) 0.0)
               (throw
                (ex-info
                 "The charset of the Content-Type header in the request is not supported by the resource"
-                (into req {:ring.response/status 415
-                           ::acceptable acceptable
-                           ::content-type (get request-rep "content-type")})))))
+                {::acceptable acceptable
+                 ::content-type (get request-rep "content-type")
+                 ::site/request-context (assoc req :ring.response/status 415)}))))
 
           (when (get prefs "accept-encoding")
             (cond
@@ -184,9 +183,9 @@
               (throw
                (ex-info
                 "The content-encoding in the request is not supported by the resource"
-                (into req {:ring.response/status 409
-                           ::acceptable acceptable
-                           ::content-encoding (get-in req [:ring.request/headers "content-encoding"] "identity")})))))
+                {::acceptable acceptable
+                 ::content-encoding (get-in req [:ring.request/headers "content-encoding"] "identity")
+                 ::site/request-context (assoc req :ring.response/status 409)}))))
 
           (when (get prefs "accept-language")
             (cond
@@ -194,24 +193,23 @@
               (throw
                (ex-info
                 "Request must contain Content-Language header"
-                (into req {:ring.response/status 409
-                           ::acceptable acceptable
-                           ::content-language (get-in req [:ring.request/headers "content-language"])})))
+                {::acceptable acceptable
+                 ::content-language (get-in req [:ring.request/headers "content-language"])
+                 ::site/request-context (assoc req :ring.response/status 409)}))
 
               (= (:juxt.pick.alpha/content-language-qvalue request-rep) 0.0)
               (throw
                (ex-info
                 "The content-language in the request is not supported by the resource"
-                (into req {:ring.response/status 415
-                           ::acceptable acceptable
-                           ::content-language (get-in req [:ring.request/headers "content-language"])})))))))
+                {::acceptable acceptable
+                 ::content-language (get-in req [:ring.request/headers "content-language"])
+                 ::site/request-context (assoc req :ring.response/status 415)}))))))
 
       (when (get-in req [:ring.request/headers "content-range"])
         (throw
          (ex-info
           "Content-Range header not allowed on a PUT request"
-          (into req
-                {:ring.response/status 400}))))
+          {::site/request-context (assoc req :ring.response/status 400)})))
 
       (with-open [in (:ring.request/body req)]
         (let [body (.readNBytes in content-length)
@@ -330,25 +328,30 @@
           (try
             (or
              (requiring-resolve post-fn)
-             (throw (ex-info (format "Requiring resolve of %s returned nil" post-fn) {:post-fn post-fn})))
+             (throw
+              (ex-info
+               (format "Requiring resolve of %s returned nil" post-fn)
+               {:post-fn post-fn
+                ::site/request-context (assoc req :ring.response/status 500)})))
             (catch Exception e
               (throw
                (ex-info
                 (format "post-fn '%s' is not resolvable" post-fn)
-                {::post-fn post-fn}
+                {::post-fn post-fn
+                 ::site/request-context (assoc req :ring.response/status 500)}
                 e))))
 
           (nil? post-fn)
           (throw
            (ex-info
             "Resource allows POST but doesn't have a post-fn function"
-            (into req {:ring.response/status 500})))
+            {::site/request-context (assoc req :ring.response/status 500)}))
 
           :else
           (throw
            (ex-info
             (format "post-fn is neither a function or a symbol, but type '%s'" (type post-fn))
-            (into req {:ring.response/status 500}))))]
+            {::site/request-context (assoc req :ring.response/status 500)})))]
 
     (assert post)
     (post req)))
@@ -370,24 +373,30 @@
                (requiring-resolve put-fn)
                (throw (ex-info (format "Requiring resolve of %s returned nil" put-fn) {:put-fn put-fn})))
               (catch Exception e
-                (throw (ex-info
-                        (format "put-fn '%s' is not resolvable" put-fn)
-                        (into req {::put-fn put-fn
-                                   :ring.response/status 500})))))
+                (throw
+                 (ex-info
+                  (format "put-fn '%s' is not resolvable" put-fn)
+                  {::put-fn put-fn
+                   ::site/request-context (assoc req :ring.response/status 500)}
+                  e))))
             (nil? put-fn)
             (throw
              (ex-info
               "Resource allows PUT but doesn't contain a put-fn function"
-              (into req {:ring.response/status 500})))
+              {::site/request-context (assoc req :ring.response/status 500)}))
 
             :else
             (throw
              (ex-info
               (format "put-fn is neither a function or a symbol, but type '%s'" (type put-fn))
-              (into req {:ring.response/status 500}))))]
+              {::site/request-context (assoc req :ring.response/status 500)})))]
       (if-let [response (put req)]
         response
-        (throw (ex-info "put-fn returned a nil response" {:put-fn put-fn}))))))
+        (throw
+         (ex-info
+          "put-fn returned a nil response"
+          {:put-fn put-fn
+           ::site/request-context (assoc req :ring.response/status 500)}))))))
 
 (defn PATCH [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
@@ -399,9 +408,9 @@
       (fn? patch-fn) (patch-fn req)
       :else
       (throw
-       (ex-info "Resource allows PATCH but doesn't contain have a patch-fn function"
-                (into req
-                      {:ring.response/status 500}))))))
+       (ex-info
+        "Resource allows PATCH but doesn't contain have a patch-fn function"
+        {::site/request-context (assoc req :ring.response/status 500)})))))
 
 (defn DELETE [{::site/keys [xt-node uri] :as req}]
   (let [tx (x/submit-tx xt-node [[:xtdb.api/delete uri]])]
@@ -482,7 +491,7 @@
       (throw
        (ex-info
         "Method not implemented"
-        (into req {:ring.response/status 501}))))
+        {::site/request-context (assoc req :ring.response/status 501)})))
     (h req)))
 
 (defn wrap-locate-resource [h]
@@ -498,10 +507,12 @@
         (throw
          (ex-info
           "Redirect"
-          (-> req
-              (assoc :ring.response/status status)
-              (update :ring.response/headers
-                      assoc "location" (::site/location resource)))))))
+          {:location (::site/location resource)
+           ::site/request-context
+           (-> req
+               (assoc :ring.response/status status)
+               (update :ring.response/headers
+                       assoc "location" (::site/location resource)))}))))
     (h req)))
 
 (defn wrap-find-current-representations
@@ -513,8 +524,7 @@
           (throw
            (ex-info
             "Not Found"
-            (into req
-                  {:ring.response/status 404}))))
+            {::site/request-context (assoc req :ring.response/status 404)})))
         (h (assoc req ::site/current-representations cur-reps)))
       (h req))))
 
@@ -570,7 +580,7 @@
           (throw
            (ex-info
             (case status 401  "Unauthorized" 403 "Forbidden")
-            (into req {:ring.response/status status})))))
+            {::site/request-context (assoc req :ring.response/status status)}))))
       (h req))))
 
 (defn wrap-method-not-allowed? [h]
@@ -581,9 +591,11 @@
           (throw
            (ex-info
             "Method not allowed"
-            (into req
-                  {:ring.response/status 405
-                   :ring.response/headers {"allow" (join-keywords allowed-methods true)}}))))
+            {:method method
+             ::site/allowed-methods allowed-methods
+             ::site/request-context
+             {:ring.response/status 405
+              :ring.response/headers {"allow" (join-keywords allowed-methods true)}}})))
         (h (assoc req ::site/allowed-methods allowed-methods)))
       (h req))))
 
@@ -822,10 +834,8 @@
      (cond->
          {:message (.getMessage e)
           :stack-trace (.getStackTrace e)}
-       (and
-        (instance? clojure.lang.ExceptionInfo e)
-        (nil? (::site/start-date (ex-data e))))
-       (assoc :ex-data (ex-data e)))
+       (instance? clojure.lang.ExceptionInfo e)
+       (assoc :ex-data (dissoc (ex-data e) ::site/request-context)))
      (when cause (errors-with-causes cause)))))
 
 (defn put-error-representation
@@ -875,18 +885,21 @@
   use the environment (dev vs. prod), subject (developer vs. customer) or other
   variables to determine the resource to use."
   [{::site/keys [db]} status]
-  (ffirst
-   (x/q db '{:find [(pull er [*])]
-             :where [[er ::site/type "ErrorResource"]
-                     [er :ring.response/status status]]
-             :in [status]} status)))
+  (let [res (ffirst
+            (x/q db '{:find [(pull er [*])]
+                      :where [[er ::site/type "ErrorResource"]
+                              [er :ring.response/status status]]
+                      :in [status]} status))]
+    (log/tracef "Finding error with status %d, %s" status res)
+    res
+    ))
 
 (defn error-resource-representation
   "Experimental. Not sure this is a good idea to have a 'global' error
   resource. Better to merge error handling into each resource (using the
   resource locator)."
   [req e]
-  (let [{:ring.response/keys [status]} (ex-data e)]
+  (let [{:ring.response/keys [status]} req]
 
     (when-let [er (error-resource req (or status 500))]
       (let [
@@ -942,10 +955,10 @@
   "Respond with the given error"
   [req e]
 
+  (assert (::site/start-date req))
+
   (let [{:ring.request/keys [method] ::site/keys [request-id]} req
         {:ring.response/keys [status] :as ex-data} (ex-data e)
-
-        site-exception? (some? (::site/start-date ex-data))
 
         representation
         (or
@@ -961,10 +974,10 @@
     (log/tracef "error-representation: %s" (pr-str representation))
 
     (let [error-resource (merge
-                          (when-not site-exception? req)
                           {:ring.response/status 500
                            ::site/errors (errors-with-causes e)}
-                          ex-data
+                          (dissoc req ::site/request-context)
+                          ;; For the error itself
                           {::site/selected-representation representation})
           response (try
                      (response/add-payload error-resource)
@@ -973,36 +986,38 @@
 
       (respond response))))
 
+
 (defn wrap-error-handling
   "Return a handler that constructs proper Ring responses, logs and error
   handling where appropriate."
   [h]
   (fn [{::site/keys [request-id] :as req}]
-
     (org.slf4j.MDC/put "reqid" request-id)
-
     (try
       (h req)
       (catch clojure.lang.ExceptionInfo e
+        ;; When throwing ex-info, try to add the ::site/request-context key,
+        ;; using the request of the cause as the base. In this way, the cause
+        ;; request (which is more recent), predominates but a catcher can always
+        ;; override aspects, such as the ring.response/status.
 
-        (log/info (str "ERROR: " (.getMessage e)))
+        (log/tracef e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
 
-        (let [{:ring.response/keys [status] :as ex-data} (ex-data e)]
+        (let [ex-data (ex-data e)
+              req (or (::site/request-context ex-data) req)
+              status (:ring.response/status req)]
 
-          (when status (log/tracef "status %s" status))
+          (assert (::site/start-date req) "Invalid request context")
 
           ;; Don't log exceptions which are used to escape (e.g. 302, 401).
           (when (or (not (integer? status)) (>= status 500))
             (let [ex-data (->storable ex-data)]
               (log/errorf e "%s: %s" (.getMessage e) (pr-str ex-data))))
 
-          (error-response (if (some? (::site/start-date ex-data)) ex-data req) e)))
+          (error-response req e)))
 
-      (catch Throwable t
-        (respond-internal-error req t))
-
-      (finally
-        (org.slf4j.MDC/clear)))))
+      (catch Throwable t (respond-internal-error req t))
+      (finally (org.slf4j.MDC/clear)))))
 
 (defn wrap-check-error-handling
   "Ensure that on exceptions slip through the net."
@@ -1180,9 +1195,10 @@
       (throw
        (ex-info
         "Service unavailable"
-        (-> req
-            (into {:ring.response/status 503})
-            (assoc-in [:ring.response/headers "retry-after"] "120")))))
+        {::site/request-context
+         (-> req
+             (into {:ring.response/status 503})
+             (assoc-in [:ring.response/headers "retry-after"] "120"))})))
     (h req)))
 
 (defn make-pipeline

@@ -34,7 +34,7 @@
       (throw
        (ex-info
         "If-Match precondition failed"
-        (into req {:ring.response/status 412})))
+        {::site/request-context (assoc req :ring.response/status 412)}))
 
       (sequential? header-field)
       (do
@@ -49,13 +49,12 @@
                         etag)]
           (log/tracef "matches: %d: %s" (count matches) matches)
           (when-not (seq matches)
-
-              ;; TODO: "unless it can be determined that the state-changing
-              ;; request has already succeeded (see Section 3.1)"
-              (throw
-               (ex-info
-                "No strong matches between if-match and current representations"
-                (into req {:ring.response/status 412})))))))))
+            ;; TODO: "unless it can be determined that the state-changing
+            ;; request has already succeeded (see Section 3.1)"
+            (throw
+             (ex-info
+              "No strong matches between if-match and current representations"
+              {::site/request-context (assoc req :ring.response/status 412)}))))))))
 
 ;; TODO: See Section 4.1, RFC 7232:
 ;;
@@ -82,14 +81,14 @@
              (if (#{:get :head} (:ring.request/method req))
                (ex-info
                 "Not modified"
-                (into req {:ring.response/status 304
-                           ::matching-entity-tag etag}))
+                {::matching-entity-tag etag
+                 ::site/request-context (assoc req :ring.response/status 304)})
                ;; "… or 412 (Precondition Failed) status code for all other
                ;; request methods."
                (ex-info
                 "If-None-Match precondition failed"
-                (into req {:ring.response/status 412
-                           ::matching-entity-tag etag})))))))
+                {::matching-entity-tag etag
+                 ::site/request-context (assoc req :ring.response/status 412)}))))))
 
       ;; "If-None-Match can also be used with a value of '*' …"
       (and (map? header-field) (::rfc7232/wildcard header-field))
@@ -99,15 +98,18 @@
         (throw
          (ex-info
           "At least one representation already exists for this resource"
-          (into req
-                (if (#{:get :head} (:ring.request/method req))
-                  ;; "the origin server MUST respond with either a) the 304 (Not
-                  ;; Modified) status code if the request method is GET or HEAD
-                  ;; …"
-                  {:ring.response/status 304}
-                  ;; "… or 412 (Precondition Failed) status code for all other
-                  ;; request methods."
-                  {:ring.response/status 412}))))))))
+          {::site/request-context
+           (assoc
+            req
+            :ring.response/status
+            (if (#{:get :head} (:ring.request/method req))
+              ;; "the origin server MUST respond with either a) the 304 (Not
+              ;; Modified) status code if the request method is GET or HEAD
+              ;; …"
+              304
+              ;; "… or 412 (Precondition Failed) status code for all other
+              ;; request methods."
+              412))}))))))
 
 (defn evaluate-if-unmodified-since! [{::site/keys [selected-representation] :as req}]
   (let [if-unmodified-since-date
@@ -121,7 +123,7 @@
       (throw
        (ex-info
         "Precondition failed"
-        (into req {:ring.resposne/status 304}))))))
+        {::site/request-context (assoc req :ring.resposne/status 304)})))))
 
 (defn evaluate-if-modified-since! [{::site/keys [selected-representation] :as req}]
   (let [if-modified-since-date
@@ -136,7 +138,7 @@
       (throw
        (ex-info
         "Not modified"
-        (into req {:ring.response/status 304}))))))
+        {::site/request-context (assoc req :ring.response/status 304)})))))
 
 (defn evaluate-preconditions!
   "Implementation of Section 6 of RFC 7232. Arguments are the (Ring) request, a

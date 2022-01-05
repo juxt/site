@@ -34,8 +34,8 @@
         (throw
          (ex-info
           "Multiple resource locators returned from query that match URI"
-          (into req
-                {::locators (map :xt/id locators)}))))
+          {::locators (map :xt/id locators)
+           ::site/request-context (assoc req :ring.response/status 500)})))
 
       (let [[e grps] (first locators)
             {typ ::site/type :as locator} (x/entity db e)]
@@ -46,14 +46,16 @@
               (throw
                (ex-info
                 "Resource locator must have a :juxt.site.alpha/locator attribute"
-                (into req {::locator locator}))))
+                {::locator locator
+                 ::site/request-context (assoc req :ring.response/status 500)})))
 
             (when-not (symbol? locator-fn)
               (throw
                (ex-info
                 "Resource locator must be a symbol"
-                (into req {::locator locator
-                           ::locator-fn locator-fn}))))
+                {::locator locator
+                 ::locator-fn locator-fn
+                 ::site/request-context (assoc req :ring.response/status 500)})))
 
 
             (log/debug "Requiring resolve of" locator-fn)

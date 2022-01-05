@@ -237,7 +237,8 @@
          (throw
           (ex-info
            (str "No resource state from OpenAPI path: " (::apex/openapi-path req))
-           (into req {:ring.response/status 404}))))]
+           {::apex/openapi-path (::apex/openapi-path req)
+            ::site/request-context (assoc req :ring.response/status 404)})))]
 
     ;; Now we've found the resource state, we need to generate a representation
     ;; of it.

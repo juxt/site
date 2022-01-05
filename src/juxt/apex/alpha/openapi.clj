@@ -76,7 +76,7 @@
   (throw
    (ex-info
     "Unsupported media type"
-    (into req {:ring.response/status 415}))))
+    {::site/request-context (assoc req :ring.response/status 415)})))
 
 (defmethod received-body->resource-state "application/edn"
   [{::site/keys [received-representation resource db] :as req}]
@@ -97,7 +97,7 @@
                      (throw
                       (ex-info
                        "Bad JSON in input"
-                       (into req {:ring.response/status 400})))))
+                       {::site/request-context (assoc req :ring.response/status 400)}))))
         _ (assert instance)
         openapi-ref (get resource ::apex/openapi) _ (assert openapi-ref)
         openapi-resource (x/entity db openapi-ref) _ (assert openapi-resource)
@@ -111,9 +111,8 @@
             (throw
              (ex-info
               "Schema validation failed"
-              (-> req
-                  (into {:ring.response/status 400
-                         ::jinx/validation-results validation})))))
+              {::jinx/validation-results validation
+               ::site/request-context (assoc req :ring.response/status 400)})))
 
         validation (-> validation
                        process-transformations process-keyword-mappings)
@@ -171,8 +170,7 @@
               (throw
                (ex-info
                 message
-                (into req {:ring.response/status status})))))
-
+                {::site/request-context (assoc req :ring.response/status status)}))))
 
         already-exists? (x/entity db id)
 
@@ -353,8 +351,7 @@
                          (throw
                           (ex-info
                            (str "Failed to find post-fn: " post-fn-sym)
-                           (into req
-                                 {:ring.response/status 500})))))]
+                           {::site/request-context (assoc req :ring.response/status 500)}))))]
                (f req))))
 
           (= method :put)
@@ -436,9 +433,10 @@
              (throw
               (ex-info
                "One or more of the path-parameters in the request did not validate against the required schema"
-               (into req {::site/resource resource
-                          :ring.response/status 400
-                          :ring.response/body "Bad Request\r\n"})))))
+               {::site/resource resource
+                ::site/request-context
+                (into req {:ring.response/status 400
+                           :ring.response/body "Bad Request\r\n"})}))))
 
          ;; Select one of the matches, and throw an error if this proves
          ;; impossible.
@@ -454,4 +452,5 @@
              (throw
               (ex-info
                "Throwing Multiple API paths match"
-               (into req {::multiple-matched-resources resources}))))))))))
+               {::multiple-matched-resources resources
+                ::site/request-context (assoc req :ring.response/status 500)})))))))))

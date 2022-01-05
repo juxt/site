@@ -144,5 +144,5 @@
 (defn graphql-errors [args]
   (for [error (some-> args :object-value ::grab/errors)]
     (-> error
-        (assoc :stack-trace (get-in error [:extensions :stack-trace]))
-        (update :extensions dissoc :stack-trace))))
+        #_(assoc :stack-trace (get-in error [:extensions :stack-trace]))
+        #_(update :extensions dissoc :stack-trace))))

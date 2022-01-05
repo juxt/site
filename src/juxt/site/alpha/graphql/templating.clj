@@ -61,7 +61,11 @@
               (try
                 (parser/parse graphql-query)
                 (catch Exception e
-                  (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]} e))))]
+                  (throw
+                   (ex-info
+                    "Failed to parse document"
+                    {::site/request-context req}
+                    e))))]
           (try
             (document/compile-document document schema)
             (catch Exception e
@@ -70,18 +74,19 @@
                 (throw
                  (ex-info
                   "Error parsing or compiling GraphQL query for template model"
-                  (into
-                   req
-                   (cond-> {:ring.response/status 500}
-                     (seq errors) (assoc ::errors errors)))
-                  e))))))]
+                  (cond-> {::site/request-context (assoc req :ring.response/status 500)}
+                    (seq errors) (assoc ::grab/errors errors))))))))]
 
     (assert graphql-query)
     #_(log/debugf "Executing GraphQL query (op-name %s) for template: %s" operation-name graphql-query)
     ;; TODO: How to communicate back if there are any errors? Throw an exception?
     (let [results (graphql/query schema document operation-name variables req)]
-      (when (seq (:errors results))
-        (throw (ex-info "GraphQL errors in template model" results))
+      (when-let [errors (seq (:errors results))]
+        (throw
+         (ex-info
+          "GraphQL errors in template model"
+          {::grab/errors errors
+           ::site/request-context req}))
         )
       #_(log/debugf "Results are %s" (pr-str results))
 
@@ -178,8 +183,6 @@
           (throw
            (ex-info
             "Error parsing or compiling GraphQL query for template model"
-            (into
-             req
-             (cond-> {:ring.response/status 500}
-               (seq errors) (assoc ::errors errors)))
+            (cond-> {::site/request-context (assoc req :ring.response/status 500)}
+              (seq errors) (assoc ::errors errors))
             e)))))))

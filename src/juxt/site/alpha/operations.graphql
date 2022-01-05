@@ -5,7 +5,11 @@ query GetRequest($siteUri: ID) {
     date
     requestUri
     method
-    operationName
+
+    graphqlStoredQueryResourcePath
+    graphqlOperationName
+    graphqlVariables
+
     errors {
       __typename
       message
@@ -24,7 +28,6 @@ query GetRequest($siteUri: ID) {
           message
           locations { line column }
           path
-          stackTrace
           extensions
         }
       }

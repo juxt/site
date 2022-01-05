@@ -60,6 +60,8 @@
       (catch Exception e
         (throw
          (ex-info
-          (str "Failed to render template: " template)
+          (format "Failed to render template: %s" template)
           {:template template
-           :exception-type (type e)} e))))))
+           :exception-type (type e)
+           ::site/request-context req}
+          e))))))

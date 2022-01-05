@@ -33,15 +33,21 @@
                           (assoc req ::site/selected-representation res))
                 template-body (:ring.response/body response)
                 _ (when-not template-body
-                    (throw (ex-info "Template body is nil"
-                                    {:template (str url)
-                                     :template-resource res})))]
+                    (throw
+                     (ex-info
+                      "Template body is nil"
+                      {:template (str url)
+                       :template-resource res})))]
 
             (cond
               (string? template-body) (java.io.ByteArrayInputStream. (.getBytes template-body))
               (bytes? template-body) (java.io.ByteArrayInputStream. template-body)
               (instance? java.io.InputStream template-body) template-body
-              :else (throw (ex-info "Unexpected type of template body" {:template-body-type (type template-body)})))))))))
+              :else
+              (throw
+               (ex-info
+                "Unexpected type of template body"
+                {:template-body-type (type template-body)})))))))))
 
 (defn expand-queries [template-model db]
   (postwalk
@@ -74,12 +80,14 @@
                (throw
                 (ex-info
                  (format "Requiring resolve of %s returned nil" template-model)
-                 {:template-model template-model})))
+                 {:template-model template-model
+                  ::site/request-context (assoc req :ring.response/status 500)})))
               (catch Exception e
                 (throw
                  (ex-info
                   (format "template-model fn '%s' not resolveable" template-model)
-                  {:template-model template-model}
+                  {:template-model template-model
+                   ::site/request-context (assoc req :ring.response/status 500)}
                   e))))
 
             ;; It can also be an id of an entity in the database which contains
@@ -97,17 +105,23 @@
                 (throw
                  (ex-info
                   "Unsupported template-model entity"
-                  {:template-model-entity template-model-entity})))
+                  {:template-model-entity template-model-entity
+                   ::site/request-context (assoc req :ring.response/status 500)})))
               (throw
                (ex-info
                 "Template model entity not found in database"
-                {:template-model template-model})))
+                {:template-model template-model
+                 ::site/request-context (assoc req :ring.response/status 500)})))
 
             (map? template-model)
             (fn [_] template-model)
 
             :else
-            (throw (ex-info "Unsupported form of template-model" {:type (type template-model)})))]
+            (throw
+             (ex-info
+              "Unsupported form of template-model"
+              {:type (type template-model)
+               ::site/request-context (assoc req :ring.response/status 500)})))]
     (f req)))
 
 (defn render-template
@@ -139,8 +153,16 @@
       "selmer" (selmer/render-template
                 (assoc req ::site/template-loader (xt-template-loader req db))
                 template combined-template-model)
-      nil (throw (ex-info "No template dialect found" {}))
-      (throw (ex-info "Unsupported template dialect" {::site/template-dialect (::site/template-dialect template)})))))
+      nil
+      (throw
+       (ex-info
+        "No template dialect found"
+        {::site/request-context (assoc req :ring.response/status 500)}))
+      (throw
+       (ex-info
+        "Unsupported template dialect"
+        {::site/template-dialect (::site/template-dialect template)
+         ::site/request-context (assoc req :ring.response/status 500)})))))
 
 (defn add-payload [{::site/keys [selected-representation db] :as req}]
   (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
@@ -154,7 +176,8 @@
         (throw
          (ex-info
           (format "body-fn cannot be resolved: %s" body-fn)
-          {:body-fn body-fn})))
+          {:body-fn body-fn
+           ::site/request-context (assoc req :ring.response/status 500)})))
 
       template (render-template req template)
 

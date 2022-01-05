@@ -3,6 +3,8 @@
 (ns juxt.site.alpha.code
   (:require [clojure.tools.logging :as log]))
 
+(alias 'site (create-ns 'juxt.site.alpha))
+
 (defn put-handler [req]
   (let [clojure-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))]
     (try
@@ -11,7 +13,8 @@
         (throw
          (ex-info
           "Compilation error"
-          (assoc req :ring.response/status 400) e))))
+          {::site/request-context (assoc req :ring.response/status 400)}
+          e))))
 
     (assoc req
            :ring.response/status 200

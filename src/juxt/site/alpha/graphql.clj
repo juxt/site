@@ -435,13 +435,13 @@
                        (drop offset)
                        (take limit)
                        (map process-history-item))))
-              (throw (ex-message "History queries must have an id argument")))
+              (throw (ex-info "History queries must have an id argument" {})))
 
             (get site-args "filter")
             (cond
               (= "ids" (ffirst argument-values))
               (map lookup-entity (get argument-values "ids"))
-              :else (throw (ex-message "That filter is not implemented yet")))
+              :else (throw (ex-info "That filter is not implemented yet" {})))
 
             ;; Direct lookup - useful for query roots
             (get site-args "e")
@@ -609,8 +609,8 @@
                               (let [msg (str "Schema does not exist at " uri ". Are you deploying it correctly?")]
                                 (throw (ex-info
                                         msg
-                                        (into req {:ring.response/status 400
-                                                   ::errors [msg]})))))
+                                        {::errors [msg] ;; TODO
+                                         ::site/request-context (assoc req :ring.response/status 400)}))))
         body (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
         {query "query"
@@ -620,18 +620,26 @@
           "application/json" (some-> body json/read-value)
           "application/graphql" {"query" body}
 
-          (throw (ex-info (format "Unknown content type for GraphQL request: %s" (some-> req ::site/received-representation ::http/content-type)) req)))
+          (throw
+           (ex-info
+            (format "Unknown content type for GraphQL request: %s" (some-> req ::site/received-representation ::http/content-type))
+            {::site/request-context req})))
 
         _ (when (nil? query)
-            (throw (ex-info "Nil GraphQL query" (-> req
-                                                    (update-in [::site/resource] dissoc ::grab/schema)
-                                                    (dissoc :juxt.pass.alpha/request-context)))))
+            (throw
+             (ex-info
+              "Nil GraphQL query"
+              {::site/request-context req})))
         document
         (try
           (parser/parse query)
           (catch Exception e
             (log/error e "Error parsing GraphQL query")
-            (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]}))))
+            (throw
+             (ex-info
+              "Failed to parse document"
+              {::site/request-context req}
+              e))))
 
         compiled-document
         (try
@@ -643,11 +651,8 @@
               (throw
                (ex-info
                 "Error parsing or compiling GraphQL query"
-                (into
-                 req
-                 (cond-> {:ring.response/status 400}
-                   (seq errors) (assoc ::errors errors)))
-                e)))))
+                (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                  (seq errors) (assoc ::grab/errors errors)))))))
 
         variables (into
                    (common-variables req)
@@ -682,14 +687,16 @@
             (throw
              (ex-info
               "No schema in request"
-              (into
-               req
-               {:ring.response/status 400}))))
+              {::site/request-context {:ring.response/status 400}})))
 
         resource (xt/entity db uri)]
 
     (when (nil? resource)
-      (throw (ex-info "GraphQL resource not configured" {:uri uri})))
+      (throw
+       (ex-info
+        "GraphQL resource not configured"
+        {:uri uri
+         ::site/request-context (assoc req :ring.response/status 400)})))
 
     (try
       (put-schema xt-node resource schema-str)
@@ -697,23 +704,15 @@
       (catch Exception e
         (let [errors (:errors (ex-data e))]
           (if (seq errors)
-            (do
-              (log/trace e "error")
-              (log/tracef "schema errors: %s" (pr-str (:errors (ex-data e))))
-              (throw
-               (ex-info
-                "Errors in schema"
-                (into
-                 req
-                 (cond-> {:ring.response/status 400}
-                   (seq errors) (assoc ::errors errors)))
-                e)))
+            (throw
+             (ex-info
+              "Errors in schema"
+              (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                (seq errors) (assoc ::grab/errors errors))))
             (throw
              (ex-info
               "Failed to put schema"
-              (into
-               req
-               {:ring.response/status 500})
+              {::site/request-context (assoc req :ring.response/status 500)}
               e))))))))
 
 (defn plain-text-error-message [error]
@@ -767,18 +766,24 @@
             (throw
              (ex-info
               "No document in request"
-              (into
-               req
-               {:ring.response/status 400}))))
+              {::site/request-context (assoc req :ring.response/status 400)})))
 
         resource (xt/entity db uri)]
 
     (when (nil? resource)
-      (throw (ex-info "GraphQL stored-document resource not configured" {:uri uri})))
+      (throw
+       (ex-info
+        "GraphQL stored-document resource not configured"
+        {:uri uri
+         ::site/request-context (assoc req :ring.response/status 400)})))
 
     ;; Validate resource
     (when-not (::site/graphql-schema resource)
-      (throw (ex-info "Resource should have a :juxt.site.alpha/graphql-schema key" {::site/resource resource})))
+      (throw
+       (ex-info
+        "Resource should have a :juxt.site.alpha/graphql-schema key"
+        {::site/resource resource
+         ::site/request-context (assoc req :ring.response/status 500)})))
 
     (let [schema-id (::site/graphql-schema resource)
           schema (some-> db (xt/entity schema-id) :juxt.grab.alpha/schema)]
@@ -787,7 +792,8 @@
         (throw
          (ex-info
           "Cannot store a GraphQL document when the schema hasn't been added"
-          {::site/graph-schema schema-id})))
+          {::site/graph-schema schema-id
+           ::site/request-context (assoc req :ring.response/status 500)})))
 
       (try
         (let [document (document/compile-document
@@ -807,24 +813,26 @@
               (do
                 (log/tracef "GraphQL document errors: %s" (pr-str (:errors (ex-data e))))
                 (throw
+                 ;; Throw but ignore the cause (since we pull out the key
+                 ;; information from it)
                  (ex-info
                   "Errors in GraphQL document"
-                  (into
-                   req
-                   (cond-> {:ring.response/status 400}
-                     (seq errors) (assoc ::errors errors)))
-                  e)))
+                  (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                    (seq errors) (assoc ::grab/errors errors)))))
               (throw
                (ex-info
                 "Failed to store GraphQL document due to error"
-                (into
-                 req
-                 {:ring.response/status 500})
+                {::site/request-context (assoc req :ring.response/status 500)}
                 e)))))))))
 
 (defn graphql-query [{::site/keys [db] :as req} stored-query-id operation-name variables]
   (let [resource (xt/entity db stored-query-id)
-        _ (when-not resource (throw (ex-info "GraphQL stored query not found" {:stored-query-id stored-query-id})))
+        _ (when-not resource
+            (throw
+             (ex-info
+              "GraphQL stored query not found"
+              {:stored-query-id stored-query-id
+               ::site/request-context (assoc req :ring.response/status 500)})))
         schema-id (::site/graphql-schema resource)
         schema (some-> (when schema-id (xt/entity db schema-id)) ::grab/schema)
         ;; TODO: This should be pre-parsed against schema
