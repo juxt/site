@@ -704,7 +704,7 @@
       (into (select-keys db [:xtdb.api/valid-time :xtdb.api/tx-id]))
       (assoc :xt/id request-id ::site/type "Request")
       redact
-      (dissoc ::site/xt-node ::site/db :ring.request/body)
+      (dissoc ::site/xt-node ::site/db :ring.request/body :ring.response/body)
       (util/deep-replace
        (fn [form]
          (cond-> form
