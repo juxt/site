@@ -24,6 +24,8 @@ module.exports = {
   rules: {
     'react/jsx-props-no-spreading': 'off',
     'import/order': 'off',
+    'react/require-default-props': 'off',
+    'react/jsx-no-useless-fragment': 'off',
     'react/jsx-filename-extension': [
       1,
       {

@@ -1,0 +1,6 @@
+query allApis {
+  apis {
+    type
+    id
+  }
+}

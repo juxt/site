@@ -349,15 +349,17 @@ export function PageLayout({children}: {children: React.ReactNode}) {
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '100vh',
+        height: '100vh',
         backgroundColor: 'background',
       }}>
       <PrimaryNavBar />
       <SidenavDesktop drawerWidth={drawerWidth} DrawerItems={<NavDrawer />} />
       <Container
+        disableGutters
         sx={{
-          maxWidth: {xs: 'md', md: 'xl'},
-          pl: {sm: `${drawerWidth + 28}px`},
+          maxWidth: {xs: 'md', md: 'xl', lg: '100%'},
+          pl: {sm: `${drawerWidth}px`},
+          height: '100%',
         }}>
         {children}
       </Container>

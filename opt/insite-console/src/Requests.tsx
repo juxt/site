@@ -6,7 +6,14 @@ import {
 import RequestsTable from './components/table/Table';
 import {useMemo, useState} from 'react';
 import {LocationGenerics} from './types';
-import {Autocomplete, Fade, Modal, Paper, TextField} from '@mui/material';
+import {
+  Autocomplete,
+  Container,
+  Fade,
+  Modal,
+  Paper,
+  TextField,
+} from '@mui/material';
 import ReactJson from 'searchable-react-json-view';
 
 function useRequest(requestId: string) {
@@ -101,7 +108,7 @@ export function RequestList() {
   const rows = useMemo(() => data?.requests?.summaries || [], [data]);
 
   return (
-    <div>
+    <Container>
       <h2>Requests</h2>
       <div>
         {status === 'loading' && 'Loading...'}
@@ -109,6 +116,6 @@ export function RequestList() {
         {rows.length && <RequestInfo />}
         <RequestsTable data={rows} />
       </div>
-    </div>
+    </Container>
   );
 }

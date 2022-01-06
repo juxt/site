@@ -6,5 +6,7 @@ export type LocationGenerics = MakeGenerics<{
   };
   Search: {
     requestId: string;
+    graphqlUrl: string;
+    query: string;
   };
 }>;

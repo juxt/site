@@ -12,9 +12,7 @@ export function SidenavDesktop({drawerWidth, DrawerItems}: SidenavProps) {
     <Drawer
       variant="permanent"
       sx={{
-        width: drawerWidth,
         display: {xs: 'none', sm: 'block'},
-        flexShrink: 0,
         [`& .MuiDrawer-paper`]: {
           width: drawerWidth,
           boxSizing: 'border-box',

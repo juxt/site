@@ -34,11 +34,25 @@ export type Scalars = {
   JSON: any;
 };
 
+export type Api = {
+  __typename?: 'Api';
+  contents: Scalars['JSON'];
+  id: Scalars['ID'];
+  type: ApiType;
+};
+
+export enum ApiType {
+  Graphql = 'GRAPHQL',
+  Openapi = 'OPENAPI'
+}
+
 /** Root query object */
 export type Query = {
   __typename?: 'Query';
   /** Access user details for all users in the system */
   allUsers?: Maybe<Array<Maybe<SiteUser>>>;
+  /** See the available openapi and graphql APIs in the system */
+  apis: Array<Api>;
   /** Access a request */
   request?: Maybe<SiteRequest>;
   requests?: Maybe<SiteRequests>;
@@ -54,6 +68,13 @@ export type Query = {
 /** Root query object */
 export type QueryRequestArgs = {
   id: Scalars['ID'];
+};
+
+
+/** Root query object */
+export type QueryRequestsArgs = {
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
 };
 
 
@@ -93,7 +114,7 @@ export type SiteRequest = {
   id: Scalars['ID'];
   method: Scalars['String'];
   /** The GraphQL operation name called by the request */
-  operationName: Scalars['String'];
+  operationName?: Maybe<Scalars['String']>;
   requestUri: Scalars['ID'];
   status: Scalars['Int'];
 };
@@ -101,6 +122,7 @@ export type SiteRequest = {
 export type SiteRequestSummary = {
   __typename?: 'SiteRequestSummary';
   date: Scalars['String'];
+  details: Scalars['JSON'];
   id: Scalars['ID'];
   status: Scalars['Int'];
 };
@@ -156,6 +178,11 @@ export type SiteVersionDetails = {
   gitSha: Scalars['String'];
 };
 
+export type AllApisQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type AllApisQuery = { __typename?: 'Query', apis: Array<{ __typename?: 'Api', type: ApiType, id: string }> };
+
 export type AllRequestsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -166,9 +193,36 @@ export type GetRequestSummaryQueryVariables = Exact<{
 }>;
 
 
-export type GetRequestSummaryQuery = { __typename?: 'Query', request?: { __typename?: 'SiteRequest', id: string, status: number, date: string, requestUri: string, method: string, operationName: string, detail: any } | null | undefined };
+export type GetRequestSummaryQuery = { __typename?: 'Query', request?: { __typename?: 'SiteRequest', id: string, status: number, date: string, requestUri: string, method: string, operationName?: string | null | undefined, detail: any } | null | undefined };
 
 
+export const AllApisDocument = `
+    query allApis {
+  apis {
+    type
+    id
+  }
+}
+    `;
+export const useAllApisQuery = <
+      TData = AllApisQuery,
+      TError = Error
+    >(
+      variables?: AllApisQueryVariables,
+      options?: UseQueryOptions<AllApisQuery, TError, TData>
+    ) =>
+    useQuery<AllApisQuery, TError, TData>(
+      variables === undefined ? ['allApis'] : ['allApis', variables],
+      fetcher<AllApisQuery, AllApisQueryVariables>(AllApisDocument, variables),
+      options
+    );
+useAllApisQuery.document = AllApisDocument;
+
+
+useAllApisQuery.getKey = (variables?: AllApisQueryVariables) => variables === undefined ? ['allApis'] : ['allApis', variables];
+;
+
+useAllApisQuery.fetcher = (variables?: AllApisQueryVariables) => fetcher<AllApisQuery, AllApisQueryVariables>(AllApisDocument, variables);
 export const AllRequestsDocument = `
     query allRequests {
   requests {
