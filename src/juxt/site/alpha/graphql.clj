@@ -519,7 +519,7 @@
                   val (if (vector? att)
                         (traverse object-value att subject db)
                         (get object-value (keyword att)))]
-              (if (= field-kind 'LIST)
+              (if (-> field ::g/type-ref list-type?)
                 (map #(protected-lookup % subject db) val)
                 (throw (ex-info "Can only used 'each' on a LIST type" {:field-kind field-kind}))))
 
