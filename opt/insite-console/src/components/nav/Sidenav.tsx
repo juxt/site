@@ -12,6 +12,7 @@ export function SidenavDesktop({drawerWidth, DrawerItems}: SidenavProps) {
     <Drawer
       variant="permanent"
       sx={{
+        width: drawerWidth,
         display: {xs: 'none', sm: 'block'},
         [`& .MuiDrawer-paper`]: {
           width: drawerWidth,

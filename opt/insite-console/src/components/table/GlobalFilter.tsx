@@ -4,17 +4,13 @@ import {Box} from '@mui/material';
 import {alpha} from '@mui/material/styles';
 
 type Props = {
-  preGlobalFilteredRows: Array<unknown>;
+  rows: Array<unknown>;
   globalFilter: string;
   setGlobalFilter: (value: string | undefined) => void;
 };
 
-function GlobalFilter({
-  preGlobalFilteredRows,
-  globalFilter,
-  setGlobalFilter,
-}: Props) {
-  const count = preGlobalFilteredRows.length;
+function GlobalFilter({rows, globalFilter, setGlobalFilter}: Props) {
+  const count = rows.length;
 
   // Global filter only works with pagination from the first page.
   // This may not be a problem for server side pagination when

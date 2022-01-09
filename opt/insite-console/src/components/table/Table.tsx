@@ -1,7 +1,3 @@
-/* eslint-disable react/prop-types */
-/* eslint-disable react/forbid-prop-types */
-/* eslint-disable react/require-default-props */
-/* eslint-disable react/jsx-filename-extension */
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
 import React from 'react';
@@ -18,7 +14,7 @@ import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import TableToolbar from './TableToolbar';
 import {LocationGenerics} from '../../types';
-import {useNavigate, useSearch} from 'react-location';
+import {useNavigate} from 'react-location';
 import {
   useGlobalFilter,
   usePagination,
@@ -97,7 +93,7 @@ function RequestsTable({data}: TableProps) {
               setter: (value: number[]) => setFilter('status', value),
             },
           ]}
-          preGlobalFilteredRows={preGlobalFilteredRows}
+          rows={rows}
           setGlobalFilter={setGlobalFilter}
           globalFilter={globalFilter}
         />

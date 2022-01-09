@@ -14,18 +14,11 @@ export function ApiList() {
         {data &&
           data.apis.map((api) => (
             <div key={api.id}>
-              {api.type === 'GRAPHQL' ? (
-                <Link
-                  to="/apis/graphiql"
-                  search={(old) => ({...old, graphqlUrl: api.id})}>
-                  {api.id}
-                </Link>
-              ) : (
-                <a
-                  href={`http://localhost:5509/swagger-ui/index.html?url=${api.id}`}>
-                  {api.id}
-                </a>
-              )}
+              <Link
+                to={`./${api.type.toLowerCase()}`}
+                search={(old) => ({...old, url: api.id})}>
+                {api.id}
+              </Link>
               <p>{api.type}</p>
             </div>
           ))}

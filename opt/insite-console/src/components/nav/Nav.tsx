@@ -25,6 +25,7 @@ import {useScrollTrigger} from '@mui/material';
 import {SidenavDesktop} from './Sidenav';
 import {Link as RouterLink} from 'react-location';
 import MainSearch from './MainSearch';
+import {baseUrl} from '../../common';
 
 const drawerWidth = 100;
 
@@ -52,17 +53,17 @@ function NavDrawer() {
   const navItems = [
     {
       name: 'Home',
-      path: '/',
+      path: `${baseUrl}/`,
       icon: <HomeIcon fontSize={iconSize} />,
     },
     {
       name: 'Requests',
-      path: '/requests',
+      path: `${baseUrl}/requests`,
       icon: <InfoIcon fontSize={iconSize} />,
     },
     {
       name: 'APIs',
-      path: '/apis',
+      path: `${baseUrl}/apis`,
       icon: <SearchIcon fontSize={iconSize} />,
     },
   ];

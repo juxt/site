@@ -4,11 +4,13 @@ import {ReactQueryDevtools} from 'react-query/devtools';
 import {ReactLocationDevtools} from 'react-location-devtools';
 import {parseSearch, stringifySearch} from 'react-location-jsurl';
 import {useAllApisQuery, useAllRequestsQuery} from './generated/graphql';
-import {RequestList, RequestInfo} from './Requests';
-import Graphiql from './components/graphiql';
+import {RequestList} from './Requests';
+import Graphiql from './components/Graphiql';
+import Swagger from './components/Swagger';
 import {ApiList} from './Apis';
 import {PageLayout} from './components/nav';
 import {LocationGenerics} from './types';
+import {baseUrl} from './common';
 
 const location = new ReactLocation<LocationGenerics>({
   parseSearch,
@@ -23,33 +25,42 @@ export default function App() {
         location={location}
         routes={[
           {
-            path: '/',
-            element: 'InSite',
-          },
-          {
-            path: 'requests',
-            element: <RequestList />,
-            loader: () =>
-              rootQueryClient.getQueryData('requests') ??
-              rootQueryClient
-                .fetchQuery('requests', useAllRequestsQuery.fetcher())
-                .then(() => ({})),
-          },
-          {
-            path: 'apis',
+            path: baseUrl,
             children: [
               {
                 path: '/',
-                element: <ApiList />,
+                element: 'InSite',
+              },
+              {
+                path: 'requests',
+                element: <RequestList />,
                 loader: () =>
-                  rootQueryClient.getQueryData('allApis') ??
+                  rootQueryClient.getQueryData('requests') ??
                   rootQueryClient
-                    .fetchQuery('allApis', useAllApisQuery.fetcher())
+                    .fetchQuery('requests', useAllRequestsQuery.fetcher())
                     .then(() => ({})),
               },
               {
-                path: 'graphiql',
-                element: <Graphiql />,
+                path: 'apis',
+                children: [
+                  {
+                    path: '/',
+                    element: <ApiList />,
+                    loader: () =>
+                      rootQueryClient.getQueryData('allApis') ??
+                      rootQueryClient
+                        .fetchQuery('allApis', useAllApisQuery.fetcher())
+                        .then(() => ({})),
+                  },
+                  {
+                    path: 'graphql',
+                    element: <Graphiql />,
+                  },
+                  {
+                    path: 'openapi',
+                    element: <Swagger />,
+                  },
+                ],
               },
             ],
           },

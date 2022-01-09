@@ -7,3 +7,5 @@ export function notEmpty<TValue>(
   if (value === null || value === undefined) return false;
   return true;
 }
+
+export const baseUrl = '/_site/insite';

@@ -13,13 +13,13 @@ type Filter = {
 
 type Props = {
   setGlobalFilter: (filter: string | undefined) => void;
-  preGlobalFilteredRows: Array<unknown>;
+  rows: Array<unknown>;
   globalFilter: string;
   filters: Array<Filter>;
 };
 
 function TableToolbar(props: Props) {
-  const {preGlobalFilteredRows, setGlobalFilter, globalFilter, filters} = props;
+  const {rows, setGlobalFilter, globalFilter, filters} = props;
   return (
     <Toolbar
       sx={(theme) =>
@@ -62,7 +62,7 @@ function TableToolbar(props: Props) {
         );
       })}
       <GlobalFilter
-        preGlobalFilteredRows={preGlobalFilteredRows}
+        rows={rows}
         globalFilter={globalFilter}
         setGlobalFilter={setGlobalFilter}
       />

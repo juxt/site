@@ -1,4 +1,4 @@
-import GraphiQL from 'graphiql';
+import GraphiQL, {FetcherParams} from 'graphiql';
 import GraphiQLExplorer from 'graphiql-explorer';
 import {getIntrospectionQuery, buildClientSchema} from 'graphql';
 import 'graphiql/graphiql.min.css';
@@ -6,8 +6,6 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import {useNavigate, useSearch} from 'react-location';
 import {LocationGenerics} from '../types';
 import {useQuery} from 'react-query';
-
-const queryParams = new URLSearchParams(window.location.search);
 
 function fixExplorerStyles() {
   // nasty hack to make the explorer not rediculously wide, tempting to fork it really
@@ -26,10 +24,10 @@ function fixExplorerStyles() {
 }
 
 const graphQLInitialFetcher = async (
-  graphqlUrl: string,
+  url: string,
   body = {query: getIntrospectionQuery()}
 ) => {
-  const data = await fetch(graphqlUrl, {
+  const data = await fetch(url, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -40,17 +38,17 @@ const graphQLInitialFetcher = async (
   });
   return data
     .json()
-    .catch(() => console.error(`error fetching from ${graphqlUrl}`, data));
+    .catch(() => console.error(`error fetching from ${url}`, data));
 };
-const graphQLFetcher = async (params: any, url: string) => {
+const graphQLFetcher = async (params: FetcherParams, url: string) => {
   return graphQLInitialFetcher(url, params);
 };
-function Graphiql({graphqlUrl}: {graphqlUrl: string}) {
+function Graphiql({url}: {url: string}) {
   const {data: schema, isLoading} = useQuery(
-    graphqlUrl,
-    () => graphQLInitialFetcher(graphqlUrl),
+    url,
+    () => graphQLInitialFetcher(url),
     {
-      enabled: !!graphqlUrl,
+      enabled: !!url,
       select: (result: {data: import('graphql').IntrospectionQuery}) => {
         if (result?.data) {
           return buildClientSchema(result.data);
@@ -73,7 +71,7 @@ function Graphiql({graphqlUrl}: {graphqlUrl: string}) {
 
   useEffect(() => {
     if (!isLoading && refGq.current) {
-      setTimeout(() => fixExplorerStyles(), 50);
+      fixExplorerStyles();
     }
     // needed to stop graphiql from remembering old queries which are potentially from the wrong api
     navigate({
@@ -101,7 +99,7 @@ function Graphiql({graphqlUrl}: {graphqlUrl: string}) {
           <GraphiQL
             ref={refGq}
             schema={schema}
-            fetcher={(params) => graphQLFetcher(params, graphqlUrl)}
+            fetcher={(params) => graphQLFetcher(params, url)}
             query={query}
             onEditQuery={handleEditQuery}
             defaultVariableEditorOpen
@@ -122,11 +120,10 @@ function Graphiql({graphqlUrl}: {graphqlUrl: string}) {
 }
 
 function GraphiqlWrapper() {
-  const {graphqlUrl} = useSearch<LocationGenerics>();
+  const {url} = useSearch<LocationGenerics>();
+
   return (
-    <div className="graphiql-container">
-      {graphqlUrl && <Graphiql graphqlUrl={graphqlUrl} />}
-    </div>
+    <div className="graphiql-container">{url && <Graphiql url={url} />}</div>
   );
 }
 
