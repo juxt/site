@@ -46,6 +46,12 @@
        ::g/type-ref
        ::g/name)))
 
+(defn list-type?
+  [type-ref]
+  (or
+   (-> type-ref ::g/non-null-type ::g/list-type)
+   (::g/list-type type-ref)))
+
 (defn default-query
   [field-or-type type-k]
   (let [type (or (field->type field-or-type)
@@ -69,7 +75,9 @@
                (and (map? x) (:set x))
                (-> (get :set) set)
                (and (map? x) (:edn x))
-               (-> (get :edn) edn/read-string))
+               (-> (get :edn) edn/read-string)
+               (= 'type x)
+               ((constantly type-k)))
              (catch Exception e
                (throw (ex-info "Error in q site arg" {:x x} e)))))
          query)
@@ -181,7 +189,7 @@
                          e))))))
 
                ;; Is it a list? Then put in as a vector
-               (::g/list-type type-ref)
+               (list-type? type-ref)
                (let [val (or (get args (name key))
                              ;; TODO: default value?
                              (generate-value generator-args args))
@@ -191,7 +199,7 @@
                      ;; form-plane into the data-plane!
                      val (cond-> val (symbol? val) str)
 
-                     list-type (get-in type-ref [::g/list-type ::g/name])]
+                     list-type (field->type arg-def)]
                  (cond
                    (scalar? list-type types-by-name) (assoc-some acc key val)
                    :else
@@ -228,12 +236,12 @@
   (let [type-ref (::g/type-ref field)]
     (if-let [type (::g/non-null-type type-ref)]
       (cond
-        (::g/list-type type)
+        (list-type? type-ref)
         (or results [])
         :else
         (first results))
       (cond
-        (::g/list-type type-ref)
+        (list-type? type-ref)
         results
         ;; If this isn't a list type, take the first
         :else
@@ -331,9 +339,7 @@
   [type-ref]
   (let [type-name (::g/name type-ref)]
     (cond
-      (or
-       (-> type-ref ::g/non-null-type ::g/list-type)
-       (::g/list-type type-ref))
+      (list-type? type-ref)
       []
       (= "String" type-name)
       ""
@@ -458,6 +464,7 @@
                   q (assoc
                      (to-xt-query field site-args argument-values type-k)
                      :in (if (second in) [in] (vec in)))
+
                   query-args (cond->> (vals argument-values)
                                object-id (concat [object-id]))
                   args (if (second query-args) query-args (first query-args))
@@ -569,7 +576,7 @@
             ;; Or simply try to extract the keyword
             (contains? object-value (keyword field-name))
             (let [result (get object-value (keyword field-name))]
-              (if (-> field ::g/type-ref ::g/list-type)
+              (if (-> field ::g/type-ref list-type?)
                 (limit-results argument-values result)
                 result))
 
