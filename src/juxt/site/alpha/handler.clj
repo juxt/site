@@ -1078,7 +1078,7 @@
 
 (defn normalize-path
   "Normalize path prior to constructing URL used for resource lookup. This is to
-  avoid two equivalent URLs pointing to two different Xtdb entities."
+  avoid two equivalent URLs pointing to two different XTDB entities."
   [path]
   (cond
     (str/blank? path) "/"
