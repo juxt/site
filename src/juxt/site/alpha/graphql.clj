@@ -810,15 +810,13 @@
         (catch clojure.lang.ExceptionInfo e
           (let [errors (:errors (ex-data e))]
             (if (seq errors)
-              (do
-                (log/tracef "GraphQL document errors: %s" (pr-str (:errors (ex-data e))))
-                (throw
-                 ;; Throw but ignore the cause (since we pull out the key
-                 ;; information from it)
-                 (ex-info
-                  "Errors in GraphQL document"
-                  (cond-> {::site/request-context (assoc req :ring.response/status 400)}
-                    (seq errors) (assoc ::grab/errors errors)))))
+              (throw
+               ;; Throw but ignore the cause (since we pull out the key
+               ;; information from it)
+               (ex-info
+                "Errors in GraphQL document"
+                (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                  (seq errors) (assoc ::grab/errors errors))))
               (throw
                (ex-info
                 "Failed to store GraphQL document due to error"

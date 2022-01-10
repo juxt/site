@@ -73,7 +73,7 @@
           {:ring.response/status 406
            }))))
 
-    (log/debug "result of negotiate-representation" (dissoc selected-representation ::http/body ::http/content))
+    #_(log/debug "result of negotiate-representation" (dissoc selected-representation ::http/body ::http/content))
 
     ;; Pin the vary header onto the selected representation's
     ;; metadata
@@ -885,14 +885,13 @@
   use the environment (dev vs. prod), subject (developer vs. customer) or other
   variables to determine the resource to use."
   [{::site/keys [db]} status]
-  (let [res (ffirst
+  (when-let [res (ffirst
             (x/q db '{:find [(pull er [*])]
                       :where [[er ::site/type "ErrorResource"]
                               [er :ring.response/status status]]
                       :in [status]} status))]
-    (log/tracef "Finding error with status %d, %s" status res)
-    res
-    ))
+    (log/tracef "ErrorResource found for status %d: %s" status res)
+    res))
 
 (defn error-resource-representation
   "Experimental. Not sure this is a good idea to have a 'global' error
@@ -996,29 +995,25 @@
 
           ;; This is an error, it won't be cached, it isn't negotiable 'content'
           ;; so the Vary header isn't deemed applicable. Let's not set it.
-          (dissoc ::http/vary))
+          (dissoc ::http/vary)))
 
-         )]
+        error-resource (merge
+                        {:ring.response/status 500
+                         ::site/errors (errors-with-causes e)}
+                        (dissoc req ::site/request-context)
+                        ;; For the error itself
+                        {::site/selected-representation representation})
 
-    (log/tracef "error-representation: %s" (pr-str representation))
+        error-resource (assoc
+                        error-resource
+                        ::site/status-message (status-message (:ring.response/status error-resource)))
 
-    (let [error-resource (merge
-                          {:ring.response/status 500
-                           ::site/errors (errors-with-causes e)}
-                          (dissoc req ::site/request-context)
-                          ;; For the error itself
-                          {::site/selected-representation representation})
+        response (try
+                   (response/add-payload error-resource)
+                   (catch Exception e
+                     (respond-internal-error req e)))]
 
-          error-resource (assoc
-                          error-resource
-                          ::site/status-message (status-message (:ring.response/status error-resource)))
-
-          response (try
-                     (response/add-payload error-resource)
-                     (catch Exception e
-                       (respond-internal-error req e)))]
-
-      (respond response))))
+    (respond response)))
 
 
 (defn wrap-error-handling
