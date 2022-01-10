@@ -54,7 +54,7 @@
 (defn negotiate-representation [request current-representations]
   ;; Negotiate the best representation, determining the vary
   ;; header.
-  (log/debug "current-representations" (map (fn [rep] (dissoc rep ::http/body ::http/content)) current-representations))
+  #_(log/debug "current-representations" (map (fn [rep] (dissoc rep ::http/body ::http/content)) current-representations))
 
   (let [{selected-representation ::pick/representation
          vary ::pick/vary}
