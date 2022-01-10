@@ -1041,7 +1041,7 @@
           ;; Don't log exceptions which are used to escape (e.g. 302, 401).
           (when (or (not (integer? status)) (>= status 500))
             (let [ex-data (->storable ex-data)]
-              (log/errorf e "%s: %s" (.getMessage e) (pr-str ex-data))))
+              (log/errorf e "%s: %s" (.getMessage e) (pr-str (dissoc ex-data ::site/request-context)))))
 
           (error-response req e)))
 
