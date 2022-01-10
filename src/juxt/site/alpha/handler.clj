@@ -957,19 +957,48 @@
 
   (assert (::site/start-date req))
 
-  (let [{:ring.request/keys [method] ::site/keys [request-id]} req
-        {:ring.response/keys [status] :as ex-data} (ex-data e)
+  (let [{:ring.response/keys [status]
+         :ring.request/keys [method]
+         ::site/keys [request-id]} req
 
         representation
         (or
          (when (= method :put) (put-error-representation req e))
          (when (= method :post) (post-error-representation req e))
          (error-resource-representation req e)
-         (let [content (cond-> (str (status-message status) "\r\n")
-                         request-id (str (format "<a href=\"%s\" target=\"_site_error\">%s</a>\r\n" request-id "Error")))]
-           {::http/content-type "text/html;charset=utf-8"
-            ::http/content-length (count content)
-            ::http/content content}))]
+
+         ;; Some default representations for errors
+         (some->
+          (negotiate-representation
+           req
+           [(let [content
+                  ;; We don't want to provide much information here, we don't
+                  ;; know much about the recipient, only that they're probably
+                  ;; using a web browser. We provide a link to the error
+                  ;; resource, because that will be subject to authorization
+                  ;; checks. So authorized users get to see extensive error
+                  ;; information, unauthorized users don't.
+                  (cond-> (str (status-message status) "\r\n")
+                    request-id (str (format "<a href=\"%s\" target=\"_site_error\">%s</a>\r\n" request-id "Error")))]
+              {::http/content-type "text/html;charset=utf-8"
+               ::http/content-length (count content)
+               ::http/content content})
+            (let [content
+                  (str (status-message status)
+                       ;; For text/plain we might be using the site tool. Here,
+                       ;; we decide that providing a little more context to the
+                       ;; user outweighs the need to restrict information about
+                       ;; the underlying implementation.
+                       " – " (.getMessage e) "\r\n")]
+              {::http/content-type "text/plain;charset=utf-8"
+               ::http/content-length (count content)
+               ::http/content content})])
+
+          ;; This is an error, it won't be cached, it isn't negotiable 'content'
+          ;; so the Vary header isn't deemed applicable. Let's not set it.
+          (dissoc ::http/vary))
+
+         )]
 
     (log/tracef "error-representation: %s" (pr-str representation))
 
