@@ -29,7 +29,7 @@ jobs:
 
           key: v1-dependencies-{{ checksum "deps.edn" }}
 
-      - run: ./bin/kaocha :clj --plugin kaocha.plugin/junit-xml --junit-xml-file test-results/kaocha/results.xml
+      - run: ./bin/kaocha :test --plugin kaocha.plugin/junit-xml --junit-xml-file test-results/kaocha/results.xml
 
       - store_test_results:
           path: test-results
