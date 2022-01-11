@@ -427,6 +427,18 @@
       config)
      (status (steps config)))))
 
+(defn init!
+  [username password]
+  (let [xt-node (xt-node)
+        config (config)]
+    (put-site-api!)
+    (put-auth-resources!)
+    (put-superuser-role!)
+    (put-superuser! username "Administrator" password)
+    (init/put-graphql-operations! xt-node config)
+    (init/put-graphql-schema-endpoint! xt-node config)
+    (init/put-request-template! xt-node config)))
+
 (defn allow-public-access-to-public-resources! []
   (let [config (config)
         xt-node (xt-node)]
