@@ -760,6 +760,29 @@
       (cond-> error
         location (assoc :location location)))}))
 
+(defn stored-document-resource-map [document-str schema]
+  (try
+    (let [document (document/compile-document
+                    (parser/parse document-str)
+                    schema)]
+
+      {::site/graphql-compiled-query document
+       ::http/body (.getBytes document-str)
+       ::http/content-type "text/plain;charset=utf-8"})
+
+    (catch clojure.lang.ExceptionInfo e
+      (let [errors (:errors (ex-data e))]
+        (if (seq errors)
+          (throw
+           (ex-info
+            "Errors in GraphQL document"
+            {::grab/errors errors}))
+          (throw
+           (ex-info
+            "Failed to store GraphQL document due to error"
+            {}
+            e)))))))
+
 (defn stored-document-put-handler [{::site/keys [uri db xt-node] :as req}]
   (let [document-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
@@ -797,38 +820,33 @@
            ::site/request-context (assoc req :ring.response/status 500)})))
 
       (try
-        (let [document (document/compile-document
-                        (parser/parse document-str)
-                        schema)]
+        (let [m (stored-document-resource-map document-str schema)]
           (xt/await-tx
            xt-node
            (xt/submit-tx
             xt-node
-            [[:xtdb.api/put
-              (assoc resource
-                     ::site/graphql-compiled-query document
-                     ::http/body (.getBytes document-str)
-                     ::http/content-type "text/plain;charset=utf-8")]])))
+            [[:xtdb.api/put (into resource m)]])))
 
         (assoc req :ring.response/status 204)
 
         (catch clojure.lang.ExceptionInfo e
-          (let [errors (:errors (ex-data e))]
-            (if (seq errors)
-              (throw
-               ;; Throw but ignore the cause (since we pull out the key
-               ;; information from it)
-               (ex-info
-                "Errors in GraphQL document"
-                (cond-> {::site/request-context (assoc req :ring.response/status 400)}
-                  (seq errors) (assoc ::grab/errors errors))))
-              (throw
-               (ex-info
-                "Failed to store GraphQL document due to error"
-                {::site/request-context (assoc req :ring.response/status 500)}
-                e)))))))))
+          (if-let [errors (::grab/errors (ex-data e))]
+            (throw
+             ;; Throw but ignore the cause (since we pull out the key
+             ;; information from it)
+             (ex-info
+              "Errors in GraphQL document"
+              (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                (seq errors) (assoc ::grab/errors errors))))
+            (throw
+             (ex-info
+              "Failed to store GraphQL document due to error"
+              {::site/request-context (assoc req :ring.response/status 500)}
+              e))))))))
 
 (defn graphql-query [{::site/keys [db] :as req} stored-query-id operation-name variables]
+  (assert stored-query-id)
+
   (let [resource (xt/entity db stored-query-id)
         _ (when-not resource
             (throw
@@ -838,12 +856,18 @@
                ::site/request-context (assoc req :ring.response/status 500)})))
 
         schema-id (::site/graphql-schema resource)
+
+        _ (when-not schema-id
+            (throw (ex-info "No schema id on resource" {:xt/id stored-query-id})))
         schema (some-> (when schema-id (xt/entity db schema-id)) ::site/graphql-compiled-schema)
 
         document (some-> resource ::site/graphql-compiled-query)]
 
-    (when document
-      (query schema document operation-name variables req))))
+    (when-not document
+      (throw (ex-info "Resource does not contain query" {:stored-query-id stored-query-id
+                                                         :keys (keys resource)})))
+
+    (query schema document operation-name variables req)))
 
 (defn stored-document-post-handler
   [{::site/keys [xt-node db resource received-representation base-uri]

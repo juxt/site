@@ -225,11 +225,14 @@
                       ::errors (:errors result)
                       ::data (:data result)})))
 
-                 ;; Ensure that the data contains something
-                 (if-let [check (get-in resource [::apex/operation "x-juxt-site-data-exists-if"])]
-                   (when (json-pointer (:data result) check)
-                     (:data result))
-                   (:data result))))))
+                 (let [check (get-in resource [::apex/operation "x-juxt-site-data-exists-if"])]
+                   (when (or (not check) (json-pointer (:data result) check))
+                     (if-let [data (:data result)]
+                       data
+                       (throw (ex-info "Data from result is nil"
+                                       {:stored-query-id stored-query-id
+                                        :operation-name operation-name
+                                        :variables variables})))))))))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
          ;; filter out the http metadata?
