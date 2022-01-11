@@ -146,9 +146,9 @@
                (log/tracef "transform is %s" transform))
 
              (cond
-               arg-type                ; is it a singular (not a LIST)
-               (let [value (or (get args arg-name)
-                               (generate-value generator-args args))
+               arg-type                ; not a LIST
+               (let [value (or (generate-value generator-args args)
+                               (get args arg-name))
                      value
                      (cond-> value
                        ;; We don't want symbols in XT entities, because this leaks the
