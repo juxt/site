@@ -940,7 +940,7 @@
   [opts]
   (try
     (let [{access-token "access_token"} (load-token)
-          {:keys [base-uri directory path]
+          {:keys [base-uri directory path spa]
            :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
       (message! "putting site" base-uri directory path)
       (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
@@ -957,15 +957,22 @@
                     {:keys [status headers body]}
                     (curl/put
                      destination
-                     {:headers {"authorization" (format "Bearer %s" access-token)
-                                "content-type" (content-type (.getName file))}
+                     {:headers (merge
+                                {"authorization" (format "Bearer %s" access-token)
+                                 "content-type" (content-type (.getName file))}
+                                (prn (relative-path file))
+                                (when (and (str/includes? (relative-path file) "index.html")
+                                           spa)
+                                  (prn "adding headers")
+                                  {"site-type" "AppRoutes"
+                                   "site-pattern" (str base-uri "/" path "/.*")}))
                       :body (io/file file)
                       :throw false})]
                 (case status
                   (201 204)
                   (message! (format "Resource %s: %s"
                                     (case status 201 "created" 204 "updated")
-                                    (get headers "location")))
+                                    headers))
 
                   207
                   (let [results (edn/read-string body)
@@ -1165,7 +1172,8 @@
    ["put-static-site"
     {:description (:doc (meta #'put-static-site))
      :cli-options [["-d" "--directory DIR" "Directory containing static site files"]
-                   ["-p" "--path PATH" "Path the site will be available at. e.g -p mysite will make the site available at BASE_URI/mysite/index.html"]]
+                   ["-p" "--path PATH" "Path the site will be available at. e.g -p mysite will make the site available at BASE_URI/mysite/index.html"]
+                   ["-spa" "--spa SPA" "If set the html file will be served at PATH/*"]]
      :delegate put-static-site}]])
 
 (let [{:keys [options arguments summary errors]}

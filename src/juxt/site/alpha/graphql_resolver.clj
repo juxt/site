@@ -98,7 +98,7 @@
            :contents api})
         graphql-apis
         (map first (xt/q db '{:find [uri]
-                              :where [[uri :juxt.grab.alpha/schema]]}))
+                              :where [[uri :juxt.site.alpha/graphql-compiled-schema]]}))
         graphqls
         (for [uri graphql-apis]
           {:xt/id uri
@@ -119,13 +119,10 @@
 
    "summaries"
    (fn [_]
-     (for [{:keys [xt/id ring.response/status juxt.site.alpha/date]}
+     (for [{:keys [xt/id]}
            (paginate (remove #(= "/_site/graphql" (:ring.request/path %))
                              cache/requests-cache) args)]
-       {"id" id
-        "status" status
-        "details" (->site-request (get cache/requests-cache id))
-        "date" (str date)}))})
+       (request {:argument-values {"id" id}})))})
 
 (defn system [_]
   (let [system (repl/system)]

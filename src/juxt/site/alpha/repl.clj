@@ -427,6 +427,10 @@
       config)
      (status (steps config)))))
 
+(defn update-site-graphql
+  []
+  (init/put-graphql-schema-endpoint! (xt-node) (config)))
+
 (defn init!
   [username password]
   (let [xt-node (xt-node)

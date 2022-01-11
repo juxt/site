@@ -20,6 +20,8 @@
         classification (get-in req [:ring.request/headers "site-classification"])
         variant-of (get-in req [:ring.request/headers "site-variant-of"])
         template-dialect (get-in req [:ring.request/headers "site-template-dialect"])
+        type (get-in req [:ring.request/headers "site-type"])
+        pattern (get-in req [:ring.request/headers "site-pattern"])
         new-rep (merge
                  {:xt/id uri
                   ::http/methods #{:get :head :options :put :patch}
@@ -29,9 +31,11 @@
                      {::http/etag (util/etag received-representation)
                       ::http/last-modified start-date
                       ::site/request request-id}
-                     variant-of (assoc ::site/variant-of variant-of)
-                     classification (assoc ::pass/classification classification)
-                     template-dialect (assoc ::site/template-dialect (str/lower-case template-dialect)))
+                   pattern (assoc ::site/pattern (re-pattern pattern))
+                   type (assoc ::site/type type)
+                   variant-of (assoc ::site/variant-of variant-of)
+                   classification (assoc ::pass/classification classification)
+                   template-dialect (assoc ::site/template-dialect (str/lower-case template-dialect)))
                  received-representation)]
 
     ;; Currently we cannot tell whether a submitted tx has been successful,
