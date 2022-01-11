@@ -72,7 +72,7 @@
            :contents api})
         graphql-apis
         (map first (xt/q db '{:find [uri]
-                              :where [[uri :juxt.grab.alpha/schema]]}))
+                              :where [[uri :juxt.site.alpha/graphql-compiled-schema]]}))
         graphqls
         (for [uri graphql-apis]
           {:xt/id uri
