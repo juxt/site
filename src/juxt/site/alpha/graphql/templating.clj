@@ -66,35 +66,9 @@
           {::grab/errors errors
            ::site/request-context req})))
 
-      #_(log/debugf "Results are %s" (pr-str results))
+      (log/debugf "Results are %s" (pr-str results))
 
-      ;; Process results to apply dynamic queries - siteTemplateModel
-      (let [data (:data results)]
-        (postwalk
-         ;; Deprecated because _siteTemplateModel has become an abandoned
-         ;; experiment, superceded by simply generating a template and calling
-         ;; Selmer again. However, it's a bit too early to delete the code.
-         (fn [x]
-           (cond
-             (and (map? x) (contains? x :_siteTemplateModel))
-             (let [siteTemplateModel (json/read-value (:_siteTemplateModel x))]
-
-               ;; If there is a special _siteTemplateModel, we process the trees
-               ;; of all its siblings, replacing any variable reference ('{{
-               ;; foo.bar }}') with the value in the template model. We also
-               ;; look for tables.
-
-               (reduce-kv
-                (fn [acc k v]
-                  (cond-> acc
-                    (not= k :_siteTemplateModel)
-                    (assoc k (postwalk
-                              (fn [s] (if (and (string? s) (str/index-of s "{{"))
-                                        (selmer/render s siteTemplateModel)
-                                        s)) v))))
-                x x))
-             :else x))
-         data)))))
+      (:data results))))
 
 
 ;; Deprecated. This has been abandoned in favour of using an OpenAPI approach,
