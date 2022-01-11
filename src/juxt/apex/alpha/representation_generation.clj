@@ -19,8 +19,7 @@
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]
    [juxt.jinx.alpha :as jinx]
-   [juxt.jinx.alpha.jsonpointer :refer [json-pointer]]
-   [clojure.string :as str]))
+   [juxt.apex.alpha.jsonpointer :refer [json-pointer]]))
 
 (alias 'jinx (create-ns 'juxt.jinx.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -195,7 +194,6 @@
 
          ;; Try to get the resource's state via GraphQL
          (when-let [stored-query-resource-path (get-in resource [::apex/operation "x-juxt-site-graphql-query-resource"])]
-           #_(log/tracef "GraphQL attempt: %s" stored-query-resource-path)
            (let [stored-query-id (if (.startsWith stored-query-resource-path "/")
                                    (str (:juxt.site.alpha/base-uri req) stored-query-resource-path)
                                    stored-query-resource-path)
@@ -208,13 +206,11 @@
                   (for [[k v] (::apex/openapi-path-params resource)
                         :when (::jinx/valid? v)]
                     [k (:value v)]))]
+
              (when operation-name
-               #_(log/tracef "Trying operation: %s" operation-name)
                (let [result (graphql/graphql-query
                              req
                              stored-query-id operation-name variables)]
-
-                 #_(log/tracef "result is %s" result)
 
                  ;; TODO: Need to check if the result indicates that nothing was found
                  ;; Perhaps the test should be if all values in the :data map are nil
@@ -230,20 +226,16 @@
                       ::data (:data result)})))
 
                  ;; Ensure that the data contains something
-                 (try
-                   (when-let [check (get-in resource [::apex/operation "x-juxt-site-data-exists-if"])]
-                     ;; TODO: It would be better for jinx to provide a version
-                     ;; of json-pointer that didn't throw exceptions.
-                     (json-pointer (:data result) check))
-                   (:data result)
-                   (catch clojure.lang.ExceptionInfo e
-                     ;; Escape and result in a 404
-                     nil))
-                 ))))
+                 (if-let [check (get-in resource [::apex/operation "x-juxt-site-data-exists-if"])]
+                   (when (json-pointer (:data result) check)
+                     (:data result))
+                   (:data result))))))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
          ;; filter out the http metadata?
-         (x/entity db uri)
+         (do
+           (log/tracef "Looking up resource-state in DB with uri %s" uri)
+           (x/entity db uri))
 
          ;; No resource-state, so there can be no representations, so 404.
          (throw
@@ -254,6 +246,4 @@
 
     ;; Now we've found the resource state, we need to generate a representation
     ;; of it.
-    (entity-body req resource-state)
-
-    ))
+    (entity-body req resource-state)))
