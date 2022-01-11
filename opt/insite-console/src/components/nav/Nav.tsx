@@ -53,7 +53,7 @@ function NavDrawer() {
   const navItems = [
     {
       name: 'Home',
-      path: `${baseUrl}/`,
+      path: `${baseUrl}/home`,
       icon: <HomeIcon fontSize={iconSize} />,
     },
     {

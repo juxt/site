@@ -5,7 +5,22 @@ query GetRequestSummary($uri: ID!) {
     date
     requestUri
     method
-    operationName
-    detail
+    durationMillis
+    graphqlOperationName
+    _detail
+    graphqlStoredQueryResourcePath
+    graphqlVariables
+    errors {
+      exData
+      message
+      stackTrace {
+        className
+        fileName
+        lineNumber
+        methodName
+      }
+    }
+    requestHeaders
+    statusMessage
   }
 }

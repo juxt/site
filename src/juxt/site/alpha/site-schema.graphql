@@ -137,14 +137,7 @@ type SiteAttributeStat {
 
 type SiteRequests {
   count: Int!
-  summaries: [SiteRequestSummary!]!
-}
-
-type SiteRequestSummary {
-  id: ID!
-  status: Int!
-  date: String!
-  details: JSON!
+  summaries: [SiteRequest!]!
 }
 
 scalar JSON
@@ -154,10 +147,11 @@ scalar JSON
 scalar DateTime
 
 type SiteRequest {
-  id: ID
+  id: ID!
   method: String @site(a: "ring.request/method")
   requestUri: ID @site(a: "juxt.site.alpha/uri")
   date: DateTime @site(a: "juxt.site.alpha/date")
+  durationMillis: Int @site(a: "juxt.site.alpha/duration-millis")
   requestHeaders: JSON @site(a: "ring.request/headers")
   "The GraphQL operation name called by the request"
 

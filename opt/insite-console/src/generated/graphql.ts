@@ -31,7 +31,9 @@ export type Scalars = {
   Boolean: boolean;
   Int: number;
   Float: number;
+  DateTime: any;
   JSON: any;
+  SiteGraphqlPathElement: any;
 };
 
 export type Api = {
@@ -107,30 +109,67 @@ export type SiteDatabaseStatus = {
   version: Scalars['String'];
 };
 
-export type SiteRequest = {
-  __typename?: 'SiteRequest';
-  date: Scalars['String'];
-  detail: Scalars['JSON'];
-  id: Scalars['ID'];
-  method: Scalars['String'];
-  /** The GraphQL operation name called by the request */
-  operationName?: Maybe<Scalars['String']>;
-  requestUri: Scalars['ID'];
-  status: Scalars['Int'];
+export type SiteError = {
+  exData?: Maybe<Scalars['JSON']>;
+  message?: Maybe<Scalars['String']>;
+  stackTrace?: Maybe<Array<Maybe<SiteStackTraceElement>>>;
 };
 
-export type SiteRequestSummary = {
-  __typename?: 'SiteRequestSummary';
-  date: Scalars['String'];
-  details: Scalars['JSON'];
-  id: Scalars['ID'];
-  status: Scalars['Int'];
+export type SiteGeneralError = SiteError & {
+  __typename?: 'SiteGeneralError';
+  exData?: Maybe<Scalars['JSON']>;
+  message?: Maybe<Scalars['String']>;
+  stackTrace?: Maybe<Array<Maybe<SiteStackTraceElement>>>;
+};
+
+export type SiteGraphqlExecutionError = SiteError & {
+  __typename?: 'SiteGraphqlExecutionError';
+  exData?: Maybe<Scalars['JSON']>;
+  fieldErrors?: Maybe<Array<Maybe<SiteGraphqlFieldError>>>;
+  message?: Maybe<Scalars['String']>;
+  operationName?: Maybe<Scalars['String']>;
+  stackTrace?: Maybe<Array<Maybe<SiteStackTraceElement>>>;
+  storedQueryResourcePath?: Maybe<Scalars['String']>;
+  variables?: Maybe<Scalars['JSON']>;
+};
+
+export type SiteGraphqlFieldError = {
+  __typename?: 'SiteGraphqlFieldError';
+  extensions?: Maybe<Scalars['JSON']>;
+  locations?: Maybe<Array<Maybe<SiteGraphqlLocation>>>;
+  message?: Maybe<Scalars['String']>;
+  path?: Maybe<Array<Maybe<Scalars['SiteGraphqlPathElement']>>>;
+  stackTrace?: Maybe<Scalars['JSON']>;
+};
+
+export type SiteGraphqlLocation = {
+  __typename?: 'SiteGraphqlLocation';
+  column?: Maybe<Scalars['Int']>;
+  line?: Maybe<Scalars['Int']>;
+};
+
+export type SiteRequest = {
+  __typename?: 'SiteRequest';
+  _detail?: Maybe<Scalars['JSON']>;
+  date?: Maybe<Scalars['DateTime']>;
+  durationMillis?: Maybe<Scalars['Int']>;
+  errors?: Maybe<Array<Maybe<SiteError>>>;
+  graphqlOperationName?: Maybe<Scalars['String']>;
+  /** The GraphQL operation name called by the request */
+  graphqlStoredQueryResourcePath?: Maybe<Scalars['String']>;
+  graphqlVariables?: Maybe<Scalars['JSON']>;
+  id?: Maybe<Scalars['ID']>;
+  method?: Maybe<Scalars['String']>;
+  requestHeaders?: Maybe<Scalars['JSON']>;
+  requestUri?: Maybe<Scalars['ID']>;
+  status?: Maybe<Scalars['Int']>;
+  statusMessage?: Maybe<Scalars['String']>;
 };
 
 export type SiteRequests = {
   __typename?: 'SiteRequests';
   count: Scalars['Int'];
-  summaries: Array<SiteRequestSummary>;
+  summaries: Array<SiteRequest>;
 };
 
 /** A Site role, for using in policies to grant authorization to access certain resources. */
@@ -139,6 +178,14 @@ export type SiteRole = {
   description?: Maybe<Scalars['String']>;
   id: Scalars['ID'];
   name: Scalars['String'];
+};
+
+export type SiteStackTraceElement = {
+  __typename?: 'SiteStackTraceElement';
+  className?: Maybe<Scalars['String']>;
+  fileName?: Maybe<Scalars['String']>;
+  lineNumber?: Maybe<Scalars['Int']>;
+  methodName?: Maybe<Scalars['String']>;
 };
 
 export type SiteStatusDetails = {
@@ -186,14 +233,14 @@ export type AllApisQuery = { __typename?: 'Query', apis: Array<{ __typename?: 'A
 export type AllRequestsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type AllRequestsQuery = { __typename?: 'Query', requests?: { __typename?: 'SiteRequests', summaries: Array<{ __typename?: 'SiteRequestSummary', date: string, id: string, status: number }> } | null | undefined };
+export type AllRequestsQuery = { __typename?: 'Query', requests?: { __typename?: 'SiteRequests', summaries: Array<{ __typename?: 'SiteRequest', date?: any | null | undefined, id?: string | null | undefined, requestUri?: string | null | undefined, durationMillis?: number | null | undefined, status?: number | null | undefined, method?: string | null | undefined, errors?: Array<{ __typename?: 'SiteGeneralError', message?: string | null | undefined } | { __typename?: 'SiteGraphqlExecutionError', message?: string | null | undefined } | null | undefined> | null | undefined }> } | null | undefined };
 
 export type GetRequestSummaryQueryVariables = Exact<{
   uri: Scalars['ID'];
 }>;
 
 
-export type GetRequestSummaryQuery = { __typename?: 'Query', request?: { __typename?: 'SiteRequest', id: string, status: number, date: string, requestUri: string, method: string, operationName?: string | null | undefined, detail: any } | null | undefined };
+export type GetRequestSummaryQuery = { __typename?: 'Query', request?: { __typename?: 'SiteRequest', id?: string | null | undefined, status?: number | null | undefined, date?: any | null | undefined, requestUri?: string | null | undefined, method?: string | null | undefined, durationMillis?: number | null | undefined, graphqlOperationName?: string | null | undefined, _detail?: any | null | undefined, graphqlStoredQueryResourcePath?: string | null | undefined, graphqlVariables?: any | null | undefined, requestHeaders?: any | null | undefined, statusMessage?: string | null | undefined, errors?: Array<{ __typename?: 'SiteGeneralError', exData?: any | null | undefined, message?: string | null | undefined, stackTrace?: Array<{ __typename?: 'SiteStackTraceElement', className?: string | null | undefined, fileName?: string | null | undefined, lineNumber?: number | null | undefined, methodName?: string | null | undefined } | null | undefined> | null | undefined } | { __typename?: 'SiteGraphqlExecutionError', exData?: any | null | undefined, message?: string | null | undefined, stackTrace?: Array<{ __typename?: 'SiteStackTraceElement', className?: string | null | undefined, fileName?: string | null | undefined, lineNumber?: number | null | undefined, methodName?: string | null | undefined } | null | undefined> | null | undefined } | null | undefined> | null | undefined } | null | undefined };
 
 
 export const AllApisDocument = `
@@ -229,7 +276,13 @@ export const AllRequestsDocument = `
     summaries {
       date
       id
+      requestUri
+      durationMillis
       status
+      method
+      errors {
+        message
+      }
     }
   }
 }
@@ -261,8 +314,23 @@ export const GetRequestSummaryDocument = `
     date
     requestUri
     method
-    operationName
-    detail
+    durationMillis
+    graphqlOperationName
+    _detail
+    graphqlStoredQueryResourcePath
+    graphqlVariables
+    errors {
+      exData
+      message
+      stackTrace {
+        className
+        fileName
+        lineNumber
+        methodName
+      }
+    }
+    requestHeaders
+    statusMessage
   }
 }
     `;

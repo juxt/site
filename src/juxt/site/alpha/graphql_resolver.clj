@@ -62,23 +62,6 @@
       (throw (ex-info "Failed to get git sha1 version" {})))
     (str/trim out)))
 
-(defn apis [{:keys [db]}]
-  (let [openapis
-        (for [[uri api] (xt/q
-                         db '{:find [openapi-uri openapi]
-                              :where [[openapi-uri :juxt.apex.alpha/openapi openapi]]})]
-          {:xt/id uri
-           :type "OPENAPI"
-           :contents api})
-        graphql-apis
-        (map first (xt/q db '{:find [uri]
-                              :where [[uri :juxt.site.alpha/graphql-compiled-schema]]}))
-        graphqls
-        (for [uri graphql-apis]
-          {:xt/id uri
-           :type "GRAPHQL"
-           :contents (xt/entity db uri)})]
-    (concat openapis graphqls)))
 
 (defn paginate
   [items {:keys [argument-values]}]

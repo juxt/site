@@ -22,6 +22,8 @@ import {
   useSortBy,
   useTable,
 } from 'react-table';
+import {useQueryClient} from 'react-query';
+import {useGetRequestSummaryQuery} from '../../generated/graphql';
 
 // Set our editable cell renderer as the default Cell renderer
 const defaultColumn = {};
@@ -33,17 +35,28 @@ type TableProps = {
 function RequestsTable({data}: TableProps) {
   const columns = React.useMemo(
     () => [
-      {accessor: 'id', Header: 'ID', width: 90},
+      {
+        Header: 'Request URI',
+        accessor: 'requestUri',
+      },
       {
         accessor: 'date',
         type: 'date',
         Header: 'Request',
-        width: 150,
+      },
+      {
+        accessor: 'method',
+        Header: 'Method',
       },
       {
         accessor: 'status',
         Header: 'Status',
         filter: 'includesValue',
+      },
+      {
+        accessor: 'durationMillis',
+        Header: 'Duration (ms)',
+        type: 'numeric',
       },
     ],
     []
@@ -57,7 +70,6 @@ function RequestsTable({data}: TableProps) {
     gotoPage,
     setPageSize,
     setFilter,
-    preGlobalFilteredRows,
     setGlobalFilter,
     state: {pageIndex, pageSize, globalFilter, filters},
   } = useTable(
@@ -71,6 +83,7 @@ function RequestsTable({data}: TableProps) {
     useSortBy,
     usePagination
   );
+  const hasErrorsFilter = filters.find((f) => f.id === 'status');
   const navigate = useNavigate<LocationGenerics>();
 
   const handleChangePage = (_event, newPage) => {
@@ -81,6 +94,16 @@ function RequestsTable({data}: TableProps) {
     setPageSize(Number(event.target.value));
   };
 
+  const queryClient = useQueryClient();
+
+  const preFetchRequest = async (requestId: string) => {
+    await queryClient.prefetchQuery(
+      useGetRequestSummaryQuery.getKey({uri: requestId}),
+      useGetRequestSummaryQuery.fetcher({uri: requestId}),
+      {enabled: !!requestId, staleTime: Infinity}
+    );
+  };
+
   return (
     <Paper sx={{width: '100%', mb: 2}}>
       <TableContainer>
@@ -89,7 +112,7 @@ function RequestsTable({data}: TableProps) {
             {
               name: 'errors',
               value: [400, 401, 403, 404, 500],
-              isActive: filters.find((f) => f.id === 'status'),
+              isActive: hasErrorsFilter,
               setter: (value: number[]) => setFilter('status', value),
             },
           ]}
@@ -124,6 +147,7 @@ function RequestsTable({data}: TableProps) {
               prepareRow(row);
               return (
                 <TableRow
+                  onMouseEnter={() => preFetchRequest(row.original.id)}
                   hover
                   sx={{cursor: 'pointer'}}
                   onClick={() =>

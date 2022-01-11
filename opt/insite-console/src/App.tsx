@@ -11,12 +11,26 @@ import {ApiList} from './Apis';
 import {PageLayout} from './components/nav';
 import {LocationGenerics} from './types';
 import {baseUrl} from './common';
+import {Container} from '@mui/material';
 
 const location = new ReactLocation<LocationGenerics>({
   parseSearch,
   stringifySearch,
 });
 const rootQueryClient = new QueryClient();
+
+function Home() {
+  return (
+    <Container>
+      <h1>InSite Console</h1>
+      <p>Welcome to the InSite console, the best place for Site insight</p>
+      <p>
+        If you haven&apos;t already, check out the docs
+        <a href="https://juxtsite.netlify.app"> here</a>
+      </p>
+    </Container>
+  );
+}
 
 export default function App() {
   return (
@@ -28,16 +42,16 @@ export default function App() {
             path: baseUrl,
             children: [
               {
-                path: '/',
-                element: 'InSite',
+                path: 'home',
+                element: <Home />,
               },
               {
                 path: 'requests',
                 element: <RequestList />,
                 loader: () =>
-                  rootQueryClient.getQueryData('requests') ??
+                  rootQueryClient.getQueryData('allRequests') ??
                   rootQueryClient
-                    .fetchQuery('requests', useAllRequestsQuery.fetcher())
+                    .fetchQuery('allRequests', useAllRequestsQuery.fetcher())
                     .then(() => ({})),
               },
               {

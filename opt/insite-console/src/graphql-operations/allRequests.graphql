@@ -3,7 +3,13 @@ query allRequests {
     summaries {
       date
       id
+      requestUri
+      durationMillis
       status
+      method
+      errors {
+        message
+      }
     }
   }
 }

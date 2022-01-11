@@ -26,6 +26,7 @@ module.exports = {
     'import/order': 'off',
     'react/require-default-props': 'off',
     'react/jsx-no-useless-fragment': 'off',
+    'no-underscore-dangle': 'off',
     'react/jsx-filename-extension': [
       1,
       {
