@@ -49,4 +49,8 @@
 
 (defn patch-static-resource
   [{::site/keys [received-representation] :as req}]
-  (throw (ex-info "TODO: patch" (into req {::incoming received-representation}))))
+  (throw
+   (ex-info
+    "TODO: patch"
+    {::site/request-context req
+     ::incoming received-representation})))

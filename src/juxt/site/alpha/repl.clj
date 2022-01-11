@@ -5,7 +5,7 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.walk :refer [postwalk]]
-   [xtdb.api :as x]
+   [xtdb.api :as xt]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
    [clojure.java.shell :as sh]
@@ -49,7 +49,7 @@
   (:juxt.site.alpha.db/xt-node main/system))
 
 (defn db []
-  (x/db (xt-node)))
+  (xt/db (xt-node)))
 
 (defn e [id]
   (postwalk
@@ -62,48 +62,51 @@
                 (= ::http/content (first x)) (str (subs (second x) 0 80) "…")
                 :else (format "(%d bytes)" (count (second x))))]
              x))
-   (x/entity (db) id)))
+   (xt/entity (db) id)))
+
+(defn hist [id]
+  (xt/entity-history (db) id :asc {:with-docs? true}))
 
 (defn put! [& ms]
   (->>
-   (x/submit-tx
+   (xt/submit-tx
     (xt-node)
     (for [m ms]
       (let [vt (:xtdb.api/valid-time m)]
         [:xtdb.api/put (dissoc m :xtdb.api/valid-time) vt])))
-   (x/await-tx (xt-node))))
+   (xt/await-tx (xt-node))))
 
 (defn grep [re coll]
   (filter #(re-matches (re-pattern re) %) coll))
 
 (defn rm! [& ids]
   (->>
-   (x/submit-tx
+   (xt/submit-tx
     (xt-node)
     (for [id ids]
       [:xtdb.api/delete id]))
-   (x/await-tx (xt-node))))
+   (xt/await-tx (xt-node))))
 
 (defn evict! [& ids]
   (->>
-   (x/submit-tx
+   (xt/submit-tx
     (xt-node)
     (for [id ids]
       [:xtdb.api/evict id]))
-   (x/await-tx (xt-node))))
+   (xt/await-tx (xt-node))))
 
 (defn q [query & args]
-  (apply x/q (db) query args))
+  (apply xt/q (db) query args))
 
 (defn t [t]
   (map
    first
-   (x/q (db) '{:find [e] :where [[e ::site/type t]] :in [t]} t)))
+   (xt/q (db) '{:find [e] :where [[e ::site/type t]] :in [t]} t)))
 
 (defn t* [t]
   (map
    first
-   (x/q (db) '{:find [e] :where [[e :type t]] :in [t]} t)))
+   (xt/q (db) '{:find [e] :where [[e :type t]] :in [t]} t)))
 
 (defn types []
   (->> (q '{:find [t]
@@ -178,8 +181,8 @@
      (doseq [rec (resources-from-stream in)]
        (println "Importing record" (:xt/id rec))
        (when (:xt/id rec)
-         (x/submit-tx node [[:xtdb.api/put rec]])))
-     (x/sync node)
+         (xt/submit-tx node [[:xtdb.api/put rec]])))
+     (xt/sync node)
      (println "Import finished."))))
 
 (defn validate-resource-line [s]
@@ -289,6 +292,13 @@
     cache/requests-cache
     (re-pattern (str "/_site/requests/" s)))))
 
+(defn recent
+  ([] (recent 5))
+  ([n]
+   (map (juxt ::site/request-id ::site/date ::site/uri :ring.request/method :ring.response/status)
+        (cache/recent cache/requests-cache n))
+   ))
+
 (defn requests-cache []
   cache/requests-cache)
 
@@ -318,7 +328,7 @@
   ([] (superusers (config)))
   ([{::site/keys [base-uri]}]
    (map first
-        (x/q (db) '{:find [user]
+        (xt/q (db) '{:find [user]
                     :where [[user ::site/type "User"]
                             [mapping ::site/type "UserRoleMapping"]
                             [mapping ::pass/assignee user]
@@ -331,26 +341,26 @@
   ([opts]
    (let [{::site/keys [base-uri]} opts
          _ (assert base-uri)
-         db (x/db (xt-node))]
+         db (xt/db (xt-node))]
      [;; Awaiting a fix to https://github.com/juxt/xtdb/issues/1480
       #_{:complete? (and
-                   (x/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
-                   (x/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
+                   (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
+                   (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
        :happy-message "Site transaction functions installed."
        :sad-message "Site transaction functions not installed. "
        :fix "Enter (put-site-txfns!) to fix this."}
 
-      {:complete? (x/entity db (str base-uri "/_site/apis/site/openapi.json"))
+      {:complete? (xt/entity db (str base-uri "/_site/apis/site/openapi.json"))
        :happy-message "Site API resources installed."
        :sad-message "Site API not installed. "
        :fix "Enter (put-site-api!) to fix this."}
 
-      {:complete? (x/entity db (str base-uri "/_site/token"))
+      {:complete? (xt/entity db (str base-uri "/_site/token"))
        :happy-message "Authentication resources installed."
        :sad-message "Authentication resources not installed. "
        :fix "Enter (put-auth-resources!) to fix this."}
 
-      {:complete? (x/entity db (str base-uri "/_site/roles/superuser"))
+      {:complete? (xt/entity db (str base-uri "/_site/roles/superuser"))
        :happy-message "Role of superuser exists."
        :sad-message "Role of superuser not yet created."
        :fix "Enter (put-superuser-role!) to fix this."}

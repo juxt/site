@@ -7,7 +7,8 @@
 (defprotocol ICache
   (put! [_ k obj] "Put object into the cache")
   (find [_ pat] "Find object with k matching regex in pat")
-  (size [_] "Count records in cache"))
+  (size [_] "Count records in cache")
+  (recent [_ n] "Return n most recent records in cache"))
 
 ;; This cache is designed for storing recent requests for debugging purposes
 ;; purposes.
@@ -50,7 +51,8 @@
         0 nil
         1 (first results)
         (throw (ex-info (format "%d results" (count results)) {})))))
-  (size [_] (count @a)))
+  (size [_] (count @a))
+  (recent [_ n] (take n (map #(into {} (.get %)) (map second (reverse @a))))))
 
 (defn new-fifo-soft-atom-cache [capacity]
   (->FifoSoftAtomCache (atom []) capacity))

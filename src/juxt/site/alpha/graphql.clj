@@ -146,9 +146,9 @@
                (log/tracef "transform is %s" transform))
 
              (cond
-               arg-type                ; is it a singular (not a LIST)
-               (let [value (or (get args arg-name)
-                               (generate-value generator-args args))
+               arg-type                ; not a LIST
+               (let [value (or (generate-value generator-args args)
+                               (get args arg-name))
                      value
                      (cond-> value
                        ;; We don't want symbols in XT entities, because this leaks the
@@ -342,6 +342,10 @@
         (log/debugf "defaulting to nil, type-ref is %s" type-ref)
         nil))))
 
+
+;; TODO: Need something (in grab) that will coerce to a list
+;;(-> object-value :stack-trace seqable?)
+
 (defn query [schema document operation-name variable-values
              {::pass/keys [subject]
               ::site/keys [db xt-node base-uri resource]
@@ -363,6 +367,10 @@
       :field-resolver
       (fn [{:keys [object-type object-value field-name argument-values]
             :as field-resolver-args}]
+
+        #_(when (= "SiteError" (get-in object-type [::g/name]))
+          (def object-value object-value)
+          )
 
         (let [types-by-name (::schema/types-by-name schema)
               field (get-in object-type [::schema/fields-by-name field-name])
@@ -427,13 +435,13 @@
                        (drop offset)
                        (take limit)
                        (map process-history-item))))
-              (throw (ex-message "History queries must have an id argument")))
+              (throw (ex-info "History queries must have an id argument" {})))
 
             (get site-args "filter")
             (cond
               (= "ids" (ffirst argument-values))
               (map lookup-entity (get argument-values "ids"))
-              :else (throw (ex-message "That filter is not implemented yet")))
+              :else (throw (ex-info "That filter is not implemented yet" {})))
 
             ;; Direct lookup - useful for query roots
             (get site-args "e")
@@ -480,6 +488,7 @@
                         (get object-value (keyword att)))]
               (if (= field-kind 'OBJECT)
                 (protected-lookup val subject db)
+                ;; TODO: check for lists
                 val))
 
             (get site-args "ref")
@@ -546,77 +555,6 @@
             (get site-args "function")
             (throw (ex-info "Feature not yet supported" {}))
 
-            (get site-args "subQuery")
-            (let [sub-query (get site-args "subQuery")
-
-                  _ (when-not (:query sub-query)
-                      (throw (ex-info "subQuery must have a query key" {:sub-query sub-query})))
-
-                  expanded-sub-query
-                  (postwalk
-                   (fn [x]
-                     (cond
-                       (and (map? x) (contains? x :a))
-                       (get object-value (keyword (get x :a)))
-                       (and (map? x) (contains? x :e))
-                       (some-> x :e (protected-lookup subject db) :juxt.http.alpha/body (String.))
-                       :else x))
-                   sub-query)
-
-                  document (:query expanded-sub-query)
-
-                  operation-name (:operationName expanded-sub-query)]
-
-              (when document
-                (let [compiled-document
-                      (document/compile-document (parser/parse document) schema)
-
-                      ;; We have the variable names in InputValue
-                      ;; format, which parses as keywords. We must
-                      ;; convert to string keys before calling the query.
-                      ;;variables (reduce-kv (fn [acc k v] (assoc acc (name k) v)) {} (:variables expanded-sub-query))
-
-                      ;; TODO: Replace this map with the Site resource, to get
-                      ;; variables from there.
-                      ;; TODO: Could also get the namespace prefix of these
-                      ;; variables as they exist in the resource by specifying in
-                      ;; the subQuery config.
-                      variables {"juxtcode" (get resource :juxtcode)}
-
-                      ;; TODO: We need to source dynamic variables from query-string
-
-                      result (try
-                               (log/tracef "Executing subQuery (count %d bytes) with operationName '%s'" (count document) operation-name)
-                               (query schema compiled-document
-                                      operation-name
-                                      variables
-                                      req)
-                               (catch Exception e
-                                 (throw (ex-info "Failed to run subquery" {:document document} e))
-                                 ))]
-
-                  (if-let [errors (seq (:errors result))]
-                    (throw (ex-info "Errors in subquery" {:errors errors}))
-                    ;; Encode as JSON for now, because we don't have dynamic schema
-                    ;; TODO: Add coercion support to custom scalars
-                    (json/write-value-as-string (:data result))
-                    )))
-
-              #_(throw (ex-info "expanded-sub-query" {:expanded-sub-query (pr-str expanded-sub-query)}))
-              #_(throw
-                 (ex-info "TODO: subQuery"
-                          {:sub-query (get site-args "subQuery")
-                           :sub-query-str (pr-str (get site-args "subQuery"))
-                           :expanded-sub-query expanded-sub-query
-                           :expanded-sub-query-str (pr-str expanded-sub-query)
-                           :schema (some? (:schema field-resolver-args))
-                           :object-value object-value
-                           :keys (keys field-resolver-args)
-                           :result result
-                           }))
-              )
-
-
             ;; Another strategy is to see if the field indexes the
             ;; object-value. This strategy allows for delays to be used to prevent
             ;; computing field values that aren't resolved.
@@ -666,14 +604,14 @@
 (defn post-handler [{::site/keys [uri db]
                      ::pass/keys [subject]
                      :as req}]
-  (let [schema (some-> (xt/entity db uri) ::grab/schema)
+  (let [schema (some-> (xt/entity db uri) ::site/graphql-compiled-schema)
         _validate-schema (and (nil? schema)
                               (let [msg (str "Schema does not exist at " uri ". Are you deploying it correctly?")]
                                 (throw (ex-info
                                         msg
-                                        (into req {:ring.response/status 400
-                                                   ::errors [msg]})))))
-        body (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
+                                        {::errors [msg] ;; TODO
+                                         ::site/request-context (assoc req :ring.response/status 400)}))))
+        body (some-> req ::site/received-representation ::http/body (String.))
 
         {query "query"
          operation-name "operationName"
@@ -682,22 +620,31 @@
           "application/json" (some-> body json/read-value)
           "application/graphql" {"query" body}
 
-          (throw (ex-info (format "Unknown content type for GraphQL request: %s" (some-> req ::site/received-representation ::http/content-type)) req)))
+          (throw
+           (ex-info
+            (format "Unknown content type for GraphQL request: %s" (some-> req ::site/received-representation ::http/content-type))
+            {::site/request-context req})))
 
         _ (when (nil? query)
-            (throw (ex-info "Nil GraphQL query" (-> req
-                                                    (update-in [::site/resource] dissoc ::grab/schema)
-                                                    (dissoc :juxt.pass.alpha/request-context)))))
-        document
+            (throw
+             (ex-info
+              "Nil GraphQL query"
+              {::site/request-context req})))
+
+        parsed-query
         (try
           (parser/parse query)
           (catch Exception e
             (log/error e "Error parsing GraphQL query")
-            (throw (ex-info "Failed to parse document" {:errors [{:message (.getMessage e)}]}))))
+            (throw
+             (ex-info
+              "Failed to parse query"
+              {::site/request-context req}
+              e))))
 
-        compiled-document
+        compiled-query
         (try
-          (document/compile-document document schema)
+          (document/compile-document parsed-query schema)
           (catch Exception e
             (log/error e "Error parsing or compiling GraphQL query")
             (let [errors (:errors (ex-data e))]
@@ -705,11 +652,8 @@
               (throw
                (ex-info
                 "Error parsing or compiling GraphQL query"
-                (into
-                 req
-                 (cond-> {:ring.response/status 400}
-                   (seq errors) (assoc ::errors errors)))
-                e)))))
+                (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                  (seq errors) (assoc ::grab/errors errors)))))))
 
         variables (into
                    (common-variables req)
@@ -717,7 +661,7 @@
 
         results
         (juxt.site.alpha.graphql/query
-         schema compiled-document operation-name variables req)]
+         schema compiled-query operation-name variables req)]
 
     (-> req
         (assoc
@@ -728,7 +672,7 @@
 
 (defn schema-resource [resource schema-str]
   (let [schema (schema/compile-schema (parser/parse schema-str))]
-    (assoc resource ::grab/schema schema ::http/body (.getBytes schema-str))))
+    (assoc resource ::site/graphql-compiled-schema schema ::http/body (.getBytes schema-str))))
 
 (defn put-schema [xt-node resource schema-str]
   (xt/await-tx
@@ -744,14 +688,16 @@
             (throw
              (ex-info
               "No schema in request"
-              (into
-               req
-               {:ring.response/status 400}))))
+              {::site/request-context {:ring.response/status 400}})))
 
         resource (xt/entity db uri)]
 
     (when (nil? resource)
-      (throw (ex-info "GraphQL resource not configured" {:uri uri})))
+      (throw
+       (ex-info
+        "GraphQL resource not configured"
+        {:uri uri
+         ::site/request-context (assoc req :ring.response/status 400)})))
 
     (try
       (put-schema xt-node resource schema-str)
@@ -759,23 +705,15 @@
       (catch Exception e
         (let [errors (:errors (ex-data e))]
           (if (seq errors)
-            (do
-              (log/trace e "error")
-              (log/tracef "schema errors: %s" (pr-str (:errors (ex-data e))))
-              (throw
-               (ex-info
-                "Errors in schema"
-                (into
-                 req
-                 (cond-> {:ring.response/status 400}
-                   (seq errors) (assoc ::errors errors)))
-                e)))
+            (throw
+             (ex-info
+              "Errors in schema"
+              (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                (seq errors) (assoc ::grab/errors errors))))
             (throw
              (ex-info
               "Failed to put schema"
-              (into
-               req
-               {:ring.response/status 500})
+              {::site/request-context (assoc req :ring.response/status 500)}
               e))))))))
 
 (defn plain-text-error-message [error]
@@ -822,6 +760,29 @@
       (cond-> error
         location (assoc :location location)))}))
 
+(defn stored-document-resource-map [document-str schema]
+  (try
+    (let [document (document/compile-document
+                    (parser/parse document-str)
+                    schema)]
+
+      {::site/graphql-compiled-query document
+       ::http/body (.getBytes document-str)
+       ::http/content-type "text/plain;charset=utf-8"})
+
+    (catch clojure.lang.ExceptionInfo e
+      (let [errors (:errors (ex-data e))]
+        (if (seq errors)
+          (throw
+           (ex-info
+            "Errors in GraphQL document"
+            {::grab/errors errors}))
+          (throw
+           (ex-info
+            "Failed to store GraphQL document due to error"
+            {}
+            e)))))))
+
 (defn stored-document-put-handler [{::site/keys [uri db xt-node] :as req}]
   (let [document-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
@@ -829,72 +790,84 @@
             (throw
              (ex-info
               "No document in request"
-              (into
-               req
-               {:ring.response/status 400}))))
+              {::site/request-context (assoc req :ring.response/status 400)})))
 
         resource (xt/entity db uri)]
 
     (when (nil? resource)
-      (throw (ex-info "GraphQL stored-document resource not configured" {:uri uri})))
+      (throw
+       (ex-info
+        "GraphQL stored-document resource not configured"
+        {:uri uri
+         ::site/request-context (assoc req :ring.response/status 400)})))
 
     ;; Validate resource
     (when-not (::site/graphql-schema resource)
-      (throw (ex-info "Resource should have a :juxt.site.alpha/graphql-schema key" {::site/resource resource})))
+      (throw
+       (ex-info
+        "Resource should have a :juxt.site.alpha/graphql-schema key"
+        {::site/resource resource
+         ::site/request-context (assoc req :ring.response/status 500)})))
 
     (let [schema-id (::site/graphql-schema resource)
-          schema (some-> db (xt/entity schema-id) :juxt.grab.alpha/schema)]
+          schema (some-> db (xt/entity schema-id) ::site/graphql-compiled-schema)]
 
       (when-not schema
         (throw
          (ex-info
           "Cannot store a GraphQL document when the schema hasn't been added"
-          {::site/graph-schema schema-id})))
+          {::site/graph-schema schema-id
+           ::site/request-context (assoc req :ring.response/status 500)})))
 
       (try
-        (let [document (document/compile-document
-                        (parser/parse document-str)
-                        schema)]
+        (let [m (stored-document-resource-map document-str schema)]
           (xt/await-tx
            xt-node
            (xt/submit-tx
             xt-node
-            [[:xtdb.api/put (assoc resource ::grab/document document)]])))
+            [[:xtdb.api/put (into resource m)]])))
 
         (assoc req :ring.response/status 204)
 
         (catch clojure.lang.ExceptionInfo e
-          (let [errors (:errors (ex-data e))]
-            (if (seq errors)
-              (do
-                (log/tracef "GraphQL document errors: %s" (pr-str (:errors (ex-data e))))
-                (throw
-                 (ex-info
-                  "Errors in GraphQL document"
-                  (into
-                   req
-                   (cond-> {:ring.response/status 400}
-                     (seq errors) (assoc ::errors errors)))
-                  e)))
-              (throw
-               (ex-info
-                "Failed to store GraphQL document due to error"
-                (into
-                 req
-                 {:ring.response/status 500})
-                e)))))))))
+          (if-let [errors (::grab/errors (ex-data e))]
+            (throw
+             ;; Throw but ignore the cause (since we pull out the key
+             ;; information from it)
+             (ex-info
+              "Errors in GraphQL document"
+              (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                (seq errors) (assoc ::grab/errors errors))))
+            (throw
+             (ex-info
+              "Failed to store GraphQL document due to error"
+              {::site/request-context (assoc req :ring.response/status 500)}
+              e))))))))
 
 (defn graphql-query [{::site/keys [db] :as req} stored-query-id operation-name variables]
-  (let [resource (xt/entity db stored-query-id)
-        _ (when-not resource (throw (ex-info "GraphQL stored query not found" {:stored-query-id stored-query-id})))
-        schema-id (::site/graphql-schema resource)
-        schema (some-> (when schema-id (xt/entity db schema-id)) ::grab/schema)
-        ;; TODO: This should be pre-parsed against schema
-        document-str (some-> resource ::http/body (String. "UTF-8"))
-        document (some-> document-str parser/parse (document/compile-document schema))]
+  (assert stored-query-id)
 
-    (when document
-      (query schema document operation-name variables req))))
+  (let [resource (xt/entity db stored-query-id)
+        _ (when-not resource
+            (throw
+             (ex-info
+              "GraphQL stored query not found"
+              {:stored-query-id stored-query-id
+               ::site/request-context (assoc req :ring.response/status 500)})))
+
+        schema-id (::site/graphql-schema resource)
+
+        _ (when-not schema-id
+            (throw (ex-info "No schema id on resource" {:xt/id stored-query-id})))
+        schema (some-> (when schema-id (xt/entity db schema-id)) ::site/graphql-compiled-schema)
+
+        document (some-> resource ::site/graphql-compiled-query)]
+
+    (when-not document
+      (throw (ex-info "Resource does not contain query" {:stored-query-id stored-query-id
+                                                         :keys (keys resource)})))
+
+    (query schema document operation-name variables req)))
 
 (defn stored-document-post-handler
   [{::site/keys [xt-node db resource received-representation base-uri]
@@ -909,7 +882,7 @@
         form (form-decode posted-body)
         operation-name (get form "operationName")
         schema-id (::site/graphql-schema resource)
-        schema (some-> (when schema-id (xt/entity db schema-id)) ::grab/schema)
+        schema (some-> (when schema-id (xt/entity db schema-id)) ::site/graphql-compiled-schema)
         ;; TODO: This should be pre-parsed against schema
         document-str (String. (::http/body resource) "UTF-8")
         document (document/compile-document (parser/parse document-str) schema)
@@ -920,20 +893,19 @@
 
 (defn text-plain-representation-body [{::site/keys [db] :as req}]
   (let [lookup (fn [id] (xt/entity db id))]
-    (-> req ::site/selected-representation ::site/variant-of lookup ::http/body (String. "utf-8"))))
+    (-> req ::site/selected-representation ::site/variant-of lookup ::http/body (String. "UTF-8"))))
 
 (defn text-html-template-model [{::site/keys [resource db]}]
   (let [original-resource (if-let [variant-of (::site/variant-of resource)] (xt/entity db variant-of) resource)
         endpoint (:juxt.site.alpha/graphql-schema original-resource)
         schema-resource (xt/entity db endpoint)
-        schema (some-> schema-resource ::grab/schema)
         schema-str (String. (some-> schema-resource ::http/body))
-        document-str (String. (::http/body original-resource) "UTF-8")
-        document (document/compile-document (parser/parse document-str) schema)
+        document-str (some-> original-resource ::http/body (String. "UTF-8"))
+        document (::site/graphql-compiled-query original-resource)
         operation-names (->> (:juxt.grab.alpha.document/operations document)
                              (filter #(= (::g/operation-type %) :query))
                              (map ::g/name))]
-    {"document" (String. (::http/body original-resource) "UTF-8")
+    {"document" document-str
      "endpoint" endpoint
      "operationNames" operation-names
      "schemaString" schema-str

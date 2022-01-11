@@ -4,7 +4,7 @@ import './index.css';
 //import reportWebVitals from './reportWebVitals';
 import Page from './Page';
 
-const mockRequest = require('./mockRequest.json').request;
+const mockRequest = require('./mockRequest.json').data.request;
 
 ReactDOM.render(
   <div>

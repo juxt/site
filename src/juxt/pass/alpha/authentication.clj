@@ -49,12 +49,13 @@
 
   ;; Check grant_type of posted-representation
   (assert (.startsWith (::http/content-type received-representation)
-             "application/x-www-form-urlencoded"))
+                       "application/x-www-form-urlencoded"))
 
   (when-not subject
     (throw
-     (ex-info "Unauthorized"
-              (into req {:ring.response/status 401}))))
+     (ex-info
+      "Unauthorized"
+      {::site/request-context (assoc req :ring.response/status 401)})))
 
   (let [posted-body (slurp (::http/body received-representation))
 
@@ -201,9 +202,10 @@
      (throw
       (ex-info
        "Failed to login"
-       (-> req
-           (assoc :ring.response/status 302 :ring.response/body "Failed to login\r\n")
-           (update :ring.response/headers assoc "location" "/")))))))
+       {::site/request-context
+        (-> req
+            (assoc :ring.response/status 302 :ring.response/body "Failed to login\r\n")
+            (update :ring.response/headers assoc "location" "/"))})))))
 
 (defn logout-response
   [req]
@@ -277,8 +279,9 @@
                      )))
 
            (throw
-            (ex-info "Auth scheme unsupported"
-                     (into req {:ring.response/status 401})))))))))
+            (ex-info
+             "Auth scheme unsupported"
+             {::site/request-context (assoc req :ring.response/status 401)}))))))))
 
 (defn login-template-model [req]
   {:query (str (:ring.request/query req))})

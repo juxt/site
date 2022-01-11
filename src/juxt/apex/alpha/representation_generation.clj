@@ -19,7 +19,7 @@
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]
    [juxt.jinx.alpha :as jinx]
-   [clojure.string :as str]))
+   [juxt.apex.alpha.jsonpointer :refer [json-pointer]]))
 
 (alias 'jinx (create-ns 'juxt.jinx.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -194,7 +194,6 @@
 
          ;; Try to get the resource's state via GraphQL
          (when-let [stored-query-resource-path (get-in resource [::apex/operation "x-juxt-site-graphql-query-resource"])]
-           #_(log/tracef "GraphQL attempt: %s" stored-query-resource-path)
            (let [stored-query-id (if (.startsWith stored-query-resource-path "/")
                                    (str (:juxt.site.alpha/base-uri req) stored-query-resource-path)
                                    stored-query-resource-path)
@@ -207,41 +206,47 @@
                   (for [[k v] (::apex/openapi-path-params resource)
                         :when (::jinx/valid? v)]
                     [k (:value v)]))]
+
              (when operation-name
-               #_(log/tracef "Trying operation: %s" operation-name)
                (let [result (graphql/graphql-query
                              req
                              stored-query-id operation-name variables)]
 
-                 #_(log/tracef "result is %s" result)
-
                  ;; TODO: Need to check if the result indicates that nothing was found
                  ;; Perhaps the test should be if all values in the :data map are nil
                  (when (seq (:errors result))
+                   (log/trace (first (:errors result)))
                    (throw
                     (ex-info
-                     "Getting the state for the resource via GraphQL resulted in errors"
-                     (into req {:ring.response/status 500
-                                ::stored-query-id stored-query-id
-                                ::operation-name operation-name
-                                ::variables variables
-                                ::errors (:errors result)
-                                ::data (:data result)}))))
+                     (format "Getting the state for the resource via GraphQL resulted in %d errors" (count (:errors result)))
+                     {::stored-query-id stored-query-id
+                      ::operation-name operation-name
+                      ::variables variables
+                      ::errors (:errors result)
+                      ::data (:data result)})))
 
-                 (:data result)))))
+                 (let [check (get-in resource [::apex/operation "x-juxt-site-data-exists-if"])]
+                   (when (or (not check) (json-pointer (:data result) check))
+                     (if-let [data (:data result)]
+                       data
+                       (throw (ex-info "Data from result is nil"
+                                       {:stored-query-id stored-query-id
+                                        :operation-name operation-name
+                                        :variables variables})))))))))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
          ;; filter out the http metadata?
-         (x/entity db uri)
+         (do
+           (log/tracef "Looking up resource-state in DB with uri %s" uri)
+           (x/entity db uri))
 
          ;; No resource-state, so there can be no representations, so 404.
          (throw
           (ex-info
            (str "No resource state from OpenAPI path: " (::apex/openapi-path req))
-           (into req {:ring.response/status 404}))))]
+           {::apex/openapi-path (::apex/openapi-path req)
+            ::site/request-context (assoc req :ring.response/status 404)})))]
 
     ;; Now we've found the resource state, we need to generate a representation
     ;; of it.
-    (entity-body req resource-state)
-
-    ))
+    (entity-body req resource-state)))

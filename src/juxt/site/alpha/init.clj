@@ -15,7 +15,8 @@
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.site.alpha.graphql :as graphql]
    [juxt.site.alpha.util :as util]
-   [selmer.parser :as selmer])
+   [selmer.parser :as selmer]
+   [xtdb.api :as xt])
   (:import
    (java.util Date)))
 
@@ -132,39 +133,19 @@
 (defn put-graphql-operations!
   "Add GraphQL operations that provide idiomatic requests to Site's GraphQL endpoint."
   [xt-node {::site/keys [base-uri]}]
-  (put!
-   xt-node
-   {:xt/id (str base-uri "/_site/graphql/requests/operations.graphql")
-    ::http/methods #{:get :head :put :post :options}
-    ::http/acceptable-on-put {"accept" "application/graphql"}
-    ::http/acceptable-on-post {"accept" "application/x-www-form-urlencoded"}
-    ::site/type "StaticRepresentation"
-    ::site/graphql-schema (str base-uri "/_site/graphql")
-    ::site/post-fn 'juxt.site.alpha.graphql/stored-document-post-handler
-    ::http/content-type "application/graphql"
-    ::http/body (.getBytes (slurp (io/resource "juxt/site/alpha/operations.graphql")))})
-  (put!
-   xt-node
-   {:xt/id (str base-uri "/_site/graphql/requests/operations.graphql.txt")
-    :juxt.site.alpha/variant-of (str base-uri "/_site/graphql/requests/operations.graphql")
-    :juxt.http.alpha/methods #{:get :head :options}
-    :juxt.http.alpha/content-type "text/plain;charset=utf-8"
-    :juxt.site.alpha/body-fn 'juxt.site.alpha.graphql/text-plain-representation-body}))
-
-(defn put-graphql-operations!
-  "Add GraphQL operations that provide idiomatic requests to Site's GraphQL endpoint."
-  [xt-node {::site/keys [base-uri]}]
-  (put!
-   xt-node
-   {:xt/id (str base-uri "/_site/graphql/requests/operations.graphql")
-    ::http/methods #{:get :head :put :post :options}
-    ::http/acceptable-on-put {"accept" "application/graphql"}
-    ::http/acceptable-on-post {"accept" "application/x-www-form-urlencoded"}
-    ::site/type "StaticRepresentation"
-    ::site/graphql-schema (str base-uri "/_site/graphql")
-    ::site/post-fn 'juxt.site.alpha.graphql/stored-document-post-handler
-    ::http/content-type "application/graphql"
-    ::http/body (.getBytes (slurp (io/resource "juxt/site/alpha/operations.graphql")))})
+  (let [schema-id (str base-uri "/_site/graphql")
+        schema (-> (xt/db xt-node) (xt/entity schema-id) ::site/graphql-compiled-schema)]
+    (put!
+     xt-node
+     (into
+      {:xt/id (str base-uri "/_site/graphql/requests/operations.graphql")
+       ::http/methods #{:get :head :post :options}
+       ::http/acceptable-on-post {"accept" "application/x-www-form-urlencoded"}
+       ::site/graphql-schema schema-id
+       ::site/post-fn 'juxt.site.alpha.graphql/stored-document-post-handler}
+      (graphql/stored-document-resource-map
+       (slurp (io/resource "juxt/site/alpha/operations.graphql"))
+       schema))))
   (put!
    xt-node
    {:xt/id (str base-uri "/_site/graphql/requests/operations.graphql.txt")

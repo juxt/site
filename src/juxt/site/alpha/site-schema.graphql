@@ -1,4 +1,6 @@
-schema {
+schema
+@site(type: "juxt.site.alpha/graphql-type")
+{
   query: Query
 }
 
@@ -144,15 +146,73 @@ type SiteRequestSummary {
 
 scalar JSON
 
+# https://www.npmjs.com/package/graphql-iso-date
+# 2007-12-03T10:15:30Z
+scalar DateTime
+
 type SiteRequest {
   id: ID
-  status: Int
-  date: String
-  requestUri: ID
-  method: String
-
+  method: String @site(a: "ring.request/method")
+  requestUri: ID @site(a: "juxt.site.alpha/uri")
+  date: DateTime @site(a: "juxt.site.alpha/date")
+  requestHeaders: JSON @site(a: "ring.request/headers")
   "The GraphQL operation name called by the request"
-  operationName: String
 
-  detail: JSON
+  graphqlStoredQueryResourcePath: String @site(a: "juxt.site.alpha/graphql-stored-query-resource-path")
+  graphqlOperationName: String @site(a: "juxt.site.alpha/graphql-operation-name")
+  graphqlVariables: JSON @site(a: "juxt.site.alpha/graphql-variables")
+
+  status: Int @site(a: "ring.response/status")
+  statusMessage: String @site(a: "juxt.site.alpha/status-message")
+
+  errors: [SiteError] @site(resolver: "juxt.site.alpha.graphql-resolver/extract-errors")
+  #@site(a: "juxt.site.alpha/errors" transform: "juxt.site.alpha.graphql-resolver/->graphql-error")
+
+  _detail: JSON
+}
+
+interface SiteError {
+  message: String
+  stackTrace: [SiteStackTraceElement]
+  exData: JSON
+}
+
+type SiteGeneralError implements SiteError {
+  message: String @site(a: "message")
+  stackTrace: [SiteStackTraceElement] @site(resolver: "juxt.site.alpha.graphql-resolver/stack-trace")
+  exData: JSON @site(a: "ex-data")
+}
+
+type SiteGraphqlExecutionError implements SiteError {
+  message: String @site(a: "message")
+  stackTrace: [SiteStackTraceElement] @site(resolver: "juxt.site.alpha.graphql-resolver/stack-trace")
+  exData: JSON @site(a: "ex-data")
+
+  storedQueryResourcePath: String @site(a: "juxt.site.alpha/graphql-stored-query-resource-path")
+  operationName: String @site(a: "juxt.site.alpha/graphql-operation-name")
+  variables: JSON @site(a: "juxt.site.alpha/graphql-variables")
+  fieldErrors: [SiteGraphqlFieldError] @site(resolver: "juxt.site.alpha.graphql-resolver/graphql-errors")
+}
+
+# Essentially, a String or an Int
+scalar SiteGraphqlPathElement
+
+type SiteGraphqlFieldError {
+  message: String
+  locations: [SiteGraphqlLocation]
+  path: [SiteGraphqlPathElement] @site(a: "path")
+  stackTrace: JSON @site(a: ["extensions" "stack-trace"])
+  extensions: JSON
+}
+
+type SiteGraphqlLocation {
+  line: Int
+  column: Int
+}
+
+type SiteStackTraceElement {
+  methodName: String
+  fileName: String
+  lineNumber: Int
+  className: String
 }

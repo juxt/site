@@ -741,7 +741,7 @@
         {:keys [base-uri file type encoding language path]
          :or {base-uri (:juxt.site.alpha/base-uri config)}}
         (:options opts)
-        type (or type (when file (content-type (.getName file))))]
+        type (or type (when file (content-type file)))]
 
     (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
     (when-not file (error-and-usage! "Asset file required" opts))

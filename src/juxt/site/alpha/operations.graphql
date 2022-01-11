@@ -2,10 +2,38 @@ query GetRequest($siteUri: ID) {
   request(id: $siteUri) {
     id
     status
+    statusMessage
     date
     requestUri
     method
-    operationName
-    detail
+
+    graphqlStoredQueryResourcePath
+    graphqlOperationName
+    graphqlVariables
+
+    errors {
+      __typename
+      message
+      stackTrace {
+        methodName
+        fileName
+        lineNumber
+        className
+      }
+      exData
+      ... on SiteGraphqlExecutionError {
+        storedQueryResourcePath
+        operationName
+        variables
+        fieldErrors {
+          message
+          locations { line column }
+          path
+          extensions
+          stackTrace
+        }
+      }
+    }
+    _detail
   }
 }

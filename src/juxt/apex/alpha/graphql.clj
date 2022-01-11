@@ -12,6 +12,7 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'jinx (create-ns 'juxt.jinx.alpha))
+(alias 'grab (create-ns 'juxt.grab.alpha))
 
 (defn post-handler [req]
   (let [resource (::site/resource req)
@@ -48,12 +49,21 @@
      stored-query-resource-path operation-name variables (pr-str result))
 
     (if (seq (:errors result))
-      (throw (ex-info "Errors on GraphQL mutation"
-                      (into req {:ring.response/status 400
-                                 ::stored-query-resource-path stored-query-resource-path
-                                 ::operation-name operation-name
-                                 ::variables variables
-                                 ::result result})))
+      (throw
+       (ex-info
+        "Errors on GraphQL mutation"
+        {::site/graphql-type "SiteGraphqlExecutionError"
+         ::site/graphql-stored-query-resource-path stored-query-resource-path
+         ::site/graphql-operation-name operation-name
+         ::site/graphql-variables variables
+         ::site/graphql-result result
+         ::grab/errors (:errors result)
+         ::site/request-context
+         (into req {:ring.response/status 400
+                    ::site/graphql-stored-query-resource-path stored-query-resource-path
+                    ::site/graphql-operation-name operation-name
+                    ::site/graphql-variables variables})}))
+
 
       (if-let [ok-response (get-in resource [::apex/operation "responses" "200"])]
         (assoc req
