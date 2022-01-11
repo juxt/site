@@ -23,14 +23,12 @@
   [{::site/keys [xt-node db resource selected-representation uri]
     ::pass/keys [subject] :as req}
    {graphql-schema-id ::site/graphql-schema
+    graphql-compiled-query ::site/graphql-compiled-query
     :as stored-document-entity}]
 
   (assert graphql-schema-id "No graphql-schema reference in stored document entity")
 
-  (let [graphql-query-bytes (::http/body stored-document-entity)
-        _ (assert graphql-query-bytes (pr-str stored-document-entity))
-
-        operation-name (or
+  (let [operation-name (or
                         (:juxt.site.alpha/graphql-operation-name selected-representation)
                         (:juxt.site.alpha/graphql-operation-name resource))
 
@@ -45,49 +43,29 @@
                     (:juxt.site.alpha/graphql-variables resource)
                     {}))
 
-        graphql-query (String. graphql-query-bytes "UTF-8")
-
         graphql-schema-entity (xt/entity db graphql-schema-id)
 
-        _ (assert graphql-schema-entity (str "No graphql-schema in database with id of " graphql-schema-id))
+        _ (when-not graphql-schema-entity
+            (throw
+             (ex-info
+              (format "No graphql-schema in database with id of %s" graphql-schema-id)
+              {:entity graphql-schema-entity})))
 
-        schema (::grab/schema graphql-schema-entity)
+        schema (::site/graphql-compiled-schema graphql-schema-entity)]
 
-        _ (assert schema (str "GraphQL schema entity does not have a current schema"))
+    (when-not schema
+      (throw (ex-info "GraphQL schema entity does not have a current schema" {:entity graphql-schema-entity})))
 
-        document
-        ;; TODO: We should parse, compile and validate GraphQL queries ahead of time
-        (let [document
-              (try
-                (parser/parse graphql-query)
-                (catch Exception e
-                  (throw
-                   (ex-info
-                    "Failed to parse document"
-                    {::site/request-context req}
-                    e))))]
-          (try
-            (document/compile-document document schema)
-            (catch Exception e
-              (let [errors (:errors (ex-data e))]
-                (log/errorf e "Error compiling GraphQL query: %s" (seq errors))
-                (throw
-                 (ex-info
-                  "Error parsing or compiling GraphQL query for template model"
-                  (cond-> {::site/request-context (assoc req :ring.response/status 500)}
-                    (seq errors) (assoc ::grab/errors errors))))))))]
+    (assert graphql-compiled-query)
 
-    (assert graphql-query)
-    #_(log/debugf "Executing GraphQL query (op-name %s) for template: %s" operation-name graphql-query)
-    ;; TODO: How to communicate back if there are any errors? Throw an exception?
-    (let [results (graphql/query schema document operation-name variables req)]
+    (let [results (graphql/query schema graphql-compiled-query operation-name variables req)]
       (when-let [errors (seq (:errors results))]
         (throw
          (ex-info
           "GraphQL errors in template model"
           {::grab/errors errors
-           ::site/request-context req}))
-        )
+           ::site/request-context req})))
+
       #_(log/debugf "Results are %s" (pr-str results))
 
       ;; Process results to apply dynamic queries - siteTemplateModel

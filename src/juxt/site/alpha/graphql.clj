@@ -604,14 +604,14 @@
 (defn post-handler [{::site/keys [uri db]
                      ::pass/keys [subject]
                      :as req}]
-  (let [schema (some-> (xt/entity db uri) ::grab/schema)
+  (let [schema (some-> (xt/entity db uri) ::site/graphql-compiled-schema)
         _validate-schema (and (nil? schema)
                               (let [msg (str "Schema does not exist at " uri ". Are you deploying it correctly?")]
                                 (throw (ex-info
                                         msg
                                         {::errors [msg] ;; TODO
                                          ::site/request-context (assoc req :ring.response/status 400)}))))
-        body (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
+        body (some-> req ::site/received-representation ::http/body (String.))
 
         {query "query"
          operation-name "operationName"
@@ -630,20 +630,21 @@
              (ex-info
               "Nil GraphQL query"
               {::site/request-context req})))
-        document
+
+        parsed-query
         (try
           (parser/parse query)
           (catch Exception e
             (log/error e "Error parsing GraphQL query")
             (throw
              (ex-info
-              "Failed to parse document"
+              "Failed to parse query"
               {::site/request-context req}
               e))))
 
-        compiled-document
+        compiled-query
         (try
-          (document/compile-document document schema)
+          (document/compile-document parsed-query schema)
           (catch Exception e
             (log/error e "Error parsing or compiling GraphQL query")
             (let [errors (:errors (ex-data e))]
@@ -660,7 +661,7 @@
 
         results
         (juxt.site.alpha.graphql/query
-         schema compiled-document operation-name variables req)]
+         schema compiled-query operation-name variables req)]
 
     (-> req
         (assoc
@@ -671,7 +672,7 @@
 
 (defn schema-resource [resource schema-str]
   (let [schema (schema/compile-schema (parser/parse schema-str))]
-    (assoc resource ::grab/schema schema ::http/body (.getBytes schema-str))))
+    (assoc resource ::site/graphql-compiled-schema schema ::http/body (.getBytes schema-str))))
 
 (defn put-schema [xt-node resource schema-str]
   (xt/await-tx
@@ -786,7 +787,7 @@
          ::site/request-context (assoc req :ring.response/status 500)})))
 
     (let [schema-id (::site/graphql-schema resource)
-          schema (some-> db (xt/entity schema-id) :juxt.grab.alpha/schema)]
+          schema (some-> db (xt/entity schema-id) ::site/graphql-compiled-schema)]
 
       (when-not schema
         (throw
@@ -803,7 +804,11 @@
            xt-node
            (xt/submit-tx
             xt-node
-            [[:xtdb.api/put (assoc resource ::grab/document document)]])))
+            [[:xtdb.api/put
+              (assoc resource
+                     ::site/graphql-compiled-query document
+                     ::http/body (.getBytes document-str)
+                     ::http/content-type "text/plain;charset=utf-8")]])))
 
         (assoc req :ring.response/status 204)
 
@@ -831,11 +836,11 @@
               "GraphQL stored query not found"
               {:stored-query-id stored-query-id
                ::site/request-context (assoc req :ring.response/status 500)})))
+
         schema-id (::site/graphql-schema resource)
-        schema (some-> (when schema-id (xt/entity db schema-id)) ::grab/schema)
-        ;; TODO: This should be pre-parsed against schema
-        document-str (some-> resource ::http/body (String. "UTF-8"))
-        document (some-> document-str parser/parse (document/compile-document schema))]
+        schema (some-> (when schema-id (xt/entity db schema-id)) ::site/graphql-compiled-schema)
+
+        document (some-> resource ::site/graphql-compiled-query)]
 
     (when document
       (query schema document operation-name variables req))))
@@ -853,7 +858,7 @@
         form (form-decode posted-body)
         operation-name (get form "operationName")
         schema-id (::site/graphql-schema resource)
-        schema (some-> (when schema-id (xt/entity db schema-id)) ::grab/schema)
+        schema (some-> (when schema-id (xt/entity db schema-id)) ::site/graphql-compiled-schema)
         ;; TODO: This should be pre-parsed against schema
         document-str (String. (::http/body resource) "UTF-8")
         document (document/compile-document (parser/parse document-str) schema)
@@ -864,20 +869,19 @@
 
 (defn text-plain-representation-body [{::site/keys [db] :as req}]
   (let [lookup (fn [id] (xt/entity db id))]
-    (-> req ::site/selected-representation ::site/variant-of lookup ::http/body (String. "utf-8"))))
+    (-> req ::site/selected-representation ::site/variant-of lookup ::http/body (String. "UTF-8"))))
 
 (defn text-html-template-model [{::site/keys [resource db]}]
   (let [original-resource (if-let [variant-of (::site/variant-of resource)] (xt/entity db variant-of) resource)
         endpoint (:juxt.site.alpha/graphql-schema original-resource)
         schema-resource (xt/entity db endpoint)
-        schema (some-> schema-resource ::grab/schema)
         schema-str (String. (some-> schema-resource ::http/body))
-        document-str (String. (::http/body original-resource) "UTF-8")
-        document (document/compile-document (parser/parse document-str) schema)
+        document-str (some-> original-resource ::http/body (String. "UTF-8"))
+        document (::site/graphql-compiled-query original-resource)
         operation-names (->> (:juxt.grab.alpha.document/operations document)
                              (filter #(= (::g/operation-type %) :query))
                              (map ::g/name))]
-    {"document" (String. (::http/body original-resource) "UTF-8")
+    {"document" document-str
      "endpoint" endpoint
      "operationNames" operation-names
      "schemaString" schema-str
