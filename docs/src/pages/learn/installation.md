@@ -55,7 +55,7 @@ rlwrap nc localhost 50505
 Site contains several modules in the `opt` directory. These modules are used to provide the following functionality:
 
 - graphiql - an html template that can display [GraphiQL](/reference/graphiql). You will need node (version <17) installed to build this.
-- login-form - a basic login page and API for authenticating users
 - swagger-ui - an html template that can display [Swagger UI](/reference/swagger-ui)
+- insite-console - A Dashboard containing both the swagger and graphiql dashboards, as well as a tool for viewing a table of all requests (including error stack traces, response latency and more)
 
 To install any of these modules, look in the README file inside the modules directory. A better way to install these is planned for a future release.
