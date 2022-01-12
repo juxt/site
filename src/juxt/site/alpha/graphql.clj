@@ -125,14 +125,14 @@
   (= (get-in types-by-name [arg-name ::g/kind]) 'SCALAR))
 
 (defn- args-to-entity
-  [args schema field base-uri site-args type-k]
+  [{:keys [argument-values schema field base-uri site-args type-k]}]
   (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
-  (let [types-by-name (:juxt.grab.alpha.schema/types-by-name schema)
+  (let [args argument-values
+        types-by-name (:juxt.grab.alpha.schema/types-by-name schema)
         transform-sym (some-> site-args (get "transform") symbol)
         transform (when transform-sym (requiring-resolve transform-sym))
         _  (when (and transform-sym (not transform))
              (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
-
         entity
         (reduce
          (fn [acc arg-def]
@@ -231,6 +231,21 @@
 
       )))
 
+(defn args-to-entities
+  [{:keys [argument-values field types-by-name] :as opts}]
+  (let [args (and
+              (= 1 (count argument-values))
+              (first (vals argument-values)))]
+    (when-not args
+      (throw (ex-info "Mutations that insert multiple entities must take a single InputType as their only argument"
+                      argument-values)))
+    (for [arg args
+          :let [input-type-name (-> field ::g/arguments-definition first ::g/type-ref ::g/list-type ::g/name)
+                input-type (::g/input-values (get types-by-name input-type-name))
+                arg-type (::g/list-type (::g/type-ref field))
+                field (assoc field ::g/arguments-definition input-type ::g/type-ref arg-type)]]
+      (args-to-entity (assoc opts :argument-values arg :field field)))))
+
 (defn process-xt-results
   [field results]
   (let [type-ref (::g/type-ref field)]
@@ -312,12 +327,12 @@
     object-value))
 
 (defn await-tx
-  [xt-node tx]
+  [xt-node txes]
   (xt/await-tx
    xt-node
    (xt/submit-tx
     xt-node
-    [tx])))
+    txes)))
 
 (defn xt-delete
   [id]
@@ -329,11 +344,15 @@
        (throw (ex-info "Trying to put object without xt id" {:object object})))
   [:xtdb.api/put object valid-from])
 
-(defn put-object! [xt-node object]
-  (let [valid-time (some-> object :xtdb.api/valid-time
-                           (java.time.Instant/parse)
-                           (java.util.Date/from))]
-    (await-tx xt-node (xt-put (dissoc object :xtdb.api/valid-time) valid-time))))
+(defn put-objects! [xt-node objects]
+  (let [processed-objects
+        (for [object objects]
+            (let [valid-time (some-> object
+                                     :xtdb.api/valid-time
+                                     (java.time.Instant/parse)
+                                     (java.util.Date/from))]
+              (xt-put (dissoc object :xtdb.api/valid-time) valid-time)))]
+    (await-tx xt-node processed-objects)))
 
 (defn default-for-type
   [type-ref]
@@ -348,6 +367,35 @@
         (log/debugf "defaulting to nil, type-ref is %s" type-ref)
         nil))))
 
+(defn perform-mutation!
+  [{:keys [argument-values site-args xt-node lookup-entity field-kind] :as opts}]
+  (let [action (or (get site-args "mutation") "put")
+        validate-id! (fn [args]
+                       (let [id (get args "id")]
+                         (or id (throw (ex-info "Delete mutations need an 'id' key"
+                                                {:arg-values argument-values})))))
+        bulk-mutation (= 'LIST field-kind)]
+    (case action
+      "delete"
+      (let [id (validate-id! argument-values)]
+        (await-tx xt-node [(xt-delete id)])
+        ;; TODO: Allow an argument to correspond to valid-time, via
+        ;; @site(a: "xtdb.api/valid-time").
+        (lookup-entity id))
+      "put"
+      (if bulk-mutation
+        (let [txes (args-to-entities opts)]
+          (put-objects! xt-node txes)
+          txes)
+        (let [tx (args-to-entity opts)]
+          (put-objects! xt-node [tx])
+          tx))
+      "update"
+      (let [new-entity (args-to-entity opts)
+            old-entity (some-> new-entity :xt/id lookup-entity)
+            new-entity (merge old-entity new-entity)]
+        (put-objects! xt-node [new-entity])
+        new-entity))))
 
 ;; TODO: Need something (in grab) that will coerce to a list
 ;;(-> object-value :stack-trace seqable?)
@@ -397,32 +445,22 @@
                    db)
               object-id (:xt/id object-value)
               ;; TODO: Protected lookup please!
-              lookup-entity (fn [id] (xt/entity db id))]
+              lookup-entity (fn [id] (xt/entity db id))
+              opts {:site-args site-args
+                    :xt-node xt-node
+                    :schema schema
+                    :field field
+                    :mutation? mutation?
+                    :base-uri base-uri
+                    :type-k type-k
+                    :argument-values argument-values
+                    :lookup-entity lookup-entity
+                    :field-resolver-args field-resolver-args
+                    :subject subject
+                    :db db}]
 
           (cond
-            mutation?
-            (let [action (or (get site-args "mutation") "put")
-                  validate-id! (fn [args]
-                                 (let [id (get args "id")]
-                                   (or id (throw (ex-info "Delete mutations need an 'id' key"
-                                                          {:arg-values argument-values})))))]
-              (case action
-                "delete"
-                (let [id (validate-id! argument-values)]
-                  (await-tx xt-node (xt-delete id))
-                  ;; TODO: Allow an argument to correspond to valid-time, via
-                  ;; @site(a: "xtdb.api/valid-time").
-                  (lookup-entity id))
-                "put"
-                (let [object (args-to-entity argument-values schema field base-uri site-args type-k)]
-                  (put-object! xt-node object)
-                  object)
-                "update"
-                (let [new-entity (args-to-entity argument-values schema field base-uri site-args type-k)
-                      old-entity (some-> new-entity :xt/id lookup-entity)
-                      new-entity (merge old-entity new-entity)]
-                  (put-object! xt-node new-entity)
-                  new-entity)))
+            mutation? (perform-mutation! opts)
 
             (get site-args "history")
             (if-let [id (get argument-values "id")]
