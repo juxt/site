@@ -2170,6 +2170,11 @@ editions@^2.2.0:
     errlop "^2.0.0"
     semver "^6.3.0"
 
+edn-data@^0.2.0:
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/edn-data/-/edn-data-0.2.0.tgz#139ce844e9f32360ff17eb1131c39cf95f5009a8"
+  integrity sha512-fdwcWAsaCmiUmngxOJr+L2/UCijwCJuLGEoM9CR6QvJS1GVlKa79piTKufvD+qU4+oZGi01uRQVvTTIL5qPrvw==
+
 electron-to-chromium@^1.3.723, electron-to-chromium@^1.3.896:
   version "1.4.12"
   resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.4.12.tgz#5f73d1278c6205fc41d7a0ebd75563046b77c5d8"

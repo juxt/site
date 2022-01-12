@@ -24,6 +24,7 @@ import YouWillLearnCard from './YouWillLearnCard';
 import {Challenges, Hint, Solution} from './Challenges';
 import {IconNavArrow} from '../Icon/IconNavArrow';
 import ButtonLink from 'components/ButtonLink';
+import {SiteCliArgs} from './SiteCliDocs';
 
 const P = (p: JSX.IntrinsicElements['p']) => (
   <p className="whitespace-pre-wrap my-4" {...p} />
@@ -364,4 +365,5 @@ export const MDXComponents = {
   Challenges,
   Hint,
   Solution,
+  SiteCliArgs,
 };

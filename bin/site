@@ -965,7 +965,7 @@
                                            spa)
                                   (prn "adding headers")
                                   {"site-type" "AppRoutes"
-                                   "site-pattern" (str base-uri "/" path "/.*")}))
+                                   "site-pattern" (str base-uri "/" path "/app/.*")}))
                       :body (io/file file)
                       :throw false})]
                 (case status
@@ -1173,7 +1173,7 @@
     {:description (:doc (meta #'put-static-site))
      :cli-options [["-d" "--directory DIR" "Directory containing static site files"]
                    ["-p" "--path PATH" "Path the site will be available at. e.g -p mysite will make the site available at BASE_URI/mysite/index.html"]
-                   ["-spa" "--spa SPA" "If set the html file will be served at PATH/*"]]
+                   ["-spa" "--spa SPA" "If set the html file will be served at PATH/app/*"]]
      :delegate put-static-site}]])
 
 (let [{:keys [options arguments summary errors]}

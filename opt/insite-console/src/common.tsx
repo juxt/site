@@ -8,4 +8,4 @@ export function notEmpty<TValue>(
   return true;
 }
 
-export const baseUrl = '/_site/insite';
+export const baseUrl = '/_site/insite/app';
