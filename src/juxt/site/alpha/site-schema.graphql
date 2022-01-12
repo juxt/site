@@ -31,9 +31,11 @@ type Query {
   """
   Access a request
   """
-  request(id: ID): SiteRequest @site(resolver: "juxt.site.alpha.graphql-resolver/request")
+  request(id: ID!): SiteRequest
+    @site(resolver: "juxt.site.alpha.graphql-resolver/request")
 
-  requests: SiteRequests @site(resolver: "juxt.site.alpha.graphql-resolver/requests")
+  requests(limit: Int offset: Int): SiteRequests
+    @site(resolver: "juxt.site.alpha.graphql-resolver/requests")
 
   """
   Access the currently logged in user
@@ -67,7 +69,7 @@ type SiteSubject {
 An object representing a Site user. Anyone who needs to log in to the system must have a user record.
 """
 type SiteUser {
-  id: ID @site(a: "xt/id") # should definitely default this for ID scalars...
+  id: ID!
   username: String @site(a: "juxt.pass.alpha/username")
   name: String
   email: String
@@ -83,65 +85,59 @@ type SiteUser {
 A Site role, for using in policies to grant authorization to access certain resources.
 """
 type SiteRole {
-  id: ID @site(a: "xt/id")
-  name: String @site(a: "name")
-  description: String @site(a: "description")
+  id: ID!
+  name: String!
+  description: String
 }
 
 type SiteConfiguration {
-  baseUri: String
-  unixPassPasswordPrefix: String
-  serverPortNumber: Int
+  baseUri: String!
+  unixPassPasswordPrefix: String!
+  serverPortNumber: Int!
 }
 
 type SiteSystem {
-  database: SiteDatabaseStatus
+  database: SiteDatabaseStatus!
   """
   Access Site's configuration
   """
   # Adding a NON_NULL wrapper (Configuration!) seems to break introspection on
   # GraphiQL, this might not have been completely implemented yet. For now,
   # don't use NON_NULL.
-  configuration: SiteConfiguration
+  configuration: SiteConfiguration!
 
-  version: SiteVersionDetails
-  status: SiteStatusDetails
+  version: SiteVersionDetails!
+  status: SiteStatusDetails!
 }
 
 type SiteVersionDetails {
-  gitSha: String
+  gitSha: String!
 }
 
 type SiteStatusDetails {
-  txLogAvail: Int
-  docStoreAvail: Int
-  indexStoreAvail: Int
+  txLogAvail: Int!
+  docStoreAvail: Int!
+  indexStoreAvail: Int!
 }
 
 type SiteDatabaseStatus {
-  version: String
-  revision: String
-  indexVersion: Int
-  kvStore: String
-  estimateNumKeys: Int
-  kvSize: Int
-  attributeStats: [SiteAttributeStat]
+  version: String!
+  revision: String!
+  indexVersion: Int!
+  kvStore: String!
+  estimateNumKeys: Int!
+  kvSize: Int!
+  attributeStats: [SiteAttributeStat!]!
 }
 
 type SiteAttributeStat {
-  attribute: String
-  frequency: Int
+  attribute: String!
+  frequency: Int!
 }
 
 type SiteRequests {
-  count: Int
-  summaries: [SiteRequestSummary]
-}
-
-type SiteRequestSummary {
-  id: ID
-  status: Int
-  date: String
+  count: Int!
+  summaries: [SiteRequest!]!
 }
 
 scalar JSON
@@ -151,10 +147,11 @@ scalar JSON
 scalar DateTime
 
 type SiteRequest {
-  id: ID
+  id: ID!
   method: String @site(a: "ring.request/method")
   requestUri: ID @site(a: "juxt.site.alpha/uri")
   date: DateTime @site(a: "juxt.site.alpha/date")
+  durationMillis: Int @site(a: "juxt.site.alpha/duration-millis")
   requestHeaders: JSON @site(a: "ring.request/headers")
   "The GraphQL operation name called by the request"
 

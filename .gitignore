@@ -8,3 +8,4 @@ opt/graphiql/target
 .vscode
 /import
 *.dylib
+.clj-kondo

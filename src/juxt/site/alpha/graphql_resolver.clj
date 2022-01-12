@@ -62,6 +62,15 @@
       (throw (ex-info "Failed to get git sha1 version" {})))
     (str/trim out)))
 
+
+(defn paginate
+  [items {:keys [argument-values]}]
+  (let [limit (get argument-values "limit" 1000)
+        offset (get argument-values "offset" 0)]
+    (some->> (seq items)
+             (drop offset)
+             (take limit))))
+
 (defn apis [{:keys [db]}]
   (let [openapis
         (for [[uri api] (xt/q
@@ -87,17 +96,16 @@
 (defn stack-trace [args]
   (some->> args :object-value :stack-trace (map bean)))
 
-(defn requests [_]
+(defn requests [args]
   {"count"
    (fn [_] (.size cache/requests-cache))
 
    "summaries"
    (fn [_]
-     (for [{:keys [xt/id ring.response/status juxt.site.alpha/date]}
-           (seq cache/requests-cache)]
-       {"id" id
-        "status" status
-        "date" (str date)}))})
+     (for [{:keys [xt/id]}
+           (paginate (remove #(= "/_site/graphql" (:ring.request/path %))
+                             cache/requests-cache) args)]
+       (request {:argument-values {"id" id}})))})
 
 (defn system [_]
   (let [system (repl/system)]

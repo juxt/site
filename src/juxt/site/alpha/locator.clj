@@ -89,7 +89,8 @@
    ;; Is it in XTDB?
    (when-let [r (x/entity db uri)]
      (cond-> (assoc r ::site/resource-provider ::db)
-       (= (get r ::site/type) "StaticRepresentation")
+       (or (= (get r ::site/type) "StaticRepresentation")
+           (= (get r ::site/type) "AppRoutes"))
        (assoc ::site/put-fn static/put-static-resource
               ::site/patch-fn static/patch-static-resource)))
 

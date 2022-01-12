@@ -1,0 +1,15 @@
+query allRequests {
+  requests {
+    summaries {
+      date
+      id
+      requestUri
+      durationMillis
+      status
+      method
+      errors {
+        message
+      }
+    }
+  }
+}
