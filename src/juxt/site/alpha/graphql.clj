@@ -154,9 +154,13 @@
                (log/tracef "transform is %s" transform))
 
              (cond
-               arg-type                ; not a LIST
-               (let [value (or (generate-value generator-args args)
-                               (get args arg-name))
+               arg-type                 ; not a LIST
+               (let [value (or
+                            ;; If provided we use it
+                            (get args arg-name)
+                            ;; Else we try to generate it
+                            (generate-value generator-args args)
+                            )
                      value
                      (cond-> value
                        ;; We don't want symbols in XT entities, because this leaks the
