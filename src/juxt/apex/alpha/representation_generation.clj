@@ -6,7 +6,7 @@
    [clojure.pprint :refer [pprint]]
    [juxt.site.alpha.response :as response]
    [clojure.walk :refer [postwalk]]
-   [xtdb.api :as x]
+   [xtdb.api :as xt]
    [hiccup.page :as hp]
    selmer.parser
    [json-html.core :refer [edn->html]]
@@ -19,7 +19,9 @@
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]
    [juxt.jinx.alpha :as jinx]
-   [juxt.apex.alpha.jsonpointer :refer [json-pointer]]))
+   [juxt.apex.alpha.jsonpointer :refer [json-pointer]]
+   [xtdb.api :as xt]
+   [clojure.string :as str]))
 
 (alias 'jinx (create-ns 'juxt.jinx.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -52,9 +54,9 @@
 (defn entity-body
   [{::site/keys [selected-representation resource db base-uri] :as req}
    resource-state]
+
   (case (::http/content-type selected-representation)
     "application/json"
-    ;; TODO: Might want to filter out the http metadata at some point
     (-> resource-state
         (json/write-value-as-string (json/object-mapper {:pretty true}))
         (str "\r\n")
@@ -66,16 +68,7 @@
                                    (::http/content-type selected-representation)])
           template (->
                     (get config "x-juxt-site-template")
-                    (selmer.parser/render {:base-uri base-uri}))
-
-          ;; Push the resource-state through jsonista and back. We do this
-          ;; jsonista expands out objects like StackTraceElement[], whereas
-          ;; selmer just calls a .toString. This also makes the resource state
-          ;; going into the tempate aligned with the body of the
-          ;; application/json representation.
-          resource-state (-> resource-state
-                             json/write-value-as-bytes
-                             json/read-value)]
+                    (selmer.parser/render {:base-uri base-uri}))]
       (cond
         template
         (selmer/render-file
@@ -143,9 +136,47 @@
           [:pre (with-out-str (pprint resource-state))])
          (.getBytes "UTF-8"))))))
 
+(defn deep-merge
+  [a b]
+  (if (map? a)
+    (into a (for [[k v] b] [k (deep-merge (a k) v)]))
+    b))
+
 ;; By default we output the resource state, but there may be a better rendering
 ;; of collections, which can be inferred from the schema being an array and use
 ;; the items subschema.
+
+(defn find-path-by-operation-id [openapi operation-id]
+  (let [paths (get openapi "paths")]
+    (some
+     (fn [[path path-object]]
+       (some
+        (fn [[method op]]
+          (when (= (get op "operationId") operation-id)
+            {:method method :path path})) path-object))
+     paths)))
+
+(defn expand-path [path resolve-param]
+  (assert (string? path))
+  (assert (ifn? resolve-param))
+  (str/replace path #"\{([\p{Alnum}]+)\}" (fn [[_ param]] (resolve-param param))))
+
+(comment
+  (expand-path "/~{juxtcode}/employment-record/{foo}" str/reverse))
+
+(defn deref-operation [openapi resolve-param]
+  (fn [x]
+    (let [server (get-in openapi ["servers" 0 "url"])]
+      (or
+       (when (map? x)
+         (when-let [operation-ref (get x "x-juxt-site-operation-ref")]
+           (when-let [{:keys [path]} (find-path-by-operation-id openapi operation-ref)]
+             (when path
+               (str server (expand-path path resolve-param))))))
+       x))))
+
+(defn process-merge-resource-state [merge-resource-state openapi resolve-param]
+  (postwalk (deref-operation openapi resolve-param) merge-resource-state))
 
 ;; This generates representations
 (defn entity-bytes-generator
@@ -154,13 +185,16 @@
 
   (assert authorization "No authorization to generate entity payload")
 
-  (let [param-defs
+  (let [lookup (fn [id] (xt/entity db id))
+        param-defs
         (get-in resource [::apex/operation "parameters"])
 
-        db (x/with-tx db [[:xtdb.api/put
-                           (-> subject
-                               (assoc :xt/id :subject)
-                               util/->freezeable)]])
+        openapi (delay (some-> resource ::apex/openapi lookup ::apex/openapi))
+
+        db (xt/with-tx db [[:xtdb.api/put
+                            (-> subject
+                                (assoc :xt/id :subject)
+                                util/->freezeable)]])
 
         query-params (when-let [query-param-defs
                                 (not-empty (filter #(= (get % "in") "query") param-defs))]
@@ -185,7 +219,7 @@
         (or
          (when query
            (try
-             (cond->> (x/q db query)
+             (cond->> (xt/q db query)
                extract-first-projection? (map first)
                extract-entry (map #(get % extract-entry))
                singular-result? first)
@@ -227,8 +261,35 @@
 
                  (let [check (get-in resource [::apex/operation "x-juxt-site-data-exists-if"])]
                    (when (or (not check) (json-pointer (:data result) check))
-                     (if-let [data (:data result)]
-                       data
+                     (if-let [resource-state (:data result)]
+
+                       (let [resource-state
+                             ;; Push the resource-state through jsonista and back. We do this
+                             ;; jsonista expands out objects like StackTraceElement[], whereas
+                             ;; selmer just calls a .toString. This also makes the resource state
+                             ;; going into the tempate aligned with the body of the
+                             ;; application/json representation.
+                             (-> resource-state
+                                 json/write-value-as-bytes
+                                 json/read-value)
+
+                             ;; If present, this data can be merged
+                             merge-resource-state
+                             (some->
+                              resource
+                              (get-in [::apex/operation "x-juxt-site-merge-resource-state"])
+                              (process-merge-resource-state
+                               @openapi
+                               (fn [param]
+                                 (let [path-param (get-in resource [::apex/openapi-path-params param])]
+                                   (when (::jinx/valid? path-param)
+                                     (:value path-param))))))]
+
+                         (log/tracef "merge-resource-state: %s" (pr-str merge-resource-state))
+
+                         (cond-> resource-state
+                           merge-resource-state (deep-merge merge-resource-state)))
+
                        (throw (ex-info "Data from result is nil"
                                        {:stored-query-id stored-query-id
                                         :operation-name operation-name
@@ -238,7 +299,7 @@
          ;; filter out the http metadata?
          (do
            (log/tracef "Looking up resource-state in DB with uri %s" uri)
-           (x/entity db uri))
+           (xt/entity db uri))
 
          ;; No resource-state, so there can be no representations, so 404.
          (throw
