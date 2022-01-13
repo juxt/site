@@ -14,7 +14,7 @@
    [clojure.set :refer [rename-keys]]
    [xtdb.api :as xt]
    [clojure.tools.logging :as log]
-   [clojure.walk :refer [postwalk]]
+   [clojure.walk :refer [postwalk keywordize-keys]]
    [clojure.edn :as edn]
    [tick.core :as t]))
 
@@ -178,7 +178,12 @@
 
                    :else
                    (try
-                     (assoc acc key value)
+                     (merge acc (keywordize-keys value))
+                     ;; TODO if we need to assoc, like if someone wants to nest
+                     ;; a map inside an entity to prevent it being indexed, then
+                     ;; that needs to happen here. probably with a directive to
+                     ;; differentiate from the default which is to merge (which
+                     ;; is needed to support input types)
                      (catch Exception e
                        (throw
                         (ex-info
