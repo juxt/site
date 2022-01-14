@@ -594,8 +594,10 @@
             {:method method
              ::site/allowed-methods allowed-methods
              ::site/request-context
-             {:ring.response/status 405
-              :ring.response/headers {"allow" (join-keywords allowed-methods true)}}})))
+             (into
+              req
+              {:ring.response/status 405
+               :ring.response/headers {"allow" (join-keywords allowed-methods true)}})})))
         (h (assoc req ::site/allowed-methods allowed-methods)))
       (h req))))
 
@@ -1030,6 +1032,7 @@
         ;; request (which is more recent), predominates but a catcher can always
         ;; override aspects, such as the ring.response/status.
 
+        #_(log/tracef e "wrap-error-handling, message: %s" (.getMessage e))
         #_(log/tracef e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
 
         (let [ex-data (ex-data e)
