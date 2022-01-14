@@ -459,6 +459,8 @@
                     :xt-node xt-node
                     :schema schema
                     :field field
+                    :field-kind field-kind
+                    :types-by-name types-by-name
                     :mutation? mutation?
                     :base-uri base-uri
                     :type-k type-k
@@ -663,7 +665,7 @@
                               (let [msg (str "Schema does not exist at " uri ". Are you deploying it correctly?")]
                                 (throw (ex-info
                                         msg
-                                        {::errors [msg] ;; TODO
+                                        {::site/errors [msg] ;; TODO
                                          ::site/request-context (assoc req :ring.response/status 400)}))))
         body (some-> req ::site/received-representation ::http/body (String.))
 
@@ -782,9 +784,9 @@
 
 (defn put-error-text-body [req]
   (cond
-    (::errors req)
+    (::site/errors req)
     (->>
-     (for [error (::errors req)]
+     (for [error (::site/errors req)]
        (cond-> (str \tab (plain-text-error-message error))
          ;;(:location error) (str " (line " (-> error :location :line) ")")
          ))
@@ -796,11 +798,11 @@
 (defn put-error-json-body [req]
   (json/write-value-as-string
    {:message "Schema compilation errors"
-    :errors (::errors req)}))
+    :errors (::site/errors req)}))
 
 (defn post-error-text-body [req]
   (->>
-   (for [error (::errors req)]
+   (for [error (::site/errors req)]
      (cond-> (str \tab (:error error))
        (:location error) (str " (line " (-> error :location :row inc) ")")))
    (into ["Query errors"])
@@ -809,7 +811,7 @@
 (defn post-error-json-body [req]
   (json/write-value-as-string
    {:errors
-    (for [error (::errors req)
+    (for [error (::site/errors req)
           :let [location (:location error)]]
       (cond-> error
         location (assoc :location location)))}))
