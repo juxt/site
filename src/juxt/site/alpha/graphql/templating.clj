@@ -22,7 +22,8 @@
 (defn template-model
   [{::site/keys [xt-node db resource selected-representation uri]
     ::pass/keys [subject] :as req}
-   {graphql-schema-id ::site/graphql-schema
+   {stored-query-resource-path :xt/id
+    graphql-schema-id ::site/graphql-schema
     graphql-compiled-query ::site/graphql-compiled-query
     :as stored-document-entity}]
 
@@ -58,17 +59,24 @@
 
     (assert graphql-compiled-query)
 
-    (let [results (graphql/query schema graphql-compiled-query operation-name variables req)]
-      (when-let [errors (seq (:errors results))]
+    (let [result (graphql/query schema graphql-compiled-query operation-name variables req)]
+      (when-let [errors (seq (:errors result))]
         (throw
          (ex-info
           "GraphQL errors in template model"
           {::grab/errors errors
-           ::site/request-context req})))
+           ::site/graphql-type "SiteGraphqlExecutionError"
+           ::site/graphql-stored-query-resource-path stored-query-resource-path
+           ::site/graphql-operation-name operation-name
+           ::site/graphql-variables variables
+           ::site/graphql-result result
+           ::site/request-context (into req {::site/graphql-stored-query-resource-path stored-query-resource-path
+                                             ::site/graphql-operation-name operation-name
+                                             ::site/graphql-variables variables})})))
 
-      (log/debugf "Results are %s" (pr-str results))
+      #_(log/debugf "GraphQL result is %s" (pr-str result))
 
-      (:data results))))
+      (:data result))))
 
 
 ;; Deprecated. This has been abandoned in favour of using an OpenAPI approach,
