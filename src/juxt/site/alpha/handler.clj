@@ -1035,7 +1035,10 @@
         #_(log/tracef e "wrap-error-handling, message: %s" (.getMessage e))
         #_(log/tracef e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
 
-        (let [ex-data (ex-data e)
+        (let [ex-data
+              (-> (ex-data e)
+                  (update-in [::site/request-context :ring.response/status]
+                             (fn [x] (or x 500))))
               req (or (::site/request-context ex-data) req)
               status (:ring.response/status req)]
 
