@@ -93,7 +93,7 @@
   (let [req (get cache/requests-cache (get-in args [:argument-values "id"]))]
     (assoc req :_detail req)))
 
-(defn stack-trace [args]
+(defn stack-trace-resolver [args]
   (some->> args :object-value :stack-trace (map bean)))
 
 (defn requests [args]
@@ -149,7 +149,7 @@
 
      }))
 
-(defn extract-errors [args]
+(defn extract-errors-resolver [args]
   (some->>
    args
    :object-value

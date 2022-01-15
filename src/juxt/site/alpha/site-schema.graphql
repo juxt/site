@@ -162,7 +162,7 @@ type SiteRequest {
   status: Int @site(a: "ring.response/status")
   statusMessage: String @site(a: "juxt.site.alpha/status-message")
 
-  errors: [SiteError] @site(resolver: "juxt.site.alpha.graphql-resolver/extract-errors")
+  errors: [SiteError] @site(resolver: "juxt.site.alpha.graphql-resolver/extract-errors-resolver")
   #@site(a: "juxt.site.alpha/errors" transform: "juxt.site.alpha.graphql-resolver/->graphql-error")
 
   _detail: JSON
@@ -176,13 +176,13 @@ interface SiteError {
 
 type SiteGeneralError implements SiteError {
   message: String @site(a: "message")
-  stackTrace: [SiteStackTraceElement] @site(resolver: "juxt.site.alpha.graphql-resolver/stack-trace")
+  stackTrace: [SiteStackTraceElement] @site(resolver: "juxt.site.alpha.graphql-resolver/stack-trace-resolver")
   exData: JSON @site(a: "ex-data")
 }
 
 type SiteGraphqlExecutionError implements SiteError {
   message: String @site(a: "message")
-  stackTrace: [SiteStackTraceElement] @site(resolver: "juxt.site.alpha.graphql-resolver/stack-trace")
+  stackTrace: [SiteStackTraceElement] @site(resolver: "juxt.site.alpha.graphql-resolver/stack-trace-resolver")
   exData: JSON @site(a: "ex-data")
 
   storedQueryResourcePath: String @site(a: "juxt.site.alpha/graphql-stored-query-resource-path")
