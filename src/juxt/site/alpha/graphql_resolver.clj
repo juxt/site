@@ -48,6 +48,8 @@
 (defn constant [args]
   (some-> args :argument-values (get "value")))
 
+(defn make-string-transform [o] (String. o))
+
 (defn df [dir]
   (when-let [out (:out (sh/sh "df" "--output=avail" dir))]
     (Long/parseLong

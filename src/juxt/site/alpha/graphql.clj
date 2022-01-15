@@ -432,8 +432,8 @@
             :as field-resolver-args}]
 
         #_(when (= "SiteError" (get-in object-type [::g/name]))
-          (def object-value object-value)
-          )
+            (def object-value object-value)
+            )
 
         (let [types-by-name (::schema/types-by-name schema)
               field (get-in object-type [::schema/fields-by-name field-name])
@@ -528,11 +528,11 @@
                                       e))))
                   limited-results (limit-results argument-values results)
                   result-entities (cond->>
-                                   (pull-entities db subject limited-results q)
-                                    (get site-args "a")
-                                    (map (keyword (get site-args "a")))
+                                      (pull-entities db subject limited-results q)
+                                      (get site-args "a")
+                                      (map (keyword (get site-args "a")))
 
-                                   )]
+                                      )]
               ;;(log/tracef "GraphQL results is %s" (seq result-entities))
 
               (process-xt-results field result-entities))
@@ -541,11 +541,15 @@
             (let [att (get site-args "a")
                   val (if (vector? att)
                         (traverse object-value att subject db)
-                        (get object-value (keyword att)))]
+                        (get object-value (keyword att)))
+                  transform-sym (some-> site-args (get "transform") symbol)
+                  transform (when transform-sym (requiring-resolve transform-sym))
+                  ]
               (if (= field-kind 'OBJECT)
                 (protected-lookup val subject db)
                 ;; TODO: check for lists
-                val))
+                (cond-> val
+                  transform transform)))
 
             (get site-args "ref")
             (let [ref (get site-args "ref")
