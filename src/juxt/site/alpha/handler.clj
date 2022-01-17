@@ -298,7 +298,7 @@
 
 (defn post-redirect [{::site/keys [xt-node db]
                       :as req}]
-  (let [resource-state (openapi/validate-request-body req)
+  (let [resource-state (::apex/request-instance (openapi/validate-request-payload req))
         {::site/keys [resource]} resource-state
         existing (x/entity db resource)]
     (->> (x/submit-tx
