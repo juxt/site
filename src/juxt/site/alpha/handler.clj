@@ -298,7 +298,7 @@
 
 (defn post-redirect [{::site/keys [xt-node db]
                       :as req}]
-  (let [resource-state (openapi/received-body->resource-state req)
+  (let [resource-state (openapi/parse-request-body req)
         {::site/keys [resource]} resource-state
         existing (x/entity db resource)]
     (->> (x/submit-tx

@@ -58,7 +58,7 @@
            (if (= (::site/resource-provider resource) ::openapi-empty-document-resource)
              201 204))))
 
-(defmulti received-body->resource-state
+(defmulti parse-request-body
   "Convert the request payload into the proposed new state of a resource."
   (fn [req]
     (let [rep (::site/received-representation req)
@@ -68,7 +68,7 @@
       ;; payload, if not, throw a 415.
       (format "%s/%s" type subtype))))
 
-(defmethod received-body->resource-state :default [req]
+(defmethod parse-request-body :default [req]
   ;; Regardless of whether the OpenAPI declares it can read the content-type, we
   ;; can't process it. TODO: Should have some way of passing it 'raw' to some
   ;; processing function that is able to turn it into resource state (a XT
@@ -78,34 +78,18 @@
     "Unsupported media type"
     {::site/request-context (assoc req :ring.response/status 415)})))
 
-(defmethod received-body->resource-state "application/edn"
+(defmethod parse-request-body "application/edn"
   [{::site/keys [received-representation resource db] :as req}]
   ;; The assumption here is that EDN resource is 'good to go' as resource
   ;; state. But authorization rules will be run by put-resource-state that will
   ;; determine whether it is allowed in.
   received-representation)
 
-(defmethod received-body->resource-state "application/json"
-  [{::site/keys [received-representation resource db] :as req}]
-  (let [schema (get-in resource [::apex/operation "requestBody" "content"
-                                 "application/json" "schema"])
-        _ (assert schema)
-        body (::http/body received-representation)
-        instance (try
-                   (json/read-value body)
-                   (catch Exception _
-                     (throw
-                      (ex-info
-                       "Bad JSON in input"
-                       {::site/request-context (assoc req :ring.response/status 400)}))))
-        _ (assert instance)
-        openapi-ref (get resource ::apex/openapi) _ (assert openapi-ref)
-        openapi-resource (x/entity db openapi-ref) _ (assert openapi-resource)
-
-        validation
+(defn validate-instance [req instance schema base-document]
+  (let [validation
         (jinx.api/validate
          schema instance
-         {:base-document (::apex/openapi openapi-resource)})
+         {:base-document (::apex/openapi base-document)})
 
         _ (when-not (::jinx/valid? validation)
             (throw
@@ -115,11 +99,35 @@
                ::site/request-context (assoc req :ring.response/status 400)})))
 
         validation (-> validation
-                       process-transformations process-keyword-mappings)
+                       process-transformations process-keyword-mappings)]
 
-        path-params (get-in req [::site/resource ::apex/openapi-path-params])
+    (::jinx/instance validation)))
 
-        instance (::jinx/instance validation)
+(defmethod parse-request-body "application/json"
+  [{::site/keys [received-representation resource db] :as req}]
+  (let [
+        body (::http/body received-representation)
+
+        instance (try
+                   (json/read-value body)
+                   (catch Exception _
+                     (throw
+                      (ex-info
+                       "Bad JSON in input"
+                       {::site/request-context (assoc req :ring.response/status 400)}))))
+        _ (assert instance)
+
+        schema (get-in resource [::apex/operation "requestBody" "content"
+                                 "application/json" "schema"])
+        _ (assert schema)
+
+        openapi-ref (get resource ::apex/openapi)
+        _ (assert openapi-ref)
+
+        openapi-resource (x/entity db openapi-ref)
+        _ (assert openapi-resource)
+
+        instance (validate-instance req instance schema (::apex/openapi openapi-resource))
 
         ;; Replace any remaining string keys with keyword equivalents.
         instance (reduce-kv
@@ -128,13 +136,14 @@
 
         ;; Inject path parameter values into body, this is a feature, enabled by
         ;; the x-juxt-site-inject-property OpenAPI extension keyword.
-        instance (reduce-kv
-                  (fn [acc _ v]
-                    (let [inject-property (get v :inject-property)]
-                      (cond-> acc
-                        inject-property
-                        (assoc (keyword inject-property) (:value v)))))
-                  instance path-params)]
+        instance (let [path-params (get-in req [::site/resource ::apex/openapi-path-params])]
+                   (reduce-kv
+                    (fn [acc _ v]
+                      (let [inject-property (get v :inject-property)]
+                        (cond-> acc
+                          inject-property
+                          (assoc (keyword inject-property) (:value v)))))
+                    instance path-params))]
     instance))
 
 (defn put-resource-state
@@ -364,7 +373,7 @@
                (put-resource-state
                 req
                 (-> req
-                    received-body->resource-state
+                    parse-request-body
                     ;; Since this is a PUT, we add
                     (assoc :xt/id (::site/uri req))))))))))))
 
