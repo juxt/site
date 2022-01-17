@@ -58,7 +58,7 @@
            (if (= (::site/resource-provider resource) ::openapi-empty-document-resource)
              201 204))))
 
-(defmulti parse-request-body
+(defmulti validate-request-body
   "Convert the request payload into the proposed new state of a resource."
   (fn [req]
     (let [rep (::site/received-representation req)
@@ -68,17 +68,15 @@
       ;; payload, if not, throw a 415.
       (format "%s/%s" type subtype))))
 
-(defmethod parse-request-body :default [req]
+(defmethod validate-request-body :default [req]
   ;; Regardless of whether the OpenAPI declares it can read the content-type, we
-  ;; can't process it. TODO: Should have some way of passing it 'raw' to some
-  ;; processing function that is able to turn it into resource state (a XT
-  ;; resource)?
+  ;; can't process it.
   (throw
    (ex-info
     "Unsupported media type"
     {::site/request-context (assoc req :ring.response/status 415)})))
 
-(defmethod parse-request-body "application/edn"
+(defmethod validate-request-body "application/edn"
   [{::site/keys [received-representation resource db] :as req}]
   ;; The assumption here is that EDN resource is 'good to go' as resource
   ;; state. But authorization rules will be run by put-resource-state that will
@@ -103,7 +101,7 @@
 
     (::jinx/instance validation)))
 
-(defmethod parse-request-body "application/json"
+(defmethod validate-request-body "application/json"
   [{::site/keys [received-representation resource db] :as req}]
   (let [
         body (::http/body received-representation)
@@ -146,6 +144,8 @@
                     instance path-params))]
     instance))
 
+;; TODO: Should have some way of passing it 'raw' to some processing function
+;; that is able to turn it into resource state (a XT resource)?
 (defn put-resource-state
   "Put some new resource state into XT, if authorization checks pass. The new
   resource state should be a valid XT entity, with a :xt/id"
@@ -361,7 +361,7 @@
                           (ex-info
                            (str "Failed to find post-fn: " post-fn-sym)
                            {::site/request-context (assoc req :ring.response/status 500)}))))]
-               (f req))))
+               (f (assoc req ::apex/parsed-request-body)))))
 
           (= method :put)
           (assoc
@@ -373,7 +373,7 @@
                (put-resource-state
                 req
                 (-> req
-                    parse-request-body
+                    validate-request-body
                     ;; Since this is a PUT, we add
                     (assoc :xt/id (::site/uri req))))))))))))
 
