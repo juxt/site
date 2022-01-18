@@ -1039,17 +1039,22 @@
               (-> (ex-data e)
                   (update-in [::site/request-context :ring.response/status]
                              (fn [x] (or x 500))))
-              req (or (::site/request-context ex-data) req)
-              status (:ring.response/status req)]
+              rc (or (::site/request-context ex-data) req)
+              status (:ring.response/status rc)]
 
-          (assert (::site/start-date req) "Invalid request context")
+          (if (::site/start-date rc)
+            (do
+              ;; Don't log exceptions which are used to escape (e.g. 302, 401).
+              (when (or (not (integer? status)) (>= status 500))
+                (let [ex-data (->storable ex-data)]
+                  (log/errorf e "%s: %s" (.getMessage e) (pr-str (dissoc ex-data ::site/request-context)))))
 
-          ;; Don't log exceptions which are used to escape (e.g. 302, 401).
-          (when (or (not (integer? status)) (>= status 500))
-            (let [ex-data (->storable ex-data)]
-              (log/errorf e "%s: %s" (.getMessage e) (pr-str (dissoc ex-data ::site/request-context)))))
+              (assert (::site/start-date rc) "HERE")
+              (error-response rc e))
 
-          (error-response req e)))
+            (error-response
+             req
+             (ex-info "ExceptionInfo caught, but with an invalid request-context attached" {::site/request-context rc} e)))))
 
       (catch Throwable t (respond-internal-error req t))
       (finally (org.slf4j.MDC/clear)))))
