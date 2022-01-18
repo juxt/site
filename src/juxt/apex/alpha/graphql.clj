@@ -24,11 +24,8 @@
                         (get-in resource [::apex/operation "x-juxt-site-graphql-operation-name"])
                         (get-in resource [::apex/operation "operationId"]))
 
-        input-body-as-string
-        (-> req :juxt.site.alpha/received-representation
-            :juxt.http.alpha/body
-            (String.))
-        form (form-decode input-body-as-string)
+        form (::apex/request-payload req)
+        _ (assert form)
 
         variables (into
                    (graphql/common-variables req)

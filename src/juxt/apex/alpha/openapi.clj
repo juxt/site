@@ -13,7 +13,8 @@
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha.perf :refer [fast-get-in]]
-   [juxt.site.alpha.util :as util])
+   [juxt.site.alpha.util :as util]
+   [ring.util.codec :refer [form-decode url-decode]])
   (:import (java.net URLDecoder)))
 
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -87,7 +88,7 @@
   (let [validation
         (jinx.api/validate
          schema instance
-         {:base-document (::apex/openapi base-document)})
+         {:base-document base-document})
 
         _ (when-not (::jinx/valid? validation)
             (throw
@@ -142,6 +143,46 @@
                           inject-property
                           (assoc (keyword inject-property) (:value v)))))
                     instance path-params))]
+
+    (assoc req ::apex/request-payload instance)))
+
+(defmethod validate-request-payload "application/x-www-form-urlencoded"
+  [{::site/keys [received-representation resource db] :as req}]
+  (let [
+        body (::http/body received-representation)
+
+        instance (try
+                   (form-decode (String. body))
+                   (catch Exception e
+                     (throw
+                      (ex-info
+                       "Bad input"
+                       {::site/request-context (assoc req :ring.response/status 400)}
+                       e))))
+        _ (assert instance)
+
+        ;; Unfilled fields will be presented as empty strings. We want to nil
+        ;; these out because if they are present they will be validated, even if
+        ;; the field itself is optional. So an empty string "" means that the
+        ;; field is not provided.
+        instance (reduce-kv
+                  (fn [acc k v]
+                    (cond-> acc (not (str/blank? v)) (assoc k v)))
+                  {} instance)
+
+        _ (log/tracef "form instance is %s" instance)
+
+        schema (get-in resource [::apex/operation "requestBody" "content"
+                                 "application/x-www-form-urlencoded" "schema"])
+        _ (assert schema)
+
+        openapi-ref (get resource ::apex/openapi)
+        _ (assert openapi-ref)
+
+        openapi-resource (x/entity db openapi-ref)
+        _ (assert openapi-resource)
+
+        instance (validate-instance req instance schema (::apex/openapi openapi-resource))]
 
     (assoc req ::apex/request-payload instance)))
 
@@ -354,6 +395,7 @@
           (assoc
            ::site/post-fn
            (fn post-fn-proxy [req]
+             (assert ::site/start-date req)
              (log/debug "Calling post-fn" post-fn-sym)
              (let [f (try
                        (requiring-resolve post-fn-sym)
