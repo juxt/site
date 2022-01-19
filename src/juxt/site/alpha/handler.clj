@@ -6,7 +6,7 @@
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [xtdb.api :as x]
+   [xtdb.api :as xt]
    [crypto.password.bcrypt :as password]
    [juxt.apex.alpha.openapi :as openapi]
    [juxt.dave.alpha :as dave]
@@ -238,7 +238,7 @@
   representation metadata. This function takes a representation and merges in
   its template's metadata, if necessary."
   [db representation]
-  (if-let [template (some->> representation ::site/template (x/entity db))]
+  (if-let [template (some->> representation ::site/template (xt/entity db))]
     (merge
      (select-keys template [::http/content-type ::http/content-encoding ::http/content-language])
      representation)
@@ -246,7 +246,7 @@
 
 (defn find-variants [{::site/keys [resource uri db] :as req}]
 
-  (let [variants (x/q db '{:find [(pull v [*])]
+  (let [variants (xt/q db '{:find [(pull v [*])]
                            :where [[v ::site/variant-of uri]]
                            :in [uri]}
                       uri)]
@@ -286,12 +286,12 @@
                      :as req}]
   (let [location
         (str uri (hash (select-keys request-instance [::site/resource ::site/variant])))
-        existing (x/entity db location)]
+        existing (xt/entity db location)]
 
-    (->> (x/submit-tx
+    (->> (xt/submit-tx
           xt-node
           [[:xtdb.api/put (merge {:xt/id location} request-instance)]])
-         (x/await-tx xt-node))
+         (xt/await-tx xt-node))
 
     (into req {:ring.response/status (if existing 204 201)
                :ring.response/headers {"location" location}})))
@@ -300,15 +300,15 @@
                       :as req}]
   (let [resource-state (::apex/request-instance (openapi/validate-request-payload req))
         {::site/keys [resource]} resource-state
-        existing (x/entity db resource)]
-    (->> (x/submit-tx
+        existing (xt/entity db resource)]
+    (->> (xt/submit-tx
           xt-node
           [[:xtdb.api/put
             (merge
              {:xt/id resource}
              ;; ::site/resource = :xt/id, no need to duplicate
              (dissoc resource-state ::site/resource))]])
-         (x/await-tx xt-node))
+         (xt/await-tx xt-node))
 
     (into req {:ring.response/status (if existing 204 201)})))
 
@@ -413,8 +413,8 @@
         {::site/request-context (assoc req :ring.response/status 500)})))))
 
 (defn DELETE [{::site/keys [xt-node uri] :as req}]
-  (let [tx (x/submit-tx xt-node [[:xtdb.api/delete uri]])]
-    (x/await-tx xt-node tx)
+  (let [tx (xt/submit-tx xt-node [[:xtdb.api/delete uri]])]
+    (xt/await-tx xt-node tx)
     (into req {:ring.response/status 204})))
 
 (defn OPTIONS [{::site/keys [resource allowed-methods] :as req}]
@@ -463,7 +463,7 @@
   (dave.methods/propfind req))
 
 (defn MKCOL [{::site/keys [xt-node uri]}]
-  (let [tx (x/submit-tx
+  (let [tx (xt/submit-tx
             xt-node
             [[:xtdb.api/put
               {:xt/id uri
@@ -472,7 +472,7 @@
                ::http/content-type "text/html;charset=utf-8"
                ::http/content "<h1>Index</h1>\r\n"
                ::http/options {"DAV" "1"}}]])]
-    (x/await-tx xt-node tx))
+    (xt/await-tx xt-node tx))
   {:ring.response/status 201
    :ring.response/headers {}})
 
@@ -619,12 +619,12 @@
   ;; - this should really be in a 'finally' block.
   (fn [{::site/keys [xt-node] ::pass/keys [subject] :as req}]
 
-    (let [db (x/db xt-node) ; latest post-method db
+    (let [db (xt/db xt-node) ; latest post-method db
           result (h req)
 
           triggers
           (map first
-               (x/q db '{:find [rule]
+               (xt/q db '{:find [rule]
                          :where [[rule ::site/type "Trigger"]]}))
 
           request-context
@@ -639,8 +639,8 @@
            'environment {}}]
 
       (try
-        ;; TODO: Can we use the new refreshed db here to save another call to x/db?
-        (let [actions (rules/eval-triggers (x/db xt-node) triggers request-context)]
+        ;; TODO: Can we use the new refreshed db here to save another call to xt/db?
+        (let [actions (rules/eval-triggers (xt/db xt-node) triggers request-context)]
           (when (seq actions)
             (log/tracef "Triggered actions are %s" (pr-str actions)))
           (doseq [action actions]
@@ -886,7 +886,7 @@
   variables to determine the resource to use."
   [{::site/keys [db]} status]
   (when-let [res (ffirst
-            (x/q db '{:find [(pull er [*])]
+            (xt/q db '{:find [(pull er [*])]
                       :where [[er ::site/type "ErrorResource"]
                               [er :ring.response/status status]]
                       :in [status]} status))]
@@ -1117,7 +1117,7 @@
   (assert xt-node)
   (assert base-uri)
   (fn [{:ring.request/keys [scheme] :as req}]
-    (let [db (x/db xt-node)
+    (let [db (xt/db xt-node)
           req-id (new-request-id base-uri)
           scheme+authority
           (or uri-prefix
@@ -1196,7 +1196,7 @@
       (when-let [req-id (::site/request-id req)]
         (let [{:ring.request/keys [method] ::site/keys [xt-node]} req]
           (when (or (= method :post) (= method :put))
-            (x/submit-tx
+            (xt/submit-tx
              xt-node
              [[:xtdb.api/put (-> req ->storable
                                 (select-keys [:juxt.pass.alpha/subject
