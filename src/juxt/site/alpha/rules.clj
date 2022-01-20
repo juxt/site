@@ -72,13 +72,14 @@
         ;; database. This new database is only in scope for this authorization.
         db (x/with-tx db (mapv (fn [e] [:crux.tx/put e]) (vals temp-id-map)))]
 
-    (keep
-     (fn [trigger-id]
-       (let [trigger (x/entity db trigger-id)
-             q (merge (::site/query trigger)
-                      {:in (vec (keys temp-id-map))})
-             action-data (apply x/q db q (map :crux.db/id (vals temp-id-map)))]
-         (when (seq action-data)
-           {:trigger trigger
-            :action-data action-data})))
-     triggers)))
+    (doall
+     (keep
+      (fn [trigger-id]
+        (let [trigger (x/entity db trigger-id)
+              q (merge (::site/query trigger)
+                       {:in (vec (keys temp-id-map))})
+              action-data (apply x/q db q (map :crux.db/id (vals temp-id-map)))]
+          (when (seq action-data)
+            {:trigger trigger
+             :action-data action-data})))
+      triggers))))
