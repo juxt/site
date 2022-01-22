@@ -63,10 +63,15 @@ type Mutation {
 }
 
 type Query {
-  character(id: ID!): Character @site(e: "id")
+  character(id: ID!): Character
   characters: [Character]
+  charactersById(ids: [ID!]!): [Character]
   episodes: [Episode]
 }
 ```
 
 </APIAnatomy>
+
+Common types of query:
+
+There are many common queries you might want to do when you have data inserted in Site. The simplest is a lookup by the ID of the object you wish to query. If you write a query in your schema with a single 'id' argument, site will look that id up in the database (while applying all authz rules) and return it if it exists and you are allowed to see it. The same is true for a single ids argument, but a list of matching types are returned.
