@@ -125,7 +125,7 @@
   (= (get-in types-by-name [arg-name ::g/kind]) 'SCALAR))
 
 (defn- args-to-entity
-  [{:keys [argument-values schema field base-uri site-args type-k]}]
+  [{:keys [argument-values schema field base-uri site-args type-k subject]}]
   (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
   (let [args argument-values
         types-by-name (:juxt.grab.alpha.schema/types-by-name schema)
@@ -230,6 +230,7 @@
                      {:type "UUID"
                       :pathPrefix type}
                      {})))
+      subject (assoc :_siteSubject (::pass/username subject))
       (nil? (type-k entity)) (assoc type-k type)
       (:id entity) (dissoc :id)
       transform (transform args)
