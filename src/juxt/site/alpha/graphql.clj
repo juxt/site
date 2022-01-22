@@ -134,6 +134,9 @@
 (defn scalar? [arg-name types-by-name]
   (= (get-in types-by-name [arg-name ::g/kind]) 'SCALAR))
 
+(defn enum? [arg-name types-by-name]
+  (= (get-in types-by-name [arg-name ::g/kind]) 'ENUM))
+
 (defn- args-to-entity
   [{:keys [argument-values schema field base-uri site-args type-k subject]}]
   (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
@@ -647,7 +650,7 @@
             ;; Another strategy is to see if the field indexes the
             ;; object-value. This strategy allows for delays to be used to prevent
             ;; computing field values that aren't resolved.
-            (contains? object-value field-name)
+            (and (map? object-value) (contains? object-value field-name))
             (let [f (force (get object-value field-name))]
               (if (fn? f) (f argument-values) f))
 
@@ -656,14 +659,22 @@
             (get object-value :xt/id)
 
             ;; Or simply try to extract the keyword
-            (contains? object-value (keyword field-name))
+            (and (map? object-value)
+                 (or
+                  ;; schema specifies this field is on the object
+                  (get-in field [::schema/directives-by-name "onObject"])
+                  (contains? object-value (keyword field-name))))
             (let [result (get object-value (keyword field-name))]
-              (if (-> field ::g/type-ref list-type?)
-                (limit-results argument-values result)
-                result))
+                (cond
+                  (-> field ::g/type-ref list-type?)
+                  (limit-results argument-values result)
+                  ;; TODO validate enum (enum? (field->type field) types-by-name)
+                  :else
+                  result))
 
             (and (field->type field)
-                 (not (scalar? (field->type field) types-by-name)))
+                 (not (scalar? (field->type field) types-by-name))
+                 (not (enum? (field->type field) types-by-name)))
             (infer-query db
                          subject
                          field
