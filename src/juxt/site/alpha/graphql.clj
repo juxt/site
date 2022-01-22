@@ -59,9 +59,14 @@
     {:find ['e]
      :where [['e type-k type]]}))
 
-(defn to-xt-query [field-or-type args values type-k]
-  (let [query (rename-keys
-               (or (get args "q")
+(defn to-xt-query
+  [{:keys [field argument-values type-k site-args object-value]}]
+  (let [values argument-values
+        field-or-type (or
+                       (get site-args "type")
+                       field)
+        query (rename-keys
+               (or (get site-args "q")
                    (default-query field-or-type type-k))
                ;; probably should do camelcase to kabab
                {:order :order-by})
@@ -75,7 +80,11 @@
                (and (map? x) (:set x))
                (-> (get :set) set)
                (and (map? x) (:edn x))
-               (-> (get :edn) edn/read-string)
+               (-> (get :edn)
+                   (selmer/render {"type" type-k
+                                   "object-id" (:xt/id object-value)
+                                   "args" values})
+                   edn/read-string)
                (= 'type x)
                ((constantly type-k)))
              (catch Exception e
@@ -458,6 +467,7 @@
               opts {:site-args site-args
                     :xt-node xt-node
                     :schema schema
+                    :object-value object-value
                     :field field
                     :field-kind field-kind
                     :types-by-name types-by-name
@@ -511,7 +521,7 @@
                   in (cond->> (map symbol (arg-keys argument-values))
                        object-id (concat ['object]))
                   q (assoc
-                     (to-xt-query field site-args argument-values type-k)
+                     (to-xt-query opts)
                      :in (if (second in) [in] (vec in)))
 
                   query-args (cond->> (vals argument-values)
@@ -638,7 +648,7 @@
             (infer-query db
                          subject
                          field
-                         (to-xt-query field site-args argument-values type-k)
+                         (to-xt-query opts)
                          argument-values)
 
             (get argument-values "id")
@@ -649,8 +659,7 @@
             (case (get site-args "aggregate")
               "count" (count
                        (xt/q
-                        db (to-xt-query
-                            (get site-args "type") site-args argument-values type-k))))
+                        db (to-xt-query opts))))
 
             :else
             (default-for-type (::g/type-ref field)))))})))
