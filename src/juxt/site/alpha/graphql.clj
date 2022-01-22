@@ -513,12 +513,6 @@
                        (map process-history-item))))
               (throw (ex-info "History queries must have an id argument" {})))
 
-            (get site-args "filter")
-            (cond
-              (= "ids" (ffirst argument-values))
-              (map lookup-entity (get argument-values "ids"))
-              :else (throw (ex-info "That filter is not implemented yet" {})))
-
             ;; Direct lookup - useful for query roots
             (get site-args "e")
             (let [e (get site-args "e")]
@@ -646,6 +640,14 @@
             ;; similarly sandboxed execution environment.
             (get site-args "function")
             (throw (ex-info "Feature not yet supported" {}))
+
+            (and (= 1 (count argument-values))
+                 (= "id" (ffirst argument-values)))
+            (lookup-entity (get argument-values "id"))
+
+            (and (= 1 (count argument-values))
+                 (= "ids" (ffirst argument-values)))
+            (map lookup-entity (get argument-values "ids"))
 
             ;; Another strategy is to see if the field indexes the
             ;; object-value. This strategy allows for delays to be used to prevent
