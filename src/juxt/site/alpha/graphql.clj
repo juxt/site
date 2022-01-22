@@ -272,13 +272,19 @@
         :else
         (first results)))))
 
+(defn assoc-valid-time
+  [entity db]
+  (assoc entity :_siteValidTime
+         (some-> db
+                 (xt/entity-tx (:xt/id entity))
+                 ::xt/valid-time
+                 t/instant
+                 .toString)))
+
 (defn protected-lookup [e subject db]
   (let [lookup #(xt/entity db %)
         ent (some-> (lookup e)
-                    (assoc :_siteValidTime
-                           (str (t/instant
-                                 (::xt/valid-time
-                                  (xt/entity-tx db e))))))]
+                    (assoc-valid-time db))]
     (if-let [ent-ns (::pass/namespace ent)]
       (let [rules (some-> ent-ns lookup ::pass/rules)
             acls (->>
@@ -484,7 +490,7 @@
                             :desc)
                     process-history-item
                     (fn [{::xt/keys [valid-time doc]}]
-                      (assoc doc :_siteValidTime valid-time))]
+                      (assoc doc :_siteValidTime (t/instant valid-time)))]
                 (with-open [history (xt/open-entity-history db id order {:with-docs? true})]
                   (->> history
                        (iterator-seq)
