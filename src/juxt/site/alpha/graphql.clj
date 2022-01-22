@@ -555,6 +555,17 @@
 
               (process-xt-results field result-entities))
 
+            (get site-args "itemForId")
+            (let [item-key (keyword (get site-args "itemForId"))
+                  query {:find ['e]
+                         :where [['e type-k (field->type field)]
+                                 ['e item-key (get argument-values "id")]]}
+                  results (xt/q db query)
+                  result-entities (cond->> (pull-entities db subject results query)
+                                    (get site-args "a")
+                                    (map (keyword (get site-args "a"))))]
+              (vec (process-xt-results field result-entities)))
+
             (get site-args "a")
             (let [att (get site-args "a")
                   val (if (vector? att)
