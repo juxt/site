@@ -433,11 +433,10 @@
           new-entity))
       "rollback"
       (let [as-of (try
-                    (let [str (get argument-values "asOf")]
-                      (def str str)
-                      (if (str/ends-with? str "Z")
-                        (-> str t/inst)
-                        (-> str
+                    (let [as-of (get argument-values "asOf")]
+                      (if (str/ends-with? as-of "Z")
+                        (-> as-of t/inst)
+                        (-> as-of
                             (t/parse-date-time
                              (t/formatter :iso-local-date-time))
                             t/inst)))
@@ -506,6 +505,7 @@
                     :field field
                     :field-kind field-kind
                     :types-by-name types-by-name
+                    :object-value object-value
                     :mutation? mutation?
                     :base-uri base-uri
                     :type-k type-k
