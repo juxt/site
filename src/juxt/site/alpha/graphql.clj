@@ -89,7 +89,12 @@
                (= 'type x)
                ((constantly type-k)))
              (catch Exception e
-               (throw (ex-info "Error in q site arg" {:x x} e)))))
+               (throw (ex-info "Error in q site arg"
+                               {:x x
+                                :selmer-args
+                                {"type" type-k
+                                 "object-id" (:xt/id object-value)
+                                 "args" values}} e)))))
          query)
         limit (get values "limit")
         offset (get values "offset")
