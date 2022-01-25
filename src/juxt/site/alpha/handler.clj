@@ -772,9 +772,7 @@
 
 (defn access-control-match-origin [allow-origins origin]
   (some (fn [[pattern result]]
-          (when (or
-                 (and (string? pattern) (= pattern origin))
-                 (and (instance? java.util.regex.Pattern pattern) (re-matches pattern origin)))
+          (when (re-matches (re-pattern pattern) origin)
             result))
         allow-origins))
 

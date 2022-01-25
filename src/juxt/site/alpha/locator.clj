@@ -26,7 +26,8 @@
                                [r ::site/pattern p]
                                [(first grps) grp0]
                                [(some? grp0)]
-                               [(re-matches p uri) grps]]
+                               [(re-pattern p) pat]
+                               [(re-matches pat uri) grps]]
 
                        :in [uri]} uri))]
 

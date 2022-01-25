@@ -29,6 +29,15 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
+(defn base64-reader [form]
+  {:pre [(string? form)]}
+  (let [decoder (java.util.Base64/getDecoder)]
+    (.decode decoder form)))
+
+(def edn-readers
+  {'juxt.site/base64 base64-reader
+   'regex #(re-pattern %)})
+
 (defn config []
   (main/config))
 
@@ -150,20 +159,15 @@
     (java.time.ZoneId/systemDefault))
    (java.time.Instant/now)))
 
-(defn base64-reader [form]
-  {:pre [(string? form)]}
-  (let [decoder (java.util.Base64/getDecoder)]
-    (.decode decoder form)))
-
 ;; Start import at 00:35
 
 (defn resources-from-stream [in]
   (let [record (try
                  (edn/read
-                  {:eof :eof :readers {'juxt.site/base64 base64-reader
-                                       'regex #(re-pattern %)}}
+                  {:eof :eof :readers edn-readers}
                   in)
                  (catch Exception e
+                   (def in in)
                    (prn (.getMessage e))))]
     (cond
       (nil? record)
@@ -187,7 +191,7 @@
 
 (defn validate-resource-line [s]
   (edn/read-string
-   {:eof :eof :readers {'juxt.site/base64 base64-reader}}
+   {:eof :eof :readers edn-readers}
    s))
 
 (defn get-zipped-output-stream []

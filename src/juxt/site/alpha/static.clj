@@ -31,7 +31,7 @@
                      {::http/etag (util/etag received-representation)
                       ::http/last-modified start-date
                       ::site/request request-id}
-                   pattern (assoc ::site/pattern (re-pattern pattern))
+                   pattern (assoc ::site/pattern pattern)
                    type (assoc ::site/type type)
                    variant-of (assoc ::site/variant-of variant-of)
                    classification (assoc ::pass/classification classification)

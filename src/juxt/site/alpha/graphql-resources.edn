@@ -7,7 +7,7 @@
  :juxt.http.alpha/acceptable-on-post "application/json"
 
  :juxt.site.alpha/access-control-allow-origins
- {#regex "http://localhost:\\p{Digit}+"
+ {"http://localhost:\\p{Digit}+"
   {:juxt.site.alpha/access-control-allow-methods #{:post}
    :juxt.site.alpha/access-control-allow-headers #{"authorization" "content-type"}
    :juxt.site.alpha/access-control-allow-credentials true}}
