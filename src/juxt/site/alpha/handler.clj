@@ -862,6 +862,9 @@
 (defn respond-internal-error [{::site/keys [request-id] :as req} e]
   (log/error e (str "Internal Error: " (.getMessage e)))
   ;; TODO: We should allow an ErrorResource for 500 errors
+
+  ;; TODO: Negotiate a better format for internal server errors
+
   (let [default-body
         (str "<body>\r\n"
              (cond-> "<h1>Internal Server Error</h1>\r\n"
