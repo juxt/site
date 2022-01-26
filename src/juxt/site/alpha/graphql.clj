@@ -18,6 +18,7 @@
    [clojure.edn :as edn]
    [tick.core :as t]))
 
+(alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'grab (create-ns 'juxt.grab.alpha))
@@ -657,9 +658,13 @@
 
 (defn common-variables
   "Return the common 'built-in' variables that are bound always bound."
-  [{::site/keys [uri] ::pass/keys [subject] :as req}]
-  {"siteUsername" (-> subject ::pass/username)
-   "siteUri" uri})
+  [{::site/keys [uri] ::pass/keys [subject] ::apex/keys [new-uri] :as req}]
+  (log/tracef "new-uri is %s, keys are %s" new-uri (pr-str (keys req)))
+  (let [username (::pass/username subject)]
+    (cond-> {}
+      uri (assoc "siteUri" uri)
+      new-uri (assoc "siteNewUri" new-uri)
+      username (assoc "siteUsername" username))))
 
 (defn post-handler [{::site/keys [uri db]
                      ::pass/keys [subject]
