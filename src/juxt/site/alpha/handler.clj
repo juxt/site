@@ -15,7 +15,7 @@
    [juxt.pass.alpha.authentication :as authn]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.pick.alpha.core :refer [rate-representation]]
-   [juxt.pick.alpha.ring :refer [pick decode-maybe]]
+   [juxt.pick.alpha.ring :refer [decode-maybe]]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
@@ -25,6 +25,7 @@
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.conditional :as conditional]
+   [juxt.site.alpha.content-negotiation :as conneg]
    [juxt.site.alpha.debug :as debug]
    [juxt.site.alpha.locator :as locator]
    [juxt.site.alpha.util :as util]
@@ -50,35 +51,6 @@
    distinct
    (map (comp (if upper-case? str/upper-case identity) name))
    (str/join ", ")))
-
-(defn negotiate-representation [request current-representations]
-  ;; Negotiate the best representation, determining the vary
-  ;; header.
-  #_(log/debug "current-representations" (map (fn [rep] (dissoc rep ::http/body ::http/content)) current-representations))
-
-  (let [{selected-representation ::pick/representation
-         vary ::pick/vary}
-        (when (seq current-representations)
-          ;; TODO: Pick must upgrade to ring 2 headers
-          (pick (assoc request :headers (:ring.request/headers request))
-                current-representations {::pick/vary? true}))]
-
-    #_(when (contains? #{:get :head} (:ring.request/method request))
-      (when-not selected-representation
-        (throw
-         (ex-info
-          "Not Acceptable"
-          ;; TODO: Must add list of available representations
-          ;; TODO: Add to req with into
-          {:ring.response/status 406
-           }))))
-
-    #_(log/debug "result of negotiate-representation" (dissoc selected-representation ::http/body ::http/content))
-
-    ;; Pin the vary header onto the selected representation's
-    ;; metadata
-    (cond-> selected-representation
-      (not-empty vary) (assoc ::http/vary (str/join ", " vary)))))
 
 (defn receive-representation
   "Check and load the representation enclosed in the request message payload."
@@ -231,49 +203,6 @@
                 (when charset {::http/charset charset})))
 
              {::http/body body})))))))
-
-(defn merge-template-maybe
-  "Some representations use a template engine to generate the payload. The
-  referenced template (::site/template) may provide defaults for the
-  representation metadata. This function takes a representation and merges in
-  its template's metadata, if necessary."
-  [db representation]
-  (if-let [template (some->> representation ::site/template (xt/entity db))]
-    (merge
-     (select-keys template [::http/content-type ::http/content-encoding ::http/content-language])
-     representation)
-    representation))
-
-(defn find-variants [{::site/keys [resource uri db] :as req}]
-
-  (let [variants (xt/q db '{:find [(pull v [*])]
-                           :where [[v ::site/variant-of uri]]
-                           :in [uri]}
-                      uri)]
-    (when (pos? (count variants))
-      (cond-> (for [[v] variants]
-                (assoc v ::http/content-location (:xt/id v)))
-        (or (::http/content-type resource) (::site/template resource))
-        (conj resource)))))
-
-(defn current-representations [{::site/keys [resource uri db] :as req}]
-  (->> (or
-        ;; This is not common to find statically in the db, but this option
-        ;; allows 'dynamic' resources to declare multiple representations.
-        (::http/representations resource)
-
-        ;; See if there are variants
-        (find-variants req)
-
-        ;; Most resources have a content-type, which indicates there is only one
-        ;; variant.
-        (when (or (::http/content-type resource) (::site/template resource))
-          [resource])
-
-        ;; No representations. On a GET, this would yield a 404.
-        [])
-       ;; Merge in an template defaults
-       (mapv #(merge-template-maybe db %))))
 
 (defn GET [req]
   (conditional/evaluate-preconditions! req)
@@ -519,7 +448,7 @@
   [h]
   (fn [{:ring.request/keys [method] :as req}]
     (if (#{:get :head :put} method)
-      (let [cur-reps (seq (current-representations req))]
+      (let [cur-reps (seq (conneg/current-representations req))]
         (when (and (#{:get :head} method) (empty? cur-reps))
           (throw
            (ex-info
@@ -535,7 +464,7 @@
            (seq cur-reps)
            (assoc
             ::site/selected-representation
-            (negotiate-representation req cur-reps)))))))
+            (conneg/negotiate-representation req cur-reps)))))))
 
 (defn wrap-authenticate [h]
   (fn [{:ring.request/keys [method] :as req}]
@@ -850,7 +779,7 @@
              true)) put-error-representations)]
 
     (when (seq put-error-representations)
-      (some-> (negotiate-representation req put-error-representations)
+      (some-> (conneg/negotiate-representation req put-error-representations)
               ;; Content-Location is not appropriate for errors.
               (dissoc ::http/content-location)))))
 
@@ -866,7 +795,7 @@
              true)) post-error-representations)]
 
     (when (seq post-error-representations)
-      (some-> (negotiate-representation req post-error-representations)
+      (some-> (conneg/negotiate-representation req post-error-representations)
               ;; Content-Location is not appropriate for errors.
               (dissoc ::http/content-location)))))
 
@@ -920,13 +849,13 @@
                                    "uri" (::site/uri req)}))
 
             error-representations
-            (current-representations
+            (conneg/current-representations
              (assoc req
                     ::site/resource er
                     ::site/uri (:xt/id er)))]
 
         (when (seq error-representations)
-          (some-> (negotiate-representation req error-representations)
+          (some-> (conneg/negotiate-representation req error-representations)
                   ;; Content-Location is not appropriate for errors.
                   (dissoc ::http/content-location)))))))
 
@@ -968,7 +897,7 @@
 
          ;; Some default representations for errors
          (some->
-          (negotiate-representation
+          (conneg/negotiate-representation
            req
            [(let [content
                   ;; We don't want to provide much information here, we don't
