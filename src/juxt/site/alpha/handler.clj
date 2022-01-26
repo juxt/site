@@ -917,7 +917,7 @@
                        ;; we decide that providing a little more context to the
                        ;; user outweighs the need to restrict information about
                        ;; the underlying implementation.
-                       " – " (.getMessage e) "\r\n")]
+                       " – " (.getMessage e) "\r\n\r\n")]
               {::http/content-type "text/plain;charset=utf-8"
                ::http/content-length (count content)
                ::http/content content})])
