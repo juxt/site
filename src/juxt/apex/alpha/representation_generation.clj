@@ -63,11 +63,8 @@
         (.getBytes "UTF-8"))
 
     "text/html;charset=utf-8"
-    (let [config (get-in resource [::apex/operation "responses"
-                                   "200" "content"
-                                   (::http/content-type selected-representation)])
-          template (some->
-                    config
+    (let [template (some->
+                    selected-representation
                     (get "x-juxt-site-template")
                     (selmer.parser/render {:base-uri base-uri}))]
       (cond
@@ -76,26 +73,26 @@
          template
          resource-state
          db
-         (get config "x-juxt-site-template-custom-resource-path")
+         (get selected-representation "x-juxt-site-template-custom-resource-path")
          (response/xt-template-loader req db))
 
         :else
         (->
          (hp/html5
-          [:h1 (get config "title" "No title")]
+          [:h1 (get selected-representation "title" "No title")]
 
-          [:pre (pr-str config)]
+          [:pre (pr-str selected-representation)]
 
           ;; Get :path-params = {"id" "owners"}
 
           (cond
-            (= (get config "type") "edn-table")
+            (= (get selected-representation "type") "edn-table")
             (list
              [:style
               (slurp (io/resource "json.human.css"))]
              (edn->html resource-state))
 
-            (= (get config "type") "table")
+            (= (get selected-representation "type") "table")
             (if (seq resource-state)
               (let [fields (distinct (concat [:xt/id]
                                              (keys (first resource-state))))]

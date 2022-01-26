@@ -367,10 +367,12 @@
              ::http/representations
              (for [[media-type media-type-object]
                    (fast-get-in path-item-object ["get" "responses" "200" "content"])]
-               {::http/content-type media-type
-                ;; Wait a second, if this doesn't get logged then we
-                ;; can use a 'proper' function right?
-                ::site/body-fn 'juxt.apex.alpha.representation-generation/entity-bytes-generator})
+               (into
+                media-type-object
+                {::http/content-type media-type
+                 ;; Wait a second, if this doesn't get logged then we
+                 ;; can use a 'proper' function right?
+                 ::site/body-fn 'juxt.apex.alpha.representation-generation/entity-bytes-generator}))
 
              ;; TODO: The allowed origins ought to be specified in the top-level
              ;; of the openapi document, or under the security section. This is
