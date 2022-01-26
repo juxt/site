@@ -2,26 +2,27 @@
 
 (ns juxt.apex.alpha.representation-generation
   (:require
+   [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.pprint :refer [pprint]]
-   [juxt.site.alpha.response :as response]
+   [clojure.string :as str]
+   [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk]]
-   [xtdb.api :as xt]
    [hiccup.page :as hp]
-   selmer.parser
    [json-html.core :refer [edn->html]]
    [jsonista.core :as json]
+   [juxt.apex.alpha.jsonpointer :refer [json-pointer]]
    [juxt.apex.alpha.parameters :as parameters]
+   [juxt.jinx.alpha :as jinx]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.site.alpha.graphql :as graphql]
+   [juxt.site.alpha.response :as response]
+   [juxt.site.alpha.return :refer [return]]
    [juxt.site.alpha.selmer :as selmer]
    [juxt.site.alpha.util :as util]
-   [clojure.edn :as edn]
-   [clojure.tools.logging :as log]
-   [juxt.jinx.alpha :as jinx]
-   [juxt.apex.alpha.jsonpointer :refer [json-pointer]]
    [xtdb.api :as xt]
-   [clojure.string :as str]))
+   selmer.parser))
+
 
 (alias 'jinx (create-ns 'juxt.jinx.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -132,7 +133,15 @@
 
           [:h3 "Resource state"]
           [:pre (with-out-str (pprint resource-state))])
-         (.getBytes "UTF-8"))))))
+         (.getBytes "UTF-8"))))
+
+    (return
+     req
+     500
+     "Cannot produce entity body of content-type %s"
+     {:representation selected-representation}
+     (::http/content-type selected-representation))))
+
 
 (defn deep-merge
   [a b]
