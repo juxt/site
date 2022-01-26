@@ -66,8 +66,9 @@
     (let [config (get-in resource [::apex/operation "responses"
                                    "200" "content"
                                    (::http/content-type selected-representation)])
-          template (->
-                    (get config "x-juxt-site-template")
+          template (some->
+                    config
+                    (get "x-juxt-site-template")
                     (selmer.parser/render {:base-uri base-uri}))]
       (cond
         template
