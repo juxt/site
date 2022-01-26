@@ -10,17 +10,31 @@
 (alias 'pick (create-ns 'juxt.pick.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn negotiate-representation [request representations]
+(defn pick-representation [req representations]
+  (when representations
+    (::pick/representation
+     (pick
+      ;; TODO: Pick must upgrade to ring 2 headers
+      (assoc req :headers (:ring.request/headers req))
+      representations
+      {::pick/vary? false}))))
+
+(defn pick-with-vary [req representations]
+  (when representations
+    (pick
+     ;; TODO: Pick must upgrade to ring 2 headers
+     (assoc req :headers (:ring.request/headers req))
+     representations
+     {::pick/vary? true})))
+
+(defn negotiate-representation [req representations]
   ;; Negotiate the best representation, determining the vary
   ;; header.
   #_(log/debug "current-representations" (map (fn [rep] (dissoc rep ::http/body ::http/content)) current-representations))
 
   (let [{selected-representation ::pick/representation
          vary ::pick/vary}
-        (when (seq representations)
-          ;; TODO: Pick must upgrade to ring 2 headers
-          (pick (assoc request :headers (:ring.request/headers request))
-                representations {::pick/vary? true}))]
+        (pick-with-vary req representations)]
 
     #_(when (contains? #{:get :head} (:ring.request/method request))
         (when-not selected-representation
