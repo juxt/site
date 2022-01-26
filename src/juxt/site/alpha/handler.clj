@@ -258,8 +258,8 @@
 
 (defn current-representations [{::site/keys [resource uri db] :as req}]
   (->> (or
-        ;; This is not common in the Xtdb DB, but allows 'dynamic' resources to
-        ;; declare multiple representations.
+        ;; This is not common to find statically in the db, but this option
+        ;; allows 'dynamic' resources to declare multiple representations.
         (::http/representations resource)
 
         ;; See if there are variants
