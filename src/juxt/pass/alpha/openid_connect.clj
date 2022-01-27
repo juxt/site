@@ -1,5 +1,12 @@
 ;; Copyright © 2022, JUXT LTD.
 
+;; References
+;;
+;; https://openid.net/
+;; https://www.scottbrady91.com/openid-connect/identity-tokens
+;; https://www.scottbrady91.com/jose/jwts-which-signing-algorithm-should-i-use
+
+
 (ns juxt.pass.alpha.openid-connect
   (:require
    [xtdb.api :as xt]
@@ -32,6 +39,9 @@
         hex-format (HexFormat/of)]
     (.nextBytes (new java.security.SecureRandom) nonce)
     (.formatHex hex-format nonce)))
+
+;; Nonce is a hash of the session
+;; See https://openid.net/specs/openid-connect-core-1_0.html
 
 (defn login
   "Redirect to an authorization endpoint"
@@ -118,7 +128,7 @@
 
       (when-not (= (get ky "alg") (.getAlgorithm decoded-jwt))
         (return req 500 "Algorithm of JWT (%s) doesn't match algorithm of key (%s)"
-                {:kid kid :jwt-alg (.getAlgorithm decoded-jwt)  :key-alg (get ky "alg") }
+                {:kid kid :jwt-alg (.getAlgorithm decoded-jwt) :key-alg (get ky "alg") }
                 (.getAlgorithm decoded-jwt)
                 (get ky "alg")))
 
@@ -138,6 +148,10 @@
             (catch JWTVerificationException e
               (throw (ex-info "" {} e)))))
 
+        ;; TODO: EdDSA, etc.
+        ;; See https://www.scottbrady91.com/jose/jwts-which-signing-algorithm-should-i-use
+
+        ;; We definitely do not support 'alg: none' or symmetric algorithms (HS256).
         (return req 500 "No support for algo: %s" {} (.getAlgorithm decoded-jwt)))
 
       {:verification-status true
