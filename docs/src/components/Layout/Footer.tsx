@@ -49,7 +49,7 @@ export function Footer() {
                 XTDB Github
               </FooterLink>
               <FooterLink href="https://juxt-oss.zulipchat.com/#narrow/stream/194466-xtdb">
-                XTDB Zuplip
+                XTDB Zulip
               </FooterLink>
               <FooterLink href="http://www.twitter.com/xtdb_com">
                 XTDB Twitter
