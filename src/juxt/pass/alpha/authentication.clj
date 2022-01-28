@@ -155,7 +155,7 @@
              (update :ring.response/headers assoc
                      "cache-control" "no-store"
                      "location" redirect)
-             (assoc :cookies {"site_session"
+             (assoc :ring.response/cookies {"site_session"
                               (cond
                                 (.startsWith uri "https")
                                 {:value
@@ -217,7 +217,7 @@
       (update :ring.response/headers assoc
               "cache-control" "no-store"
               "location" "/")
-      (assoc :cookies {"site_session"
+      (assoc :ring.response/cookies {"site_session"
                        {:value  ""
                         :max-age 0
                         :same-site :strict
@@ -236,7 +236,7 @@
         (some-> req
                 ((fn [req] (assoc req :headers (get req :ring.request/headers))))
                 cookies-request
-                :cookies (get "site_session") :value json/read-value)
+                :ring.response/cookies (get "site_session") :value json/read-value)
         now (::site/start-date req)]
 
     (or

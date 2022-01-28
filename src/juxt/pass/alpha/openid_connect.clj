@@ -6,7 +6,6 @@
 ;; https://www.scottbrady91.com/openid-connect/identity-tokens
 ;; https://www.scottbrady91.com/jose/jwts-which-signing-algorithm-should-i-use
 
-
 (ns juxt.pass.alpha.openid-connect
   (:require
    [xtdb.api :as xt]
@@ -20,7 +19,7 @@
    (com.auth0.jwt JWT)
    (com.auth0.jwt.algorithms Algorithm)
    (com.auth0.jwk Jwk)
-   (java.util Date HexFormat)))
+   (java.util Date)))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
@@ -29,19 +28,19 @@
 (defn lookup [id db]
   (xt/entity db id))
 
-(defn make-nonce
-  "This uses java.util.HexFormat which requires Java 17 and above. If required,
-  this can be re-coded, see
-  https://stackoverflow.com/questions/9655181/how-to-convert-a-byte-array-to-a-hex-string-in-java
-  and similar. For the size parameter, try 12."
-  [size]
-  (let [nonce (byte-array size)
-        hex-format (HexFormat/of)]
-    (.nextBytes (new java.security.SecureRandom) nonce)
-    (.formatHex hex-format nonce)))
-
 ;; Nonce is a hash of the session
 ;; See https://openid.net/specs/openid-connect-core-1_0.html
+
+(defn test-login [req]
+  (let [location "/test-destination"]
+    (-> req
+        (assoc :ring.response/status 302)
+        (assoc :ring.response/body "TEST")
+        ;;(update :ring.response/headers assoc "location" location)
+        (assoc :session "ABC123"))))
+
+(defn test-destination [req]
+  "Arrived!")
 
 (defn login
   "Redirect to an authorization endpoint"

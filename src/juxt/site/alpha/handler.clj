@@ -31,7 +31,9 @@
    [juxt.site.alpha.util :as util]
    [juxt.site.alpha.response :as response]
    [juxt.site.alpha.triggers :as triggers]
-   [juxt.site.alpha.rules :as rules])
+   [juxt.site.alpha.rules :as rules]
+   [ring.middleware.session :as ring-session]
+   [ring.middleware.cookies :as ring-cookies])
   (:import (java.net URI)))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -1115,6 +1117,27 @@
                             :ring.response/headers :headers
                             :ring.response/body :body})))))
 
+(defn upgrade-ring-middleware [h]
+  (fn [ring-1-middleware]
+    (h
+     (fn [req]
+       (-> req
+           (set/rename-keys
+            {:ring.response/status :status
+             :ring.response/headers :headers
+             :ring.response/body :body
+;;             :ring.response/session :session
+             ;;:ring.response/cookies :cookies
+             })
+           ring-1-middleware
+           (set/rename-keys
+            {:status :ring.response/status
+             :headers :ring.response/headers
+             :body :ring.response/body
+;;             :session :ring.response/session
+;;             :cookies :ring.response/cookies
+             }))))))
+
 (defn wrap-store-request-in-request-cache [h]
   (fn [req]
     (let [req (h req)]
@@ -1177,6 +1200,7 @@
   or Sieppari (https://github.com/metosin/sieppari) could be used. This is
   currently a synchronous chain but async could be supported in the future."
   [opts]
+  (let [w (fn [h])])
   [
    ;; Switch Ring requests/responses to Ring 2 namespaced keywords
    wrap-ring-1-adapter
@@ -1186,6 +1210,13 @@
 
    ;; Initialize the request by merging in some extra data
    #(wrap-initialize-request % opts)
+
+   ;; Allow cookies and session details to be set on the response
+   (upgrade-ring-middleware ring-cookies/wrap-cookies)
+   (upgrade-ring-middleware
+    #(ring-session/wrap-session
+      % {:cookie-name "id"
+         :cookie-attrs {:secure true}}))
 
    wrap-service-unavailable?
 

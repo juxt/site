@@ -165,9 +165,20 @@
          ::site/request-context (assoc req :ring.response/status 500)})))))
 
 (defn add-payload [{::site/keys [selected-representation db] :as req}]
-  (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
+  (let [{::http/keys [body content] ::site/keys [get-fn body-fn]} selected-representation
         template (some->> selected-representation ::site/template (xt/entity db))]
     (cond
+      get-fn
+      (if-let [f (cond-> get-fn (symbol? get-fn) requiring-resolve)]
+        (do
+          (log/debugf "Calling get-fn: %s %s" get-fn (type get-fn))
+          (f req))
+        (throw
+         (ex-info
+          (format "get-fn cannot be resolved: %s" body-fn)
+          {:get-fn get-fn
+           ::site/request-context (assoc req :ring.response/status 500)})))
+
       body-fn
       (if-let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
         (do

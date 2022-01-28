@@ -15,3 +15,18 @@
    :juxt.site.alpha/body-fn juxt.pass.alpha.openid-connect/callback}]
  :juxt.pass.alpha/oauth2-client "{{base-uri}}/_site/oauth2-client-config"
  :juxt.pass.alpha/classification "PUBLIC"}
+
+
+{:xt/id "{{base-uri}}/test-login"
+ :juxt.http.alpha/methods #{:head :get :options}
+ :juxt.http.alpha/representations
+ [{:juxt.http.alpha/content-type "text/plain"
+   :juxt.site.alpha/get-fn juxt.pass.alpha.openid-connect/test-login}]
+ :juxt.pass.alpha/classification "PUBLIC"}
+
+{:xt/id "{{base-uri}}/test-destination"
+ :juxt.http.alpha/methods #{:head :get :options}
+ :juxt.http.alpha/representations
+ [{:juxt.http.alpha/content-type "text/plain"
+   :juxt.site.alpha/body-fn juxt.pass.alpha.openid-connect/test-destination}]
+ :juxt.pass.alpha/classification "PUBLIC"}
