@@ -137,8 +137,32 @@
 (defn enum? [arg-name types-by-name]
   (= (get-in types-by-name [arg-name ::g/kind]) 'ENUM))
 
+(defn prepare-mutation-entity
+  [{:keys [field pass/subject type-k argument-values site-args]}
+   entity transform]
+  (let [type (-> field ::g/type-ref ::g/name)
+        _validate-type (and (nil? type)
+                            (throw (ex-info "Couldn't infer type" {:field field})))]
+    (cond-> entity
+      true (assoc
+            :xt/id (or
+                    (:xt/id entity)
+                    (:id entity)
+                    (generate-value
+                     {:type "UUID"
+                      :pathPrefix type}
+                     {})))
+      subject (assoc :_siteSubject (::pass/username subject))
+      (nil? (type-k entity)) (assoc type-k type)
+      (:id entity) (dissoc :id)
+      transform (transform argument-values)
+
+      ;; This is special argument that adds Site specific attributes
+      (get site-args "methods")
+      (assoc ::http/methods (set (map (comp keyword str/lower-case) (get site-args "methods")))))))
+
 (defn- args-to-entity
-  [{:keys [argument-values schema field base-uri site-args type-k subject]}]
+  [{:keys [argument-values schema field base-uri site-args] :as opts}]
   (log/tracef "args-to-entity, site-args is %s" (pr-str site-args))
   (let [args argument-values
         types-by-name (:juxt.grab.alpha.schema/types-by-name schema)
@@ -230,29 +254,8 @@
 
                :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
          {}
-         (::g/arguments-definition field))
-        type (-> field ::g/type-ref ::g/name)
-        _validate-type (and (nil? type)
-                            (throw (ex-info "Couldn't infer type" {:field field})))]
-    (cond-> entity
-      true (assoc
-            :xt/id (or
-                    (:xt/id entity)
-                    (:id entity)
-                    (generate-value
-                     {:type "UUID"
-                      :pathPrefix type}
-                     {})))
-      subject (assoc :_siteSubject (::pass/username subject))
-      (nil? (type-k entity)) (assoc type-k type)
-      (:id entity) (dissoc :id)
-      transform (transform args)
-
-      ;; This is special argument that adds Site specific attributes
-      (get site-args "methods")
-      (assoc ::http/methods (set (map (comp keyword str/lower-case) (get site-args "methods"))))
-
-      )))
+         (::g/arguments-definition field))]
+    (prepare-mutation-entity opts entity transform)))
 
 (defn args-to-entities
   [{:keys [argument-values field types-by-name] :as opts}]
@@ -475,23 +478,29 @@
               object-id (:xt/id object-value)
               ;; TODO: Protected lookup please!
               lookup-entity (fn [id] (xt/entity db id))
-              opts {:site-args site-args
-                    :xt-node xt-node
-                    :schema schema
-                    :object-value object-value
-                    :field field
-                    :field-kind field-kind
-                    :types-by-name types-by-name
-                    :mutation? mutation?
-                    :base-uri base-uri
-                    :type-k type-k
-                    :argument-values argument-values
-                    :lookup-entity lookup-entity
-                    :field-resolver-args field-resolver-args
-                    :subject subject
-                    :db db}]
+              opts
+              (merge field-resolver-args
+                     {:site-args site-args
+                      :xt-node xt-node
+                      :schema schema
+                      :field field
+                      :field-kind field-kind
+                      :types-by-name types-by-name
+                      :mutation? mutation?
+                      :base-uri base-uri
+                      :type-k type-k
+                      :lookup-entity lookup-entity
+                      ::pass/subject subject
+                      :db db})]
 
           (cond
+            ;; The registration of a resolver should be a privileged operation, since it
+            ;; has the potential to bypass access control.
+            (get site-args "resolver")
+            (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
+              ;; Resolvers need to do their own access control
+              (resolver opts))
+
             mutation? (perform-mutation! opts)
 
             (get site-args "history")
@@ -601,13 +610,6 @@
               (if (-> field ::g/type-ref list-type?)
                 (map #(protected-lookup % subject db) val)
                 (throw (ex-info "Can only used 'each' on a LIST type" {:field-kind field-kind}))))
-
-            ;; The registration of a resolver should be a privileged operation, since it
-            ;; has the potential to bypass access control.
-            (get site-args "resolver")
-            (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
-              ;; Resolvers need to do their own access control
-              (resolver (assoc field-resolver-args ::pass/subject subject :db db)))
 
             (get site-args "siteResolver")
             (let [resolver
