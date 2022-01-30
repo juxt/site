@@ -34,9 +34,9 @@
 (defn test-login [req]
   (let [location "/test-destination"]
     (-> req
-        (assoc :ring.response/status 302)
-        (assoc :ring.response/body "TEST")
-        ;;(update :ring.response/headers assoc "location" location)
+        (assoc :ring.response/status 303)
+        (assoc :ring.response/body "TEST\r\n")
+        (update :ring.response/headers assoc "location" location)
         (assoc :session "ABC123"))))
 
 (defn test-destination [req]
