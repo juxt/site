@@ -6,7 +6,9 @@
 (ns juxt.pass.alpha.session
   (:require
    [juxt.pass.alpha.util :refer [make-nonce]]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   [ring.middleware.cookies :refer [cookies-request cookies-response]]
+   [clojure.tools.logging :as log]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
@@ -49,6 +51,26 @@
   (let [session-id-binding (xt/entity db sid)
         session-id (xt/entity db (::pass/session session-id-binding))]
     session-id))
+
+(defn ->cookie [session-id]
+  (format "id=%s;Path=/; Path=/; SameSite=Strict; Secure; HttpOnly" session-id))
+
+(defn wrap-associate-session [h]
+  (fn [{::site/keys [db] :as req}]
+    (let [ ;; New: session management
+          {session-id "id"}
+          (some-> req
+                  ((fn [req] (assoc req :headers (get req :ring.request/headers))))
+                  cookies-request
+                  :ring.response/cookies (get "id") :value)
+
+          session (when session-id
+                    (lookup-session db session-id))
+
+          req (cond-> req session (assoc ::pass/session session))]
+
+      (when req (log/tracef "assoc session: %s" session))
+      (h req))))
 
 (comment
   (let [xt-node (xt/start-node {})

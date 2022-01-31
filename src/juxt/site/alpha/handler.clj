@@ -14,6 +14,7 @@
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha.authentication :as authn]
    [juxt.pass.alpha.pdp :as pdp]
+   [juxt.pass.alpha.session :as session]
    [juxt.pick.alpha.core :refer [rate-representation]]
    [juxt.pick.alpha.ring :refer [decode-maybe]]
    [juxt.reap.alpha.decoders :as reap]
@@ -33,7 +34,8 @@
    [juxt.site.alpha.triggers :as triggers]
    [juxt.site.alpha.rules :as rules]
    [ring.middleware.session :as ring-session]
-   [ring.middleware.cookies :as ring-cookies])
+   [ring.middleware.cookies :as ring-cookies]
+   [juxt.pass.alpha.session :as session])
   (:import (java.net URI)))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -1216,6 +1218,7 @@
    wrap-negotiate-representation
 
    ;; Authentication, authorization
+   session/wrap-associate-session
    wrap-authenticate
    wrap-authorize
 

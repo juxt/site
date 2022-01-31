@@ -47,7 +47,7 @@
         (update :ring.response/headers assoc "location" location)
         (update-in
          [:ring.response/headers "set-cookie"]
-         conj (format "id=%s;Secure;HttpOnly" session-id)))))
+         conj (session/->cookie session-id)))))
 
 (comment
   (test-login {::site/xt-node (xt/start-node {})}))
@@ -95,7 +95,7 @@
      "Redirect to %s"
      {:ring.response/headers
       {"location" location
-       "set-cookie" (format "id=%s;Secure;HttpOnly" session-id)}}
+       "set-cookie" (session/->cookie session-id)}}
      location)))
 
 (defn find-key [kid jwks]

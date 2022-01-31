@@ -8,6 +8,8 @@
    [xtdb.api :as x]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.rfc7235 :as rfc7235]
+   ;; We're gradually moving over to this ns
+   [juxt.pass.alpha.session :as session]
    [ring.util.codec :refer [form-decode url-decode]]
    [ring.middleware.cookies :refer [cookies-request cookies-response]]))
 
@@ -40,8 +42,6 @@
 (defn lookup-session [k date-now]
   (expire-sessions! date-now)
   (get @sessions-by-access-token k))
-
-;;(identity @sessions-by-access-token)
 
 (defn token-response
   [{::site/keys [received-representation resource start-date]
@@ -232,15 +232,22 @@
   authentication scheme(s) for accessing the resource."
   [{::site/keys [db] :as req}]
   ;; TODO: This might be where we also add the 'on-behalf-of' info
-  (let [{access-token "access_token"}
+  (let [
+
+
+        ;; Deprecated
+        {access-token "access_token"}
         (some-> req
                 ((fn [req] (assoc req :headers (get req :ring.request/headers))))
                 cookies-request
                 :ring.response/cookies (get "site_session") :value json/read-value)
+
         now (::site/start-date req)]
 
     (or
-     ;; Cookie
+     ;; TODO: Load subject from session
+
+     ;; Old Cookie
      (when access-token
        (when-let [session (lookup-session access-token now)]
          (->
