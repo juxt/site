@@ -1218,7 +1218,7 @@
    wrap-negotiate-representation
 
    ;; Authentication, authorization
-   session/wrap-associate-session
+   #_session/wrap-associate-session
    wrap-authenticate
    wrap-authorize
 
