@@ -1189,12 +1189,6 @@
    ;; Initialize the request by merging in some extra data
    #(wrap-initialize-request % opts)
 
-   (wrap-test-middleware
-    (fn [h]
-      (fn [req]
-        (log/tracef "Delegate being called...")
-        (h req))))
-
    wrap-service-unavailable?
 
    ;; Logging and store request
