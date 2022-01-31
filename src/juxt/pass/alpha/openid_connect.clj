@@ -57,7 +57,7 @@
 
 (defn login
   "Redirect to an authorization endpoint"
-  [{::site/keys [resource db] :as req}]
+  [{::site/keys [resource xt-node db] :as req}]
   (let [{::pass/keys [oauth2-client-id redirect-uri] :as oauth2-client} (some-> resource ::pass/oauth2-client (lookup db))
         _ (when-not oauth2-client
             (return req 500 "No oauth2 client configuration found" {:oauth2-client (some-> resource ::pass/oauth2-client)}))
@@ -74,6 +74,12 @@
         _ (when-not authorization-endpoint
             (return req 500 "No authorization endpoint found in OpenID configuration" {:openid-configuration openid-configuration}))
 
+        session-id
+        (session/create-session
+         xt-node
+         {::pass/state (make-nonce 8)
+          ::pass/nonce (make-nonce 12)})
+
         query-string
         (codec/form-encode
          {"response_type" "code"
@@ -84,7 +90,13 @@
 
         location (format "%s?%s" authorization-endpoint query-string)]
 
-    (return req 303 "Redirect to %s" {:ring.response/headers {"location" location}} location)))
+    (return
+     req 303
+     "Redirect to %s"
+     {:ring.response/headers
+      {"location" location
+       "set-cookie" (format "id=%s;Secure;HttpOnly" session-id)}}
+     location)))
 
 (defn find-key [kid jwks]
   (when kid
