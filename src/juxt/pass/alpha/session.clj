@@ -15,19 +15,20 @@
 ;; "The session ID or token binds the user authentication credentials (in the
 ;; form of a user session) to the user HTTP traffic and the appropriate access
 ;; controls enforced by the web application." [OWASP-SM]
-(defn new-session
+(defn create-session
   "Create sesssion identifier."
-  []
+  [xt-node init-state]
   ;; "The session ID content (or value) must be meaningless to prevent
   ;; information disclosure attacks, where an attacker is able to decode the
   ;; contents of the ID and extract details of the user, the session, or the
   ;; inner workings of the web application.
   ;;
-  (let [;; The session ID must simply be an identifier on the client side, and its
+  (let [ ;; The session ID must simply be an identifier on the client side, and its
         ;; value must never include sensitive information (or PII)." [OWASP-SM]
         session-id (make-nonce 16)
 
-        session {:xt/id session-id}
+        inner-session-id (make-nonce 16)
+        session (assoc init-state :xt/id inner-session-id)
 
         ;; A session-id binding is a document that can be evicted, such that
         ;; switching the database to a different basis doesn't unintentionally
@@ -36,16 +37,20 @@
         {:xt/id session-id
          ::pass/session (:xt/id session)}
         ]
-    [session session-id-binding]))
+    (let [tx
+          (xt/submit-tx
+           xt-node
+           [[:xtdb.api/put session]
+            [:xtdb.api/put session-id-binding]])]
+      (xt/await-tx xt-node tx))
+    session-id))
 
-(defn create-session
-  "Creates a new session, stored in the database, returning the session ID."
-  [xt-node]
-  (let [[session session-id-binding] (new-session)]
-    (xt/submit-tx
-     xt-node
-     (mapv #(vector :xtdb.api/put %) (new-session)))
-    (:xt/id session-id-binding)))
+(defn lookup-session [db sid]
+  (let [session-id-binding (xt/entity db sid)
+        session-id (xt/entity db (::pass/session session-id-binding))]
+    session-id))
 
 (comment
-  (create-session (xt/start-node {})))
+  (let [xt-node (xt/start-node {})
+        sid (create-session xt-node {:foo "foo"})]
+    (lookup-session (xt/db xt-node) sid)))

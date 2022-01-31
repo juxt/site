@@ -17,6 +17,8 @@
  :juxt.pass.alpha/classification "PUBLIC"}
 
 
+;; Temporary for testing
+
 {:xt/id "{{base-uri}}/test-login"
  :juxt.http.alpha/methods #{:head :get :options}
  :juxt.http.alpha/representations

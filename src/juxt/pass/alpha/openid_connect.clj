@@ -11,7 +11,10 @@
    [xtdb.api :as xt]
    [java-http-clj.core :as hc]
    [juxt.site.alpha.return :refer [return]]
+   [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.pass.alpha.session :as session]
    [ring.util.codec :as codec]
+   [ring.middleware.cookies :as ring-cookies]
    [jsonista.core :as json]
    [clojure.tools.logging :as log])
   (:import
@@ -31,13 +34,23 @@
 ;; Nonce is a hash of the session
 ;; See https://openid.net/specs/openid-connect-core-1_0.html
 
-(defn test-login [req]
-  (let [location "/test-destination"]
+(defn test-login [{::site/keys [xt-node] :as req}]
+  (let [session-id
+        (session/create-session
+         xt-node
+         {::pass/state (make-nonce 8)
+          ::pass/nonce (make-nonce 12)})
+        location "/test-destination"]
     (-> req
         (assoc :ring.response/status 303)
         (assoc :ring.response/body "TEST\r\n")
         (update :ring.response/headers assoc "location" location)
-        (assoc :session "ABC123"))))
+        (update-in
+         [:ring.response/headers "set-cookie"]
+         conj (format "id=%s;Secure;HttpOnly" session-id)))))
+
+(comment
+  (test-login {::site/xt-node (xt/start-node {})}))
 
 (defn test-destination [req]
   "Arrived!")
@@ -71,7 +84,7 @@
 
         location (format "%s?%s" authorization-endpoint query-string)]
 
-    (return req 302 "Redirect to %s" {:ring.response/headers {"location" location}} location)))
+    (return req 303 "Redirect to %s" {:ring.response/headers {"location" location}} location)))
 
 (defn find-key [kid jwks]
   (when kid
