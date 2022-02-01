@@ -31,9 +31,6 @@
 (defn lookup [id db]
   (xt/entity db id))
 
-(defn test-destination [req]
-  "Arrived!")
-
 (defn login
   "Redirect to an authorization endpoint"
   [{::site/keys [resource xt-node db] :as req}]
