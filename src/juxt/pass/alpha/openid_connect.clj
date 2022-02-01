@@ -31,27 +31,6 @@
 (defn lookup [id db]
   (xt/entity db id))
 
-;; Nonce is a hash of the session
-;; See https://openid.net/specs/openid-connect-core-1_0.html
-
-(defn test-login [{::site/keys [xt-node] :as req}]
-  (let [session-id
-        (session/create-session
-         xt-node
-         {::pass/state (make-nonce 8)
-          ::pass/nonce (make-nonce 12)})
-        location "/test-destination"]
-    (-> req
-        (assoc :ring.response/status 303)
-        (assoc :ring.response/body "TEST\r\n")
-        (update :ring.response/headers assoc "location" location)
-        (update-in
-         [:ring.response/headers "set-cookie"]
-         conj (session/->cookie session-id)))))
-
-(comment
-  (test-login {::site/xt-node (xt/start-node {})}))
-
 (defn test-destination [req]
   "Arrived!")
 
@@ -74,18 +53,21 @@
         _ (when-not authorization-endpoint
             (return req 500 "No authorization endpoint found in OpenID configuration" {:openid-configuration openid-configuration}))
 
+        state (make-nonce 8)
+
         session-id
         (session/create-session
          xt-node
-         {::pass/state (make-nonce 8)
+         {::pass/state state
           ::pass/nonce (make-nonce 12)})
 
         query-string
         (codec/form-encode
          {"response_type" "code"
-          "scope" "openid name picture profile email"
+          "scope" "openid name picture profile email" ; TODO: configure in the XT entity
           "client_id" oauth2-client-id
           "redirect_uri" redirect-uri
+          "state" state
           "connection" "github"})
 
         location (format "%s?%s" authorization-endpoint query-string)]
@@ -97,6 +79,9 @@
       {"location" location
        "set-cookie" (session/->cookie session-id)}}
      location)))
+
+(defn login-with-github [req]
+  (login req))
 
 (defn find-key [kid jwks]
   (when kid
@@ -213,8 +198,12 @@
 (defn callback
   "OAuth2 callback"
   [{::site/keys [resource db xt-node]
+    ::pass/keys [session]
     :ring.request/keys [query]
     :as req}]
+
+  (when-not session
+    (return req 500 "No session found" {}))
 
   ;; Exchange code for JWT
   (let [{::pass/keys [oauth2-client-id oauth2-client-secret redirect-uri] :as oauth2-client} (some-> resource ::pass/oauth2-client (lookup db))
@@ -226,6 +215,18 @@
         token-endpoint (get openid-configuration "token_endpoint")
 
         query-params (some-> query (codec/form-decode "US-ASCII"))
+
+        state-received (when (map? query-params) (get query-params "state"))
+        state-sent (::pass/state session)
+
+        _ (when-not state-sent
+            (return req 500 "Expected to find state in session" {}))
+
+        _ (when-not (= state-sent state-received)
+            ;; This could be a CSRF attack, we should log this
+            (return req 500 "State mismatch" {:state-received state-received
+                                              :session session}))
+
         code (when (map? query-params) (get query-params "code"))
 
         _ (when-not code

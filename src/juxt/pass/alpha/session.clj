@@ -53,16 +53,23 @@
     session-id))
 
 (defn ->cookie [session-id]
-  (format "id=%s;Path=/; Path=/; SameSite=Strict; Secure; HttpOnly" session-id))
+  ;; TODO: In local testing (against home.test) it seems that setting
+  ;; SameSite=Strict means that the cookie doesn't get passed through. I think
+  ;; it's because the first-party is being 'called' from Auth0, which means that
+  ;; samesite=strict cookies aren't sent across. Note: I've tried replacing the
+  ;; POST to /_site/login-with-github with a GET but to no avail (I've left it
+  ;; at a GET as that seems more mainstream)
+  (format "id=%s; Path=/; Secure; HttpOnly; SameSite=Lax" session-id))
 
 (defn wrap-associate-session [h]
   (fn [{::site/keys [db] :as req}]
-    (let [ ;; New: session management
-          {session-id "id"}
-          (some-> req
-                  ((fn [req] (assoc req :headers (get req :ring.request/headers))))
-                  cookies-request
-                  :ring.response/cookies (get "id") :value)
+    (def req req)
+    (let [session-id
+          (-> (assoc req :headers (get req :ring.request/headers))
+              cookies-request
+              :cookies (get "id") :value)
+
+          _ (log/tracef "session-id is %s" session-id)
 
           session (when session-id
                     (lookup-session db session-id))

@@ -1,0 +1,16 @@
+{:xt/id "{{base-uri}}/_site/rules/public-resources"
+ :juxt.site.alpha/type "Rule"
+ :juxt.site.alpha/description "PUBLIC resources are accessible to all"
+ :juxt.pass.alpha/target
+ [[resource :juxt.pass.alpha/classification "PUBLIC"]
+  [request :ring.request/method #{:get :head :options :post}]]
+ :juxt.pass.alpha/effect :juxt.pass.alpha/allow}
+
+{:xt/id "{{base-uri}}/_site/rules/internal-resources"
+ :juxt.site.alpha/type "Rule"
+ :juxt.site.alpha/description "INTERNAL resources are accessible to all logged in users"
+ :juxt.pass.alpha/target
+ [[resource :juxt.pass.alpha/classification "INTERNAL"]
+  [request :ring.request/method #{:get :head :options :post}]
+  [subject :juxt.pass.alpha/user]]
+ :juxt.pass.alpha/effect :juxt.pass.alpha/allow}
