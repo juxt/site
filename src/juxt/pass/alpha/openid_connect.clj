@@ -54,12 +54,16 @@
             (return req 500 "No authorization endpoint found in OpenID configuration" {:openid-configuration openid-configuration}))
 
         state (make-nonce 8)
+        nonce (make-nonce 12)
 
+        ;; Create a pre-auth session
         session-id
         (session/create-session
          xt-node
          {::pass/state state
-          ::pass/nonce (make-nonce 12)})
+          ::pass/nonce nonce
+          ;; TODO: Also capture redirect value
+          })
 
         query-string
         (codec/form-encode
@@ -68,6 +72,7 @@
           "client_id" oauth2-client-id
           "redirect_uri" redirect-uri
           "state" state
+          "nonce" nonce
           "connection" "github"})
 
         location (format "%s?%s" authorization-endpoint query-string)]
@@ -223,7 +228,7 @@
             (return req 500 "Expected to find state in session" {}))
 
         _ (when-not (= state-sent state-received)
-            ;; This could be a CSRF attack, we should log this
+            ;; This could be a CSRF attack, we should log an alert
             (return req 500 "State mismatch" {:state-received state-received
                                               :session session}))
 
@@ -266,7 +271,17 @@
 
         json-body (json/read-value body)
 
-        id-token (decode-id-token req (get json-body "id_token") jwks openid-configuration oauth2-client)]
+        id-token (decode-id-token req (get json-body "id_token") jwks openid-configuration oauth2-client)
+
+        original-nonce (::pass/nonce session)
+        claimed-nonce (get-in id-token [:claims "nonce"])
+
+        _ (when-not original-nonce
+            (return req 500 "Expected to find nonce in session" {}))
+
+        _ (when-not (=  claimed-nonce original-nonce)
+            ;; This is possibly an attack, we should log an alert
+            (return req 500 "Nonce received does not match expected"))]
 
     (return req 500 "TODO" {:code-offered code
                             :client-id oauth2-client-id
