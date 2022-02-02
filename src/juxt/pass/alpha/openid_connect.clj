@@ -14,7 +14,7 @@
    [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.pass.alpha.session :as session]
    [ring.util.codec :as codec]
-   [ring.middleware.cookies :as ring-cookies]
+   [juxt.site.alpha.response :refer [redirect]]
    [jsonista.core :as json]
    [clojure.tools.logging :as log])
   (:import
@@ -59,8 +59,7 @@
          xt-node
          {::pass/state state
           ::pass/nonce nonce
-          ;; TODO: Also capture redirect value
-          })
+          ::pass/redirect "/index.html"})
 
         query-string
         (codec/form-encode
@@ -74,13 +73,9 @@
 
         location (format "%s?%s" authorization-endpoint query-string)]
 
-    (return
-     req 303
-     "Redirect to %s"
-     {:ring.response/headers
-      {"location" location
-       "set-cookie" (session/->cookie session-id)}}
-     location)))
+    (-> req
+        (redirect 303 location)
+        (session/set-cookie session-id))))
 
 (defn login-with-github [req]
   (login req))
@@ -200,9 +195,12 @@
 (defn callback
   "OAuth2 callback"
   [{::site/keys [resource db xt-node]
-    ::pass/keys [session]
+    ::pass/keys [session session-id!]
     :ring.request/keys [query]
     :as req}]
+
+  (when-not session-id!
+    (return req 500 "No session id found" {}))
 
   (when-not session
     (return req 500 "No session found" {}))
@@ -280,13 +278,15 @@
             ;; This is possibly an attack, we should log an alert
             (return req 500 "Nonce received does not match expected"))]
 
-    (return req 500 "TODO" {:code-offered code
-                            :client-id oauth2-client-id
-                            :client-secret oauth2-client-secret
-                            :status status
-                            :token-endpoint token-endpoint
-                            :response response
-                            :json-body json-body
-                            :redirect-uri redirect-uri
-                            :id-token id-token
-                            :jwks jwks})))
+    ;; Put the ID_TOKEN into the session, cycle the session id and redirect to
+    ;; the redirect URI stored in the original session.
+
+    (-> req
+        (redirect 303 (::pass/redirect session))
+        (session/escalate-session
+         #(assoc %
+                 ::pass/claims (:claims id-token)
+                 ;; We need to index some of the common known claims in order to
+                 ;; use them in our Datalog rules.
+                 ::pass/sub (get-in id-token [:claims "sub"])
+                 ::pass/iss (get-in id-token [:claims "iss"]))))))

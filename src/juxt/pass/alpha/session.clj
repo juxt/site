@@ -6,9 +6,9 @@
 (ns juxt.pass.alpha.session
   (:require
    [juxt.pass.alpha.util :refer [make-nonce]]
-   [xtdb.api :as xt]
    [ring.middleware.cookies :refer [cookies-request cookies-response]]
-   [clojure.tools.logging :as log]))
+   [clojure.tools.logging :as log]
+   [xtdb.api :as xt]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
@@ -30,27 +30,29 @@
         session-id (make-nonce 16)
 
         inner-session-id (make-nonce 16)
-        session (assoc init-state :xt/id inner-session-id)
+        session (assoc init-state
+                       :xt/id inner-session-id
+                       ::site/type "Session")
 
         ;; A session-id binding is a document that can be evicted, such that
         ;; switching the database to a different basis doesn't unintentionally
         ;; reanimate expired session ids. It maps the session id to the session.
         session-id-binding
         {:xt/id session-id
+         ::site/type "SessionId"
          ::pass/session (:xt/id session)}
         ]
     (let [tx
           (xt/submit-tx
            xt-node
-           [[:xtdb.api/put session]
-            [:xtdb.api/put session-id-binding]])]
+           [[::xt/put session]
+            [::xt/put session-id-binding]])]
       (xt/await-tx xt-node tx))
     session-id))
 
 (defn lookup-session [db sid]
-  (let [session-id-binding (xt/entity db sid)
-        session-id (xt/entity db (::pass/session session-id-binding))]
-    session-id))
+  (let [session-id-binding (xt/entity db sid)]
+    (xt/entity db (::pass/session session-id-binding))))
 
 (defn ->cookie [session-id]
   ;; TODO: In local testing (against home.test) it seems that setting
@@ -61,20 +63,52 @@
   ;; at a GET as that seems more mainstream)
   (format "id=%s; Path=/; Secure; HttpOnly; SameSite=Lax" session-id))
 
+(defn set-cookie [req session-id]
+  (-> req
+      (update :ring.response/headers assoc "set-cookie" (->cookie session-id))))
+
+(defn escalate-session
+  "Update the session by applying f and return the result of rotating the session id."
+  [{::site/keys [db xt-node] ::pass/keys [session-id!] :as req} f]
+  (let [session (lookup-session db session-id!)
+        _ (assert session)
+        new-session-id! (make-nonce 16)
+        new-session (-> (f session)
+                        (assoc :xt/id (:xt/id session)))
+        session-id-binding {:xt/id new-session-id!
+                            ::pass/session (:xt/id session)}
+
+        tx (xt/submit-tx
+            xt-node
+            [[::xt/match (:xt/id session) session]
+             [::xt/put new-session]
+             [::xt/evict session-id!]
+             [::xt/put session-id-binding]])
+
+        tx-status (xt/await-tx xt-node tx)]
+
+    (log/tracef "escalate-session, tx-status: %s" tx-status)
+
+    (if (xt/tx-committed? xt-node tx)
+      (-> req
+          (set-cookie new-session-id!))
+      (throw (ex-info "Session wasn't escalated" {})))))
+
 (defn wrap-associate-session [h]
   (fn [{::site/keys [db] :as req}]
-    (def req req)
-    (let [session-id
+    (let [session-id!
           (-> (assoc req :headers (get req :ring.request/headers))
               cookies-request
               :cookies (get "id") :value)
 
-          _ (log/tracef "session-id is %s" session-id)
+          session (when session-id!
+                    (lookup-session db session-id!))
 
-          session (when session-id
-                    (lookup-session db session-id))
-
-          req (cond-> req session (assoc ::pass/session session))]
+          req (cond-> req
+                ;; The purpose of the trailing exclamation mark (!) is to
+                ;; indicate sensitivity. Avoid logging sensitive data.
+                session-id! (assoc ::pass/session-id! session-id!)
+                session (assoc ::pass/session session))]
 
       (when req (log/tracef "assoc session: %s" session))
       (h req))))

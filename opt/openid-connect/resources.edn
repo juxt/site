@@ -2,23 +2,21 @@
 
 {:xt/id "{{base-uri}}/_site/oauth2-login"
  :juxt.http.alpha/methods #{:head :get :options}
- :juxt.http.alpha/representations
- [{:juxt.http.alpha/content-type "text/plain"
-   :juxt.site.alpha/body-fn juxt.pass.alpha.openid-connect/login}]
+ :juxt.http.alpha/content-type "text/plain"
+ :juxt.site.alpha/get-fn juxt.pass.alpha.openid-connect/login
  :juxt.pass.alpha/oauth2-client "{{base-uri}}/_site/oauth2-client-config"
  :juxt.pass.alpha/classification "PUBLIC"}
 
 {:xt/id "{{base-uri}}/_site/oauth2-login-with-github"
  :juxt.http.alpha/methods #{:head :get :options}
  :juxt.http.alpha/content-type "text/plain"
- :juxt.site.alpha/body-fn juxt.pass.alpha.openid-connect/login-with-github
+ :juxt.site.alpha/get-fn juxt.pass.alpha.openid-connect/login-with-github
  :juxt.pass.alpha/oauth2-client "{{base-uri}}/_site/oauth2-client-config"
  :juxt.pass.alpha/classification "PUBLIC"}
 
 {:xt/id "{{base-uri}}/_site/oauth2-callback"
  :juxt.http.alpha/methods #{:get}
- :juxt.http.alpha/representations
- [{:juxt.http.alpha/content-type "text/plain"
-   :juxt.site.alpha/body-fn juxt.pass.alpha.openid-connect/callback}]
+ :juxt.http.alpha/content-type "text/plain"
+ :juxt.site.alpha/get-fn juxt.pass.alpha.openid-connect/callback
  :juxt.pass.alpha/oauth2-client "{{base-uri}}/_site/oauth2-client-config"
  :juxt.pass.alpha/classification "PUBLIC"}

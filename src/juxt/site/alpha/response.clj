@@ -195,3 +195,9 @@
       content (assoc req :ring.response/body content)
       body (assoc req :ring.response/body body)
       :else req)))
+
+
+(defn redirect [req status location]
+  (-> req
+      (assoc :ring.response/status status)
+      (update :ring.response/headers assoc "location" location)))
