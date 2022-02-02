@@ -288,14 +288,17 @@
         :else
         (first results)))))
 
+(defn entity-valid-time
+  [entity db]
+  (some-> db
+          (xt/entity-tx (:xt/id entity))
+          ::xt/valid-time
+          t/instant
+          .toString))
+
 (defn assoc-valid-time
   [entity db]
-  (assoc entity :_siteValidTime
-         (some-> db
-                 (xt/entity-tx (:xt/id entity))
-                 ::xt/valid-time
-                 t/instant
-                 .toString)))
+  (assoc entity :_siteValidTime (entity-valid-time entity db)))
 
 (defn protected-lookup [e subject db]
   (let [lookup #(xt/entity db %)
@@ -400,7 +403,7 @@
         nil))))
 
 (defn perform-mutation!
-  [{:keys [argument-values site-args xt-node lookup-entity field-kind] :as opts}]
+  [{:keys [argument-values site-args xt-node lookup-entity field-kind pass/subject] :as opts}]
   (let [action (or (get site-args "mutation") "put")
         validate-id! (fn [args]
                        (let [id (get args "id")]
@@ -426,6 +429,24 @@
       (let [new-entity (args-to-entity opts)
             old-entity (some-> new-entity :xt/id lookup-entity)
             new-entity (merge old-entity new-entity)]
+        (put-objects! xt-node [new-entity])
+        new-entity)
+      "rollback"
+      (let [as-of (try
+                    (let [as-of (get argument-values "asOf")]
+                      (if (str/ends-with? as-of "Z")
+                        (-> as-of t/inst)
+                        (-> as-of
+                            (t/parse-date-time
+                             (t/formatter :iso-local-date-time))
+                            t/inst)))
+                    (catch Exception e
+                      (throw (ex-info "rollback mutations need a valid asOf argument"
+                                      {:args argument-values}
+                                      e))))
+            db (xt/db xt-node as-of)
+            id (validate-id! argument-values)
+            new-entity (protected-lookup id subject db)]
         (put-objects! xt-node [new-entity])
         new-entity))))
 
@@ -530,7 +551,16 @@
                                     subject db)))
 
             (get site-args "q")
-            (let [object-id (:xt/id object-value)
+            (let [db (if-let [t (:_siteValidTime object-value)]
+                       (try
+                         (xt/db xt-node (-> t
+                                            t/instant
+                                            t/inst))
+                         (catch Exception e
+                           (prn "Can't parse valid time" e)
+                           db))
+                       db)
+                  object-id (:xt/id object-value)
                   arg-keys (fn [m] (remove #{"limit" "offset" "orderBy"} (keys m)))
                   in (cond->> (map symbol (arg-keys argument-values))
                        object-id (concat ['object]))
@@ -694,6 +724,9 @@
               "count" (count
                        (xt/q
                         db (to-xt-query opts))))
+
+            (= "_siteValidTime" field-name)
+            (entity-valid-time object-value db)
 
             :else
             (default-for-type (::g/type-ref field)))))})))
