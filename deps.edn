@@ -33,7 +33,7 @@
 
         juxt/grab
         {:git/url "https://github.com/juxt/grab.git"
-         :sha "a4769d6d90440d1440453e19d6956a51b0a25387"
+         :sha "805d5ba96f98ecbd11e280e1ec18660b2102e2fa"
          ;;:local/root "../grab"
          }
 
@@ -61,7 +61,7 @@
         ;; REPL highlighting
         mvxcvi/puget {:mvn/version "1.3.1"}
 
-	;; Time
+  ;; Time
         tick/tick {:mvn/version "0.5.0-RC4"}
 
         ;; Removing AWS means we now need a direct dependency on this jar for an
