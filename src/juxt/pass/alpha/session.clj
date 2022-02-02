@@ -76,6 +76,7 @@
         new-session (-> (f session)
                         (assoc :xt/id (:xt/id session)))
         session-id-binding {:xt/id new-session-id!
+                            ::site/type "SessionId"
                             ::pass/session (:xt/id session)}
 
         tx (xt/submit-tx

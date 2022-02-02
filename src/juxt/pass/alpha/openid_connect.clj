@@ -26,6 +26,7 @@
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
+(alias 'openid (create-ns 'juxt.pass.openid))
 (alias 'site (create-ns 'juxt.site.alpha))
 
 (defn lookup [id db]
@@ -288,5 +289,5 @@
                  ::pass/claims (:claims id-token)
                  ;; We need to index some of the common known claims in order to
                  ;; use them in our Datalog rules.
-                 ::pass/sub (get-in id-token [:claims "sub"])
-                 ::pass/iss (get-in id-token [:claims "iss"]))))))
+                 ::openid/pass (get-in id-token [:claims "sub"])
+                 ::openid/iss (get-in id-token [:claims "iss"]))))))
