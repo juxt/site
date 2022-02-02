@@ -29,7 +29,10 @@
         ;; value must never include sensitive information (or PII)." [OWASP-SM]
         session-id (make-nonce 16)
 
-        inner-session-id (make-nonce 16)
+        ;; It could get confusing to have both session-id documents and
+        ;; sessions, so the id-of-the-session-doc is indicated with a URN, as
+        ;; per https://datatracker.ietf.org/doc/html/rfc2141.
+        inner-session-id (format "site:session:%s" (make-nonce 16))
         session (assoc init-state
                        :xt/id inner-session-id
                        ::site/type "Session")
