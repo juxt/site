@@ -55,7 +55,7 @@
         nonce (make-nonce 12)
 
         ;; Create a pre-auth session
-        session-id
+        session-token-id!
         (session/create-session
          xt-node
          {::pass/state state
@@ -76,7 +76,7 @@
 
     (-> req
         (redirect 303 location)
-        (session/set-cookie session-id))))
+        (session/set-cookie session-token-id!))))
 
 (defn login-with-github [req]
   (login req))
@@ -196,12 +196,12 @@
 (defn callback
   "OAuth2 callback"
   [{::site/keys [resource db xt-node]
-    ::pass/keys [session session-id!]
+    ::pass/keys [session session-token-id!]
     :ring.request/keys [query]
     :as req}]
 
-  (when-not session-id!
-    (return req 500 "No session id found" {}))
+  (when-not session-token-id!
+    (return req 500 "No session token id" {}))
 
   (when-not session
     (return req 500 "No session found" {}))
@@ -289,5 +289,5 @@
                  ::pass/claims (:claims id-token)
                  ;; We need to index some of the common known claims in order to
                  ;; use them in our Datalog rules.
-                 ::openid/pass (get-in id-token [:claims "sub"])
+                 ::openid/sub (get-in id-token [:claims "sub"])
                  ::openid/iss (get-in id-token [:claims "iss"]))))))

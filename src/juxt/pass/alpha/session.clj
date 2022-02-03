@@ -14,6 +14,9 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
+(defn session-token-id->urn [session-token-id!]
+  (format "urn:site:session-token:%s" session-token-id!))
+
 ;; "The session ID or token binds the user authentication credentials (in the
 ;; form of a user session) to the user HTTP traffic and the appropriate access
 ;; controls enforced by the web application." [OWASP-SM]
@@ -27,44 +30,46 @@
   ;;
   (let [ ;; The session ID must simply be an identifier on the client side, and its
         ;; value must never include sensitive information (or PII)." [OWASP-SM]
-        session-id (make-nonce 16)
+        ;;
+        ;; We suffix this symbol to indicate it is sensitive (we should strive
+        ;;to prevent an attacker getting access to this token).
+        session-token-id! (make-nonce 16)
 
-        ;; It could get confusing to have both session-id documents and
-        ;; sessions, so the id-of-the-session-doc is indicated with a URN, as
+        ;; It could get confusing to have both session-token and session
+        ;; documents, so the id-of-the-session-doc is indicated with a URN, as
         ;; per https://datatracker.ietf.org/doc/html/rfc2141.
-        inner-session-id (format "site:session:%s" (make-nonce 16))
         session (assoc init-state
-                       :xt/id inner-session-id
+                       :xt/id (format "urn:site:session:%s" (make-nonce 16))
                        ::site/type "Session")
 
         ;; A session-id binding is a document that can be evicted, such that
         ;; switching the database to a different basis doesn't unintentionally
         ;; reanimate expired session ids. It maps the session id to the session.
-        session-id-binding
-        {:xt/id session-id
-         ::site/type "SessionId"
+        session-token
+        {:xt/id (session-token-id->urn session-token-id!)
+         ::site/type "SessionToken"
          ::pass/session (:xt/id session)}
         ]
     (let [tx
           (xt/submit-tx
            xt-node
            [[::xt/put session]
-            [::xt/put session-id-binding]])]
+            [::xt/put session-token]])]
       (xt/await-tx xt-node tx))
-    session-id))
+    session-token-id!))
 
-(defn lookup-session [db sid]
-  (let [session-id-binding (xt/entity db sid)]
-    (xt/entity db (::pass/session session-id-binding))))
+(defn lookup-session [db session-token-id!]
+  (let [session-token (xt/entity db (session-token-id->urn session-token-id!))]
+    (xt/entity db (::pass/session session-token))))
 
-(defn ->cookie [session-id]
+(defn ->cookie [session-token-id]
   ;; TODO: In local testing (against home.test) it seems that setting
   ;; SameSite=Strict means that the cookie doesn't get passed through. I think
   ;; it's because the first-party is being 'called' from Auth0, which means that
   ;; samesite=strict cookies aren't sent across. Note: I've tried replacing the
   ;; POST to /_site/login-with-github with a GET but to no avail (I've left it
   ;; at a GET as that seems more mainstream)
-  (format "id=%s; Path=/; Secure; HttpOnly; SameSite=Lax" session-id))
+  (format "id=%s; Path=/; Secure; HttpOnly; SameSite=Lax" session-token-id))
 
 (defn set-cookie [req session-id]
   (-> req
@@ -72,46 +77,45 @@
 
 (defn escalate-session
   "Update the session by applying f and return the result of rotating the session id."
-  [{::site/keys [db xt-node] ::pass/keys [session-id!] :as req} f]
-  (let [session (lookup-session db session-id!)
+  [{::site/keys [db xt-node] ::pass/keys [session-token-id!] :as req} f]
+  (let [session (lookup-session db session-token-id!)
         _ (assert session)
-        new-session-id! (make-nonce 16)
+        new-session-token-id! (make-nonce 16)
         new-session (-> (f session)
                         (assoc :xt/id (:xt/id session)))
-        session-id-binding {:xt/id new-session-id!
-                            ::site/type "SessionId"
-                            ::pass/session (:xt/id session)}
+
+        session-token {:xt/id (session-token-id->urn new-session-token-id!)
+                       ::site/type "SessionToken"
+                       ::pass/session (:xt/id session)}
 
         tx (xt/submit-tx
             xt-node
             [[::xt/match (:xt/id session) session]
              [::xt/put new-session]
-             [::xt/evict session-id!]
-             [::xt/put session-id-binding]])
+             [::xt/evict (session-token-id->urn session-token-id!)]
+             [::xt/put session-token]])
 
-        tx-status (xt/await-tx xt-node tx)]
-
-    (log/tracef "escalate-session, tx-status: %s" tx-status)
+        _ (xt/await-tx xt-node tx)]
 
     (if (xt/tx-committed? xt-node tx)
       (-> req
-          (set-cookie new-session-id!))
+          (set-cookie new-session-token-id!))
       (throw (ex-info "Session wasn't escalated" {})))))
 
 (defn wrap-associate-session [h]
   (fn [{::site/keys [db] :as req}]
-    (let [session-id!
+    (let [session-token-id!
           (-> (assoc req :headers (get req :ring.request/headers))
               cookies-request
               :cookies (get "id") :value)
 
-          session (when session-id!
-                    (lookup-session db session-id!))
+          session (when session-token-id!
+                    (lookup-session db session-token-id!))
 
           req (cond-> req
                 ;; The purpose of the trailing exclamation mark (!) is to
                 ;; indicate sensitivity. Avoid logging sensitive data.
-                session-id! (assoc ::pass/session-id! session-id!)
+                session-token-id! (assoc ::pass/session-token-id! session-token-id!)
                 session (assoc ::pass/session session))]
 
       (when req (log/tracef "assoc session: %s" session))
