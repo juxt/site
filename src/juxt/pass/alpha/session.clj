@@ -92,6 +92,8 @@
             xt-node
             [[::xt/match (:xt/id session) session]
              [::xt/put new-session]
+             ;; TODO: Mark this token as stale and have a separate eviction
+             ;; process
              [::xt/evict (session-token-id->urn session-token-id!)]
              [::xt/put session-token]])
 

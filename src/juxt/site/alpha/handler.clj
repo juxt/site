@@ -13,6 +13,7 @@
    [juxt.dave.alpha.methods :as dave.methods]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha.authentication :as authn]
+   [juxt.pass.alpha.authorization :as authz]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.pass.alpha.session :as session]
    [juxt.pick.alpha.core :refer [rate-representation]]
@@ -475,46 +476,63 @@
     (let [sub (when-not (= method :options) (authn/authenticate req))]
       (h (cond-> req sub (assoc ::pass/subject sub))))))
 
-(defn wrap-authorize
+(defn wrap-authorize-with-acls [h]
+  (fn [{::pass/keys [session] :as req}]
+    (h (cond-> req session authz/authorize))))
+
+(defn wrap-authorize-with-pdp
   ;; Do authorization as late as possible (in order to have as much data
   ;; as possible to base the authorization decision on. However, note
   ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
   ;; before checking any HTTP conditional header.".
   [h]
-  (fn [{:ring.request/keys [method] ::site/keys [db resource] ::pass/keys [subject] :as req}]
-    (let [request-context
-          {'subject subject
-           'resource (dissoc resource ::http/body ::http/content)
-           'request (select-keys
-                     req
-                     [:ring.request/headers :ring.request/method :ring.request/path
-                      :ring.request/query :ring.request/protocol :ring.request/remote-addr
-                      :ring.request/scheme :ring.request/server-name :ring.request/server-post
-                      :ring.request/ssl-client-cert
-                      ::site/uri])
-           'representation (dissoc resource ::http/body ::http/content)
-           'environment {}}
+  (fn [{:ring.request/keys [method] ::site/keys [db resource] ::pass/keys [subject authorization session] :as req}]
+    (if authorization
+      ;; If authorization already established, this is sufficient
+      (h req)
+      ;; Otherwise, authorize with PDP
+      (let [request-context
+            {'subject subject
+             'resource (dissoc resource ::http/body ::http/content)
+             'request (select-keys
+                       req
+                       [:ring.request/headers :ring.request/method :ring.request/path
+                        :ring.request/query :ring.request/protocol :ring.request/remote-addr
+                        :ring.request/scheme :ring.request/server-name :ring.request/server-post
+                        :ring.request/ssl-client-cert
+                        ::site/uri])
+             'representation (dissoc resource ::http/body ::http/content)
+             'environment {}}
 
-          authz (when (not= method :options)
-                  (pdp/authorization db request-context))
+            authz (when (not= method :options)
+                    (pdp/authorization db request-context))
 
-          req (cond-> req
-                true (assoc ::pass/request-context request-context)
-                authz (assoc ::pass/authorization authz)
-                ;; If the max-content-length has been modified, update that in the
-                ;; resource
-                (::http/max-content-length authz)
-                (update ::site/resource
-                        assoc ::http/max-content-length (::http/max-content-length authz)))]
+            req (cond-> req
+                  true (assoc ::pass/request-context request-context)
+                  authz (assoc ::pass/authorization authz)
+                  ;; If the max-content-length has been modified, update that in the
+                  ;; resource
+                  (::http/max-content-length authz)
+                  (update ::site/resource
+                          assoc ::http/max-content-length (::http/max-content-length authz)))]
 
-      (when (and (not= method :options)
-                 (not= (::pass/access authz) ::pass/approved))
-        (let [status (if-not (::pass/user subject) 401 403)]
-          (throw
-           (ex-info
-            (case status 401  "Unauthorized" 403 "Forbidden")
-            {::site/request-context (assoc req :ring.response/status status)}))))
-      (h req))))
+        (when (and (not= method :options)
+                   (not= (::pass/access authz) ::pass/approved))
+          (let [status
+                (if (or
+                     (::pass/user subject)
+                     ;; This is temporarily coupled to the new authz in order to
+                     ;; generate a correct 403 response. We need to rework this
+                     ;; to give these two authorization mechanisms independence
+                     ;; from each other.
+                     (:juxt.pass.openid/sub session))
+                  403
+                  401)]
+            (throw
+             (ex-info
+              (case status 401  "Unauthorized" 403 "Forbidden")
+              {::site/request-context (assoc req :ring.response/status status)}))))
+        (h req)))))
 
 (defn wrap-method-not-allowed? [h]
   (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
@@ -1220,7 +1238,8 @@
    ;; Authentication, authorization
    session/wrap-associate-session
    wrap-authenticate
-   wrap-authorize
+   wrap-authorize-with-acls
+   wrap-authorize-with-pdp
 
    ;; 405
    wrap-method-not-allowed?
