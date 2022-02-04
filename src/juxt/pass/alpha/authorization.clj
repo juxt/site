@@ -21,6 +21,7 @@
           '{:find [(pull acl [*])]
             :where [[session :juxt.pass.openid/sub sub]
                     [session :juxt.pass.openid/iss iss]
+                    ;; TODO: Can't reference home here
                     [ident :juxt.home/issuer iss]
                     [ident :juxt.home/subject-identifier sub]
                     [ident :juxt.home/person-id subject]
