@@ -551,16 +551,7 @@
                                     subject db)))
 
             (get site-args "q")
-            (let [db (if-let [t (:_siteValidTime object-value)]
-                       (try
-                         (xt/db xt-node (-> t
-                                            t/instant
-                                            t/inst))
-                         (catch Exception e
-                           (prn "Can't parse valid time" e)
-                           db))
-                       db)
-                  object-id (:xt/id object-value)
+            (let [object-id (:xt/id object-value)
                   arg-keys (fn [m] (remove #{"limit" "offset" "orderBy"} (keys m)))
                   in (cond->> (map symbol (arg-keys argument-values))
                        object-id (concat ['object]))
