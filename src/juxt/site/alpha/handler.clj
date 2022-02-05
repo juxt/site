@@ -216,15 +216,15 @@
       (response/add-payload)))
 
 (defn post-variant [{::site/keys [xt-node db uri]
-                     ::apex/keys [request-instance]
+                     ::apex/keys [request-payload]
                      :as req}]
   (let [location
-        (str uri (hash (select-keys request-instance [::site/resource ::site/variant])))
+        (str uri (hash (select-keys request-payload [::site/resource ::site/variant])))
         existing (xt/entity db location)]
 
     (->> (xt/submit-tx
           xt-node
-          [[:xtdb.api/put (merge {:xt/id location} request-instance)]])
+          [[:xtdb.api/put (merge {:xt/id location} request-payload)]])
          (xt/await-tx xt-node))
 
     (into req {:ring.response/status (if existing 204 201)
@@ -232,7 +232,7 @@
 
 (defn post-redirect [{::site/keys [xt-node db]
                       :as req}]
-  (let [resource-state (::apex/request-instance (openapi/validate-request-payload req))
+  (let [resource-state (::apex/request-payload (openapi/validate-request-payload req))
         {::site/keys [resource]} resource-state
         existing (xt/entity db resource)]
     (->> (xt/submit-tx
