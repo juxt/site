@@ -7,7 +7,8 @@
    [juxt.apex.alpha.representation-generation :refer [entity-body]]
    [juxt.site.alpha.content-negotiation :as conneg]
    [clojure.tools.logging :as log]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   [clojure.string :as str]))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -99,25 +100,28 @@
              :post ["201" "200" "204"]
              :delete ["200" "204"]))
 
+          ;; TODO: This is better as a warning
           _ (assert status "Status cannot be nil, badly formed response object in OpenAPI")
 
-          ;;          _ (log/tracef "status is %s, response is %s" status response)
+          status (when status (Integer/parseInt status))
 
-          req (assoc req :ring.response/status (Integer/parseInt status))
-
-          resource-state (:data result)
+          req (cond-> req status (assoc :ring.response/status status))
 
           representation
           (conneg/pick-representation
            req (for [[media-type media-type-object] (get response "content")]
                  (assoc media-type-object ::http/content-type media-type)))
 
-          ;;          _ (log/tracef "representation: %s" representation)
+          resource-state (:data result)
 
-          body (entity-body
-                (assoc req ::site/selected-representation representation)
-                (-> resource-state
-                    (assoc :description (get response "description" "no-description"))))]
+          body (when (#{200 201} status)
+                 (if representation     ; possibly nil
+                   (entity-body
+                    (assoc req ::site/selected-representation representation)
+                    (-> resource-state
+                        (assoc :description (get response "description" "no-description"))))
+                   (log/warnf "%s request returning %s but with no acceptable content for the response defined in the OpenAPI definition: %s" (str/upper-case (name method)) status response))
+                 )]
 
       (cond-> req
         body (assoc :ring.response/body body)

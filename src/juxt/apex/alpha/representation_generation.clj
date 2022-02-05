@@ -56,6 +56,9 @@
   [{::site/keys [selected-representation resource db base-uri] :as req}
    resource-state]
 
+  (def req req)
+  (def selected-representation selected-representation)
+
   (case (::http/content-type selected-representation)
     "application/json"
     (-> resource-state
@@ -188,11 +191,12 @@
 ;; This generates representations
 (defn entity-bytes-generator
   [{::site/keys [uri resource db]
-    ::pass/keys [authorization subject] :as req}]
+    ::pass/keys [subject] :as req}]
 
-  (assert authorization "No authorization to generate entity payload")
+  (let [authorization (::pass/authorization resource)
+        _ (assert authorization "No authorization to generate entity payload")
 
-  (let [lookup (fn [id] (xt/entity db id))
+        lookup (fn [id] (xt/entity db id))
         param-defs
         (get-in resource [::apex/operation "parameters"])
 

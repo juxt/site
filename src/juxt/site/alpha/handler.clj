@@ -477,8 +477,11 @@
       (h (cond-> req sub (assoc ::pass/subject sub))))))
 
 (defn wrap-authorize-with-acls [h]
-  (fn [{::pass/keys [session] :as req}]
-    (h (cond-> req session authz/authorize))))
+  (fn [{::pass/keys [session] ::site/keys [resource] :as req}]
+    (h (cond-> req
+         ;; Only authorize if not already authorized, AND a session exists.
+         (and (not (::pass/authorization resource)) session)
+         authz/authorize))))
 
 (defn wrap-authorize-with-pdp
   ;; Do authorization as late as possible (in order to have as much data
@@ -486,8 +489,8 @@
   ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
   ;; before checking any HTTP conditional header.".
   [h]
-  (fn [{:ring.request/keys [method] ::site/keys [db resource] ::pass/keys [subject authorization session] :as req}]
-    (if authorization
+  (fn [{:ring.request/keys [method] ::site/keys [db resource] ::pass/keys [subject session] :as req}]
+    (if (::pass/authorization resource)
       ;; If authorization already established, this is sufficient
       (h req)
       ;; Otherwise, authorize with PDP
@@ -509,7 +512,7 @@
 
             req (cond-> req
                   true (assoc ::pass/request-context request-context)
-                  authz (assoc ::pass/authorization authz)
+                  authz (update ::site/resource assoc ::pass/authorization authz)
                   ;; If the max-content-length has been modified, update that in the
                   ;; resource
                   (::http/max-content-length authz)
@@ -1227,6 +1230,10 @@
    ;; 501
    wrap-method-not-implemented?
 
+   ;; Authenticate
+   session/wrap-associate-session
+   wrap-authenticate
+
    ;; Locate resources
    wrap-locate-resource
    wrap-redirect
@@ -1235,9 +1242,7 @@
    wrap-find-current-representations
    wrap-negotiate-representation
 
-   ;; Authentication, authorization
-   session/wrap-associate-session
-   wrap-authenticate
+   ;; Authorize
    wrap-authorize-with-acls
    wrap-authorize-with-pdp
 

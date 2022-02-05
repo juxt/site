@@ -39,8 +39,7 @@
                      [acl ::site/type "ACL"]
                      [acl :juxt.home/role "https://home.test/_home/roles/internal"]
                      [acl :juxt.home/person-id subject]
-                     [resource :juxt.pass.alpha/classification "INTERNAL"]
-                     ]
+                     [resource :juxt.pass.alpha/classification "INTERNAL"]]
 
                     ;; Role access (with ACL granting the role to the subject)
                     [(check acl subject resource)
@@ -49,9 +48,7 @@
                      [acl :juxt.home/role role]
                      [role-access :juxt.home/type "RoleAccess"]
                      [role-access :juxt.home/role role]
-                     [role-access :juxt.site/uri resource]
-                     ]
-                    ]}
+                     [role-access :juxt.site/uri resource]]]}
 
           (:xt/id session)
 
@@ -60,7 +57,7 @@
     (log/tracef "acls are %s" acls)
 
     (cond-> req
-      acls (assoc ::pass/authorization {::pass/acls acls})
+      acls (assoc-in [::site/resource ::pass/authorization ::pass/acls] acls)
       ;; Get a 403 rather than a 401 login page
       ;;(empty? acls) (assoc-in [::pass/subject ::pass/user] "Bill")
       )))

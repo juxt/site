@@ -84,7 +84,7 @@
   [{::site/keys [db uri base-uri] :as req}]
   (or
    ;; We call OpenAPI location here, because a resource can be defined in
-   ;; OpenAPI, and exist in Xtdb, simultaneously.
+   ;; OpenAPI, and exist in XT, simultaneously.
    (openapi/locate-resource db uri req)
 
    ;; Is it in XTDB?
