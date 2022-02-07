@@ -120,7 +120,6 @@
                 session-token-id! (assoc ::pass/session-token-id! session-token-id!)
                 session (assoc ::pass/session session))]
 
-      (when req (log/tracef "assoc session: %s" session))
       (h req))))
 
 (comment

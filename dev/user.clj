@@ -87,13 +87,14 @@
 
    "https://home.test/pages.graphql")
 
+#_(def mal "https://home.test/people/f8c2c5c3-635d-4b66-a48d-0d831dce88aa")
+
 ;; This is a grant of INTERNAL resources to Malcolm
 #_(put!
  {:xt/id "https://home.test/grants/mal-has-internal"
   ::site/type "ACL"
-  :juxt.home/person-id "https://home.test/people/8430214a-5b05-469a-9639-f65d6d6dfa24"
+  :juxt.home/person-id mal
   :juxt.home/role "https://home.test/_home/roles/internal"})
-
 
 ;; A grant of pages to developers
 
@@ -102,23 +103,11 @@
   :juxt.home/type "RoleAccess"
   :juxt.home/role "https://home.test/_home/roles/developer"
   :juxt.site/uri #{"https://home.test/pages.graphql"
-                   "https://home.test/employee.graphql"}})
+                   "https://home.test/employee.graphql"
+                   "https://home.test/_site/apis/home/openapi.json"}})
 
 #_(put!
  {:xt/id "https://home.test/grants/mal-has-developer"
   ::site/type "ACL"
-  :juxt.home/person-id "https://home.test/people/8430214a-5b05-469a-9639-f65d6d6dfa24"
+  :juxt.home/person-id mal
   :juxt.home/role "https://home.test/_home/roles/developer"})
-
-
-#_(e "https://home.test/grants/mal-has-internal")
-
-#_(rm! "https://home.test/grants/mal-has-internal")
-
-#_(e "https://home.test/people/8430214a-5b05-469a-9639-f65d6d6dfa24")
-
-#_(e "urn:site:session:16c10e3bece6be15d05670c6748da43f")
-
-#_(e "https://home.test/index.html")
-
-#_(keys (e "https://home.test/pages.graphql"))

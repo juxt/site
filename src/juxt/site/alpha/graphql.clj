@@ -699,7 +699,6 @@
 (defn common-variables
   "Return the common 'built-in' variables that are bound always bound."
   [{::site/keys [uri] ::pass/keys [subject] ::apex/keys [new-uri] :as req}]
-  (log/tracef "new-uri is %s, keys are %s" new-uri (pr-str (keys req)))
   (let [username (::pass/username subject)]
     (cond-> {}
       uri (assoc "siteUri" uri)

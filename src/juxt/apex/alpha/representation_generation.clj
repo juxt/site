@@ -296,8 +296,6 @@
                                    (when (::jinx/valid? path-param)
                                      (:value path-param))))))]
 
-                         (log/tracef "merge-resource-state: %s" (pr-str merge-resource-state))
-
                          (cond-> resource-state
                            merge-resource-state (deep-merge merge-resource-state)))
 

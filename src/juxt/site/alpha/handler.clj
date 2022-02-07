@@ -478,6 +478,9 @@
 
 (defn wrap-authorize-with-acls [h]
   (fn [{::pass/keys [session] ::site/keys [resource] :as req}]
+    (when (::pass/authorization resource)
+      (log/trace "Already authorized")
+      )
     (h (cond-> req
          ;; Only authorize if not already authorized, AND a session exists.
          (and (not (::pass/authorization resource)) session)
@@ -492,7 +495,9 @@
   (fn [{:ring.request/keys [method] ::site/keys [db resource] ::pass/keys [subject session] :as req}]
     (if (::pass/authorization resource)
       ;; If authorization already established, this is sufficient
-      (h req)
+      (do
+        (log/tracef "pre-authorized: %s" (::pass/authorization resource))
+        (h req))
       ;; Otherwise, authorize with PDP
       (let [request-context
             {'subject subject

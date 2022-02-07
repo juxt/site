@@ -364,6 +364,12 @@
 
              ::http/methods methods
 
+             ;; TODO: Pull out the scopes from the document, find a grant for
+             ;;each scope. The scope doesn't necessarily provide access to the
+             ;;data, only the operation.
+
+             ::pass/authorization {::pass/authorizer ::authorizer}
+
              ::http/representations
              (for [[media-type media-type-object]
                    (fast-get-in path-item-object ["get" "responses" "200" "content"])]

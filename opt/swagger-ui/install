@@ -37,7 +37,8 @@ for f in $(find $prefix -type f); do
     site put-asset \
          --file $f \
          --type $(media-type $f) \
-         --path /swagger-ui/${f:${#prefix}}
+         --path /swagger-ui/${f:${#prefix}} \
+         --classification PUBLIC
 done
 
 # Clean up
