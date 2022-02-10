@@ -119,7 +119,14 @@
 
     (first users)))
 
-(defn login-response
+
+(defn ^:deprecated login-response
+  "This is the original login called by a POST of user credentials to
+  /_site/login. It checks the credentials and creates an access-token which is
+  sets in the returned cookie. This will be replaced entirely with an OAuth2
+  standard way of issuing tokens with token-response (above), which is being
+  extended to support implicit and authorization code grant flows, in addition
+  to client_credentials."
   [{::site/keys [received-representation db resource start-date uri]
     :as req}]
 

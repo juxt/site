@@ -4,7 +4,7 @@
   (:require
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [xtdb.api :as x]
+   [xtdb.api :as xt]
    [jsonista.core :as json]
    [juxt.jinx.alpha :as jinx]
    [juxt.jinx.alpha.api :as jinx.api]
@@ -37,7 +37,7 @@
                        (.getBytes (pr-str openapi) "UTF-8")) 0 32))]
 
     (->>
-     (x/submit-tx
+     (xt/submit-tx
       xt-node
       [[:xtdb.api/put
         (merge
@@ -52,7 +52,7 @@
           :title (get-in openapi ["info" "title"])
           :version (get-in openapi ["info" "version"])
           :description (get-in openapi ["info" "description"])})]])
-     (x/await-tx xt-node))
+     (xt/await-tx xt-node))
 
     (assoc req
            :ring.response/status
@@ -123,7 +123,7 @@
         openapi-ref (get resource ::apex/openapi)
         _ (assert openapi-ref)
 
-        openapi-resource (x/entity db openapi-ref)
+        openapi-resource (xt/entity db openapi-ref)
         _ (assert openapi-resource)
 
         instance (validate-instance req instance schema (::apex/openapi openapi-resource))
@@ -179,7 +179,7 @@
         openapi-ref (get resource ::apex/openapi)
         _ (assert openapi-ref)
 
-        openapi-resource (x/entity db openapi-ref)
+        openapi-resource (xt/entity db openapi-ref)
         _ (assert openapi-resource)
 
         instance (validate-instance req instance schema (::apex/openapi openapi-resource))]
@@ -223,7 +223,7 @@
                 message
                 {::site/request-context (assoc req :ring.response/status status)}))))
 
-        already-exists? (x/entity db id)
+        already-exists? (xt/entity db id)
 
         last-modified start-date
         etag (format "\"%s\"" (-> received-representation
@@ -241,10 +241,10 @@
     ;; representation into the db anyway, if only to store the last-modified and
     ;; etag validators?
 
-    (->> (x/submit-tx
+    (->> (xt/submit-tx
           xt-node
           [[:xtdb.api/put new-resource-state]])
-         (x/await-tx xt-node))
+         (xt/await-tx xt-node))
 
     (-> req
         (assoc :ring.response/status (if-not already-exists? 201 204)
@@ -267,10 +267,59 @@
    {}
    path-param-defs))
 
+(defn authorize [resource db session]
+  ;;(def resource resource)
+  ;;(def session session)
+
+  (let [required-scopes (:juxt.apex.alpha/scopes resource)
+        acquired-scopes
+        (xt/q
+         db
+         '{:find [(pull acl [*])]
+           :where [[session :juxt.pass.openid/sub sub]
+                   [session :juxt.pass.openid/iss iss]
+                   ;; TODO: Can't reference home here
+                   [ident :juxt.home/issuer iss]
+                   [ident :juxt.home/subject-identifier sub]
+                   [ident :juxt.home/person-id subject]
+                   (check acl subject resource)]
+
+           :in [session resource]
+
+           ;; Here are the rules, attached to /index.html, that say that for an
+           ;; INTERNAL resource, those that have been granted access to internal, can
+           ;; {GET,HEAD,OPTIONS} it.
+           :rules [
+                   ;; Anyone who has the internal role can see resources classified as INTERNAL
+                   [(check acl subject resource)
+                    [acl ::site/type "ACL"]
+                    [acl :juxt.home/role "https://home.test/_home/roles/internal"]
+                    [acl :juxt.home/person-id subject]
+                    [resource :juxt.pass.alpha/classification "INTERNAL"]]
+
+                   ;; Role access (with ACL granting the role to the subject)
+                   [(check acl subject resource)
+                    [acl ::site/type "ACL"]
+                    [acl :juxt.home/person-id subject]
+                    [acl :juxt.home/role role]
+                    [role-access :juxt.home/type "RoleAccess"]
+                    [role-access :juxt.home/role role]
+                    [role-access :juxt.site/uri resource]]]}
+
+         (:xt/id session))]
+
+    ;; Mapping over each scope, check that a grant exists that maps the session
+
+    (log/tracef "TODO: %s" {:resource resource
+                            :required-scopes required-scopes
+                            :session session}))
+
+  (assoc resource ::pass/authorization {::pass/authorizer ::authorizer}))
+
 (defn path-entry->resource
   "From an OpenAPI path-to-path-object entry, return the corresponding resource if
   it matches the path. Path matching also considers path-parameters."
-  [{:ring.request/keys [method]}
+  [{:ring.request/keys [method] ::pass/keys [session] ::site/keys [db]}
    [path path-item-object] openapi openapi-uri rel-request-path]
 
   (let [path-param-defs
@@ -350,50 +399,53 @@
 
             post-fn-sym (when (= method :post) (some-> (get operation-object "juxt.site.alpha/post-fn") symbol))
 
+            ;; The 'oauth' key is merely an Apex convention.
+            scopes (get-in operation-object ["security" "oauth"])
+
             resource
-            {::site/resource-provider ::apex/openapi-path
+            (cond-> {::site/resource-provider ::apex/openapi-path
 
-             ;; This is useful, because it is the base document for any relative
-             ;; json pointers.
-             ;; TODO: Search for instances of apex/openapi and ensure they do (x/entity)
-             ::apex/openapi openapi-uri
+                     ;; This is useful, because it is the base document for any relative
+                     ;; json pointers.
+                     ;; TODO: Search for instances of apex/openapi and ensure they do (x/entity)
+                     ::apex/openapi openapi-uri
 
-             ::apex/operation operation-object
-             ::apex/openapi-path path
-             ::apex/openapi-path-params path-params
+                     ::apex/operation operation-object
+                     ::apex/openapi-path path
+                     ::apex/openapi-path-params path-params
 
-             ::http/methods methods
+                     ::http/methods methods
 
-             ;; TODO: Pull out the scopes from the document, find a grant for
-             ;;each scope. The scope doesn't necessarily provide access to the
-             ;;data, only the operation.
+                     ;; TODO: Pull out the scopes from the document, find a grant for
+                     ;;each scope. The scope doesn't necessarily provide access to the
+                     ;;data, only the operation.
 
-             ::pass/authorization {::pass/authorizer ::authorizer}
+                     ::http/representations
+                     (for [[media-type media-type-object]
+                           (fast-get-in path-item-object ["get" "responses" "200" "content"])]
+                       (into
+                        media-type-object
+                        {::http/content-type media-type
+                         ;; Wait a second, if this doesn't get logged then we
+                         ;; can use a 'proper' function right?
+                         ::site/body-fn 'juxt.apex.alpha.representation-generation/entity-bytes-generator}))
 
-             ::http/representations
-             (for [[media-type media-type-object]
-                   (fast-get-in path-item-object ["get" "responses" "200" "content"])]
-               (into
-                media-type-object
-                {::http/content-type media-type
-                 ;; Wait a second, if this doesn't get logged then we
-                 ;; can use a 'proper' function right?
-                 ::site/body-fn 'juxt.apex.alpha.representation-generation/entity-bytes-generator}))
+                     ;; TODO: The allowed origins ought to be specified in the top-level
+                     ;; of the openapi document, or under the security section. This is
+                     ;; just for testing.
+                     ::site/access-control-allow-origins
+                     {"http://localhost:8000"
+                      {::site/access-control-allow-methods #{:get :put :post :delete}
+                       ::site/access-control-allow-headers #{"authorization" "content-type"}
+                       ::site/access-control-allow-credentials true}}
 
-             ;; TODO: The allowed origins ought to be specified in the top-level
-             ;; of the openapi document, or under the security section. This is
-             ;; just for testing.
-             ::site/access-control-allow-origins
-             {"http://localhost:8000"
-              {::site/access-control-allow-methods #{:get :put :post :delete}
-               ::site/access-control-allow-headers #{"authorization" "content-type"}
-               ::site/access-control-allow-credentials true}}
-
-             ;; TODO: Merge in any properties of a resource that is in
-             ;; XT - e.g. if this resource is a collection, what type
-             ;; of collection is it? Some properties that can be used in
-             ;; the PDP.
-             }]
+                     ;; TODO: Merge in any properties of a resource that is in
+                     ;; XT - e.g. if this resource is a collection, what type
+                     ;; of collection is it? Some properties that can be used in
+                     ;; the PDP.
+                     }
+              scopes (assoc ::apex/scopes scopes)
+              true (authorize db session))]
 
         ;; Add conditional entries to the resource
         (cond-> resource
@@ -449,7 +501,7 @@
    (when (re-matches (re-pattern (format "%s/_site/apis/\\w+/openapi.json" base-uri)) uri)
      (or
       ;; It might exist
-      (some-> (x/entity db uri)
+      (some-> (xt/entity db uri)
               (assoc ::site/resource-provider ::openapi-document
                      ::site/put-fn put-openapi))
 
@@ -459,10 +511,10 @@
        ::site/description
        "Resource with no representations accepting a PUT of an OpenAPI JSON document."
        ::http/methods #{:get :head :options :put}
-       ::http/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.0.2"}
+       ::http/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.1.0"}
        ::site/put-fn put-openapi}))
 
-   (let [openapis (x/q db '{:find [openapi-uri openapi]
+   (let [openapis (xt/q db '{:find [openapi-uri openapi]
                             :where [[openapi-uri ::apex/openapi openapi]]})
          matches
          (for [[openapi-uri openapi] openapis
@@ -488,7 +540,7 @@
 
        (if (= (count matches) 1)        ; this is the most common case
          (let [openapi-resource (first matches)
-               resource (merge openapi-resource (x/entity db uri))]
+               resource (merge openapi-resource (xt/entity db uri))]
            (if (every? ::jinx/valid? (vals (::apex/openapi-path-params openapi-resource)))
              resource
              (throw
