@@ -6,6 +6,7 @@
    [clojure.tools.logging :as log]
    [xtdb.api :as xt]
    [jsonista.core :as json]
+   [juxt.apex.alpha.authorization :refer [authorize]]
    [juxt.jinx.alpha :as jinx]
    [juxt.jinx.alpha.api :as jinx.api]
    [juxt.jinx.alpha.vocabularies.keyword-mapping :refer [process-keyword-mappings]]
@@ -267,59 +268,10 @@
    {}
    path-param-defs))
 
-(defn authorize [resource db session]
-  ;;(def resource resource)
-  ;;(def session session)
-
-  (let [required-scopes (:juxt.apex.alpha/scopes resource)
-        acquired-scopes
-        (xt/q
-         db
-         '{:find [(pull acl [*])]
-           :where [[session :juxt.pass.openid/sub sub]
-                   [session :juxt.pass.openid/iss iss]
-                   ;; TODO: Can't reference home here
-                   [ident :juxt.home/issuer iss]
-                   [ident :juxt.home/subject-identifier sub]
-                   [ident :juxt.home/person-id subject]
-                   (check acl subject resource)]
-
-           :in [session resource]
-
-           ;; Here are the rules, attached to /index.html, that say that for an
-           ;; INTERNAL resource, those that have been granted access to internal, can
-           ;; {GET,HEAD,OPTIONS} it.
-           :rules [
-                   ;; Anyone who has the internal role can see resources classified as INTERNAL
-                   [(check acl subject resource)
-                    [acl ::site/type "ACL"]
-                    [acl :juxt.home/role "https://home.test/_home/roles/internal"]
-                    [acl :juxt.home/person-id subject]
-                    [resource :juxt.pass.alpha/classification "INTERNAL"]]
-
-                   ;; Role access (with ACL granting the role to the subject)
-                   [(check acl subject resource)
-                    [acl ::site/type "ACL"]
-                    [acl :juxt.home/person-id subject]
-                    [acl :juxt.home/role role]
-                    [role-access :juxt.home/type "RoleAccess"]
-                    [role-access :juxt.home/role role]
-                    [role-access :juxt.site/uri resource]]]}
-
-         (:xt/id session))]
-
-    ;; Mapping over each scope, check that a grant exists that maps the session
-
-    (log/tracef "TODO: %s" {:resource resource
-                            :required-scopes required-scopes
-                            :session session}))
-
-  (assoc resource ::pass/authorization {::pass/authorizer ::authorizer}))
-
 (defn path-entry->resource
   "From an OpenAPI path-to-path-object entry, return the corresponding resource if
   it matches the path. Path matching also considers path-parameters."
-  [{:ring.request/keys [method] ::pass/keys [session] ::site/keys [db]}
+  [{:ring.request/keys [method] :as req}
    [path path-item-object] openapi openapi-uri rel-request-path]
 
   (let [path-param-defs
@@ -399,8 +351,11 @@
 
             post-fn-sym (when (= method :post) (some-> (get operation-object "juxt.site.alpha/post-fn") symbol))
 
-            ;; The 'oauth' key is merely an Apex convention.
-            scopes (get-in operation-object ["security" "oauth"])
+            ;; The 'oauth' key is merely an Apex convention (possibly temporary).
+            ;; TODO: Replace this convention with something more robust.
+            _ (def operation-object operation-object)
+
+            required-scope (set (get-in operation-object ["security" "oauth"]))
 
             resource
             (cond-> {::site/resource-provider ::apex/openapi-path
@@ -444,8 +399,8 @@
                      ;; of collection is it? Some properties that can be used in
                      ;; the PDP.
                      }
-              scopes (assoc ::apex/scopes scopes)
-              true (authorize db session))]
+              required-scope (assoc ::apex/required-scope required-scope)
+              true (authorize req))]
 
         ;; Add conditional entries to the resource
         (cond-> resource

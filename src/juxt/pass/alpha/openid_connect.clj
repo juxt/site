@@ -26,7 +26,7 @@
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'openid (create-ns 'juxt.pass.openid))
+(alias 'jwt (create-ns 'juxt.pass.jwt))
 (alias 'site (create-ns 'juxt.site.alpha))
 
 (defn lookup [id db]
@@ -254,11 +254,12 @@
          :uri token-endpoint
          :headers {"Content-Type" "application/json" #_"application/x-www-form-urlencoded"
                    "Accept" "application/json"}
-         :body (json/write-value-as-string {"grant_type" "authorization_code"
-                                            "client_id" oauth2-client-id
-                                            "client_secret" oauth2-client-secret
-                                            "code" code
-                                            "redirect_uri" redirect-uri})}
+         :body (json/write-value-as-string
+                {"grant_type" "authorization_code"
+                 "client_id" oauth2-client-id
+                 "client_secret" oauth2-client-secret
+                 "code" code
+                 "redirect_uri" redirect-uri})}
 
         {:keys [status headers body] :as response}
         (hc/send
@@ -289,5 +290,5 @@
                  ::pass/claims (:claims id-token)
                  ;; We need to index some of the common known claims in order to
                  ;; use them in our Datalog rules.
-                 ::openid/sub (get-in id-token [:claims "sub"])
-                 ::openid/iss (get-in id-token [:claims "iss"]))))))
+                 ::jwt/sub (get-in id-token [:claims "sub"])
+                 ::jwt/iss (get-in id-token [:claims "iss"]))))))

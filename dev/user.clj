@@ -47,3 +47,45 @@
   (println (ansi/yellow "Enter (help) for help"))
 
   :ready)
+
+
+(map first
+     (xt/q (db) {:find ['scope]
+                 :where '[
+                          (check-scope grant subject)
+                          [grant :juxt.site.alpha/type "ScopeGrant"]
+                          [grant :juxt.apex.alpha/scope scope]
+                          ]
+                 :rules [
+                         '[(check-scope grant subject)
+                           [session :juxt.pass.jwt/sub sub]
+                           [session :juxt.pass.jwt/iss iss]
+                           [ident :juxt.home/issuer iss]
+                           [ident :juxt.home/subject-identifier sub]
+                           [ident :juxt.home/person-id person]
+                           [acl :juxt.home/person-id person]
+                           [acl :juxt.site.alpha/type "ACL"]
+                           [acl :juxt.home/role role]
+                           [grant :juxt.home/role role]
+                           ]]
+                 :in '[session]}
+           "urn:site:session:6e561642a82618655d1345a4981908cf"))
+
+(ls-type "ACL")
+
+(e "https://home.test/grants/mal-has-internal")
+
+
+{:juxt.site.alpha/type "ACL",
+ :juxt.home/person-id
+ "https://home.test/people/f8c2c5c3-635d-4b66-a48d-0d831dce88aa",
+ :juxt.home/role "https://home.test/_home/roles/internal",
+ :xt/id "https://home.test/grants/mal-has-internal"}
+
+
+(e"urn:site:session:6e561642a82618655d1345a4981908cf")
+
+(e "https://home.test/grants/mal-has-internal")
+
+
+(e "https://home.test/_home/internal-role-scope")

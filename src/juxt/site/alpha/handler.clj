@@ -533,7 +533,7 @@
                      ;; generate a correct 403 response. We need to rework this
                      ;; to give these two authorization mechanisms independence
                      ;; from each other.
-                     (:juxt.pass.openid/sub session))
+                     (:juxt.pass.jwt/sub session))
                   403
                   401)]
             (throw
@@ -992,8 +992,7 @@
         ;; request (which is more recent), predominates but a catcher can always
         ;; override aspects, such as the ring.response/status.
 
-        #_(log/tracef e "wrap-error-handling, message: %s" (.getMessage e))
-        #_(log/tracef e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
+        (log/errorf e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
 
         (let [ex-data
               (-> (ex-data e)
@@ -1009,7 +1008,7 @@
                 (let [ex-data (->storable ex-data)]
                   (log/errorf e "%s: %s" (.getMessage e) (pr-str (dissoc ex-data ::site/request-context)))))
 
-              (assert (::site/start-date rc) "HERE")
+              (assert (::site/start-date rc))
               (error-response rc e))
 
             (error-response
