@@ -50,8 +50,13 @@
 (defn authorize
   "Add an authorization to a resource, given the request."
   [resource req]
-  (cond-> resource
-    (set/superset?
-     (request-scope req)
-     (:juxt.apex.alpha/required-scope resource))
-    (assoc ::pass/authorization {})))
+  (let [required-scope (:juxt.apex.alpha/required-scope resource)]
+    (cond-> resource
+      (and
+       ;; Deny by default, see
+       ;; https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html#deny-by-default
+       required-scope
+       (set/superset?
+        (request-scope req)
+        required-scope))
+      (assoc ::pass/authorization {}))))

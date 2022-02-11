@@ -940,7 +940,7 @@
   [opts]
   (try
     (let [{access-token "access_token"} (load-token)
-          {:keys [base-uri directory path spa]
+          {:keys [base-uri directory path spa classification]
            :or {base-uri (:juxt.site.alpha/base-uri config)}} (:options opts)]
       (message! "putting site" base-uri directory path)
       (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
@@ -965,7 +965,8 @@
                                            spa)
                                   (prn "adding headers")
                                   {"site-type" "AppRoutes"
-                                   "site-pattern" (str base-uri "/" path "/app/.*")}))
+                                   "site-pattern" (str base-uri "/" path "/app/.*")})
+                                (when classification {"site-classification" classification}))
                       :body (io/file file)
                       :throw false})]
                 (case status
@@ -1173,7 +1174,9 @@
     {:description (:doc (meta #'put-static-site))
      :cli-options [["-d" "--directory DIR" "Directory containing static site files"]
                    ["-p" "--path PATH" "Path the site will be available at. e.g -p mysite will make the site available at BASE_URI/mysite/index.html"]
-                   ["-spa" "--spa SPA" "If set the html file will be served at PATH/app/*"]]
+                   ["-s" "--spa SPA" "If set the html file will be served at PATH/app/*"]
+                   ["-c" "--classification CLASSIFICATION" "The classification (e.g PUBLIC, INTERNAL, RESTRICTED) applied to the resources"]
+                   ]
      :delegate put-static-site}]])
 
 (let [{:keys [options arguments summary errors]}

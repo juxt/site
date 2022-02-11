@@ -353,9 +353,13 @@
 
             ;; The 'oauth' key is merely an Apex convention (possibly temporary).
             ;; TODO: Replace this convention with something more robust.
-            _ (def operation-object operation-object)
-
-            required-scope (set (get-in operation-object ["security" "oauth"]))
+            required-scope
+            (or
+             (some-> (get-in operation-object ["security" "oauth"]) set)
+             ;; If the security entry is an empty map, it means 'no scopes'
+             (when (= {} (get-in operation-object ["security"])) #{})
+             ;; otherwise, nil means no authorization (which means 'deny access')
+             )
 
             resource
             (cond-> {::site/resource-provider ::apex/openapi-path
