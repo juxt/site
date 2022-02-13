@@ -10,24 +10,26 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 
 (defn rules [db]
-  (->> '{:find [(pull rule [:juxt.pass.alpha/rule])]
-         :where [[rule :juxt.site.alpha/type "ResourceAccessRule"]]}
+  (->> '{:find [(pull rule [::pass/rule])]
+         :where [[rule ::site/type "ResourceAccessRule"]]}
        (xt/q db)
        (map first)
-       (mapv :juxt.pass.alpha/rule)))
+       (mapv ::pass/rule)))
 
 (defn acls
   "Return ACLs"
   [db session resource]
-  (let [rules (rules db)]
+  (let [rules (rules db)
+        query {:find ['(pull acl [*])]
+               :where '[[acl ::site/type "ACL"]
+                        (check acl subject resource)]
+               :rules rules
+               :in '[session resource]}]
     (if (seq rules)
-      (xt/q db {:find ['(pull acl [*])]
-                :where '[[acl ::site/type "ACL"]
-                         (check acl subject resource)]
-                :rules rules
-                :in '[session resource]}
-            session resource)
-      [])))
+      (do
+        (log/tracef "Query %s" (pr-str query))
+        (xt/q db query session resource))
+      #{})))
 
 (defn authorize [{::site/keys [db uri]
                   ::pass/keys [session] :as req}]

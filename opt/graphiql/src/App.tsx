@@ -11,7 +11,7 @@ async function fetchGraphQlSchema(fetcher: import("graphiql").Fetcher) {
 
   //
   const schema = buildClientSchema(
-    (result as { data: import("graphql").IntrospectionQuery }).data,
+    (result as unknown as { data: import("graphql").IntrospectionQuery }).data,
   );
   return schema;
 }
