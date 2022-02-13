@@ -19,12 +19,15 @@
 (defn acls
   "Return ACLs"
   [db session resource]
-  (xt/q db {:find ['(pull acl [*])]
-            :where '[[acl ::site/type "ACL"]
-                     (check acl subject resource)]
-            :rules (rules db)
-            :in '[session resource]}
-        session resource))
+  (let [rules (rules db)]
+    (if (seq rules)
+      (xt/q db {:find ['(pull acl [*])]
+                :where '[[acl ::site/type "ACL"]
+                         (check acl subject resource)]
+                :rules rules
+                :in '[session resource]}
+            session resource)
+      [])))
 
 (defn authorize [{::site/keys [db uri]
                   ::pass/keys [session] :as req}]

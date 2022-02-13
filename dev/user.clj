@@ -49,7 +49,7 @@
   :ready)
 
 
-(map first
+#_(map first
      (xt/q (db) {:find ['scope]
                  :where '[
                           (check-scope grant subject)
@@ -71,21 +71,13 @@
                  :in '[session]}
            "urn:site:session:6e561642a82618655d1345a4981908cf"))
 
-(ls-type "ACL")
+#_(ls-type "ACL")
 
-(e "https://home.test/grants/mal-has-internal")
+#_(e "https://home.test/grants/mal-has-internal")
 
 
-{:juxt.site.alpha/type "ACL",
+#_{:juxt.site.alpha/type "ACL",
  :juxt.home/person-id
  "https://home.test/people/f8c2c5c3-635d-4b66-a48d-0d831dce88aa",
  :juxt.home/role "https://home.test/_home/roles/internal",
  :xt/id "https://home.test/grants/mal-has-internal"}
-
-
-(e"urn:site:session:6e561642a82618655d1345a4981908cf")
-
-(e "https://home.test/grants/mal-has-internal")
-
-
-(e "https://home.test/_home/internal-role-scope")
