@@ -992,7 +992,7 @@
         ;; request (which is more recent), predominates but a catcher can always
         ;; override aspects, such as the ring.response/status.
 
-        (log/errorf e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
+        ;;(log/errorf e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
 
         (let [ex-data
               (-> (ex-data e)
