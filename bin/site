@@ -554,8 +554,8 @@
           (error! "Server response:" status (str/trim body))
           (message! "Request id:" (get headers "site-request-id")))))))
 
-(defn put-redirect
-  "Put a redirect"
+(defn post-redirect
+  "Post a redirect"
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri resource location]
@@ -1103,11 +1103,11 @@
                    ["-p" "--path PATH" "The destination path after the base-uri"]]
      :delegate post-graphql}]
 
-   ["put-redirect"
-    {:description (:doc (meta #'put-redirect))
+   ["post-redirect"
+    {:description (:doc (meta #'post-redirect))
      :cli-options [["-r" "--resource URL" "Resource"]
                    ["-l" "--location URL" "Location to redirect to"]]
-     :delegate put-redirect}]
+     :delegate post-redirect}]
 
    ["put-api"
     {:description (:doc (meta #'put-api))

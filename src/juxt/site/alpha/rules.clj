@@ -14,6 +14,8 @@
 (defn post-rule
   [{::site/keys [xt-node uri] ::apex/keys [request-payload] :as req}]
 
+  (assert request-payload)
+
   (let [location
         (str uri (hash (select-keys request-payload [::pass/target ::pass/effect])))]
 

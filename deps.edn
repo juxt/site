@@ -90,14 +90,17 @@
                                         :sha "c087ded910b3532a938b37e853df79fc3b9c48c1"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
               "-Dclojure.server.site={:port,50505,:accept,juxt.site.alpha.repl-server/repl}"
-              "-Dclojure.spec.check-asserts=true"]}
+              "-Dclojure.spec.check-asserts=true"
+              "--add-opens" "java.base/java.util.concurrent=ALL-UNNAMED"]}
 
   :test
   {:extra-paths ["test"]
    :extra-deps
    {lambdaisland/kaocha {:mvn/version "1.0.887"}
     lambdaisland/kaocha-junit-xml {:mvn/version "0.0.76"}
-    nrepl/nrepl {:mvn/version "0.9.0-beta4"}}}
+    nrepl/nrepl {:mvn/version "0.9.0-beta4"}}
+   :jvm-opts ["--add-opens" "java.base/java.util.concurrent=ALL-UNNAMED"]
+   }
 
   :prod
   {:extra-paths ["prod"]

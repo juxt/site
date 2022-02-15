@@ -14,6 +14,7 @@
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha.perf :refer [fast-get-in]]
+   [juxt.site.alpha.return :refer [return]]
    [juxt.site.alpha.util :as util]
    [ring.util.codec :refer [form-decode url-decode]])
   (:import (java.net URLDecoder)))
@@ -349,7 +350,17 @@
                           (contains? methods :get)
                           (conj :head)))))
 
-            post-fn-sym (when (= method :post) (some-> (get operation-object "juxt.site.alpha/post-fn") symbol))
+            post-fn (when (= method :post)
+                      (let [post-fn-sym (some-> (get operation-object "juxt.site.alpha/post-fn") symbol)
+                            _ (when-not post-fn-sym
+                                (return req 500 "A POST method operation definition must include a juxt.site.alpha/post-fn" {:operation-object operation-object}))
+                            post-fn (try
+                                      (requiring-resolve post-fn-sym)
+                                      (catch IllegalArgumentException _
+                                        (return req 500 "Failed to resolve post-fn: %s" post-fn-sym)))]
+                        (when-not post-fn
+                          (return req 500 "The post-fn for the operation is nil" {:operation-object operation-object}))
+                        post-fn))
 
             ;; The 'oauth' key is merely an Apex convention (possibly temporary).
             ;; TODO: Replace this convention with something more robust.
@@ -410,20 +421,22 @@
         (cond-> resource
           (seq acceptable) (assoc ::http/acceptable {"accept" acceptable})
 
-          post-fn-sym
-          (assoc
-           ::site/post-fn
-           (fn post-fn-proxy [req]
-             (assert ::site/start-date req)
-             (log/debug "Calling post-fn" post-fn-sym)
-             (let [f (try
-                       (requiring-resolve post-fn-sym)
-                       (catch IllegalArgumentException _
-                         (throw
-                          (ex-info
-                           (str "Failed to find post-fn: " post-fn-sym)
-                           {::site/request-context (assoc req :ring.response/status 500)}))))]
-               (f (validate-request-payload req)))))
+          post-fn (assoc ::site/post-fn post-fn)
+          ;; We no longer validate-request-payload so post-fn functions should do that
+          #_post-fn-sym
+          #_(assoc
+             ::site/post-fn
+             (fn post-fn-proxy [req]
+               (assert ::site/start-date req)
+               (log/debug "Calling post-fn" post-fn-sym)
+               (let [f (try
+                         (requiring-resolve post-fn-sym)
+                         (catch IllegalArgumentException _
+                           (throw
+                            (ex-info
+                             (str "Failed to find post-fn: " post-fn-sym)
+                             {::site/request-context (assoc req :ring.response/status 500)}))))]
+                 (f (validate-request-payload req)))))
 
           (= method :put)
           (assoc
