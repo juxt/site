@@ -9,17 +9,20 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn rules [db]
+(defn resource-access-rules [db]
   (->> '{:find [(pull rule [::pass/rule])]
          :where [[rule ::site/type "ResourceAccessRule"]]}
        (xt/q db)
        (map first)
        (mapv ::pass/rule)))
 
-(defn acls
-  "Return ACLs"
+(defn resource-access-acls
+  "Return ACLs. The session argument can be nil, the resource argument must not
+  be."
   [db session resource]
-  (let [rules (rules db)
+  ;; Session can be nil, resource cannot be
+  (assert resource)
+  (let [rules (resource-access-rules db)
         query {:find ['(pull acl [*])]
                :where '[[acl ::site/type "ACL"]
                         (check acl subject resource)]
@@ -31,10 +34,10 @@
         (xt/q db query session resource))
       #{})))
 
-(defn authorize [{::site/keys [db uri]
-                  ::pass/keys [session] :as req}]
-  (assert session "Shouldn't call this function without a session in context")
-  (let [acls (acls db (:xt/id session) uri)]
+(defn authorize-resource [{::site/keys [db uri]
+                           ::pass/keys [session] :as req}]
+  (let [acls (resource-access-acls db (:xt/id session) uri)]
     (log/tracef "acls are %s" acls)
     (cond-> req
-      (seq acls) (assoc-in [::site/resource ::pass/authorization ::pass/acls] acls))))
+      (seq acls) (assoc-in [::site/resource ::pass/authorization ::pass/acls] acls)
+      true (assoc-in [::site/resource ::pass/authorization] {:debug true}))))

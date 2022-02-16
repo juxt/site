@@ -7,15 +7,35 @@
                            *xt-node* *handler*
                            access-all-areas access-all-apis]]
    [jsonista.core :as json]
-   [clojure.java.io :as io]))
+   [juxt.jinx.alpha.api :refer [schema validate]]
+   [clojure.java.io :as io]
+   [juxt.jinx.alpha :as jinx]))
+
+(alias 'jinx (create-ns 'juxt.jinx.alpha))
+
+#_(json/write-value-as-string
+           {:openapi "3.0.2"
+            :paths {"/foo" {:post {:summary "Post some data"}}}})
+
+#_(json/read-value (io/resource "juxt/apex/schema.json"))
+
+#_(let [schema (schema (json/read-value (io/resource "juxt/apex/schema.json")))
+      doc {"openapi" "3.0.2"
+           "info" {"title" "Foo" "version" "1.0.0"}
+           "paths" {"\\/" {"get" {}}}}
+      validation (validate schema doc)
+      ]
+
+  doc
+
+  (if (::jinx/valid? validation)
+    true
+    validation))
+
 
 (t/use-fixtures :each with-xt with-handler)
 
 ;; POST method operations
-
-#_(json/write-value-as-bytes
- {:openapi "3.0.2"
-  :paths {"/foo" {:post {:summary "Post some data"}}}})
 
 (do
   (defn install-api [api]
@@ -31,7 +51,12 @@
   ((t/join-fixtures [with-xt with-handler])
    (fn []
      (submit-and-await!
-      [[:xtdb.api/put access-all-areas]
+      [
+       ;; Establish a session
+       ;; Establish a developer role
+       ;; Establish a scope write:api
+       ;; Establish a rule
+       #_[:xtdb.api/put access-all-areas]
 
        ])
      ;; Install API (with validation)

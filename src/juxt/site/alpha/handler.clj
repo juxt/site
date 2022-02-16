@@ -482,9 +482,9 @@
       (log/trace "Already authorized")
       )
     (h (cond-> req
-         ;; Only authorize if not already authorized, AND a session exists.
-         (and (not (::pass/authorization resource)) session)
-         authz/authorize))))
+         ;; Only authorize if not already authorized
+         (not (::pass/authorization resource))
+         authz/authorize-resource))))
 
 (defn wrap-authorize-with-pdp
   ;; Do authorization as late as possible (in order to have as much data
