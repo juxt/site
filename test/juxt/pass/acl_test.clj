@@ -39,7 +39,12 @@
 
      ;; Establish a session. This is effectively the subject, Bob
      [::xt/put
-      {:xt/id "urn:site:session:123"
+      {:xt/id "urn:site:session:bob"
+       :juxt.pass.jwt/sub "bob"
+       ::pass/scope "read:index"}]
+
+     [::xt/put
+      {:xt/id "urn:site:session:bob-without-scope"
        :juxt.pass.jwt/sub "bob"}]
 
      [::xt/put
@@ -51,7 +56,8 @@
        ;; authorization terminology uses the term 'resource' for anything that
        ;; can be protected.
        ::pass/resource "https://example.org/index"
-       ::pass/action "read"}]
+       ::pass/action "read"
+       ::pass/scope "read:index"}]
 
      [::xt/put
       {:xt/id "https://example.org/rules/1"
@@ -61,7 +67,13 @@
                  [acl ::pass/resource resource]
                  [acl :juxt.pass.jwt/sub sub]
                  [subject :juxt.pass.jwt/sub sub]
-                 [acl ::pass/action action]])}]
+                 [acl ::pass/action action]
+
+                 ;; A subject may be constrained to a scope. In this case, only
+                 ;; matching ACLs are literally 'in scope'.
+                 [acl ::pass/scope scope]
+                 [subject ::pass/scope scope]])}]
+
 
      ;; We can now define the ruleset
      [::xt/put
@@ -91,12 +103,13 @@
                         :expected-count expected-count
                         :actual-count (count acls)}))))]
 
-       (check "urn:site:session:123" "read" "https://example.org/index" 1)
+       (check "urn:site:session:bob" "read" "https://example.org/index" 1)
+       (check "urn:site:session:bob-without-scope" "read" "https://example.org/index" 0)
 
        ;; Fuzz each of the parameters to check that the ACL fails
-       (check "urn:site:session:456" "read" "https://example.org/index" 0)
-       (check "urn:site:session:123" "read" "https://example.org/index2" 0)
-       (check "urn:site:session:123" "write" "https://example.org/index" 0)
+       (check nil "read" "https://example.org/index" 0)
+       (check "urn:site:session:bob" "read" "https://example.org/other-page" 0)
+       (check "urn:site:session:bob" "write" "https://example.org/index" 0)
 
        )
 
