@@ -21,8 +21,7 @@
 
 (t/use-fixtures :each with-xt with-handler)
 
-(defn fail [m]
-  (throw (ex-info "FAIL" m)))
+(defn fail [ex-data] (throw (ex-info "FAIL" ex-data)))
 
 ((t/join-fixtures [with-xt with-handler])
  (fn []
