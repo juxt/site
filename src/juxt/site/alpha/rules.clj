@@ -4,7 +4,8 @@
   (:require
    [xtdb.api :as x]
    [juxt.site.alpha.util :as util]
-   [clojure.tools.logging :as log]))
+   [clojure.tools.logging :as log]
+   [clojure.string :as str]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -43,15 +44,18 @@
         (try
           (keep
            (fn [rule-id]
-             (let [rule (x/entity db rule-id)]
-               ;; Arguably ::pass/target, ::pass/effect and ::pass/matched? should
-               ;; be re-namespaced.
-               (when-let [target (::pass/target rule)]
-                 (let [q {:find ['success]
-                          :where (into '[[(identity true) success]] target)
-                          :in (vec (keys temp-id-map))}
-                       match-results (apply x/q db q (map :xt/id (vals temp-id-map)))]
-                   (assoc rule ::pass/matched? (pos? (count match-results)))))))
+             (let [rule (x/entity db rule-id)
+                   path (get-in temp-id-map ['request :ring.request/path])]
+               ;; workaround until we move to mals session branch
+               (if (or (str/includes? path "transcript")
+                       (str/includes? path "wordle"))
+                 (assoc rule ::pass/matched? true)
+                 (when-let [target (::pass/target rule)]
+                   (let [q {:find ['success]
+                            :where (into '[[(identity true) success]] target)
+                            :in (vec (keys temp-id-map))}
+                         match-results (apply x/q db q (map :xt/id (vals temp-id-map)))]
+                     (assoc rule ::pass/matched? (pos? (count match-results))))))))
            rules)
           (catch Exception e
             (log/error e "Failed to evaluate rules")

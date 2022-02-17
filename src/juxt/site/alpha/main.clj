@@ -3,6 +3,8 @@
 (ns juxt.site.alpha.main
   (:require
    [aero.core :as aero]
+   [kanban.resolvers]
+   [juxt.site.wordle.resolvers]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log]
    [integrant.core :as ig]))

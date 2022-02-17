@@ -569,6 +569,10 @@
               ;; Resolvers need to do their own access control
               (resolver opts))
 
+            (get  site-args "subject")
+            (let [k (keyword (get site-args "subject"))]
+              (get subject k))
+
             mutation? (perform-mutation! opts)
 
             (get site-args "history")
