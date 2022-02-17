@@ -48,9 +48,15 @@
   (let [acls (acls
               db
               (:xt/id session) ; for now we treat the session as representing
-                               ; the subject
-              (case method
-                :get "read")
+                                        ; the subject
+
+;; TODO: The subject needs to be in the database, accessible to Datalog, and for
+;; historic/audit. Therefore, the subject needs to be established when a session
+;; is created (access with a session id cookie), or when a Bearer token is
+;; minted. Whatever the means of access, the same subject needs to be determined
+;; (whether accessed via session id, bearer token or other means).
+
+              (case method :get "read")
               uri)]
     (log/tracef "acls are %s" acls)
     (cond-> req

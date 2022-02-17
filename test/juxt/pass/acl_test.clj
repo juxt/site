@@ -47,11 +47,60 @@
       {:xt/id "urn:site:session:alice-without-scope"
        :juxt.pass.jwt/sub "alice"}]
 
+     ;; Bob's access will be via his 'manager' role
+
+     [::xt/put
+      {:xt/id "urn:site:session:bob"
+       :juxt.pass.jwt/sub "bob"
+       ::pass/scope "read:index"}]
+
+     [::xt/put
+      {:xt/id "https://example.org/roles/manager"
+       ::site/type "Role"}]
+
+     [::xt/put
+      {:xt/id "https://example.org/roles/bob-is-manager"
+       ::site/type "ACL"
+       :juxt.pass.jwt/sub "bob"
+       ::pass/role "https://example.org/roles/manager"}]
+
+     ;; Carl isn't a manager
+
+     [::xt/put
+      {:xt/id "urn:site:session:carl"
+       :juxt.pass.jwt/sub "carl"
+       ::pass/scope "read:index"}]
+
+     ;; A note on cacheing - each token can cache the resources it has access
+     ;; to, keyed by action and transaction time. If a resource is updated, the
+     ;; cache will fail. If an ACL is revoked, such that read access would no
+     ;; longer be possible, the cache can still be used (avoiding the need to
+     ;; detect changes to ACLs). See 'new enemy'
+     ;; problem. https://duckduckgo.com/?t=ffab&q=authorization+%22new+enemy%22&ia=web
+
      [::xt/put
       {:xt/id "https://example.org/grants/alice-can-access-index"
        ::site/description "Alice is granted access to /index"
        ::site/type "ACL"
+
        :juxt.pass.jwt/sub "alice"
+
+       ;; A resource can be any XT document, a superset of web resources. Common
+       ;; authorization terminology uses the term 'resource' for anything that
+       ;; can be protected.
+       ::pass/resource "https://example.org/index"
+       ::pass/action "read"
+       ::pass/scope "read:index"}]
+
+     ;; TODO: Resource 'sets'
+
+     [::xt/put
+      {:xt/id "https://example.org/grants/managers-can-access-index"
+       ::site/description "Managers are granted access to /index"
+       ::site/type "ACL"
+
+       ::pass/role "https://example.org/roles/manager"
+
        ;; A resource can be any XT document, a superset of web resources. Common
        ;; authorization terminology uses the term 'resource' for anything that
        ;; can be protected.
@@ -75,7 +124,17 @@
 
                  [(granted acl subject)
                   [acl :juxt.pass.jwt/sub sub]
-                  [subject :juxt.pass.jwt/sub sub]]])}]
+                  [subject :juxt.pass.jwt/sub sub]]
+
+                 [(granted acl subject)
+                  [acl ::pass/role role]
+                  [subject :juxt.pass.jwt/sub sub]
+
+                  [role ::site/type "Role"]
+                  [role-membership ::site/type "ACL"]
+                  [role-membership :juxt.pass.jwt/sub sub]
+                  [role-membership ::pass/role role]
+                  ]])}]
 
 
      ;; We can now define the ruleset
@@ -93,7 +152,7 @@
    (let [db (xt/db *xt-node*)]
 
      ;; Check rules
-     (when (not= (count (authz/rules db "https://example.org/index")) 2)
+     (when (not= (count (authz/rules db "https://example.org/index")) 3)
        (fail {:rules (authz/rules db "https://example.org/index")}))
 
      (let [check
@@ -114,6 +173,6 @@
        (check "urn:site:session:alice" "read" "https://example.org/other-page" 0)
        (check "urn:site:session:alice" "write" "https://example.org/index" 0)
 
-       )
+       (check "urn:site:session:bob" "read" "https://example.org/index" 1)
 
-     )))
+       (check "urn:site:session:carl" "read" "https://example.org/index" 0)))))
