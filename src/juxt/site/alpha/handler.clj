@@ -477,7 +477,7 @@
       (h (cond-> req sub (assoc ::pass/subject sub))))))
 
 (defn wrap-authorize-with-acls [h]
-  (fn [{::pass/keys [session] ::site/keys [resource] :as req}]
+  (fn [{::pass/keys [session] ::site/keys [resource]}]
     (when (::pass/authorization resource)
       (log/trace "Already authorized")
       )

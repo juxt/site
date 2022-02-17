@@ -21,6 +21,9 @@
 
 (t/use-fixtures :each with-xt with-handler)
 
+(defn fail [m]
+  (throw (ex-info "FAIL" m)))
+
 ((t/join-fixtures [with-xt with-handler])
  (fn []
    (submit-and-await!
@@ -39,33 +42,28 @@
       {:xt/id "urn:site:session:123"
        :juxt.pass.jwt/sub "bob"}]
 
-     ;; Grants
-
      [::xt/put
       {:xt/id "https://example.org/grants/bob-can-access-index"
        ::site/description "Bob is granted access to /index"
        ::site/type "ACL"
        :juxt.pass.jwt/sub "bob"
        ::pass/resource "https://example.org/index"
-       }]
-
-     ;; Rules
+       ::pass/action "read"}]
 
      [::xt/put
       {:xt/id "https://example.org/rules/1"
-       ::site/description "Allow access to those directly granted"
+       ::site/description "Allow read access of resources to granted subjects"
        ::pass/rule-content
-       (pr-str '[(check acl subject resource)
+       (pr-str '[(check acl subject action resource)
                  [acl ::pass/resource resource]
                  [acl :juxt.pass.jwt/sub sub]
-                 [subject :juxt.pass.jwt/sub sub]])}]
+                 [subject :juxt.pass.jwt/sub sub]
+                 [acl ::pass/action action]])}]
 
-     ;; We can now
+     ;; We can now define the ruleset
      [::xt/put
       {:xt/id "https://example.org/ruleset"
-       ::pass/rules ["https://example.org/rules/1"]}]
-
-     ])
+       ::pass/rules ["https://example.org/rules/1"]}]])
 
    ;; Is subject allowed to do action to resource?
    ;; ACLs involved will include any limitations on actions
@@ -74,18 +72,30 @@
    ;; e.g. list of documents
    ;; This might be a solution to the n+1 problem in our graphql
 
-   (let [db (xt/db *xt-node*)
-
-         {:ring.response/keys [status] :as response}
-         (*handler*
-          {:ring.request/method :get
-           :ring.request/path "/index"})]
+   (let [db (xt/db *xt-node*)]
 
      ;; Check rules
      (when (not= (count (authz/rules db "https://example.org/index")) 1)
        (throw (ex-info "FAIL" {})))
 
-     (authz/acls db "urn:site:session:123" "https://example.org/index")
+     (let [check (fn [subject action resource expected-count]
+                   (let [acls (authz/acls db subject action resource)]
+                     (when-not (= expected-count (count acls))
+                       (fail {:subject subject
+                              :action action
+                              :resource resource
+                              :expected-count expected-count
+                              :actual-count (count acls)})
+                       )))]
+
+       (check "urn:site:session:123" "read" "https://example.org/index" 1)
+
+       ;; Fuzz each of the parameters to check that the ACL fails
+       (check "urn:site:session:456" "read" "https://example.org/index" 0)
+       (check "urn:site:session:123" "read" "https://example.org/index2" 0)
+       (check "urn:site:session:123" "write" "https://example.org/index" 0)
+
+       )
 
      ;;(when (not= 200 status) (throw (ex-info "FAIL" {:response response})))
      ;;(is (= 200 status))

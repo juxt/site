@@ -25,30 +25,30 @@
 (defn acls
   "Return ACLs. The session argument can be nil, the resource argument must not
   be."
-  [db subject resource]
+  [db subject action resource]
   ;; Subject can be nil, resource cannot be
   (assert (or (nil? subject) (string? subject)))
+  (assert (string? action))
   (assert (string? resource))
   (let [rules (rules db resource)
         query {:find ['(pull acl [*])]
                :where '[[acl ::site/type "ACL"]
-                        (check acl subject resource)]
+                        (check acl subject action resource)]
                :rules rules
-               :in '[subject resource]}]
+               :in '[subject action resource]}]
     (if (seq rules)
-      (do
-        (log/tracef "Query %s" (pr-str query))
-        (log/tracef "Resource %s" resource)
-        (log/tracef "Subject %s" subject)
-        (map first (xt/q db query subject resource)))
+      (map first (xt/q db query subject action resource))
       #{})))
 
 (defn authorize-resource [{::site/keys [db uri]
+                           :ring.request/keys [method]
                            ::pass/keys [session] :as req}]
   (let [acls (acls
               db
               (:xt/id session) ; for now we treat the session as representing
                                ; the subject
+              (case method
+                :get "read")
               uri)]
     (log/tracef "acls are %s" acls)
     (cond-> req
