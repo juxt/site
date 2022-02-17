@@ -11,8 +11,7 @@
 
 (defn rules [db resource]
   (assert (string? resource))
-  (mapv
-   (comp read-string first)
+  (->>
    (xt/q
     db
     '{:find [rule-content]
@@ -20,7 +19,10 @@
               [ruleset ::pass/rules rule]
               [rule ::pass/rule-content rule-content]]
       :in [resource]}
-    resource)))
+    resource)
+   (map (comp read-string first))
+   (mapcat seq)
+   vec))
 
 (defn acls
   "Return ACLs. The session argument can be nil, the resource argument must not

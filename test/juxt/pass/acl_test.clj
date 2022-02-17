@@ -63,16 +63,16 @@
       {:xt/id "https://example.org/rules/1"
        ::site/description "Allow read access of resources to granted subjects"
        ::pass/rule-content
-       (pr-str '[(check acl subject action resource)
-                 [acl ::pass/resource resource]
-                 [acl :juxt.pass.jwt/sub sub]
-                 [subject :juxt.pass.jwt/sub sub]
-                 [acl ::pass/action action]
+       (pr-str '[[(check acl subject action resource)
+                  [acl ::pass/resource resource]
+                  [acl :juxt.pass.jwt/sub sub]
+                  [subject :juxt.pass.jwt/sub sub]
+                  [acl ::pass/action action]
 
-                 ;; A subject may be constrained to a scope. In this case, only
-                 ;; matching ACLs are literally 'in scope'.
-                 [acl ::pass/scope scope]
-                 [subject ::pass/scope scope]])}]
+                  ;; A subject may be constrained to a scope. In this case, only
+                  ;; matching ACLs are literally 'in scope'.
+                  [acl ::pass/scope scope]
+                  [subject ::pass/scope scope]]])}]
 
 
      ;; We can now define the ruleset
