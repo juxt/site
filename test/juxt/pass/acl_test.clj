@@ -47,6 +47,9 @@
        ::site/description "Bob is granted access to /index"
        ::site/type "ACL"
        :juxt.pass.jwt/sub "bob"
+       ;; A resource can be any XT document, a superset of web resources. Common
+       ;; authorization terminology uses the term 'resource' for anything that
+       ;; can be protected.
        ::pass/resource "https://example.org/index"
        ::pass/action "read"}]
 
@@ -97,6 +100,4 @@
 
        )
 
-     ;;(when (not= 200 status) (throw (ex-info "FAIL" {:response response})))
-     ;;(is (= 200 status))
      )))
