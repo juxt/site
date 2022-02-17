@@ -65,14 +65,17 @@
        ::pass/rule-content
        (pr-str '[[(check acl subject action resource)
                   [acl ::pass/resource resource]
-                  [acl :juxt.pass.jwt/sub sub]
-                  [subject :juxt.pass.jwt/sub sub]
+                  (granted acl subject)
                   [acl ::pass/action action]
 
                   ;; A subject may be constrained to a scope. In this case, only
                   ;; matching ACLs are literally 'in scope'.
                   [acl ::pass/scope scope]
-                  [subject ::pass/scope scope]]])}]
+                  [subject ::pass/scope scope]]
+
+                 [(granted acl subject)
+                  [acl :juxt.pass.jwt/sub sub]
+                  [subject :juxt.pass.jwt/sub sub]]])}]
 
 
      ;; We can now define the ruleset
@@ -90,8 +93,8 @@
    (let [db (xt/db *xt-node*)]
 
      ;; Check rules
-     (when (not= (count (authz/rules db "https://example.org/index")) 1)
-       (throw (ex-info "FAIL" {})))
+     (when (not= (count (authz/rules db "https://example.org/index")) 2)
+       (fail {:rules (authz/rules db "https://example.org/index")}))
 
      (let [check
            (fn [subject action resource expected-count]
