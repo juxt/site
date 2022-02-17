@@ -8,9 +8,6 @@ import RequestsTable from './components/table/Table';
 import {useMemo, useState} from 'react';
 import {LocationGenerics} from './types';
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Autocomplete,
   Container,
   Fade,
@@ -23,11 +20,9 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Typography,
 } from '@mui/material';
 import ReactJson from 'searchable-react-json-view';
 import {notEmpty} from './common';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 function useRequest(requestId: string) {
   return useGetRequestSummaryQuery(
@@ -118,7 +113,7 @@ export function RequestInfo() {
   const {requestId} = useSearch<LocationGenerics>();
   const navigate = useNavigate<LocationGenerics>();
 
-  const {status, data, error, isFetching} = useRequest(requestId || '');
+  const {status, data, error} = useRequest(requestId || '');
   const isOpen = !!data?.request?._detail;
 
   const [search, setSearch] = useState('');
@@ -179,24 +174,6 @@ export function RequestInfo() {
                     )}
                   </p>
                 </>
-              )}
-              {data.request.errors && (
-                <Accordion sx={{mb: 2}} TransitionProps={{timeout: 200}}>
-                  <AccordionSummary
-                    aria-controls="panel1a-content"
-                    expandIcon={<ExpandMoreIcon />}
-                    id="panel1a-header">
-                    <Typography>
-                      <strong>{data.request.errors.length} error(s)</strong>
-                    </Typography>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    {data.request.errors.filter(notEmpty).map((e) => (
-                      <p key={e.message}>{e.message}</p>
-                    ))}
-                    <pre>{JSON.stringify(data.request.errors, null, 2)}</pre>
-                  </AccordionDetails>
-                </Accordion>
               )}
 
               <Autocomplete

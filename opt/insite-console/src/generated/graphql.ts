@@ -7,7 +7,7 @@ export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]: Mayb
 
 function fetcher<TData, TVariables>(query: string, variables?: TVariables) {
   return async (): Promise<TData> => {
-    const res = await fetch("http://localhost:2021/_site/graphql", {
+    const res = await fetch("http://localhost:5509/_site/graphql", {
     method: "POST",
     ...({"headers":{"Content-Type":"application/json"},"credentials":"include"}),
       body: JSON.stringify({ query, variables }),
@@ -233,14 +233,14 @@ export type AllApisQuery = { __typename?: 'Query', apis: Array<{ __typename?: 'A
 export type AllRequestsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type AllRequestsQuery = { __typename?: 'Query', requests?: { __typename?: 'SiteRequests', summaries: Array<{ __typename?: 'SiteRequest', date?: any | null | undefined, id: string, requestUri?: string | null | undefined, durationMillis?: number | null | undefined, status?: number | null | undefined, method?: string | null | undefined, errors?: Array<{ __typename?: 'SiteGeneralError', message?: string | null | undefined } | { __typename?: 'SiteGraphqlExecutionError', message?: string | null | undefined } | null | undefined> | null | undefined }> } | null | undefined };
+export type AllRequestsQuery = { __typename?: 'Query', requests?: { __typename?: 'SiteRequests', summaries: Array<{ __typename?: 'SiteRequest', date?: any | null | undefined, id: string, requestUri?: string | null | undefined, durationMillis?: number | null | undefined, status?: number | null | undefined, method?: string | null | undefined }> } | null | undefined };
 
 export type GetRequestSummaryQueryVariables = Exact<{
   uri: Scalars['ID'];
 }>;
 
 
-export type GetRequestSummaryQuery = { __typename?: 'Query', request?: { __typename?: 'SiteRequest', id: string, status?: number | null | undefined, date?: any | null | undefined, requestUri?: string | null | undefined, method?: string | null | undefined, durationMillis?: number | null | undefined, graphqlOperationName?: string | null | undefined, _detail?: any | null | undefined, graphqlStoredQueryResourcePath?: string | null | undefined, graphqlVariables?: any | null | undefined, requestHeaders?: any | null | undefined, statusMessage?: string | null | undefined, errors?: Array<{ __typename?: 'SiteGeneralError', exData?: any | null | undefined, message?: string | null | undefined, stackTrace?: Array<{ __typename?: 'SiteStackTraceElement', className?: string | null | undefined, fileName?: string | null | undefined, lineNumber?: number | null | undefined, methodName?: string | null | undefined } | null | undefined> | null | undefined } | { __typename?: 'SiteGraphqlExecutionError', exData?: any | null | undefined, message?: string | null | undefined, stackTrace?: Array<{ __typename?: 'SiteStackTraceElement', className?: string | null | undefined, fileName?: string | null | undefined, lineNumber?: number | null | undefined, methodName?: string | null | undefined } | null | undefined> | null | undefined } | null | undefined> | null | undefined } | null | undefined };
+export type GetRequestSummaryQuery = { __typename?: 'Query', request?: { __typename?: 'SiteRequest', id: string, status?: number | null | undefined, date?: any | null | undefined, requestUri?: string | null | undefined, method?: string | null | undefined, durationMillis?: number | null | undefined, graphqlOperationName?: string | null | undefined, _detail?: any | null | undefined, graphqlStoredQueryResourcePath?: string | null | undefined, graphqlVariables?: any | null | undefined, requestHeaders?: any | null | undefined, statusMessage?: string | null | undefined } | null | undefined };
 
 
 export const AllApisDocument = `
@@ -280,9 +280,6 @@ export const AllRequestsDocument = `
       durationMillis
       status
       method
-      errors {
-        message
-      }
     }
   }
 }
@@ -319,16 +316,6 @@ export const GetRequestSummaryDocument = `
     _detail
     graphqlStoredQueryResourcePath
     graphqlVariables
-    errors {
-      exData
-      message
-      stackTrace {
-        className
-        fileName
-        lineNumber
-        methodName
-      }
-    }
     requestHeaders
     statusMessage
   }

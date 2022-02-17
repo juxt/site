@@ -12,16 +12,20 @@ export function ApiList() {
         {status === 'loading' && 'Loading...'}
         {status === 'error' && <span>Error: {error?.message}</span>}
         {data &&
-          data.apis.map((api) => (
-            <div key={api.id}>
-              <Link
-                to={`./${api.type.toLowerCase()}`}
-                search={(old) => ({...old, url: api.id})}>
-                {api.id}
-              </Link>
-              <p>{api.type}</p>
-            </div>
-          ))}
+          data.apis.map((api) => {
+            const url = new URL(api.id);
+            const path = url.pathname;
+            return (
+              <div key={api.id}>
+                <Link
+                  to={`./${api.type.toLowerCase()}`}
+                  search={(old) => ({...old, url: path})}>
+                  {api.id}
+                </Link>
+                <p>{api.type}</p>
+              </div>
+            );
+          })}
       </div>
     </Container>
   );
