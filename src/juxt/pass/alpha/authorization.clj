@@ -9,35 +9,49 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn resource-access-rules [db]
-  (->> '{:find [(pull rule [::pass/rule])]
-         :where [[rule ::site/type "ResourceAccessRule"]]}
-       (xt/q db)
-       (map first)
-       (mapv ::pass/rule)))
+(defn rules [db resource]
+  (assert (string? resource))
+  (mapv
+   (comp read-string first)
+   (xt/q
+    db
+    '{:find [rule-content]
+      :where [[resource ::pass/ruleset ruleset]
+              [ruleset ::pass/rules rule]
+              [rule ::pass/rule-content rule-content]]
+      :in [resource]}
+    resource)))
 
-(defn resource-access-acls
+(defn acls
   "Return ACLs. The session argument can be nil, the resource argument must not
   be."
-  [db session resource]
-  ;; Session can be nil, resource cannot be
-  (assert resource)
-  (let [rules (resource-access-rules db)
+  [db subject resource]
+  ;; Subject can be nil, resource cannot be
+  (assert (or (nil? subject) (string? subject)))
+  (assert (string? resource))
+  (let [rules (rules db resource)
         query {:find ['(pull acl [*])]
                :where '[[acl ::site/type "ACL"]
                         (check acl subject resource)]
                :rules rules
-               :in '[session resource]}]
+               :in '[subject resource]}]
     (if (seq rules)
       (do
         (log/tracef "Query %s" (pr-str query))
-        (xt/q db query session resource))
+        (log/tracef "Resource %s" resource)
+        (log/tracef "Subject %s" subject)
+        (map first (xt/q db query subject resource)))
       #{})))
 
 (defn authorize-resource [{::site/keys [db uri]
                            ::pass/keys [session] :as req}]
-  (let [acls (resource-access-acls db (:xt/id session) uri)]
+  (let [acls (acls
+              db
+              (:xt/id session) ; for now we treat the session as representing
+                               ; the subject
+              uri)]
     (log/tracef "acls are %s" acls)
     (cond-> req
       (seq acls) (assoc-in [::site/resource ::pass/authorization ::pass/acls] acls)
-      true (assoc-in [::site/resource ::pass/authorization] {:debug true}))))
+      ;;true (assoc-in [::site/resource ::pass/authorization] {:debug true})
+      )))
