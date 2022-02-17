@@ -86,8 +86,7 @@
                         :action action
                         :resource resource
                         :expected-count expected-count
-                        :actual-count (count acls)})
-                 )))]
+                        :actual-count (count acls)}))))]
 
        (check "urn:site:session:123" "read" "https://example.org/index" 1)
 
