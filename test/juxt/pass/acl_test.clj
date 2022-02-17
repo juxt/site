@@ -37,21 +37,21 @@
        ;; We'll define this lower down
        ::pass/ruleset "https://example.org/ruleset"}]
 
-     ;; Establish a session. This is effectively the subject, Bob
+     ;; Establish a session. This is effectively the subject, Alice
      [::xt/put
-      {:xt/id "urn:site:session:bob"
-       :juxt.pass.jwt/sub "bob"
+      {:xt/id "urn:site:session:alice"
+       :juxt.pass.jwt/sub "alice"
        ::pass/scope "read:index"}]
 
      [::xt/put
-      {:xt/id "urn:site:session:bob-without-scope"
-       :juxt.pass.jwt/sub "bob"}]
+      {:xt/id "urn:site:session:alice-without-scope"
+       :juxt.pass.jwt/sub "alice"}]
 
      [::xt/put
-      {:xt/id "https://example.org/grants/bob-can-access-index"
-       ::site/description "Bob is granted access to /index"
+      {:xt/id "https://example.org/grants/alice-can-access-index"
+       ::site/description "Alice is granted access to /index"
        ::site/type "ACL"
-       :juxt.pass.jwt/sub "bob"
+       :juxt.pass.jwt/sub "alice"
        ;; A resource can be any XT document, a superset of web resources. Common
        ;; authorization terminology uses the term 'resource' for anything that
        ;; can be protected.
@@ -106,13 +106,13 @@
                         :expected-count expected-count
                         :actual-count (count acls)}))))]
 
-       (check "urn:site:session:bob" "read" "https://example.org/index" 1)
-       (check "urn:site:session:bob-without-scope" "read" "https://example.org/index" 0)
+       (check "urn:site:session:alice" "read" "https://example.org/index" 1)
+       (check "urn:site:session:alice-without-scope" "read" "https://example.org/index" 0)
 
        ;; Fuzz each of the parameters to check that the ACL fails
        (check nil "read" "https://example.org/index" 0)
-       (check "urn:site:session:bob" "read" "https://example.org/other-page" 0)
-       (check "urn:site:session:bob" "write" "https://example.org/index" 0)
+       (check "urn:site:session:alice" "read" "https://example.org/other-page" 0)
+       (check "urn:site:session:alice" "write" "https://example.org/index" 0)
 
        )
 
