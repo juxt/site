@@ -78,15 +78,16 @@
      (when (not= (count (authz/rules db "https://example.org/index")) 1)
        (throw (ex-info "FAIL" {})))
 
-     (let [check (fn [subject action resource expected-count]
-                   (let [acls (authz/acls db subject action resource)]
-                     (when-not (= expected-count (count acls))
-                       (fail {:subject subject
-                              :action action
-                              :resource resource
-                              :expected-count expected-count
-                              :actual-count (count acls)})
-                       )))]
+     (let [check
+           (fn [subject action resource expected-count]
+             (let [acls (authz/acls db subject action resource)]
+               (when-not (= expected-count (count acls))
+                 (fail {:subject subject
+                        :action action
+                        :resource resource
+                        :expected-count expected-count
+                        :actual-count (count acls)})
+                 )))]
 
        (check "urn:site:session:123" "read" "https://example.org/index" 1)
 
