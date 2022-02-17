@@ -42,19 +42,46 @@
       (map first (xt/q db query subject action resource))
       #{})))
 
+(defn list-resources
+  [db subject action ruleset]
+  (assert (string? subject))
+  (assert (string? action))
+  (let [rules
+        (->>
+         (xt/q
+          db
+          '{:find [rule-content]
+            :where [[ruleset ::pass/rules rule]
+                    [rule ::pass/rule-content rule-content]]
+            :in [ruleset]}
+          ruleset)
+         (map (comp read-string first))
+         (mapcat seq)
+         vec)
+
+        query {:find ['(pull acl [*])]
+               :where '[[acl ::site/type "ACL"]
+                        (list-resources acl subject action)]
+               :rules rules
+               :in '[subject action]}]
+
+    (if (seq rules)
+      (map first (xt/q db query subject action))
+      #{})))
+
 (defn authorize-resource [{::site/keys [db uri]
                            :ring.request/keys [method]
                            ::pass/keys [session] :as req}]
   (let [acls (acls
               db
-              (:xt/id session) ; for now we treat the session as representing
+              (:xt/id session)    ; for now we treat the session as representing
                                         ; the subject
 
-;; TODO: The subject needs to be in the database, accessible to Datalog, and for
-;; historic/audit. Therefore, the subject needs to be established when a session
-;; is created (access with a session id cookie), or when a Bearer token is
-;; minted. Whatever the means of access, the same subject needs to be determined
-;; (whether accessed via session id, bearer token or other means).
+              ;; TODO: The subject needs to be in the database, accessible to Datalog, and for
+              ;; historic/audit. Therefore, the subject needs to be established when a session
+              ;; is created (access with a session id cookie), or when a Bearer token is
+              ;; minted. Whatever the means of access, the same subject needs to be determined
+              ;; (whether accessed via session id, bearer token or other means).
 
               (case method :get "read")
               uri)]
