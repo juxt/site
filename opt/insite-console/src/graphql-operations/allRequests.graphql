@@ -7,9 +7,6 @@ query allRequests {
       durationMillis
       status
       method
-      errors {
-        message
-      }
     }
   }
 }

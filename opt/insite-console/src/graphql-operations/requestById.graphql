@@ -10,16 +10,6 @@ query GetRequestSummary($uri: ID!) {
     _detail
     graphqlStoredQueryResourcePath
     graphqlVariables
-    errors {
-      exData
-      message
-      stackTrace {
-        className
-        fileName
-        lineNumber
-        methodName
-      }
-    }
     requestHeaders
     statusMessage
   }
