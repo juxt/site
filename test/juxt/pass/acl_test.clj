@@ -173,6 +173,12 @@
        (check "urn:site:session:alice" "read" "https://example.org/other-page" 0)
        (check "urn:site:session:alice" "write" "https://example.org/index" 0)
 
+       ;; Bob can read index
        (check "urn:site:session:bob" "read" "https://example.org/index" 1)
 
-       (check "urn:site:session:carl" "read" "https://example.org/index" 0)))))
+       ;; But Carl cannot
+       (check "urn:site:session:carl" "read" "https://example.org/index" 0)
+
+       ;; Which resources can Alice access?
+
+       {:status :ok :message "All tests passed"}))))
