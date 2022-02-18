@@ -1,6 +1,7 @@
 (ns kanban.resolvers
   (:require [juxt.site.alpha.graphql :refer [protected-lookup prepare-mutation-entity put-objects!]]
-            [xtdb.api :as xt]))
+            [xtdb.api :as xt]
+            [clojure.string :as str]))
 
 (defn insert-into
   [coll idx item]
@@ -42,33 +43,32 @@
                          (count cardIds)
                          :else
                          (inc (.indexOf cardIds prev))))
-        source (lookup
-                (ffirst
-                 (xt/q db {:find ['e]
-                           :where [['e type-k "WorkflowState"]
-                                   ['e :cardIds card-id]]})))
 
-        updated-destination-cards (insert-into (vec cardIds) new-position card-id)
-        updated-source-cards (remove (fn [id] (= id card-id)) (:cardIds source))
+        ;; we handle a collection of sources just in case there are duplicates
+        sources (map lookup
+                 (map first
+                  (xt/q db {:find ['e]
+                            :where [['e type-k "WorkflowState"]
+                                    ['e :cardIds card-id]]})))
+
+        updated-destination-cards (distinct (insert-into (vec cardIds) new-position card-id))
+        updated-source-cards (into {}
+                                   (map (fn [source]
+                                          [(:xt/id source)
+                                           (distinct (remove (fn [id] (= id card-id))
+                                                             (:cardIds source)))])
+                                        sources))
         updated-destination (assoc destination :cardIds
                                    (vec updated-destination-cards))
-        updated-source (assoc source :cardIds
-                              (vec updated-source-cards))
+        updated-sources (map (fn [source] (assoc source :cardIds (vec (get updated-source-cards (:xt/id source))))) sources)
         prepare (fn [tx] (prepare-mutation-entity opts tx nil))
-        new-source-tx (prepare updated-source)
+        new-sources-txes (map prepare updated-sources)
         new-destination-tx (prepare updated-destination)
         _validate (do
                     (validate card "card")
-                    (validate source "current-state")
+                    (map (fn [source] (validate source "current-state")) sources)
                     (validate destination "new-state")
                     (validate updated-destination "updated dest")
-                    (validate updated-source "updated source")
-                    (when (= (:xt/id source)
-                             (:xt/id destination))
-                      (throw
-                       (ex-info
-                        "Can't move card to same state"
-                        {:from source
-                         :to destination}))))]
-    (prn (put-objects! xt-node [new-source-tx new-destination-tx]))
+                    (map (fn [updated-source] (validate updated-source "updated source")) updated-sources))]
+    (prn (put-objects! xt-node (conj new-sources-txes new-destination-tx)))
     card))
