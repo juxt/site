@@ -138,7 +138,7 @@
   (= (get-in types-by-name [arg-name ::g/kind]) 'ENUM))
 
 (defn prepare-mutation-entity
-  [{:keys [field pass/subject type-k argument-values site-args]}
+  [{:keys [field juxt.pass.alpha/subject type-k argument-values site-args] :as opts}
    entity transform]
   (let [type (-> field ::g/type-ref ::g/name)
         _validate-type (and (nil? type)
