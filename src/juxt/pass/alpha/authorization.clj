@@ -27,10 +27,15 @@
    vec))
 
 (defn acls
-  "Return ACLs. The session argument can be nil, the resource argument must not
-  be."
-  [db session action resource]
+  "Return any ACLs that grant access to the given resource. The subject is derived
+  from the session at the beginning of a request. The session may represent
+  additional context over and above the subject, for example, additional claims,
+  the access scope and method of authentication. Both the session and subject
+  arguments can be nil, the resource argument must not be."
+  [db subject session action resource]
+
   ;; Subject can be nil, resource cannot be
+  (assert (or (nil? subject) (string? subject)))
   (assert (or (nil? session) (string? session)))
   (assert (string? action))
   (assert (string? resource))
@@ -39,15 +44,16 @@
                 (rules db ruleset))
         query {:find ['(pull acl [*])]
                :where '[[acl ::site/type "ACL"]
-                        (check acl session action resource)]
+                        (check acl subject session action resource)
+                        ]
                :rules rules
-               :in '[session action resource]}]
+               :in '[subject session action resource]}]
     (if (seq rules)
-      (map first (xt/q db query session action resource))
+      (map first (xt/q db query subject session action resource))
       #{})))
 
 (defn list-resources
-  [db session action ruleset]
+  [db subject session action ruleset]
   (assert (string? session))
   (assert (string? action))
   (assert (string? ruleset))
@@ -66,12 +72,12 @@
 
         query {:find ['(pull acl [*])]
                :where '[[acl ::site/type "ACL"]
-                        (list-resources acl session action)]
+                        (list-resources acl subject session action)]
                :rules rules
-               :in '[session action]}]
+               :in '[subject session action]}]
 
     (if (seq rules)
-      (map first (xt/q db query session action))
+      (map first (xt/q db query subject session action))
       #{})))
 
 (defn get-subject-from-session

@@ -25,8 +25,8 @@
 
 (deftest scenario-1-test)
 
-(defn check [db session action resource expected-count]
-  (let [acls (authz/acls db session action resource)]
+(defn check [db subject session action resource expected-count]
+  (let [acls (authz/acls db subject session action resource)]
     (is (= expected-count (count acls)))
     (when-not (= expected-count (count acls))
       (fail {:session session
@@ -35,8 +35,8 @@
              :expected-count expected-count
              :actual-count (count acls)}))))
 
-(defn list-resources [db session action ruleset expected-resources]
-  (let [acls (authz/list-resources db session action ruleset)
+(defn list-resources [db subject session action ruleset expected-resources]
+  (let [acls (authz/list-resources db subject session action ruleset)
         actual-resources (set (mapcat ::pass/resource acls))]
     (is (= expected-resources actual-resources))
     (when-not (= expected-resources actual-resources)
@@ -81,11 +81,6 @@
        :juxt.pass.jwt/sub "bob"}]
 
      [::xt/put
-      {:xt/id "urn:site:session:bob"
-       :juxt.pass.jwt/sub "bob"
-       ::pass/scope "read:index"}]
-
-     [::xt/put
       {:xt/id "https://example.org/roles/manager"
        ::type "Role"}]
 
@@ -93,15 +88,16 @@
      [::xt/put
       {:xt/id "https://example.org/roles/bob-is-manager"
        ::site/type "ACL"
-       :juxt.pass.jwt/sub "bob"
+       ::pass/subject "https://example.org/people/bob"
        ::pass/role "https://example.org/roles/manager"}]
 
-     ;; Carl isn't a manager.
-
+     ;; This is Carl. Carl isn't a manager.
      [::xt/put
-      {:xt/id "urn:site:session:carl"
-       :juxt.pass.jwt/sub "carl"
-       ::pass/scope "read:index"}]
+      {:xt/id "https://example.org/people/carl"
+       ::type "User"
+       :juxt.pass.jwt/sub "carl"}]
+
+
 
      ;; A note on cacheing - each token can cache the resources it has access
      ;; to, keyed by action and transaction time. If a resource is updated, the
@@ -115,7 +111,7 @@
        ::site/description "Alice is granted access to some resources"
        ::site/type "ACL"
 
-       :juxt.pass.jwt/sub "alice"
+       ::pass/subject "https://example.org/people/alice"
 
        ;; A resource can be any XT document, a superset of web resources. Common
        ;; authorization terminology uses the term 'resource' for anything that
@@ -144,19 +140,19 @@
       {:xt/id "https://example.org/rules/1"
        ::site/description "Allow read access of resources to granted subjects"
        ::pass/rule-content
-       (pr-str '[[(check acl subject action resource)
+       (pr-str '[[(check acl subject session action resource)
+                  [acl ::site/type "ACL"]
                   [acl ::pass/resource resource]
                   (granted acl subject)
                   [acl ::pass/action action]
 
-                  ;; A subject may be constrained to a scope. In this case, only
+                  ;; A session may be constrained to a scope. In this case, only
                   ;; matching ACLs are literally 'in scope'.
                   [acl ::pass/scope scope]
-                  [subject ::pass/scope scope]]
+                  [session ::pass/scope scope]]
 
                  [(granted acl subject)
-                  [acl :juxt.pass.jwt/sub sub]
-                  [subject :juxt.pass.jwt/sub sub]]
+                  [acl ::pass/subject subject]]
 
                  [(granted acl subject)
                   [acl ::pass/role role]
@@ -164,15 +160,15 @@
 
                   [role ::type "Role"]
                   [role-membership ::site/type "ACL"]
-                  [role-membership :juxt.pass.jwt/sub sub]
+                  [role-membership ::pass/subject subject]
                   [role-membership ::pass/role role]]
 
-                 [(list-resources acl subject action)
+                 [(list-resources acl subject session action)
                   [acl ::pass/resource resource]
                   ;; Any acl, in scope, that references a resource (or set of
                   ;; resources)
                   [acl ::pass/scope scope]
-                  [subject ::pass/scope scope]
+                  [session ::pass/scope scope]
                   [acl ::pass/action action]
                   (granted acl subject)]
 
@@ -181,6 +177,11 @@
                   [subject :juxt.pass.jwt/sub sub]
                   [session :juxt.pass.jwt/sub sub]]])}]
 
+
+     ;; We can now define the ruleset
+     [::xt/put
+      {:xt/id "https://example.org/ruleset"
+       ::pass/rules ["https://example.org/rules/1"]}]
 
      ;; Establish a session for Alice.
      [::xt/put
@@ -193,10 +194,17 @@
       {:xt/id "urn:site:access-token:alice-without-read-index-scope"
        :juxt.pass.jwt/sub "alice"}]
 
-     ;; We can now define the ruleset
      [::xt/put
-      {:xt/id "https://example.org/ruleset"
-       ::pass/rules ["https://example.org/rules/1"]}]])
+      {:xt/id "urn:site:session:bob"
+       :juxt.pass.jwt/sub "bob"
+       ::pass/scope "read:index"}]
+
+     [::xt/put
+      {:xt/id "urn:site:session:carl"
+       :juxt.pass.jwt/sub "carl"
+       ::pass/scope "read:index"}]
+
+     ])
 
    ;; Is subject allowed to do action to resource?
    ;; ACLs involved will include any limitations on actions
@@ -207,34 +215,34 @@
 
    ;; Let's log in and create sessions
 
-
-
-
    (let [db (xt/db *xt-node*)
-
-         subject (get-subject db "urn:site:session:alice")]
+         session "urn:site:session:alice"
+         subject (get-subject db session)]
 
      (when-not (= subject "https://example.org/people/alice")
        (fail {:subject subject}))
 
-     (check db "urn:site:session:alice" "read" "https://example.org/index" 1)
-     (check db "urn:site:access-token:alice-without-read-index-scope" "read" "https://example.org/index" 0)
+     (check db subject session "read" "https://example.org/index" 1)
+
+
+     (check db subject "urn:site:access-token:alice-without-read-index-scope" "read" "https://example.org/index" 0)
 
      ;; Fuzz each of the parameters to check that the ACL fails
-     (check db nil "read" "https://example.org/index" 0)
-     (check db "urn:site:session:alice" "read" "https://example.org/other-page" 0)
-     (check db "urn:site:session:alice" "write" "https://example.org/index" 0)
+     (check db nil nil "read" "https://example.org/index" 0)
+     (check db subject session "read" "https://example.org/other-page" 0)
+     (check db subject session "write" "https://example.org/index" 0)
 
      ;; Bob can read index
-     (check db "urn:site:session:bob" "read" "https://example.org/index" 1)
+     (check db "https://example.org/people/bob" "urn:site:session:bob" "read" "https://example.org/index" 1)
 
      ;; But Carl cannot
-     (check db "urn:site:session:carl" "read" "https://example.org/index" 0)
+     (check db "https://example.org/people/carl" "urn:site:session:carl" "read" "https://example.org/index" 0)
 
      ;; Which resources can Alice access?
      (list-resources
       db
-      "urn:site:session:alice" "read" "https://example.org/ruleset"
+      subject session
+      "read" "https://example.org/ruleset"
       #{"https://example.org/~alice/index" "https://example.org/index"})
 
      ;; TODO: Alice sets up her own home-page, complete with an API for a test project
@@ -246,19 +254,19 @@
      ;; remainder are private and only she can access.
 
      [::xt/put
-      {:xt/id "https://example.org/alice-docs/document-1"
-       ::site/description "A document owned by Alice, to be shared with Bob"
-       ::http/methods #{:get}
-       ::http/content-type "text/html;charset=utf-8"
-       ::http/content "My Document"
-       ::pass/ruleset "https://example.org/ruleset"}]
+        {:xt/id "https://example.org/alice-docs/document-1"
+         ::site/description "A document owned by Alice, to be shared with Bob"
+         ::http/methods #{:get}
+         ::http/content-type "text/html;charset=utf-8"
+         ::http/content "My Document"
+         ::pass/ruleset "https://example.org/ruleset"}]
 
      ;; An ACL that grants Alice ownership of a document
      [::xt/put
-      {:xt/id "https://example.org/alice-owns-document-1"
-       ::site/description "An ACL that grants Alice ownership of a document"
-       ::pass/resource "https://example.org/alice-docs/document-1"
-       ::pass/owner "alice"}]
+        {:xt/id "https://example.org/alice-owns-document-1"
+         ::site/description "An ACL that grants Alice ownership of a document"
+         ::pass/resource "https://example.org/alice-docs/document-1"
+         ::pass/owner "alice"}]
 
      ;; Check Alice can read her own documents, via ::pass/owner
      ;;(check "urn:site:session:alice" "read" "https://example.org/alice-docs/document-1" 0)
@@ -275,15 +283,8 @@
      ;; TODO: Add resources to represent Alice, Bob and Carl, as subjects.
 
 
-     {:status :ok :message "All tests passed"}
+     {:status :ok :message "All tests passed"})))
 
-
-
-
-     )
-
-
-   ))
 
 ;; Create a non-trivial complex scenario which contains many different
 ;; characters and rulesets.
