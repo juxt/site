@@ -136,6 +136,28 @@
        ::pass/action "read"
        ::pass/scope "read:index"}]
 
+
+     ;; TODO: Alice is the owner of a number of documents. Some she wants to
+     ;; share some of these with Bob. Others she classifies INTERNAL (so visible
+     ;; to all colleagues), and others she classifies PUBLIC, so visible to
+     ;; anyone. The remainder are private and only she can access.
+
+     [::xt/put
+      {:xt/id "https://example.org/alice-docs/document-1"
+       ::site/description "A document owned by Alice, to be shared with Bob"
+       ::http/methods #{:get}
+       ::http/content-type "text/html;charset=utf-8"
+       ::http/content "My Document"
+       ::pass/ruleset "https://example.org/ruleset"}]
+
+     ;; An ACL that grants Alice ownership of a document
+     [::xt/put
+      {:xt/id "https://example.org/alice-owns-document-1"
+       ::site/description "An ACL that grants Alice ownership of a document"
+       ::pass/resource "https://example.org/alice-docs/document-1"
+       ::pass/owner "https://example.org/people/alice"
+       ::pass/scope #{"read:documents"}}]
+
      [::xt/put
       {:xt/id "https://example.org/rules/1"
        ::site/description "Allow read access of resources to granted subjects"
@@ -143,21 +165,27 @@
        (pr-str '[[(check acl subject session action resource)
                   [acl ::site/type "ACL"]
                   [acl ::pass/resource resource]
-                  (granted acl subject)
-                  [acl ::pass/action action]
+                  (granted? acl subject action)
 
-                  ;; A session may be constrained to a scope. In this case, only
-                  ;; matching ACLs are literally 'in scope'.
+                  ;; If the ACL has a scope, it must match the scope in a session
                   [acl ::pass/scope scope]
                   [session ::pass/scope scope]]
 
-                 [(granted acl subject)
-                  [acl ::pass/subject subject]]
+                 ;; An ACL that establishes ownership
+                 [(granted? acl subject action)
+                  [acl ::pass/owner subject]
+                  ;; An owner is assumed to be able to do any action
+                  [(string? action) action]]
 
-                 [(granted acl subject)
+                 ;; An ACL granted to the subject directly for a given action
+                 [(granted? acl subject action)
+                  [acl ::pass/subject subject]
+                  [acl ::pass/action action]]
+
+                 ;; An ACL granted on a role that the subject has
+                 [(granted? acl subject action)
                   [acl ::pass/role role]
-                  [subject :juxt.pass.jwt/sub sub]
-
+                  [acl ::pass/action action]
                   [role ::type "Role"]
                   [role-membership ::site/type "ACL"]
                   [role-membership ::pass/subject subject]
@@ -165,18 +193,17 @@
 
                  [(list-resources acl subject session action)
                   [acl ::pass/resource resource]
-                  ;; Any acl, in scope, that references a resource (or set of
+                  ;; Any ACL, in scope, that references a resource (or set of
                   ;; resources)
                   [acl ::pass/scope scope]
                   [session ::pass/scope scope]
                   [acl ::pass/action action]
-                  (granted acl subject)]
+                  (granted? acl subject action)]
 
                  [(get-subject-from-session session subject)
                   [subject ::type "User"]
                   [subject :juxt.pass.jwt/sub sub]
                   [session :juxt.pass.jwt/sub sub]]])}]
-
 
      ;; We can now define the ruleset
      [::xt/put
@@ -187,22 +214,23 @@
      [::xt/put
       {:xt/id "urn:site:session:alice"
        :juxt.pass.jwt/sub "alice"
-       ::pass/scope "read:index"}]
+       ::pass/scope #{"read:index" "read:documents"}}]
 
      ;; An access-token
      [::xt/put
       {:xt/id "urn:site:access-token:alice-without-read-index-scope"
-       :juxt.pass.jwt/sub "alice"}]
+       :juxt.pass.jwt/sub "alice"
+       ::pass/scope #{}}]
 
      [::xt/put
       {:xt/id "urn:site:session:bob"
        :juxt.pass.jwt/sub "bob"
-       ::pass/scope "read:index"}]
+       ::pass/scope #{"read:index"}}]
 
      [::xt/put
       {:xt/id "urn:site:session:carl"
        :juxt.pass.jwt/sub "carl"
-       ::pass/scope "read:index"}]
+       ::pass/scope #{"read:index"}}]
 
      ])
 
@@ -248,28 +276,12 @@
      ;; TODO: Alice sets up her own home-page, complete with an API for a test project
      ;; she's working on.
 
-     ;; TODO: Alice has a number of documents. Some she wants to share some of
-     ;; these with Bob. Others she classifies INTERNAL (so visible to all
-     ;; colleagues), and others she classifies PUBLIC, so visible to anyone. The
-     ;; remainder are private and only she can access.
 
-     [::xt/put
-        {:xt/id "https://example.org/alice-docs/document-1"
-         ::site/description "A document owned by Alice, to be shared with Bob"
-         ::http/methods #{:get}
-         ::http/content-type "text/html;charset=utf-8"
-         ::http/content "My Document"
-         ::pass/ruleset "https://example.org/ruleset"}]
 
-     ;; An ACL that grants Alice ownership of a document
-     [::xt/put
-        {:xt/id "https://example.org/alice-owns-document-1"
-         ::site/description "An ACL that grants Alice ownership of a document"
-         ::pass/resource "https://example.org/alice-docs/document-1"
-         ::pass/owner "alice"}]
+     ;; Check Alice can read her own documents, on account of ::pass/owner
+     ;;(check db subject session "read" "https://example.org/alice-docs/document-1" 1)
 
-     ;; Check Alice can read her own documents, via ::pass/owner
-     ;;(check "urn:site:session:alice" "read" "https://example.org/alice-docs/document-1" 0)
+     ;;(authz/acls db subject session "read" "https://example.org/alice-docs/document-1")
 
      ;; Alice accesses her own documents. A rule exists that automatically
      ;; grants full access to your own documents.
@@ -283,7 +295,8 @@
      ;; TODO: Add resources to represent Alice, Bob and Carl, as subjects.
 
 
-     {:status :ok :message "All tests passed"})))
+     ;;{:status :ok :message "All tests passed"}
+     )))
 
 
 ;; Create a non-trivial complex scenario which contains many different
