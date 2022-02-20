@@ -44,8 +44,7 @@
                 (rules db ruleset))
         query {:find ['(pull acl [*])]
                :where '[[acl ::site/type "ACL"]
-                        (check acl subject session action resource)
-                        ]
+                        (check acl subject session action resource)]
                :rules rules
                :in '[subject session action resource]}]
     (if (seq rules)

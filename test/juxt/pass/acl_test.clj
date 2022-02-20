@@ -101,14 +101,12 @@
       {:xt/id "https://example.org/grants/alice-can-access-index"
        ::site/description "Alice is granted access to some resources"
        ::site/type "ACL"
-
        ::pass/subject "https://example.org/people/alice"
 
        ;; A resource can be any XT document, a superset of web resources. Common
        ;; authorization terminology uses the term 'resource' for anything that
        ;; can be protected.
        ::pass/resource #{"https://example.org/index"}
-       ::pass/action "read"
        ::pass/scope #{"read:index"}}]
 
      ;; TODO: Resource 'sets'
@@ -124,7 +122,6 @@
        ;; authorization terminology uses the term 'resource' for anything that
        ;; can be protected.
        ::pass/resource "https://example.org/index"
-       ::pass/action "read"
        ::pass/scope #{"read:index"}}]
 
 
@@ -158,25 +155,21 @@
        (pr-str '[[(check acl subject session action resource)
                   [acl ::site/type "ACL"]
                   [acl ::pass/resource resource]
-                  (granted? acl subject action)
-                  [acl ::pass/scope scope]
-                  [session ::pass/scope scope]]
+                  (granted? acl subject)
+                  [acl ::pass/scope action]
+                  [session ::pass/scope action]]
 
                  ;; An ACL that establishes ownership
-                 [(granted? acl subject action)
-                  [acl ::pass/owner subject]
-                  ;; An owner is assumed to be able to do any action
-                  [(some? action)]]
+                 [(granted? acl subject)
+                  [acl ::pass/owner subject]]
 
                  ;; An ACL granted to the subject directly for a given action
-                 [(granted? acl subject action)
-                  [acl ::pass/subject subject]
-                  [acl ::pass/action action]]
+                 [(granted? acl subject)
+                  [acl ::pass/subject subject]]
 
                  ;; An ACL granted on a role that the subject has
-                 [(granted? acl subject action)
+                 [(granted? acl subject)
                   [acl ::pass/role role]
-                  [acl ::pass/action action]
                   [role ::type "Role"]
                   [role-membership ::site/type "ACL"]
                   [role-membership ::pass/subject subject]
@@ -184,9 +177,9 @@
 
                  [(list-resources acl subject session action)
                   [acl ::pass/resource resource]
-                  [acl ::pass/scope scope]
-                  [session ::pass/scope scope]
-                  (granted? acl subject action)]
+                  [acl ::pass/scope action]
+                  [session ::pass/scope action]
+                  (granted? acl subject)]
 
                  [(get-subject-from-session session subject)
                   [subject ::type "User"]
@@ -238,34 +231,40 @@
      (when-not (= subject "https://example.org/people/alice")
        (fail {:subject subject}))
 
-     (check db subject session "read" "https://example.org/index" 1)
+     (check db subject session "read:index" "https://example.org/index" 1)
 
 
-     (check db subject "urn:site:access-token:alice-without-read-index-scope" "read" "https://example.org/index" 0)
+     (check db subject "urn:site:access-token:alice-without-read-index-scope" "read:index" "https://example.org/index" 0)
 
      ;; Fuzz each of the parameters to check that the ACL fails
-     (check db nil nil "read" "https://example.org/index" 0)
-     (check db subject session "read" "https://example.org/other-page" 0)
-     (check db subject session "write" "https://example.org/index" 0)
+     (check db nil nil "read:index" "https://example.org/index" 0)
+     (check db subject session "read:index" "https://example.org/other-page" 0)
+     (check db subject session "write:index" "https://example.org/index" 0)
 
      ;; Bob can read index
-     (check db "https://example.org/people/bob" "urn:site:session:bob" "read" "https://example.org/index" 1)
+     (check db "https://example.org/people/bob" "urn:site:session:bob" "read:index" "https://example.org/index" 1)
 
      ;; But Carl cannot
-     (check db "https://example.org/people/carl" "urn:site:session:carl" "read" "https://example.org/index" 0)
+     (check db "https://example.org/people/carl" "urn:site:session:carl" "read:index" "https://example.org/index" 0)
 
      ;; Which resources can Alice access?
      (list-resources
       db
       subject session
-      "read" "https://example.org/ruleset"
-      #{"https://example.org/index" "https://example.org/alice-docs/document-1"})
+      "read:index" "https://example.org/ruleset"
+      #{"https://example.org/index"})
+
+     (list-resources
+      db
+      subject session
+      "read:documents" "https://example.org/ruleset"
+      #{"https://example.org/alice-docs/document-1"})
 
      ;; TODO: Alice sets up her own home-page, complete with an API for a test project
      ;; she's working on.
 
      ;; Check Alice can read her own documents, on account of ::pass/owner
-     (check db subject session "read" "https://example.org/alice-docs/document-1" 1)
+     (check db subject session "read:documents" "https://example.org/alice-docs/document-1" 1)
 
      ;; Alice accesses her own documents. A rule exists that automatically
      ;; grants full access to your own documents.
