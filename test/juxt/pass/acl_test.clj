@@ -228,12 +228,9 @@
          session "urn:site:session:alice"
          subject (get-subject db session)]
 
-     (when-not (= subject "https://example.org/people/alice")
-       (fail {:subject subject}))
+     (when-not (= subject "https://example.org/people/alice") (fail {:subject subject}))
 
      (check db subject session "read:index" "https://example.org/index" 1)
-
-
      (check db subject "urn:site:access-token:alice-without-read-index-scope" "read:index" "https://example.org/index" 0)
 
      ;; Fuzz each of the parameters to check that the ACL fails
@@ -247,18 +244,9 @@
      ;; But Carl cannot
      (check db "https://example.org/people/carl" "urn:site:session:carl" "read:index" "https://example.org/index" 0)
 
-     ;; Which resources can Alice access?
-     (list-resources
-      db
-      subject session
-      "read:index" "https://example.org/ruleset"
-      #{"https://example.org/index"})
-
-     (list-resources
-      db
-      subject session
-      "read:documents" "https://example.org/ruleset"
-      #{"https://example.org/alice-docs/document-1"})
+     ;; Which resources can Alice access, given session scope?
+     (list-resources db subject session "read:index" "https://example.org/ruleset" #{"https://example.org/index"})
+     (list-resources db subject session "read:documents" "https://example.org/ruleset" #{"https://example.org/alice-docs/document-1"})
 
      ;; TODO: Alice sets up her own home-page, complete with an API for a test project
      ;; she's working on.
