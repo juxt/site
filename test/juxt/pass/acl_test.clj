@@ -273,3 +273,5 @@
 ;; TODO: User content
 ;; TODO: Consent-based access control
 ;; TODO: Extend to GraphQL
+
+;; TODO: A subject using an application that is scope constrained
