@@ -61,13 +61,6 @@
        ;; We'll define this lower down
        ::pass/ruleset "https://example.org/ruleset"}]
 
-     [::xt/put
-      {:xt/id "https://example.org/~alice/index"
-       ::http/methods #{:get}
-       ::http/content-type "text/html;charset=utf-8"
-       ::http/content "Alice's page"
-       ::pass/ruleset "https://example.org/ruleset"}]
-
      ;; This is Alice.
      [::xt/put
       {:xt/id "https://example.org/people/alice"
@@ -97,8 +90,6 @@
        ::type "User"
        :juxt.pass.jwt/sub "carl"}]
 
-
-
      ;; A note on cacheing - each token can cache the resources it has access
      ;; to, keyed by action and transaction time. If a resource is updated, the
      ;; cache will fail. If an ACL is revoked, such that read access would no
@@ -116,9 +107,9 @@
        ;; A resource can be any XT document, a superset of web resources. Common
        ;; authorization terminology uses the term 'resource' for anything that
        ;; can be protected.
-       ::pass/resource #{"https://example.org/index" "https://example.org/~alice/index"}
+       ::pass/resource #{"https://example.org/index"}
        ::pass/action "read"
-       ::pass/scope "read:index"}]
+       ::pass/scope #{"read:index"}}]
 
      ;; TODO: Resource 'sets'
 
@@ -134,7 +125,7 @@
        ;; can be protected.
        ::pass/resource "https://example.org/index"
        ::pass/action "read"
-       ::pass/scope "read:index"}]
+       ::pass/scope #{"read:index"}}]
 
 
      ;; TODO: Alice is the owner of a number of documents. Some she wants to
@@ -153,9 +144,11 @@
      ;; An ACL that grants Alice ownership of a document
      [::xt/put
       {:xt/id "https://example.org/alice-owns-document-1"
+       ::site/type "ACL"
        ::site/description "An ACL that grants Alice ownership of a document"
-       ::pass/resource "https://example.org/alice-docs/document-1"
+       ::pass/resource #{"https://example.org/alice-docs/document-1"}
        ::pass/owner "https://example.org/people/alice"
+       ::pass/action "read"
        ::pass/scope #{"read:documents"}}]
 
      [::xt/put
@@ -175,7 +168,7 @@
                  [(granted? acl subject action)
                   [acl ::pass/owner subject]
                   ;; An owner is assumed to be able to do any action
-                  [(string? action) action]]
+                  [acl ::pass/action action]]
 
                  ;; An ACL granted to the subject directly for a given action
                  [(granted? acl subject action)
@@ -267,21 +260,19 @@
      (check db "https://example.org/people/carl" "urn:site:session:carl" "read" "https://example.org/index" 0)
 
      ;; Which resources can Alice access?
-     (list-resources
+     #_(list-resources
       db
       subject session
       "read" "https://example.org/ruleset"
-      #{"https://example.org/~alice/index" "https://example.org/index"})
+      #{"https://example.org/index" "https://example.org/alice-docs/document-1"})
 
      ;; TODO: Alice sets up her own home-page, complete with an API for a test project
      ;; she's working on.
 
-
-
      ;; Check Alice can read her own documents, on account of ::pass/owner
-     ;;(check db subject session "read" "https://example.org/alice-docs/document-1" 1)
+     (check db subject session "read" "https://example.org/alice-docs/document-1" 1)
 
-     ;;(authz/acls db subject session "read" "https://example.org/alice-docs/document-1")
+     ;; (authz/acls db subject session "read" "https://example.org/alice-docs/document-1")
 
      ;; Alice accesses her own documents. A rule exists that automatically
      ;; grants full access to your own documents.
@@ -291,11 +282,9 @@
      ;; This means that Alice should be able to create an ACL for Bob, which see
      ;; owns. But she can only create an ACL that references documents she owns.
 
-
      ;; TODO: Add resources to represent Alice, Bob and Carl, as subjects.
 
-
-     ;;{:status :ok :message "All tests passed"}
+     ;; {:status :ok :message "All tests passed"}
      )))
 
 
