@@ -214,6 +214,8 @@
 
          subject (get-subject db "urn:site:session:alice")]
 
+     (when-not (= subject "https://example.org/people/alice")
+       (fail {:subject subject}))
 
      (check db "urn:site:session:alice" "read" "https://example.org/index" 1)
      (check db "urn:site:access-token:alice-without-read-index-scope" "read" "https://example.org/index" 0)
