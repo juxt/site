@@ -31,7 +31,6 @@
  (fn []
    (submit-and-await!
     [
-     ;; Establish a resource.
      [::xt/put
       {:xt/id "https://example.org/index"
        ::http/methods #{:get}
@@ -47,18 +46,15 @@
        ::http/content "Alice's page"
        ::pass/ruleset "https://example.org/ruleset"}]
 
-     ;; Establish a session. This is effectively the subject, Alice.
+     ;; This is Alice.
      [::xt/put
-      {:xt/id "urn:site:session:alice"
-       :juxt.pass.jwt/sub "alice"
-       ::pass/scope "read:index"}]
-
-     ;; An access-token
-     [::xt/put
-      {:xt/id "urn:site:access-token:alice-without-read-index-scope"
+      {:xt/id "https://example.org/people/alice"
        :juxt.pass.jwt/sub "alice"}]
 
      ;; This is Bob.
+     [::xt/put
+      {:xt/id "https://example.org/people/bob"
+       :juxt.pass.jwt/sub "bob"}]
      [::xt/put
       {:xt/id "urn:site:session:bob"
        :juxt.pass.jwt/sub "bob"
@@ -155,6 +151,18 @@
                   [acl ::pass/action action]
                   (granted acl subject)]])}]
 
+
+     ;; Establish a session for Alice.
+     [::xt/put
+      {:xt/id "urn:site:session:alice"
+       :juxt.pass.jwt/sub "alice"
+       ::pass/scope "read:index"}]
+
+     ;; An access-token
+     [::xt/put
+      {:xt/id "urn:site:access-token:alice-without-read-index-scope"
+       :juxt.pass.jwt/sub "alice"}]
+
      ;; We can now define the ruleset
      [::xt/put
       {:xt/id "https://example.org/ruleset"
@@ -167,27 +175,40 @@
    ;; e.g. list of documents
    ;; This might be a solution to the n+1 problem in our graphql
 
-   (let [db (xt/db *xt-node*) check
-         (fn [subject action resource expected-count]
-           (let [acls (authz/acls db subject action resource)]
+   ;; Let's log in and create sessions
+
+
+
+   (let [db (xt/db *xt-node*)
+
+         get-subject
+         (fn [session]
+           (authz/get-subject-from-session db "https://example.org/ruleset" session))
+
+         check
+         (fn [session action resource expected-count]
+           (let [acls (authz/acls db session action resource)]
              (is (= expected-count (count acls)))
              (when-not (= expected-count (count acls))
-               (fail {:subject subject
+               (fail {:session session
                       :action action
                       :resource resource
                       :expected-count expected-count
                       :actual-count (count acls)}))))
 
          list-resources
-         (fn [subject action ruleset expected-resources]
-           (let [acls (authz/list-resources db subject action ruleset)
+         (fn [session action ruleset expected-resources]
+           (let [acls (authz/list-resources db session action ruleset)
                  actual-resources (set (mapcat ::pass/resource acls))]
              (is (= expected-resources actual-resources))
              (when-not (= expected-resources actual-resources)
-               (fail {:subject subject
+               (fail {:session session
                       :action action
                       :expected-resources expected-resources
                       :actual-resources actual-resources}))))]
+
+
+
 
      (check "urn:site:session:alice" "read" "https://example.org/index" 1)
      (check "urn:site:access-token:alice-without-read-index-scope" "read" "https://example.org/index" 0)
@@ -246,7 +267,14 @@
      ;; TODO: Add resources to represent Alice, Bob and Carl, as subjects.
 
 
-     {:status :ok :message "All tests passed"})
+     {:status :ok :message "All tests passed"}
+
+     ;;(get-subject "urn:site:session:alice")
+
+
+     )
+
+
    ))
 
 ;; Create a non-trivial complex scenario which contains many different

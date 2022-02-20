@@ -9,17 +9,19 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn rules [db resource]
-  (assert (string? resource))
+(defn rules
+  "Construct rules from a ruleset id"
+  [db ruleset]
+  (assert ruleset)
+  (assert (string? ruleset))
   (->>
    (xt/q
     db
     '{:find [rule-content]
-      :where [[resource ::pass/ruleset ruleset]
-              [ruleset ::pass/rules rule]
+      :where [[ruleset ::pass/rules rule]
               [rule ::pass/rule-content rule-content]]
-      :in [resource]}
-    resource)
+      :in [ruleset]}
+    ruleset)
    (map (comp read-string first))
    (mapcat seq)
    vec))
@@ -27,25 +29,28 @@
 (defn acls
   "Return ACLs. The session argument can be nil, the resource argument must not
   be."
-  [db subject action resource]
+  [db session action resource]
   ;; Subject can be nil, resource cannot be
-  (assert (or (nil? subject) (string? subject)))
+  (assert (or (nil? session) (string? session)))
   (assert (string? action))
   (assert (string? resource))
-  (let [rules (rules db resource)
+
+  (let [rules (when-let [ruleset (::pass/ruleset (xt/entity db resource))]
+                (rules db ruleset))
         query {:find ['(pull acl [*])]
                :where '[[acl ::site/type "ACL"]
-                        (check acl subject action resource)]
+                        (check acl session action resource)]
                :rules rules
-               :in '[subject action resource]}]
+               :in '[session action resource]}]
     (if (seq rules)
-      (map first (xt/q db query subject action resource))
+      (map first (xt/q db query session action resource))
       #{})))
 
 (defn list-resources
-  [db subject action ruleset]
-  (assert (string? subject))
+  [db session action ruleset]
+  (assert (string? session))
   (assert (string? action))
+  (assert (string? ruleset))
   (let [rules
         (->>
          (xt/q
@@ -61,21 +66,29 @@
 
         query {:find ['(pull acl [*])]
                :where '[[acl ::site/type "ACL"]
-                        (list-resources acl subject action)]
+                        (list-resources acl session action)]
                :rules rules
-               :in '[subject action]}]
+               :in '[session action]}]
 
     (if (seq rules)
-      (map first (xt/q db query subject action))
+      (map first (xt/q db query session action))
       #{})))
+
+(defn get-subject-from-session
+  "Return the subject id from the session id."
+  [db ruleset session]
+  (let [rules (rules db ruleset)]
+    (xt/q db {:find '[subject]
+              :where '[(get-subject-from-session session subject)]
+              :rules rules
+              :in '[session]} session)))
 
 (defn authorize-resource [{::site/keys [db uri]
                            :ring.request/keys [method]
                            ::pass/keys [session] :as req}]
   (let [acls (acls
               db
-              (:xt/id session)    ; for now we treat the session as representing
-                                        ; the subject
+              (:xt/id session)
 
               ;; TODO: The subject needs to be in the database, accessible to Datalog, and for
               ;; historic/audit. Therefore, the subject needs to be established when a session
