@@ -148,8 +148,8 @@
        ::site/description "An ACL that grants Alice ownership of a document"
        ::pass/resource #{"https://example.org/alice-docs/document-1"}
        ::pass/owner "https://example.org/people/alice"
-       ::pass/action "read"
-       ::pass/scope #{"read:documents"}}]
+       ::pass/scope #{"read:documents"}
+       }]
 
      [::xt/put
       {:xt/id "https://example.org/rules/1"
@@ -168,7 +168,7 @@
                  [(granted? acl subject action)
                   [acl ::pass/owner subject]
                   ;; An owner is assumed to be able to do any action
-                  [acl ::pass/action action]]
+                  [(some? action)]]
 
                  ;; An ACL granted to the subject directly for a given action
                  [(granted? acl subject action)
