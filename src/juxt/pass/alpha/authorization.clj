@@ -52,9 +52,8 @@
       #{})))
 
 (defn list-resources
-  [db subject session action ruleset]
+  [db subject session ruleset]
   (assert (string? session))
-  (assert (string? action))
   (assert (string? ruleset))
   (let [rules
         (->>
@@ -71,12 +70,12 @@
 
         query {:find ['(pull acl [*])]
                :where '[[acl ::site/type "ACL"]
-                        (list-resources acl subject session action)]
+                        (list-resources acl subject session)]
                :rules rules
-               :in '[subject session action]}]
+               :in '[subject session]}]
 
     (if (seq rules)
-      (map first (xt/q db query subject session action))
+      (map first (xt/q db query subject session))
       #{})))
 
 (defn get-subject-from-session

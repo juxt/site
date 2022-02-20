@@ -35,13 +35,12 @@
              :expected-count expected-count
              :actual-count (count acls)}))))
 
-(defn list-resources [db subject session action ruleset expected-resources]
-  (let [acls (authz/list-resources db subject session action ruleset)
+(defn list-resources [db subject session ruleset expected-resources]
+  (let [acls (authz/list-resources db subject session ruleset)
         actual-resources (set (mapcat ::pass/resource acls))]
     (is (= expected-resources actual-resources))
     (when-not (= expected-resources actual-resources)
       (fail {:session session
-             :action action
              :expected-resources expected-resources
              :actual-resources actual-resources}))))
 
@@ -175,7 +174,7 @@
                   [role-membership ::pass/subject subject]
                   [role-membership ::pass/role role]]
 
-                 [(list-resources acl subject session action)
+                 [(list-resources acl subject session)
                   [acl ::pass/resource resource]
                   [acl ::pass/scope action]
                   [session ::pass/scope action]
@@ -245,8 +244,7 @@
      (check db "https://example.org/people/carl" "urn:site:session:carl" "read:index" "https://example.org/index" 0)
 
      ;; Which resources can Alice access, given session scope?
-     (list-resources db subject session "read:index" "https://example.org/ruleset" #{"https://example.org/index"})
-     (list-resources db subject session "read:documents" "https://example.org/ruleset" #{"https://example.org/alice-docs/document-1"})
+     (list-resources db subject session "https://example.org/ruleset" #{"https://example.org/index" "https://example.org/alice-docs/document-1"})
 
      ;; TODO: Alice sets up her own home-page, complete with an API for a test project
      ;; she's working on.
