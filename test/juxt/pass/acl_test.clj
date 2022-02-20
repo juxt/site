@@ -184,11 +184,8 @@
 
                  [(list-resources acl subject session action)
                   [acl ::pass/resource resource]
-                  ;; Any ACL, in scope, that references a resource (or set of
-                  ;; resources)
                   [acl ::pass/scope scope]
                   [session ::pass/scope scope]
-                  [acl ::pass/action action]
                   (granted? acl subject action)]
 
                  [(get-subject-from-session session subject)
@@ -258,7 +255,7 @@
      (check db "https://example.org/people/carl" "urn:site:session:carl" "read" "https://example.org/index" 0)
 
      ;; Which resources can Alice access?
-     #_(list-resources
+     (list-resources
       db
       subject session
       "read" "https://example.org/ruleset"
