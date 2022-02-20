@@ -148,7 +148,7 @@
        ::site/description "An ACL that grants Alice ownership of a document"
        ::pass/resource #{"https://example.org/alice-docs/document-1"}
        ::pass/owner "https://example.org/people/alice"
-       ::pass/scope #{"read:documents"}
+       ::pass/scope #{"read:documents" "write:documents"}
        }]
 
      [::xt/put
@@ -159,8 +159,6 @@
                   [acl ::site/type "ACL"]
                   [acl ::pass/resource resource]
                   (granted? acl subject action)
-
-                  ;; If the ACL has a scope, it must match the scope in a session
                   [acl ::pass/scope scope]
                   [session ::pass/scope scope]]
 
@@ -272,8 +270,6 @@
      ;; Check Alice can read her own documents, on account of ::pass/owner
      (check db subject session "read" "https://example.org/alice-docs/document-1" 1)
 
-     ;; (authz/acls db subject session "read" "https://example.org/alice-docs/document-1")
-
      ;; Alice accesses her own documents. A rule exists that automatically
      ;; grants full access to your own documents.
 
@@ -284,7 +280,7 @@
 
      ;; TODO: Add resources to represent Alice, Bob and Carl, as subjects.
 
-     ;; {:status :ok :message "All tests passed"}
+     {:status :ok :message "All tests passed"}
      )))
 
 
