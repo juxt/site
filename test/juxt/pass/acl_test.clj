@@ -62,7 +62,7 @@
 
      [::xt/put
       {:xt/id "https://example.org/roles/manager"
-       ::site/type "Role"}]
+       ::type "Role"}]
 
      ;; Bob's access will be via his 'manager' role.
      [::xt/put
@@ -137,7 +137,7 @@
                   [acl ::pass/role role]
                   [subject :juxt.pass.jwt/sub sub]
 
-                  [role ::site/type "Role"]
+                  [role ::type "Role"]
                   [role-membership ::site/type "ACL"]
                   [role-membership :juxt.pass.jwt/sub sub]
                   [role-membership ::pass/role role]]
