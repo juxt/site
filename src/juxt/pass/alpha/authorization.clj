@@ -78,10 +78,11 @@
   "Return the subject id from the session id."
   [db ruleset session]
   (let [rules (rules db ruleset)]
-    (xt/q db {:find '[subject]
-              :where '[(get-subject-from-session session subject)]
-              :rules rules
-              :in '[session]} session)))
+    (ffirst
+     (xt/q db {:find '[subject]
+               :where '[(get-subject-from-session session subject)]
+               :rules rules
+               :in '[session]} session))))
 
 (defn authorize-resource [{::site/keys [db uri]
                            :ring.request/keys [method]

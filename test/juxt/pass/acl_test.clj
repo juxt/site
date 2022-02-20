@@ -23,9 +23,31 @@
 
 (defn fail [ex-data] (throw (ex-info "FAIL" ex-data)))
 
-(deftest scenario-1-test
-  )
+(deftest scenario-1-test)
 
+(defn check [db session action resource expected-count]
+  (let [acls (authz/acls db session action resource)]
+    (is (= expected-count (count acls)))
+    (when-not (= expected-count (count acls))
+      (fail {:session session
+             :action action
+             :resource resource
+             :expected-count expected-count
+             :actual-count (count acls)}))))
+
+(defn list-resources [db session action ruleset expected-resources]
+  (let [acls (authz/list-resources db session action ruleset)
+        actual-resources (set (mapcat ::pass/resource acls))]
+    (is (= expected-resources actual-resources))
+    (when-not (= expected-resources actual-resources)
+      (fail {:session session
+             :action action
+             :expected-resources expected-resources
+             :actual-resources actual-resources}))))
+
+
+(defn get-subject [db session]
+  (authz/get-subject-from-session db "https://example.org/ruleset" session))
 
 ((t/join-fixtures [with-xt with-handler])
  (fn []
@@ -49,12 +71,15 @@
      ;; This is Alice.
      [::xt/put
       {:xt/id "https://example.org/people/alice"
+       ::type "User"
        :juxt.pass.jwt/sub "alice"}]
 
      ;; This is Bob.
      [::xt/put
       {:xt/id "https://example.org/people/bob"
+       ::type "User"
        :juxt.pass.jwt/sub "bob"}]
+
      [::xt/put
       {:xt/id "urn:site:session:bob"
        :juxt.pass.jwt/sub "bob"
@@ -149,7 +174,12 @@
                   [acl ::pass/scope scope]
                   [subject ::pass/scope scope]
                   [acl ::pass/action action]
-                  (granted acl subject)]])}]
+                  (granted acl subject)]
+
+                 [(get-subject-from-session session subject)
+                  [subject ::type "User"]
+                  [subject :juxt.pass.jwt/sub sub]
+                  [session :juxt.pass.jwt/sub sub]]])}]
 
 
      ;; Establish a session for Alice.
@@ -179,53 +209,29 @@
 
 
 
+
    (let [db (xt/db *xt-node*)
 
-         get-subject
-         (fn [session]
-           (authz/get-subject-from-session db "https://example.org/ruleset" session))
-
-         check
-         (fn [session action resource expected-count]
-           (let [acls (authz/acls db session action resource)]
-             (is (= expected-count (count acls)))
-             (when-not (= expected-count (count acls))
-               (fail {:session session
-                      :action action
-                      :resource resource
-                      :expected-count expected-count
-                      :actual-count (count acls)}))))
-
-         list-resources
-         (fn [session action ruleset expected-resources]
-           (let [acls (authz/list-resources db session action ruleset)
-                 actual-resources (set (mapcat ::pass/resource acls))]
-             (is (= expected-resources actual-resources))
-             (when-not (= expected-resources actual-resources)
-               (fail {:session session
-                      :action action
-                      :expected-resources expected-resources
-                      :actual-resources actual-resources}))))]
+         subject (get-subject db "urn:site:session:alice")]
 
 
-
-
-     (check "urn:site:session:alice" "read" "https://example.org/index" 1)
-     (check "urn:site:access-token:alice-without-read-index-scope" "read" "https://example.org/index" 0)
+     (check db "urn:site:session:alice" "read" "https://example.org/index" 1)
+     (check db "urn:site:access-token:alice-without-read-index-scope" "read" "https://example.org/index" 0)
 
      ;; Fuzz each of the parameters to check that the ACL fails
-     (check nil "read" "https://example.org/index" 0)
-     (check "urn:site:session:alice" "read" "https://example.org/other-page" 0)
-     (check "urn:site:session:alice" "write" "https://example.org/index" 0)
+     (check db nil "read" "https://example.org/index" 0)
+     (check db "urn:site:session:alice" "read" "https://example.org/other-page" 0)
+     (check db "urn:site:session:alice" "write" "https://example.org/index" 0)
 
      ;; Bob can read index
-     (check "urn:site:session:bob" "read" "https://example.org/index" 1)
+     (check db "urn:site:session:bob" "read" "https://example.org/index" 1)
 
      ;; But Carl cannot
-     (check "urn:site:session:carl" "read" "https://example.org/index" 0)
+     (check db "urn:site:session:carl" "read" "https://example.org/index" 0)
 
      ;; Which resources can Alice access?
      (list-resources
+      db
       "urn:site:session:alice" "read" "https://example.org/ruleset"
       #{"https://example.org/~alice/index" "https://example.org/index"})
 
@@ -269,7 +275,7 @@
 
      {:status :ok :message "All tests passed"}
 
-     ;;(get-subject "urn:site:session:alice")
+
 
 
      )
