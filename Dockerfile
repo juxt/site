@@ -18,7 +18,7 @@ USER juxt
 EXPOSE 50505
 EXPOSE 2021
 RUN clojure -P
-RUN clj -M:dev -e "(println :loading-deps-repl)"
+RUN clj -M:dev -e "(println :pre-loading-deps-repl)"
 CMD [ "clojure", \
       "-J-Djava.awt.headless=true", \
       "-J-XX:-OmitStackTraceInFastThrow", \
