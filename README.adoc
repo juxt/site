@@ -102,6 +102,15 @@ In this case please be sure to change the configuration so ports are different a
 $ SITE_BASE_URI=http://localhost:5509 site/bin/site get-token -u admin
 ----
 
+=== Start the server from the provided Docker image
+
+Optionally, you can also get Site up and running using the provided Docker image. You need Docker installed in your system, then execute the following from the command line (`sudo` might not be necessary depending on your installation):
+
+```
+sudo docker build -t juxt/site:latest .
+sudo docker run -p 2021:2021 -p 50505:50505 -d juxt/site:latest
+```
+
 === The REPL
 
 If you've run Site via your development environment and 'jacked-in' you'll
