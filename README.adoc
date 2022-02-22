@@ -54,6 +54,34 @@ Before you start, you'll need to have the following installed:
 $ git clone https://github.com/juxt/site
 ----
 
+====  macOS (>= 10.15)
+It is recommended to install `openssl` and `openjdk` and make sure `JAVA_HOME`
+is set correctly. At the time of writing brew installs openjdk 17.02 and openssl
+3.0.1:
+----
+$ brew install openssl
+$ echo export JAVA_HOME=/usr/local/Cellar/openjdk/17.0.2/libexec/openjdk.jdk/Contents/Home >> ~/.zshrc
+$ exec zsh -l
+-----
+
+Check that Java can find `libcrypto`:
+----
+$ cd site # (if needed)
+$ clojure -A:dev -M:test -m kaocha.runner --focus juxt.site.authz-test
+----
+
+The test should run just fine. If instead $JAVA_HOME/bin/java aborts (signal 6)
+with the message:
+----
+$ ...
+$ ... WARNING: ${JAVA_HOME}/bin/java is loading libcrypto in an unsafe way
+----
+
+you need to make libcrypto visible to $JAVA_HOME/bin/java by running e.g.:
+----
+$ ln -s  /usr/local/Cellar/openssl@3/3.0.1/lib/libcrypto.dylib $JAVA_HOME/lib
+----
+
 === Configure
 
 There's a sample configuration in `etc` you should copy to `$HOME/.config/site/config.edn`.
@@ -203,7 +231,7 @@ The site tool is a command-line utility that allows you to remotely administer s
 If you're on MacOS, you will need to install the gnu version of `readlink`. You can do so with brew:
 ```
 brew install coreutils
-ln -s /usr/local/bin/readlink /usr/local/bin/readlink
+ln -s /usr/local/bin/greadlink /usr/local/bin/readlink
 ```
 
 We must first get a token that we can use for API access. This process authenticates to the site server using your password.
