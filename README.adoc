@@ -62,7 +62,7 @@ is set correctly. At the time of writing brew installs openjdk 17.02 and openssl
 $ brew install openssl
 $ echo export JAVA_HOME=/usr/local/Cellar/openjdk/17.0.2/libexec/openjdk.jdk/Contents/Home >> ~/.zshrc
 $ exec zsh -l
------
+----
 
 Check that Java can find `libcrypto`:
 ----
