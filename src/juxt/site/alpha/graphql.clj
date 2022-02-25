@@ -57,18 +57,20 @@
   [field-or-type type-k]
   (let [type (or (field->type field-or-type)
                  field-or-type)]
-    {:find ['e 'updatedAt]
+    {:find ['e '_siteCreatedAt]
      :where [['e type-k type]
-             ['e :updatedAt 'updatedAt]]}))
+             ['e :_siteCreatedAt '_siteCreatedAt]]}))
 
 (defn to-xt-query
-  [{:keys [field argument-values type-k site-args object-value]}]
+  [{:keys [custom-xt-query field argument-values type-k site-args object-value]}]
   (let [values argument-values
         field-or-type (or
                        (get site-args "type")
                        field)
-        query (or (get site-args "q")
-                  (default-query field-or-type type-k))
+        query (or
+               custom-xt-query
+               (get site-args "q")
+               (default-query field-or-type type-k))
         result
         (postwalk
          (fn [x]
@@ -91,7 +93,7 @@
          query)
         limit (get values "limit")
         offset (get values "offset")
-        order (get values "order")
+        order (keyword (get values "order"))
         search-terms (get values "searchTerms")
         search? (not (every? empty? (vals search-terms)))
         search-where-clauses
@@ -117,7 +119,7 @@
                             search?
                             '[[s :desc]]
                             order-by-dir
-                            [['updatedAt order-by-dir]]
+                            [['_siteCreatedAt order-by-dir]]
                             :else
                             nil)
                 :where (and search-where-clauses
@@ -161,7 +163,7 @@
                      {})))
       ;; this should use a clock component that keeps the same time for
       ;; everything in a single graphql transcation
-      true (assoc :updatedAt (str (t/now)))
+      true (assoc :_siteCreatedAt (str (t/now)))
       subject (assoc :_siteSubject (::pass/username subject))
       (nil? (type-k entity)) (assoc type-k type)
       (:id entity) (dissoc :id)
@@ -299,6 +301,44 @@
         :else
         (first results)))))
 
+(defn await-tx
+  [xt-node txes]
+  (xt/await-tx
+   xt-node
+   (xt/submit-tx
+    xt-node
+    txes)))
+
+(defn xt-delete
+  [id]
+  [:xtdb.api/delete id])
+
+(defn xt-put
+  [object valid-from]
+  (and (nil? (:xt/id object))
+       (throw (ex-info "Trying to put object without xt id" {:object object})))
+  [:xtdb.api/put object valid-from])
+
+(defn put-objects! [xt-node objects]
+  (let [processed-objects
+        (for [object objects]
+          (let [valid-time (some-> object
+                                   :xtdb.api/valid-time
+                                   (java.time.Instant/parse)
+                                   (java.util.Date/from))]
+            (xt-put (dissoc object :xtdb.api/valid-time) valid-time)))]
+    (await-tx xt-node processed-objects)))
+
+(defn entity-creation-time
+  [{:keys [xt/id]} db]
+  (with-open [history (xt/open-entity-history db id :asc)]
+    (-> history
+        iterator-seq
+        first
+        ::xt/valid-time
+        t/instant
+        .toString)))
+
 (defn entity-valid-time
   [entity db]
   (some-> db
@@ -311,10 +351,20 @@
   [entity db]
   (assoc entity :_siteValidTime (entity-valid-time entity db)))
 
-(defn protected-lookup [e subject db]
+(defn assoc-creation-time
+  [entity db xt-node]
+  (if (:_siteCreatedAt entity)
+    entity
+    (let [new-entity (assoc entity :_siteCreatedAt (entity-creation-time entity db))]
+      (put-objects! xt-node [new-entity])
+      new-entity)))
+
+(defn protected-lookup [e subject db xt-node]
   (let [lookup #(xt/entity db %)
         ent (some-> (lookup e)
-                    (assoc-valid-time db))]
+                    (assoc-valid-time db)
+                    (assoc-creation-time db xt-node))]
+    (def ent ent)
     (if-let [ent-ns (::pass/namespace ent)]
       (let [rules (some-> ent-ns lookup ::pass/rules)
             acls (->>
@@ -346,58 +396,30 @@
       results)))
 
 (defn pull-entities
-  [db subject results query]
+  [db xt-node subject results query]
   (for [[e] results]
-    (assoc-some (protected-lookup e subject db)
+    (assoc-some (protected-lookup e subject db xt-node)
                 :_siteQuery (and query (pr-str query)))))
 
 (defn infer-query
-  [db subject field query args]
+  [db xt-node subject field query args]
   (let [type (field->type field)
-        results (pull-entities db subject (xt/q db query type) query)]
+        results (pull-entities db xt-node subject (xt/q db query type) query)]
     (or (process-xt-results field results)
         (throw (ex-info "No resolver found for " type)))))
 
-(defn traverse [object-value atts subject db]
+(defn traverse [object-value atts subject db xt-node]
   (if (seq atts)
     (let [next-object-value
           (get
            (cond-> object-value
              (string? object-value)
-             (protected-lookup subject db))
+             (protected-lookup subject db xt-node))
            (keyword (first atts)))]
       (traverse next-object-value
                 (rest atts)
-                subject db))
+                subject db xt-node))
     object-value))
-
-(defn await-tx
-  [xt-node txes]
-  (xt/await-tx
-   xt-node
-   (xt/submit-tx
-    xt-node
-    txes)))
-
-(defn xt-delete
-  [id]
-  [:xtdb.api/delete id])
-
-(defn xt-put
-  [object valid-from]
-  (and (nil? (:xt/id object))
-       (throw (ex-info "Trying to put object without xt id" {:object object})))
-  [:xtdb.api/put object valid-from])
-
-(defn put-objects! [xt-node objects]
-  (let [processed-objects
-        (for [object objects]
-            (let [valid-time (some-> object
-                                     :xtdb.api/valid-time
-                                     (java.time.Instant/parse)
-                                     (java.util.Date/from))]
-              (xt-put (dissoc object :xtdb.api/valid-time) valid-time)))]
-    (await-tx xt-node processed-objects)))
 
 (defn default-for-type
   [type-ref]
@@ -456,7 +478,7 @@
                                       e))))
             db (xt/db xt-node as-of)
             id (validate-id! argument-values)
-            new-entity (protected-lookup id subject db)]
+            new-entity (protected-lookup id subject db xt-node)]
         (put-objects! xt-node [new-entity])
         new-entity))))
 
@@ -556,9 +578,8 @@
             ;; Direct lookup - useful for query roots
             (get site-args "e")
             (let [e (get site-args "e")]
-              (or (protected-lookup e subject db)
-                  (protected-lookup (get argument-values e)
-                                    subject db)))
+              (or (protected-lookup e subject db xt-node)
+                  (protected-lookup (get argument-values e) subject db xt-node)))
 
             (get site-args "q")
             (let [object-id (:xt/id object-value)
@@ -583,7 +604,7 @@
                                       e))))
                   limited-results (limit-results argument-values results)
                   result-entities (cond->>
-                                      (pull-entities db subject limited-results q)
+                                      (pull-entities db xt-node subject limited-results q)
                                       (get site-args "a")
                                       (map (keyword (get site-args "a")))
 
@@ -594,11 +615,14 @@
 
             (get site-args "itemForId")
             (let [item-key (keyword (get site-args "itemForId"))
-                  query {:find ['e]
+                  query {:find ['e '_siteCreatedAt]
                          :where [['e type-k (field->type field)]
+                                 ['e :_siteCreatedAt '_siteCreatedAt]
                                  ['e item-key (get argument-values "id")]]}
+
+                  query (to-xt-query (assoc opts :custom-xt-query query))
                   results (xt/q db query)
-                  result-entities (cond->> (pull-entities db subject results query)
+                  result-entities (cond->> (pull-entities db xt-node subject results query)
                                     (get site-args "a")
                                     (map (keyword (get site-args "a"))))]
               (vec (process-xt-results field result-entities)))
@@ -606,13 +630,13 @@
             (get site-args "a")
             (let [att (get site-args "a")
                   val (if (vector? att)
-                        (traverse object-value att subject db)
+                        (traverse object-value att subject db xt-node)
                         (get object-value (keyword att)))
                   transform-sym (some-> site-args (get "transform") symbol)
                   transform (when transform-sym (requiring-resolve transform-sym))
                   ]
               (if (= field-kind 'OBJECT)
-                (protected-lookup val subject db)
+                (protected-lookup val subject db xt-node)
                 ;; TODO: check for lists
                 (cond-> val
                   transform transform)))
@@ -620,13 +644,13 @@
             (get site-args "ref")
             (let [ref (get site-args "ref")
                   e (or
-                     (and (vector? ref) (traverse object-value ref subject db))
+                     (and (vector? ref) (traverse object-value ref subject db xt-node))
                      (get object-value ref)
                      (get object-value (keyword ref)))
                   type (field->type field)]
               (if e
-                (protected-lookup e subject db)
-                (map (comp (fn [e] (protected-lookup e subject db)) first)
+                (protected-lookup e subject db xt-node)
+                (map (comp (fn [e] (protected-lookup e subject db xt-node)) first)
                      (xt/q db {:find ['e]
                                :where [['e type-k type]
                                        ['e (keyword ref) (or
@@ -636,10 +660,10 @@
             (get site-args "each")
             (let [att (get site-args "each")
                   val (if (vector? att)
-                        (traverse object-value att subject db)
+                        (traverse object-value att subject db xt-node)
                         (get object-value (keyword att)))]
               (if (-> field ::g/type-ref list-type?)
-                (map #(protected-lookup % subject db) val)
+                (map #(protected-lookup % subject db xt-node) val)
                 (throw (ex-info "Can only used 'each' on a LIST type" {:field-kind field-kind}))))
 
             (get site-args "siteResolver")
@@ -711,6 +735,7 @@
                  (not (scalar? (field->type field) types-by-name))
                  (not (enum? (field->type field) types-by-name)))
             (infer-query db
+                         xt-node
                          subject
                          field
                          (to-xt-query opts)
@@ -728,6 +753,9 @@
 
             (= "_siteValidTime" field-name)
             (entity-valid-time object-value db)
+
+            (= "_siteCreatedAt" field-name)
+            (entity-creation-time object-value db)
 
             :else
             (default-for-type (::g/type-ref field)))))})))
