@@ -22,7 +22,7 @@
 
 (defn move-card
   [{:keys [argument-values db juxt.pass.alpha/subject type-k xt-node] :as opts}]
-  (let [lookup (fn [id] (protected-lookup id subject db))
+  (let [lookup (fn [id] (protected-lookup id subject db xt-node))
         validate (fn [item name]
                    (when-not (:xt/id item)
                      (throw
