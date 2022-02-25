@@ -57,8 +57,9 @@
   [field-or-type type-k]
   (let [type (or (field->type field-or-type)
                  field-or-type)]
-    {:find ['e]
-     :where [['e type-k type]]}))
+    {:find ['e 'updatedAt]
+     :where [['e type-k type]
+             ['e :updatedAt 'updatedAt]]}))
 
 (defn to-xt-query
   [{:keys [field argument-values type-k site-args object-value]}]
@@ -66,11 +67,8 @@
         field-or-type (or
                        (get site-args "type")
                        field)
-        query (rename-keys
-               (or (get site-args "q")
-                   (default-query field-or-type type-k))
-               ;; probably should do camelcase to kabab
-               {:order :order-by})
+        query (or (get site-args "q")
+                  (default-query field-or-type type-k))
         result
         (postwalk
          (fn [x]
@@ -93,6 +91,7 @@
          query)
         limit (get values "limit")
         offset (get values "offset")
+        order (get values "order")
         search-terms (get values "searchTerms")
         search? (not (every? empty? (vals search-terms)))
         search-where-clauses
@@ -107,14 +106,22 @@
                           ~key-symbol
                           ~val)
                         '[[e v s]]]])))
+        order-by-dir (cond
+                       (or (= :asc order) (= :desc order)) order
+                       limit :desc
+                       :else nil)
         result (assoc-some
                 result
                 :find (and search? '[e v s])
-                :order-by (and search? '[[s :desc]])
+                :order-by (cond
+                            search?
+                            '[[s :desc]]
+                            order-by-dir
+                            [['updatedAt order-by-dir]]
+                            :else
+                            nil)
                 :where (and search-where-clauses
                             (vec (concat (:where result) search-where-clauses)))
-                ;; xt does limit before search which means we can't limit or
-                ;; offset if we're also trying to search....
                 :limit limit
                 :offset (when (pos-int? offset)
                           offset))]
@@ -152,6 +159,9 @@
                      {:type "UUID"
                       :pathPrefix type}
                      {})))
+      ;; this should use a clock component that keeps the same time for
+      ;; everything in a single graphql transcation
+      true (assoc :updatedAt (str (t/now)))
       subject (assoc :_siteSubject (::pass/username subject))
       (nil? (type-k entity)) (assoc type-k type)
       (:id entity) (dissoc :id)
@@ -219,6 +229,7 @@
 
                    :else
                    (try
+                     (def value value)
                      (merge acc (keywordize-keys value))
                      ;; TODO if we need to assoc, like if someone wants to nest
                      ;; a map inside an entity to prevent it being indexed, then
@@ -336,9 +347,8 @@
 
 (defn pull-entities
   [db subject results query]
-  (for [[e _ score?] results]
+  (for [[e] results]
     (assoc-some (protected-lookup e subject db)
-                :luceneScore (and (number? score?) score?)
                 :_siteQuery (and query (pr-str query)))))
 
 (defn infer-query
@@ -748,7 +758,14 @@
          operation-name "operationName"
          variables "variables"}
         (case (some-> req ::site/received-representation ::http/content-type)
-          "application/json" (some-> body json/read-value)
+          "application/json" (try (some-> body json/read-value)
+                                  (catch Exception e
+                                    (throw
+                                     (let [msg "Error parsing JSON body"]
+                                       (ex-info
+                                        msg
+                                        {::site/errors [msg]
+                                         ::site/request-context (assoc req :ring.response/status 400)})))))
           "application/graphql" {"query" body}
 
           (throw
