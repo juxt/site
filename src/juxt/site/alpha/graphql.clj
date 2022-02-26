@@ -521,13 +521,24 @@
               mutation? (=
                          (get-in schema [::schema/root-operation-type-names :mutation])
                          (::g/name object-type))
-              db (if (and (not mutation?)
-                          (get argument-values "asOf"))
-                   (xt/db xt-node (-> argument-values
-                                      (get "asOf")
-                                      t/date-time
-                                      t/inst))
-                   db)
+              db (try
+                   (cond
+                       (and (not mutation?)
+                            (get argument-values "asOf"))
+                       (xt/db xt-node (-> argument-values
+                                          (get "asOf")
+                                          t/instant
+                                          t/inst))
+                       (and
+                        (get variable-values "historicalDb")
+                        (:_siteValidTime object-value))
+                       (do
+                         (xt/db xt-node (-> object-value
+                                            :_siteValidTime
+                                            t/inst)))
+                       :else
+                       db)
+                   (catch Exception _ db))
               object-id (:xt/id object-value)
               ;; TODO: Protected lookup please!
               lookup-entity (fn [id] (xt/entity db id))
