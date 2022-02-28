@@ -48,7 +48,10 @@
                    path (get-in temp-id-map ['request :ring.request/path])]
                ;; workaround until we move to mals session branch
                (if (or (str/includes? path "transcript")
-                       (str/includes? path "wordle"))
+                       (str/includes? path "wordle")
+                       (str/includes? path "insite")
+                       (str/includes? path "_site")
+                       (str/includes? path "kanbantest"))
                  (assoc rule ::pass/matched? true)
                  (when-let [target (::pass/target rule)]
                    (let [q {:find ['success]
