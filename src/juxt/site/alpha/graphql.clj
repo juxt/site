@@ -45,6 +45,10 @@
        ::g/name)
    (-> field
        ::g/type-ref
+       ::g/name)
+   (-> field
+       ::g/type-ref
+       ::g/non-null-type
        ::g/name)))
 
 (defn list-type?
@@ -653,20 +657,35 @@
                   transform transform)))
 
             (get site-args "ref")
-            (let [ref (get site-args "ref")
+            (let [list? (list-type? (::g/type-ref field))
+                  ref (get site-args "ref")
                   e (or
-                     (and (vector? ref) (traverse object-value ref subject db xt-node))
+                     (and (vector? ref)
+                          (traverse object-value ref subject db xt-node))
                      (get object-value ref)
-                     (get object-value (keyword ref)))
-                  type (field->type field)]
+                     (get object-value (keyword ref))
+                     (ffirst
+                      (xt/q db {:find ['e]
+                                :where [['e type-k type]
+                                        ['e (keyword ref) (or
+                                                           (get argument-values ref)
+                                                           object-id)]]})))
+                  type (field->type field)
+                  lookup-entity #(protected-lookup % subject db xt-node)]
               (if e
-                (protected-lookup e subject db xt-node)
-                (map (comp (fn [e] (protected-lookup e subject db xt-node)) first)
-                     (xt/q db {:find ['e]
-                               :where [['e type-k type]
-                                       ['e (keyword ref) (or
-                                                          (get argument-values ref)
-                                                          object-id)]]}))))
+                ;; referenced key exists on current entity
+                (lookup-entity e)
+                ;; try a query for any other entity which contains
+                ;; the reference key (reverse join)
+                (let [reverse-lookup-result
+                      (xt/q db {:find ['e]
+                                :where [['e type-k type]
+                                        ['e (keyword ref) (or
+                                                           (get argument-values ref)
+                                                           object-id)]]})]
+                  (if list-type?
+                    (map (comp lookup-entity first) reverse-lookup-result)
+                    (lookup-entity (ffirst reverse-lookup-result))))))
 
             (get site-args "each")
             (let [att (get site-args "each")
