@@ -16,6 +16,12 @@ permalink: index.html
 
 The server behaviour is defined in a declarative manner using open-source formats for describing and documenting APIs.
 
+API definitions are sent to Site via HTTP and re-read every request meaning changes are 'deployed' instantly.
+
+API definitions are stored in XTDB which means a full audit history of changes is maintained with no extra code.
+
+As XTDB has an open data model many APIs can coexist within a single system allowing efficent federation of data sources.
+
 Site currently provides execution engines for [Open Api](https://spec.openapis.org/oas/v3.0.2) and [Graphql](https://graphql.org/)
 
 APIs are also able to benefit from Site’s authorization module, [Pass](), providing Policy-Based Access Control, loosely based on XACML.

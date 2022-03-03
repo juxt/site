@@ -33,7 +33,7 @@ Looking at these example documents from the [fixtures](fixtures) you may notice 
 - Every document has a key `:xt/id`
 - Joanne's record does not have a `:person/born` attribute
 - Arnold Schwarzenegger's `:xt/id` appears the Terminator `:movie/cast` list
-- The movies are linkes by `:movie/sequel`
+- The movies are links by `:movie/sequel`
 
 XTDB is schemaless and does not have tables.
 

@@ -74,17 +74,17 @@ Add some data in XTDB via the repl
 ```clojure
 (put! {:person/name "Arnold Schwarzenegger",
        :person/born #inst "1947-07-30T00:00:00.000-00:00",
-       :juxt.site/type "Person"
+       :movies-api/type "Person"
        :xt/id "http://localhost:2021/movies/-101"}
 
       {:person/name "Linda Hamilton",
        :person/born #inst "1956-09-26T00:00:00.000-00:00",
-       :juxt.site/type "Person"
+       :movies-api/type "Person"
        :xt/id "http://localhost:2021/movies/-102"}
 
       {:person/name "James Cameron",
        :person/born #inst "1954-08-16T00:00:00.000-00:00",
-       :juxt.site/type "Person"
+       :movies-api/type "Person"
        :xt/id "http://localhost:2021/movies/-100"}
 
       {:movie/title "The Terminator",
@@ -93,33 +93,31 @@ Add some data in XTDB via the repl
        :movie/cast ["http://localhost:2021/movies/-101" "http://localhost:2021/movies/-102"],
        :movie/sequel "http://localhost:2021/movies/-207",
        :xt/id "http://localhost:2021/movies/-200"
-       :juxt.site/type "Movie"}
+       :movies-api/type "Movie"}
 
       {:movie/title "Terminator 2: Judgment Day",
        :movie/year 1991,
        :movie/director "http://localhost:2021/movies/-100"
        :movie/cast ["http://localhost:2021/movies/-101" "http://localhost:2021/movies/-102"],
        :xt/id "http://localhost:2021/movies/-207"
-       :juxt.site/type "Movie"})
+       :movies-api/type "Movie"})
 ```
 
-Site expects `:xt/id` to be a String
+Site expects `:xt/id` to be the URI of the resource.
+It is recommended to use localhost as the server and configuring HTTP redirects rather than hardcode Domains in the databse.
 
 ## Define a graphql API
 
-### Site Type
+### Site Type Directive
 
+The type directive tells Site what key identifies Graphql types in XTDB
 ```
-schema @site(type: "movies/type") {
+schema @site(type: "movie-api/type") {
   query: Query
   mutation: Mutation
 }
 ```
-TODO what is type directive?
-
-## Types
-
-Site uses the `:juxt.site/type` attribute on documents to match and return Graphql types:
+If not set the Site defaults to using the `:juxt.site.alpha/type` however it is recommended to define your own type key to allow data for many APIs to coexist with avoid name collisions or query performance degradation.
 ```
 type Person {
   id: ID!
@@ -166,7 +164,7 @@ type Query {
 ```
 note we use the [query site directive](../reference/graphql/site-directive#q) 
 
-TODO can ref directive be used here? instead
+Alternatively we could use [ref](../reference/graphql/site-directive#ref) for director and [each](../reference/graphql/site-directive#each) for cast( exercise for the reader).
 
 ## Mutations
 ```
@@ -189,7 +187,7 @@ type Mutation {
 
 Complete schema:
 ```
-schema {
+schema @site(type: "movie-api/type"){
   query: Query
   mutation: Mutation
 }
