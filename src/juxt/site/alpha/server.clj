@@ -4,7 +4,7 @@
   (:require
    [clojure.tools.logging :as log]
    [integrant.core :as ig]
-   [ring.adapter.jetty9 :refer [run-jetty]]
+   [ring.adapter.jetty :refer [run-jetty]]
    [juxt.site.alpha.handler :refer [make-handler]])
   (:import (java.lang.management ManagementFactory)
            (org.eclipse.jetty.jmx MBeanContainer)))
