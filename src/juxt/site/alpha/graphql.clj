@@ -663,15 +663,9 @@
                      (and (vector? ref)
                           (traverse object-value ref subject db xt-node))
                      (get object-value ref)
-                     (get object-value (keyword ref))
-                     (ffirst
-                      (xt/q db {:find ['e]
-                                :where [['e type-k type]
-                                        ['e (keyword ref) (or
-                                                           (get argument-values ref)
-                                                           object-id)]]})))
-                  type (field->type field)
-                  lookup-entity #(protected-lookup % subject db xt-node)]
+                     (get object-value (keyword ref)))
+                  lookup-entity #(protected-lookup % subject db xt-node)
+                  type (field->type field)]
               (if e
                 ;; referenced key exists on current entity
                 (lookup-entity e)
@@ -683,7 +677,7 @@
                                         ['e (keyword ref) (or
                                                            (get argument-values ref)
                                                            object-id)]]})]
-                  (if list-type?
+                  (if list?
                     (map (comp lookup-entity first) reverse-lookup-result)
                     (lookup-entity (ffirst reverse-lookup-result))))))
 
