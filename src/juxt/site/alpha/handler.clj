@@ -77,7 +77,7 @@
     ;; Protects resources from PUTs that are too large. If you need to
     ;; exceed this limitation, explicitly declare ::spin/max-content-length in
     ;; your resource.
-    (when-let [max-content-length (get resource ::http/max-content-length (Math/pow 2 80))]
+    (when-let [max-content-length (get resource ::http/max-content-length (Math/pow 2 24))] ;;16MB
       (when (> content-length max-content-length)
         (throw
          (ex-info
