@@ -15,7 +15,8 @@
         com.xtdb/xtdb-http-server {:mvn/version "1.20.0"}
 
         ;; Jetty
-        ring/ring-jetty-adapter {:mvn/version "1.9.1"}
+        info.sunng/ring-jetty9-adapter {:mvn/version "0.17.4"}
+
 
         ;; Logging
         org.clojure/tools.logging {:mvn/version "1.1.0"}
@@ -101,5 +102,11 @@
 
   :prod
   {:extra-paths ["prod"]
+   :jvm-opts ["-Dcom.sun.management.jmxremote"
+              "-Dcom.sun.management.jmxremote.ssl=false"
+              "-Dcom.sun.management.jmxremote.authenticate=false"
+              "-Dcom.sun.management.jmxremote.port=8001"
+              "--illegal-access=warn"]
    ;; nREPL can be useful debugging prod
-   :extra-deps {nrepl/nrepl {:mvn/version "0.9.0-beta4"}}}}}
+   :extra-deps {nrepl/nrepl {:mvn/version "0.9.0-beta4"}
+                org.eclipse.jetty/jetty-jmx {:mvn/version "10.0.8"}}}}}
