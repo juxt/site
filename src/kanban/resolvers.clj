@@ -49,9 +49,13 @@ mutation purgeCols {
                         :name name
                         :item item}))))
         card-id (get argument-values "cardId")
+        dest-id (get argument-values "workflowStateId")
         card (lookup card-id)
-        {:keys [cardIds]
-         :as destination} (lookup (get argument-values "workflowStateId"))
+        destination (lookup dest-id)
+        same-col-move? (get argument-values "sameColMove")
+        cardIds (if same-col-move?
+                   (remove #{card-id} (:cardIds destination))
+                   (:cardIds destination))
         new-position (let [prev (get argument-values "previousCard")]
                        (cond
                          (= "start" prev)
@@ -60,21 +64,22 @@ mutation purgeCols {
                          (count cardIds)
                          :else
                          (inc (.indexOf cardIds prev))))
-
         ;; we handle a collection of sources just in case there are duplicates
-        sources (map lookup
-                 (map first
-                  (xt/q db {:find ['e]
-                            :where [['e type-k "WorkflowState"]
-                                    ['e :cardIds card-id]]})))
+        sources (when (not same-col-move?)
+                  (map lookup
+                       (map first
+                            (xt/q db {:find ['e]
+                                      :where [['e type-k "WorkflowState"]
+                                              ['e :cardIds card-id]]}))))
 
         updated-destination-cards (distinct (insert-into (vec cardIds) new-position card-id))
-        updated-source-cards (into {}
-                                   (map (fn [source]
-                                          [(:xt/id source)
-                                           (distinct (remove (fn [id] (= id card-id))
-                                                             (:cardIds source)))])
-                                        sources))
+        updated-source-cards (when (not same-col-move?)
+                               (into {}
+                                     (map (fn [source]
+                                            [(:xt/id source)
+                                             (distinct (remove (fn [id] (= id card-id))
+                                                               (:cardIds source)))])
+                                          sources)))
         updated-destination (assoc destination :cardIds
                                    (vec updated-destination-cards))
         updated-sources (map (fn [source] (assoc source :cardIds (vec (get updated-source-cards (:xt/id source))))) sources)
@@ -83,12 +88,14 @@ mutation purgeCols {
         new-destination-tx (prepare updated-destination)
         _validate (do
                     (validate card "card")
-                    (map (fn [source] (validate source "current-state")) sources)
+                    (and (not same-col-move?)
+                         (map (fn [source] (validate source "current-state")) sources)
+                         (map (fn [updated-source] (validate updated-source "updated source")) updated-sources))
                     (validate destination "new-state")
-                    (validate updated-destination "updated dest")
-                    (map (fn [updated-source] (validate updated-source "updated source")) updated-sources))]
+                    (validate updated-destination "updated dest"))
+        tx (if same-col-move? [new-destination-tx] (conj new-sources-txes new-destination-tx))]
     (purge-cache)
-    (prn (put-objects! xt-node (conj new-sources-txes new-destination-tx)))
+    (prn (put-objects! xt-node tx))
     card))
 
 (defn delete-card-from-column
