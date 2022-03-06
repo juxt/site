@@ -1,6 +1,8 @@
 (ns kanban.resolvers
   (:require [juxt.site.alpha.graphql :refer [protected-lookup prepare-mutation-entity put-objects!]]
+            [java-http-clj.core :as http]
             [xtdb.api :as xt]
+            [jsonista.core :as json]
             [clojure.string :as str]))
 
 (defn insert-into
@@ -19,6 +21,21 @@
         new-item "new"]
     [(insert-into coll 2 new-item)
      (remove-by-idx coll 2)]))
+
+(def mutation-str
+  "
+mutation purgeCols {
+  _purgeType(type: \"WorkflowState\")
+}
+")
+
+(defn purge-cache
+  []
+  (let [url "https://admin.graphcdn.io/kanban"]
+    (http/post url
+               {:headers {"Content-Type" "application/json"
+                          "graphcdn-token" "b70c77f7c5eff9dd0ec598eb2043277499295c34989d459a862ef77ea3c843e4"}
+                :body (json/write-value-as-string {:query mutation-str})})))
 
 (defn move-card
   [{:keys [argument-values db juxt.pass.alpha/subject type-k xt-node] :as opts}]
@@ -70,5 +87,6 @@
                     (validate destination "new-state")
                     (validate updated-destination "updated dest")
                     (map (fn [updated-source] (validate updated-source "updated source")) updated-sources))]
+    (purge-cache)
     (prn (put-objects! xt-node (conj new-sources-txes new-destination-tx)))
     card))
