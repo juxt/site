@@ -90,3 +90,27 @@ mutation purgeCols {
     (purge-cache)
     (prn (put-objects! xt-node (conj new-sources-txes new-destination-tx)))
     card))
+
+(defn delete-card-from-column
+  [{:keys [argument-values db juxt.pass.alpha/subject type-k xt-node] :as opts}]
+  (let [lookup (fn [id] (protected-lookup id subject db xt-node))
+        validate (fn [item name]
+                   (when-not (:xt/id item)
+                     (throw
+                      (ex-info
+                       "Entity does not exist in the DB, or you do not have access to it"
+                       {:args argument-values
+                        :name name
+                        :item item}))))
+        card-id (get argument-values "cardId")
+        {:keys [cardIds] :as col} (lookup (get argument-values "workflowStateId"))
+        new-ids (remove #(= card-id %) cardIds)
+        updated-col (assoc col :cardIds (vec new-ids))
+        prepare (fn [tx] (prepare-mutation-entity opts tx nil))
+        tx (prepare updated-col)
+        _validate (do
+                    (validate col "col")
+                    (validate updated-col "updated col"))]
+    (purge-cache)
+    (prn (put-objects! xt-node [tx]))
+    updated-col))
