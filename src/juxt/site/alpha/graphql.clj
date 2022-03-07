@@ -153,7 +153,7 @@
 (defn prepare-mutation-entity
   [{:keys [field juxt.pass.alpha/subject type-k argument-values site-args] :as opts}
    entity transform]
-  (let [type (-> field ::g/type-ref ::g/name)
+  (let [type (or (get site-args "objectType") (-> field ::g/type-ref ::g/name))
         _validate-type (and (nil? type)
                             (throw (ex-info "Couldn't infer type" {:field field})))]
     (cond-> entity
@@ -167,7 +167,7 @@
                      {})))
       ;; this should use a clock component that keeps the same time for
       ;; everything in a single graphql transcation
-      true (assoc :_siteCreatedAt (str (t/now)))
+      (nil? (:_siteCreatedAt entity)) (assoc :_siteCreatedAt (str (t/now)))
       subject (assoc :_siteSubject (::pass/username subject))
       (nil? (type-k entity)) (assoc type-k type)
       (:id entity) (dissoc :id)
@@ -197,8 +197,10 @@
                  arg-name (::g/name arg-def)
                  key (keyword (or kw arg-name))
                  type-ref (::g/type-ref arg-def)
-                 arg-type (or (::g/name type-ref)
-                              (-> type-ref ::g/non-null-type ::g/name))]
+                 arg-type (or
+                           (get-in site-args "objectType")
+                           (::g/name type-ref)
+                           (-> type-ref ::g/non-null-type ::g/name))]
 
              (when (and transform-sym (not transform))
                (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
@@ -235,7 +237,6 @@
 
                    :else
                    (try
-                     (def value value)
                      (merge acc (keywordize-keys value))
                      ;; TODO if we need to assoc, like if someone wants to nest
                      ;; a map inside an entity to prevent it being indexed, then
