@@ -9,3 +9,4 @@ opt/graphiql/target
 /import
 *.dylib
 .clj-kondo
+**/generated/*
