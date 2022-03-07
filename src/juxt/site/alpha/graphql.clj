@@ -369,7 +369,6 @@
         ent (some-> (lookup e)
                     (assoc-valid-time db)
                     (assoc-creation-time db xt-node))]
-    (def ent ent)
     (if-let [ent-ns (::pass/namespace ent)]
       (let [rules (some-> ent-ns lookup ::pass/rules)
             acls (->>
