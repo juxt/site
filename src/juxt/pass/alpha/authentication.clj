@@ -166,6 +166,7 @@
                                    ;; otherwise used.
                                    "user" user})
                                  :max-age expires-in
+                                 :domain ".alexd.uk"
 
                                  :same-site :none
                                  :secure true
@@ -187,6 +188,7 @@
                                    ;; otherwise used.
                                    "user" user})
                                  :max-age expires-in
+                                 :domain ".alexd.uk"
                                  :same-site :strict
                                  ;; We should set http-only to true.  However,
                                  ;; this stops Swagger UI from make API
