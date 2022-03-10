@@ -1,6 +1,7 @@
 .PHONY: build install token
 
 build:
+	@echo 'Console will use ${GRAPHQL_API_URL} as the Site endpoint - Make sure this is correct!'
 	yarn
 	yarn build
 
