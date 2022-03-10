@@ -188,21 +188,22 @@
               content-type (:juxt.reap.alpha.rfc7231/content-type decoded-representation)]
 
           (merge
-            decoded-representation
-            {::http/content-length content-length
-             ::http/last-modified start-date}
+           decoded-representation
+           {::http/content-length content-length
+            :ring.response/headers {"Cache-Control" "public, max-age=604800, immutable"}
+            ::http/last-modified start-date}
 
-            (if (and
-                  (= (:juxt.reap.alpha.rfc7231/type content-type) "text")
-                  (nil? (get decoded-representation ::http/content-encoding)))
-              (let [charset
-                    (get-in decoded-representation
-                            [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
-                (merge
-                  {::http/content (new String body (or charset "utf-8"))}
-                  (when charset {::http/charset charset})))
+           (if (and
+                (= (:juxt.reap.alpha.rfc7231/type content-type) "text")
+                (nil? (get decoded-representation ::http/content-encoding)))
+             (let [charset
+                   (get-in decoded-representation
+                           [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
+               (merge
+                {::http/content (new String body (or charset "utf-8"))}
+                (when charset {::http/charset charset})))
 
-              {::http/body body})))))))
+             {::http/body body})))))))
 
 (defn GET [req]
   (conditional/evaluate-preconditions! req)
@@ -865,22 +866,18 @@
 
   ;; TODO: Negotiate a better format for internal server errors
 
-  (let [default-body
-        (str "<body>\r\n"
-             (cond-> "<h1>Internal Server Error</h1>\r\n"
-               request-id (str (format "<p><a href=\"%s\" target=\"_site_error\">%s</a></p>\r\n" request-id "Error")))
-             "</body>\r\n")]
+  (let [default-body request-id]
     (respond
-      (into
-        req
-        {:ring.response/status 500
-         :ring.response/body default-body
-         ::site/errors (errors-with-causes e)
-         ::site/selected-representation
-         {::http/content-type "text/html;charset=utf-8"
-          ::http/content-length (count default-body)
-          :ring.response/body default-body}
-         }))))
+     (into
+      req
+      {:ring.response/status 500
+       :ring.response/body default-body
+       ::site/errors (errors-with-causes e)
+       ::site/selected-representation
+       {::http/content-type "text/plain;charset=utf-8"
+        ::http/content-length (count default-body)
+        :ring.response/body default-body}
+       }))))
 
 (defn error-response
   "Respond with the given error"
@@ -894,40 +891,41 @@
 
         representation
         (or
-          (when (= method :put) (put-error-representation req e))
-          (when (= method :post) (post-error-representation req e))
-          (error-resource-representation req e)
+         (when (= method :put) (put-error-representation req e))
+         (when (= method :post) (post-error-representation req e))
+         (error-resource-representation req e)
 
-          ;; Some default representations for errors
-          (some->
-            (conneg/negotiate-representation
-              req
-              [(let [content
-                     ;; We don't want to provide much information here, we don't
-                     ;; know much about the recipient, only that they're probably
-                     ;; using a web browser. We provide a link to the error
-                     ;; resource, because that will be subject to authorization
-                     ;; checks. So authorized users get to see extensive error
-                     ;; information, unauthorized users don't.
-                     (cond-> (str (status-message status) "\r\n")
-                       request-id (str (format "<a href=\"%s\" target=\"_site_error\">%s</a>\r\n" request-id "Error")))]
-                 {::http/content-type "text/html;charset=utf-8"
-                  ::http/content-length (count content)
-                  ::http/content content})
-               (let [content
-                     (str (status-message status)
-                          ;; For text/plain we might be using the site tool. Here,
-                          ;; we decide that providing a little more context to the
-                          ;; user outweighs the need to restrict information about
-                          ;; the underlying implementation.
-                          " – " (.getMessage e) "\r\n\r\n")]
-                 {::http/content-type "text/plain;charset=utf-8"
-                  ::http/content-length (count content)
-                  ::http/content content})])
+         ;; Some default representations for errors
+         (some->
+          (conneg/negotiate-representation
+           req
+           [(let [content
+                  ;; We don't want to provide much information here, we don't
+                  ;; know much about the recipient, only that they're probably
+                  ;; using a web browser. We provide a link to the error
+                  ;; resource, because that will be subject to authorization
+                  ;; checks. So authorized users get to see extensive error
+                  ;; information, unauthorized users don't.
+                  (cond-> (str (status-message status) "\r\n")
+                    request-id (str (format "<a href=\"%s\" target=\"_site_error\">%s</a>\r\n" request-id "Error")))]
+              {::http/content-type "text/html;charset=utf-8"
+               ::http/content-length (count content)
+               ::http/content content})
 
-            ;; This is an error, it won't be cached, it isn't negotiable 'content'
-            ;; so the Vary header isn't deemed applicable. Let's not set it.
-            (dissoc ::http/vary)))
+            (let [content
+                  (str (status-message status)
+                       ;; For text/plain we might be using the site tool. Here,
+                       ;; we decide that providing a little more context to the
+                       ;; user outweighs the need to restrict information about
+                       ;; the underlying implementation.
+                       " – " (.getMessage e) "\r\n\r\n")]
+              {::http/content-type "text/plain;charset=utf-8"
+               ::http/content-length (count content)
+               ::http/content content})])
+
+          ;; This is an error, it won't be cached, it isn't negotiable 'content'
+          ;; so the Vary header isn't deemed applicable. Let's not set it.
+          (dissoc ::http/vary)))
 
         error-resource (merge
                          {:ring.response/status 500
