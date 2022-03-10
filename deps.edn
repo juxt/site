@@ -87,7 +87,8 @@
    :extra-deps { ;; Convenience libraries made available during development
                 org.clojure/test.check {:mvn/version "0.9.0"}
                 org.clojure/alpha.spec {:git/url "https://github.com/clojure/spec-alpha2.git"
-                                        :sha "c087ded910b3532a938b37e853df79fc3b9c48c1"}}
+                                        :sha "c087ded910b3532a938b37e853df79fc3b9c48c1"}
+                org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
               "-Dclojure.server.site={:port,50505,:accept,juxt.site.alpha.repl-server/repl}"
               "-Dclojure.spec.check-asserts=true"]}
