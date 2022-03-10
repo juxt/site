@@ -190,6 +190,7 @@
           (merge
            decoded-representation
            {::http/content-length content-length
+            :ring.response/headers {"Cache-Control" "public, max-age=604800, immutable"}
             ::http/last-modified start-date}
 
            (if (and
@@ -865,11 +866,7 @@
 
   ;; TODO: Negotiate a better format for internal server errors
 
-  (let [default-body
-        (str "<body>\r\n"
-             (cond-> "<h1>Internal Server Error</h1>\r\n"
-               request-id (str (format "<p><a href=\"%s\" target=\"_site_error\">%s</a></p>\r\n" request-id "Error")))
-             "</body>\r\n")]
+  (let [default-body request-id]
     (respond
      (into
       req
@@ -877,7 +874,7 @@
        :ring.response/body default-body
        ::site/errors (errors-with-causes e)
        ::site/selected-representation
-       {::http/content-type "text/html;charset=utf-8"
+       {::http/content-type "text/plain;charset=utf-8"
         ::http/content-length (count default-body)
         :ring.response/body default-body}
        }))))
@@ -914,6 +911,7 @@
               {::http/content-type "text/html;charset=utf-8"
                ::http/content-length (count content)
                ::http/content content})
+
             (let [content
                   (str (status-message status)
                        ;; For text/plain we might be using the site tool. Here,
