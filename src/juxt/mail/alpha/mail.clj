@@ -33,7 +33,8 @@
 
 (defn send-sms! [sns-client from-sms-name to-phone-number subject text-body]
 
-  (log/debugf "Sending sms to %s with subject %s, body %s" to-phone-number subject text-body)
+  (log/infof "Sending sms to %s with subject %s" to-phone-number subject)
+  (log/debugf "SMS body %s" text-body)
 
   (future
     (try
@@ -46,7 +47,8 @@
 
 (defn send-mail! [ses-client from to subject html-body text-body]
 
-  (log/debugf "Sending email to %s with subject %s, body %s" to subject html-body)
+  (log/infof "Sending email to %s with subject %s" to subject)
+  (log/debugf "Email body %s" html-body)
 
   (future
     (try
