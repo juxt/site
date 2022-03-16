@@ -544,8 +544,7 @@
                        db)
                    (catch Exception _ db))
               object-id (:xt/id object-value)
-              ;; TODO: Protected lookup please!
-              lookup-entity (fn [id] (xt/entity db id))
+              lookup-entity (fn [id] (protected-lookup id subject db xt-node))
               opts
               (merge field-resolver-args
                      {:site-args site-args
