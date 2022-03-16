@@ -536,253 +536,252 @@
                       (and
                         (get variable-values "historicalDb")
                         (:_siteValidTime object-value))
-                      (xt/db xt-node (-> object-value
-                                         :_siteValidTime
-                                         t/inst))
-                      :else
-                      db)
-                    (catch Exception _ db))
-               object-id (:xt/id object-value)
-               ;; TODO: Protected lookup please!
-               lookup-entity (fn [id] (xt/entity db id))
-               opts
-               (merge field-resolver-args
-                      {:site-args site-args
-                       :xt-node xt-node
-                       :schema schema
-                       :field field
-                       :field-kind field-kind
-                       :types-by-name types-by-name
-                       :mutation? mutation?
-                       :base-uri base-uri
-                       :type-k type-k
-                       :lookup-entity lookup-entity
-                       ::pass/subject subject
-                       :db db})]
+                       (do
+                         (xt/db xt-node (-> object-value
+                                            :_siteValidTime
+                                            t/inst)))
+                       :else
+                       db)
+                   (catch Exception _ db))
+              object-id (:xt/id object-value)
+              lookup-entity (fn [id] (protected-lookup id subject db xt-node))
+              opts
+              (merge field-resolver-args
+                     {:site-args site-args
+                      :xt-node xt-node
+                      :schema schema
+                      :field field
+                      :field-kind field-kind
+                      :types-by-name types-by-name
+                      :mutation? mutation?
+                      :base-uri base-uri
+                      :type-k type-k
+                      :lookup-entity lookup-entity
+                      ::pass/subject subject
+                      :db db})]
 
-           (cond
-             ;; The registration of a resolver should be a privileged operation, since it
-             ;; has the potential to bypass access control.
-             (get site-args "resolver")
-             (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
-               ;; Resolvers need to do their own access control
-               (resolver opts))
+          (cond
+            ;; The registration of a resolver should be a privileged operation, since it
+            ;; has the potential to bypass access control.
+            (get site-args "resolver")
+            (let [resolver (requiring-resolve (symbol (get site-args "resolver")))]
+              ;; Resolvers need to do their own access control
+              (resolver opts))
 
-             mutation? (perform-mutation! opts)
+            mutation? (perform-mutation! opts)
 
-             (get site-args "history")
-             (if-let [id (get argument-values "id")]
-               (let [limit (get argument-values "limit" 10)
-                     offset (get argument-values "offset" 0)
-                     order (case (get site-args "history")
-                             "desc" :desc
-                             "asc" :asc
-                             :desc)
-                     process-history-item
-                     (fn [{::xt/keys [valid-time doc]}]
-                       (assoc doc :_siteValidTime (t/instant valid-time)))]
-                 (with-open [history (xt/open-entity-history db id order {:with-docs? true})]
-                   (->> history
-                        (iterator-seq)
-                        (drop offset)
-                        (take limit)
-                        (map process-history-item))))
-               (throw (ex-info "History queries must have an id argument" {})))
+            (get site-args "history")
+            (if-let [id (get argument-values "id")]
+              (let [limit (get argument-values "limit" 10)
+                    offset (get argument-values "offset" 0)
+                    order (case (get site-args "history")
+                            "desc" :desc
+                            "asc" :asc
+                            :desc)
+                    process-history-item
+                    (fn [{::xt/keys [valid-time doc]}]
+                      (assoc doc :_siteValidTime (t/instant valid-time)))]
+                (with-open [history (xt/open-entity-history db id order {:with-docs? true})]
+                  (->> history
+                       (iterator-seq)
+                       (drop offset)
+                       (take limit)
+                       (map process-history-item))))
+              (throw (ex-info "History queries must have an id argument" {})))
 
-             ;; Direct lookup - useful for query roots
-             (get site-args "e")
-             (let [e (get site-args "e")]
-               (or (protected-lookup e subject db xt-node)
-                   (protected-lookup (get argument-values e) subject db xt-node)))
+            ;; Direct lookup - useful for query roots
+            (get site-args "e")
+            (let [e (get site-args "e")]
+              (or (protected-lookup e subject db xt-node)
+                  (protected-lookup (get argument-values e) subject db xt-node)))
 
-             (get site-args "q")
-             (let [object-id (:xt/id object-value)
-                   arg-keys (fn [m] (remove #{"limit" "offset" "orderBy"} (keys m)))
-                   in (cond->> (map symbol (arg-keys argument-values))
-                        object-id (concat ['object]))
-                   q (assoc
-                       (to-xt-query opts)
-                       :in (if (second in) [in] (vec in)))
+            (get site-args "q")
+            (let [object-id (:xt/id object-value)
+                  arg-keys (fn [m] (remove #{"limit" "offset" "orderBy"} (keys m)))
+                  in (cond->> (map symbol (arg-keys argument-values))
+                       object-id (concat ['object]))
+                  q (assoc
+                     (to-xt-query opts)
+                     :in (if (second in) [in] (vec in)))
 
-                   query-args (cond->> (vals argument-values)
-                                object-id (concat [object-id]))
-                   args (if (second query-args) query-args (first query-args))
-                   results
-                   (try
-                     (if (nil? args)
-                       (xt/q db q)
-                       (xt/q db q args))
+                  query-args (cond->> (vals argument-values)
+                               object-id (concat [object-id]))
+                  args (if (second query-args) query-args (first query-args))
+                  results
+                  (try
+                    (xt/q db q args)
+                    (catch Exception e
+                      (throw (ex-info "Failure when running XTDB query"
+                                      {:message (ex-message e)
+                                       :query (pr-str q)
+                                       :args args}
+                                      e))))
+                  limited-results (limit-results argument-values results)
+                  result-entities (cond->>
+                                      (pull-entities db xt-node subject limited-results q)
+                                      (get site-args "a")
+                                      (map (keyword (get site-args "a")))
 
-                     (catch Exception e
-                       (throw (ex-info "Failure when running XTDB query"
-                                       {:message (ex-message e)
-                                        :query (pr-str q)
-                                        :args args}
-                                       e))))
-                   limited-results (limit-results argument-values results)
-                   result-entities (cond->>
-                                       (pull-entities db xt-node subject limited-results q)
-                                     (get site-args "a")
-                                     (map (keyword (get site-args "a")))
+                                      )]
+              ;;(log/tracef "GraphQL results is %s" (seq result-entities))
 
-                                     )]
-               ;;(log/tracef "GraphQL results is %s" (seq result-entities))
+              (process-xt-results field result-entities))
 
-               (process-xt-results field result-entities))
+            (get site-args "itemForId")
+            (let [item-key (keyword (get site-args "itemForId"))
+                  query {:find ['e '_siteCreatedAt]
+                         :where [['e type-k (field->type field)]
+                                 ['e :_siteCreatedAt '_siteCreatedAt]
+                                 ['e item-key (get argument-values "id")]]}
 
-             (get site-args "itemForId")
-             (let [item-key (keyword (get site-args "itemForId"))
-                   query {:find ['e '_siteCreatedAt]
-                          :where [['e type-k (field->type field)]
-                                  ['e :_siteCreatedAt '_siteCreatedAt]
-                                  ['e item-key (get argument-values "id")]]}
+                  query (to-xt-query (assoc opts :custom-xt-query query))
+                  results (xt/q db query)
+                  result-entities (cond->> (pull-entities db xt-node subject results query)
+                                    (get site-args "a")
+                                    (map (keyword (get site-args "a"))))]
+              (vec (process-xt-results field result-entities)))
 
-                   query (to-xt-query (assoc opts :custom-xt-query query))
-                   results (xt/q db query)
-                   result-entities (cond->> (pull-entities db xt-node subject results query)
-                                     (get site-args "a")
-                                     (map (keyword (get site-args "a"))))]
-               (vec (process-xt-results field result-entities)))
+            (get site-args "a")
+            (let [att (get site-args "a")
+                  val (if (vector? att)
+                        (traverse object-value att subject db xt-node)
+                        (get object-value (keyword att)))
+                  transform-sym (some-> site-args (get "transform") symbol)
+                  transform (when transform-sym (requiring-resolve transform-sym))
+                  ]
+              (if (= field-kind 'OBJECT)
+                (protected-lookup val subject db xt-node)
+                ;; TODO: check for lists
+                (cond-> val
+                  transform transform)))
 
-             (get site-args "a")
-             (let [att (get site-args "a")
-                   val (if (vector? att)
-                         (traverse object-value att subject db xt-node)
-                         (get object-value (keyword att)))
-                   transform-sym (some-> site-args (get "transform") symbol)
-                   transform (when transform-sym (requiring-resolve transform-sym))]
-               (if (= field-kind 'OBJECT)
-                 (protected-lookup val subject db xt-node)
-                 ;; TODO: check for lists
-                 (cond-> val
-                   transform transform)))
+            (get site-args "ref")
+            (let [list? (list-type? (::g/type-ref field))
+                  ref (get site-args "ref")
+                  e (or
+                     (and (vector? ref)
+                          (traverse object-value ref subject db xt-node))
+                     (get object-value ref)
+                     (get object-value (keyword ref)))
+                  lookup-entity #(protected-lookup % subject db xt-node)
+                  type (field->type field)]
+              (if e
+                ;; referenced key exists on current entity
+                (lookup-entity e)
+                ;; try a query for any other entity which contains
+                ;; the reference key (reverse join)
+                (let [reverse-lookup-result
+                      (xt/q db {:find ['e]
+                                :where [['e type-k type]
+                                        ['e (keyword ref) (or
+                                                           (get argument-values ref)
+                                                           object-id)]]})]
+                  (if list?
+                    (map (comp lookup-entity first) reverse-lookup-result)
+                    (lookup-entity (ffirst reverse-lookup-result))))))
 
-             (get site-args "ref")
-             (let [list? (list-type? (::g/type-ref field))
-                   ref (get site-args "ref")
-                   e (or
-                       (and (vector? ref)
-                            (traverse object-value ref subject db xt-node))
-                       (get object-value ref)
-                       (get object-value (keyword ref)))
-                   lookup-entity #(protected-lookup % subject db xt-node)
-                   type (field->type field)]
-               (if e
-                 ;; referenced key exists on current entity
-                 (lookup-entity e)
-                 ;; try a query for any other entity which contains
-                 ;; the reference key (reverse join)
-                 (let [reverse-lookup-result
-                       (xt/q db {:find ['e]
-                                 :where [['e type-k type]
-                                         ['e (keyword ref) (or
-                                                             (get argument-values ref)
-                                                             object-id)]]})]
-                   (if list?
-                     (map (comp lookup-entity first) reverse-lookup-result)
-                     (lookup-entity (ffirst reverse-lookup-result))))))
+            (get site-args "each")
+            (let [att (get site-args "each")
+                  val (if (vector? att)
+                        (traverse object-value att subject db xt-node)
+                        (get object-value (keyword att)))]
+              (if (-> field ::g/type-ref list-type?)
+                (map #(protected-lookup % subject db xt-node) val)
+                (throw (ex-info "Can only used 'each' on a LIST type" {:field-kind field-kind}))))
 
-             (get site-args "each")
-             (let [att (get site-args "each")
-                   val (if (vector? att)
-                         (traverse object-value att subject db xt-node)
-                         (get object-value (keyword att)))]
-               (if (-> field ::g/type-ref list-type?)
-                 (map #(protected-lookup % subject db xt-node) val)
-                 (throw (ex-info "Can only used 'each' on a LIST type" {:field-kind field-kind}))))
+            (get site-args "siteResolver")
+            (let [resolver
+                  (case (get site-args "siteResolver")
+                    "allQueryParams"
+                    (requiring-resolve 'juxt.site.alpha.graphql-resolver/query-parameters)
+                    "queryParam"
+                    (requiring-resolve 'juxt.site.alpha.graphql-resolver/query-parameter)
+                    "queryString"
+                    (requiring-resolve 'juxt.site.alpha.graphql-resolver/query-string)
+                    "constant"
+                    (requiring-resolve 'juxt.site.alpha.graphql-resolver/constant)
+                    (throw (ex-info "No such built-in resolver" {:site-resolver (get site-args "siteResolver")})))]
+              (resolver (assoc field-resolver-args ::site/request-context req)))
 
-             (get site-args "siteResolver")
-             (let [resolver
-                   (case (get site-args "siteResolver")
-                     "allQueryParams"
-                     (requiring-resolve 'juxt.site.alpha.graphql-resolver/query-parameters)
-                     "queryParam"
-                     (requiring-resolve 'juxt.site.alpha.graphql-resolver/query-parameter)
-                     "queryString"
-                     (requiring-resolve 'juxt.site.alpha.graphql-resolver/query-string)
-                     "constant"
-                     (requiring-resolve 'juxt.site.alpha.graphql-resolver/constant)
-                     (throw (ex-info "No such built-in resolver" {:site-resolver (get site-args "siteResolver")})))]
-               (resolver (assoc field-resolver-args ::site/request-context req)))
+            ;; A function whose input is the result of a GraphqL 'sub' query,
+            ;; propagating the same subject and under the exact same access
+            ;; control policy. This allows the function to declare its necessary
+            ;; inputs as a query.
+            ;;
+            ;; In addition, a function's results may be memoized, with each result
+            ;; stored in XTDB which acts as a large persistent memoization
+            ;; cache. For this reason, the function must be pure. The function
+            ;; must take a single map which contains the results of the sub-query
+            ;; and any argument values (which would also be used as variable
+            ;; values in the GraphQL sub-query which computes the other input
+            ;; argument).
+            ;;
+            ;; Once this feature is working, replace it with a call to a lambda or
+            ;; similarly sandboxed execution environment.
+            (get site-args "function")
+            (throw (ex-info "Feature not yet supported" {}))
 
-             ;; A function whose input is the result of a GraphqL 'sub' query,
-             ;; propagating the same subject and under the exact same access
-             ;; control policy. This allows the function to declare its necessary
-             ;; inputs as a query.
-             ;;
-             ;; In addition, a function's results may be memoized, with each result
-             ;; stored in XTDB which acts as a large persistent memoization
-             ;; cache. For this reason, the function must be pure. The function
-             ;; must take a single map which contains the results of the sub-query
-             ;; and any argument values (which would also be used as variable
-             ;; values in the GraphQL sub-query which computes the other input
-             ;; argument).
-             ;;
-             ;; Once this feature is working, replace it with a call to a lambda or
-             ;; similarly sandboxed execution environment.
-             (get site-args "function")
-             (throw (ex-info "Feature not yet supported" {}))
+            (and (= 1 (count argument-values))
+                 (= "id" (ffirst argument-values)))
+            (lookup-entity (get argument-values "id"))
 
-             (and (= 1 (count argument-values))
-                  (= "id" (ffirst argument-values)))
-             (lookup-entity (get argument-values "id"))
+            (and (= 1 (count argument-values))
+                 (= "ids" (ffirst argument-values)))
+            (map lookup-entity (get argument-values "ids"))
 
-             (and (= 1 (count argument-values))
-                  (= "ids" (ffirst argument-values)))
-             (map lookup-entity (get argument-values "ids"))
+            ;; Another strategy is to see if the field indexes the
+            ;; object-value. This strategy allows for delays to be used to prevent
+            ;; computing field values that aren't resolved.
+            (and (map? object-value) (contains? object-value field-name))
+            (let [f (force (get object-value field-name))]
+              (if (fn? f) (f argument-values) f))
 
-             ;; Another strategy is to see if the field indexes the
-             ;; object-value. This strategy allows for delays to be used to prevent
-             ;; computing field values that aren't resolved.
-             (and (map? object-value) (contains? object-value field-name))
-             (let [f (force (get object-value field-name))]
-               (if (fn? f) (f argument-values) f))
+            ;; If the key is 'id', we assume it should be translated to xt/id
+            (= "id" field-name)
+            (get object-value :xt/id)
 
-             ;; If the key is 'id', we assume it should be translated to xt/id
-             (= "id" field-name)
-             (get object-value :xt/id)
+            ;; Or simply try to extract the keyword
+            (and (map? object-value)
+                 (or
+                  ;; schema specifies this field is on the object
+                  (get-in field [::schema/directives-by-name "onObject"])
+                  (contains? object-value (keyword field-name))))
+            (let [result (get object-value (keyword field-name))]
+                (cond
+                  (-> field ::g/type-ref list-type?)
+                  (limit-results argument-values result)
+                  ;; TODO validate enum (enum? (field->type field) types-by-name)
+                  :else
+                  result))
 
-             ;; Or simply try to extract the keyword
-             (and (map? object-value)
-                  (or
-                    ;; schema specifies this field is on the object
-                    (get-in field [::schema/directives-by-name "onObject"])
-                    (contains? object-value (keyword field-name))))
-             (let [result (get object-value (keyword field-name))]
-               (cond
-                 (-> field ::g/type-ref list-type?)
-                 (limit-results argument-values result)
-                 ;; TODO validate enum (enum? (field->type field) types-by-name)
-                 :else
-                 result))
+            (and (field->type field)
+                 (not (scalar? (field->type field) types-by-name))
+                 (not (enum? (field->type field) types-by-name)))
+            (infer-query db
+                         xt-node
+                         subject
+                         field
+                         (to-xt-query opts)
+                         argument-values)
 
-             (and (field->type field)
-                  (not (scalar? (field->type field) types-by-name))
-                  (not (enum? (field->type field) types-by-name)))
-             (infer-query db
-                          xt-node
-                          subject
-                          field
-                          (to-xt-query opts))
+            (get argument-values "id")
+            (xt/entity db (get argument-values "id"))
 
-             (get argument-values "id")
-             (xt/entity db (get argument-values "id"))
+            (and (get site-args "aggregate")
+                 (get site-args "type"))
+            (case (get site-args "aggregate")
+              "count" (count
+                       (xt/q
+                        db (to-xt-query opts))))
 
-             (and (get site-args "aggregate")
-                  (get site-args "type"))
-             (case (get site-args "aggregate")
-               "count" (count
-                         (xt/q
-                           db (to-xt-query opts))))
+            (= "_siteValidTime" field-name)
+            (entity-valid-time object-value db)
 
-             (= "_siteValidTime" field-name)
-             (entity-valid-time object-value db)
+            (= "_siteCreatedAt" field-name)
+            (entity-creation-time object-value db)
 
-             (= "_siteCreatedAt" field-name)
-             (entity-creation-time object-value db)
-
-             :else
-             (default-for-type (::g/type-ref field)))))})))
+            :else
+            (default-for-type (::g/type-ref field)))))})))
 
 (defn common-variables
   "Return the common 'built-in' variables that are bound always bound."
