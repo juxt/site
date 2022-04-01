@@ -1,44 +1,97 @@
-#!/bin/bash
+#_(;; Allow this script to be executed directly
+   "exec" "bb" "$0"
+   )
 
-version=3.44.1
+(require '[clojure.edn :as edn]
+         '[babashka.fs :as fs]
+         '[clojure.java.shell :refer [sh]]
+         '[selmer.parser :refer [<<]])
 
-media-type() {
-    case ${1##*.} in
-        js) echo application/javascript
-            ;;
-        map) echo application/json
-             ;;
-        json) echo application/json
-              ;;
-        png) echo image/png
-             ;;
-        css) echo text/css
-             ;;
-        html) echo "text/html;charset=utf-8"
-             ;;
-        *) echo ${1#*.}
-           ;;
-    esac
-}
+(defn error-and-exit! [exit & msg]
+  (prn msg)
+  (System/exit exit))
 
-tmp=tmp
-zipfile=swagger-ui.zip
+(def path-to-site-exec "")
+(when (empty? path-to-site-exec) (error-and-exit! 1 "Need to set path-to-site-exec var"))
 
-# Download swagger-ui distribution
-curl -o $zipfile https://codeload.github.com/swagger-api/swagger-ui/zip/v$version
+(defn get-config []
+  (case (System/getProperty "os.name")
+    ("Linux" "Mac OS X") (clojure.java.io/file (System/getProperty "user.home") ".config/site/config.edn")
+    (error-and-exit! 1 "Unsupported OS")))
 
-# Uncompress to tmp directory
-unzip -qo $zipfile -d $tmp "swagger-ui-$version/dist/*"
+(defn read-config [config]
+  (edn/read-string
+   {:readers {'ig/ref identity
+              'ref identity
+              'profile #(get % :prod)
+              'env #(System/getenv (str %))
+              'join #(apply str %)}}
+   (slurp config)))
 
-prefix=$tmp/swagger-ui-$version/dist/
+(defn get-file-from-path [path]
+  (last (clojure.string/split path #"/")))
 
-# Upload each file in the distribution to site
-for f in $(find $prefix -type f); do
-    site put-asset \
-         --file $f \
-         --type $(media-type $f) \
-         --path /swagger-ui/${f:${#prefix}}
-done
+(defn parse-path [path]
+  (let [file (get-file-from-path path)
+        parts (clojure.string/split file #"\.")
+        name (drop-last parts)
+        type (last parts)]
+    {:name (apply str (interpose "." name))
+     :type (str "." type)
+     :file-path path}))
 
-# Clean up
-rm -rf $tmp $zipfile
+(def file-type->content-type
+  {".js" "application/javascript"
+   ".map" "application/json"
+   ".json" "application/json"
+   ".png" "image/png"
+   ".css" "text/css"
+   ".html" "text/html;charset=utf-8"})
+
+(defn get-content-type [file-type]
+  (get file-type->content-type file-type "text/plain"))
+
+(defn put-file-on-site! [{:keys [name type file-path]}]
+  (:out (sh path-to-site-exec "put-asset"
+            "--file" file-path
+            "--type" (get-content-type type)
+            "--path" (str "/swagger-ui/" name type))))
+
+(defn download-and-write-swagger! [file version]
+  (sh "curl" "-o" file (str "https://codeload.github.com/swagger-api/swagger-ui/zip/v" version)))
+
+(defn unzip-swagger-and-write-to-dir! [swagger-zip temp-dir dest-dir]
+  (sh "unzip" "-qo" swagger-zip "-d" temp-dir dest-dir))
+
+(defn install-swagger []
+  (let [base-uri (->> (get-config)
+                      read-config
+                      :juxt.site.alpha/base-uri)
+        version "3.44.1"
+
+        zip-file "swagger-ui.zip"
+        zip-source-dir (str "swagger-ui-" version "/dist/")
+        zip-source-dir-match (str zip-source-dir "*")
+
+        temp-dir "tmp"
+
+        destination (str temp-dir "/" zip-source-dir)
+
+        index-template-content (slurp "index-template.html")
+        index-content (<< index-template-content)]
+
+    (download-and-write-swagger! zip-file version)
+    (unzip-swagger-and-write-to-dir! zip-file temp-dir zip-source-dir-match)
+
+    (spit (str destination "index.html") index-content)
+
+    (doall (->> (fs/list-dir destination)
+                (map str)
+                (map parse-path)
+                (map put-file-on-site!)
+                (map println)))
+
+    (fs/delete-tree temp-dir)
+    (fs/delete zip-file)))
+
+(install-swagger)

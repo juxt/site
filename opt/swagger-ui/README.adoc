@@ -1,5 +1,9 @@
 = Swagger UI
 
+Configure swagger by editing the json object given to `+SwaggerUIBundle+` in `+index-template.html+`
+
+Open `+install+` script and set `+path-to-site-exec+` to the path to the `+site+` executable before installing
+
 Install with
 
 ----
