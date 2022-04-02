@@ -147,6 +147,15 @@
     {200 {:description "Password successfully updated"
           :content {"text/plain;charset=utf-8" {}}}
      201 {:description "Password successfully created"
+          :content {"text/plain;charset=utf-8" {}}}}}
+
+   :delete
+   {:summary "Deletes a password for a given user"
+    :operationId "deletePassword"
+    :tags ["Users"]
+
+    :responses
+    {204 {:description "Password successfully deleted"
           :content {"text/plain;charset=utf-8" {}}}}}}
 
   "/roles/"
@@ -241,7 +250,16 @@
           {"text/plain;charset=utf-8" {}}}
      201 {:description "UserRoleMapping successfully created"
           :content
-          {"text/plain;charset=utf-8" {}}}}}}
+          {"text/plain;charset=utf-8" {}}}}}
+
+   :delete
+   {:summary "Deletes a user-role mapping"
+    :operationId "deleteUserRoleMapping"
+    :tags ["Roles"]
+
+    :responses
+    {204 {:description "User-role mapping successfully deleted"
+          :content {"text/plain;charset=utf-8" {}}}}}}
 
   "/rules/"
   {:get
