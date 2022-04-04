@@ -1,0 +1,9 @@
+#!/bin/bash
+
+site -s check-token || site get-token
+
+site put-template --dialect "selmer" --file login.html --type 'text/html;charset=utf-8' --path /_site/templates/login.html
+site put-rule -n site-login-form -r login-form-rule.edn
+
+site put-template --dialect "selmer" --file unauthorized.html --type 'text/html;charset=utf-8' --path /_site/templates/unauthorized.html
+site post-resources -f resources.edn
