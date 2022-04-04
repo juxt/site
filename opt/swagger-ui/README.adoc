@@ -1,13 +1,19 @@
 = Swagger UI
 
-Configure swagger by editing the json object given to `+SwaggerUIBundle+` in `+index-template.html+`
+== Install standard Swagger UI
 
-Open `+install+` script and set `+path-to-site-exec+` to the path to the `+site+` executable before installing
-
-Install with
+Configure swagger by editing the `+/dist/swagger-initializer.js+`. Then run
 
 ----
-./install
+./install [path-to-site-executable]
 ----
 
-After installing, navigate to https://home.test/swagger-ui/index.html?url=/_site/apis/site/openapi.json
+== Install custom Swagger UI
+
+To use a custom Swagger UI distribution give its path as the second argument to the script
+
+----
+./install [path-to-site-executable] [path-to-custom-swagger-dist]
+----
+
+After installing, navigate to https://home.test/swagger-ui/index.html

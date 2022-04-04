@@ -1,18 +1,19 @@
-#_(;; Allow this script to be executed directly
-   "exec" "bb" "$0"
-   )
+#!/usr/bin/env bb
 
 (require '[clojure.edn :as edn]
-         '[babashka.fs :as fs]
          '[clojure.java.shell :refer [sh]]
-         '[selmer.parser :refer [<<]])
+         '[babashka.fs :refer [path]])
 
 (defn error-and-exit! [exit & msg]
   (prn msg)
   (System/exit exit))
 
-(def path-to-site-exec "")
-(when (empty? path-to-site-exec) (error-and-exit! 1 "Need to set path-to-site-exec var"))
+(def args (let [[exec swagger] *command-line-args*]
+            (when (nil? exec) (error-and-exit! 1 "Need to supply path to site executable"))
+            {:path-to-site-exec exec
+             :path-to-swagger-dist swagger}))
+
+(def swagger-path (or (:path-to-swagger-dist args) "dist"))
 
 (defn get-config []
   (case (System/getProperty "os.name")
@@ -52,46 +53,33 @@
   (get file-type->content-type file-type "text/plain"))
 
 (defn put-file-on-site! [{:keys [name type file-path]}]
-  (:out (sh path-to-site-exec "put-asset"
+  (:out (sh (:path-to-site-exec args) "put-asset"
             "--file" file-path
             "--type" (get-content-type type)
             "--path" (str "/swagger-ui/" name type))))
 
-(defn download-and-write-swagger! [file version]
-  (sh "curl" "-o" file (str "https://codeload.github.com/swagger-api/swagger-ui/zip/v" version)))
+(defn insert-base-uri! [dir-path base-uri]
+  (doall (->> (fs/list-dir dir-path)
+              (map str)
+              (map (fn [file-path]
+                     (let [content (slurp file-path)
+                           content-with-base-uri (clojure.string/replace content #"\{\{base-uri\}\}" base-uri)]
+                       (spit file-path content-with-base-uri)))))))
 
-(defn unzip-swagger-and-write-to-dir! [swagger-zip temp-dir dest-dir]
-  (sh "unzip" "-qo" swagger-zip "-d" temp-dir dest-dir))
-
-(defn install-swagger []
+(defn install-swagger! []
   (let [base-uri (->> (get-config)
                       read-config
                       :juxt.site.alpha/base-uri)
-        version "3.44.1"
+        temp-dir "tmp"]
 
-        zip-file "swagger-ui.zip"
-        zip-source-dir (str "swagger-ui-" version "/dist/")
-        zip-source-dir-match (str zip-source-dir "*")
+    (fs/copy-tree swagger-path temp-dir {:replace-existing true})
+    (insert-base-uri! temp-dir base-uri)
 
-        temp-dir "tmp"
-
-        destination (str temp-dir "/" zip-source-dir)
-
-        index-template-content (slurp "index-template.html")
-        index-content (<< index-template-content)]
-
-    (download-and-write-swagger! zip-file version)
-    (unzip-swagger-and-write-to-dir! zip-file temp-dir zip-source-dir-match)
-
-    (spit (str destination "index.html") index-content)
-
-    (doall (->> (fs/list-dir destination)
+    (doall (->> (fs/list-dir temp-dir)
                 (map str)
                 (map parse-path)
                 (map put-file-on-site!)
                 (map println)))
+    (fs/delete-tree temp-dir)))
 
-    (fs/delete-tree temp-dir)
-    (fs/delete zip-file)))
-
-(install-swagger)
+(install-swagger!)
