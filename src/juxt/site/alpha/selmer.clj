@@ -56,8 +56,9 @@
         spec-db (x/with-tx db txes)
 
         template-model (assoc
-                        (::site/template-model resource)
-                        "_site" req)
+                         (templating/process-template-model
+                           (::site/template-model selected-representation) req)
+                         "_site" req)
 
         template-model
         (postwalk

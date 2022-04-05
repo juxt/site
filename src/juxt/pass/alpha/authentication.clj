@@ -132,7 +132,7 @@
         username (get form "user")
         [user pwhash] (lookup-user db base-uri username)
         password (get form "password")
-        redirect (some-> (get form "_redirect") url-decode)]
+        redirect (some-> form (get "_query") form-decode (get "redirect"))]
     (or
      (when (and password pwhash (password/check password pwhash))
        (let [access-token (access-token)
@@ -277,3 +277,11 @@
            (throw
             (ex-info "Auth scheme unsupported"
                      (into req {:ring.response/status 401})))))))))
+
+(defn login-template-model [req]
+  {:query (str (:ring.request/query req))})
+
+(defn unauthorized-template-model [req]
+  {:redirect (str
+               (:ring.request/path req)
+               (when-let [query (:ring.request/query req)] (str "?" query)))})
