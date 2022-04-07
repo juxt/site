@@ -1,7 +1,7 @@
 ;; Copyright © 2021, JUXT LTD.
 
 {:paths ["src"]
- :deps {org.clojure/clojure {:mvn/version "1.10.1"}
+ :deps {org.clojure/clojure {:mvn/version "1.11.0-rc1"}
 
         ;; Project skeleton - also see src/config.edn
         integrant/integrant {:mvn/version "0.7.0"}
@@ -9,10 +9,10 @@
         io.aviso/pretty {:mvn/version "0.1.35"}
 
         ;; XT
-        com.xtdb/xtdb-core {:mvn/version "1.20.0"}
-        com.xtdb/xtdb-rocksdb {:mvn/version "1.20.0"}
-        com.xtdb/xtdb-lucene {:mvn/version "1.20.0"}
-        com.xtdb/xtdb-http-server {:mvn/version "1.20.0"}
+        com.xtdb/xtdb-core {:mvn/version "1.21.0-beta2"}
+        com.xtdb/xtdb-rocksdb {:mvn/version "1.21.0-beta2"}
+        com.xtdb/xtdb-lucene {:mvn/version "1.21.0-beta2"}
+        com.xtdb/xtdb-http-server {:mvn/version "1.21.0-beta2"}
 
         ;; Jetty
         ring/ring-jetty-adapter {:mvn/version "1.9.5"}
@@ -86,19 +86,7 @@
   {:extra-paths ["dev" "test"]
    :extra-deps { ;; Convenience libraries made available during development
                 org.clojure/test.check {:mvn/version "0.9.0"}
-                org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}
-                org.clojure/alpha.spec {:git/url "https://github.com/clojure/spec-alpha2.git"
-                                        :sha "c087ded910b3532a938b37e853df79fc3b9c48c1"}}
-   :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
-              "-Dclojure.server.site={:port,50505,:accept,juxt.site.alpha.repl-server/repl}"
-              "-Dclojure.spec.check-asserts=true"]}
-
-  :armDev
-  {:extra-paths ["dev" "test"]
-   :extra-deps {org.rocksdb/rocksdbjni {:local/root "rocksdbjni/rocksdbjni-7.0.0-osx.jar"}
-                org.clojure/test.check {:mvn/version "0.9.0"}
                 nrepl/nrepl {:mvn/version "0.9.0-beta4"}
-                org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}
                 org.clojure/alpha.spec {:git/url "https://github.com/clojure/spec-alpha2.git"
                                         :sha "c087ded910b3532a938b37e853df79fc3b9c48c1"}
                 org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}}
@@ -123,5 +111,5 @@
    ;; nREPL can be useful debugging prod
    :extra-deps {nrepl/nrepl {:mvn/version "0.9.0-beta4"}
                 com.newrelic.logging/logback {:mvn/version "2.3.2"}
-                io.dropwizard.metrics/metrics-jmx {:mvn/version "4.1.2"} 
+                io.dropwizard.metrics/metrics-jmx {:mvn/version "4.1.2"}
                 org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}}}}}

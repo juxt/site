@@ -11,5 +11,5 @@ clojure \
   -J-Dsite.config=$SITE_CONFIG \
   -J-Xms256m \
   -J-Xmx2400m \
-  -MarmDev \
+  -Mdev \
   -m juxt.site.alpha.main

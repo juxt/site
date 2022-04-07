@@ -16,14 +16,15 @@
    [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk keywordize-keys]]
    [clojure.edn :as edn]
-   [tick.core :as t]))
+   [tick.core :as t]
 
-(alias 'apex (create-ns 'juxt.apex.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'grab (create-ns 'juxt.grab.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'g (create-ns 'juxt.grab.alpha.graphql))
+   [juxt.apex.alpha :as-alias apex]
+   [juxt.site.alpha :as-alias site]
+   [juxt.http.alpha :as-alias http]
+   [juxt.grab.alpha :as-alias grab]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.grab.alpha.graphql :as-alias g]))
+
 
 (defn field->type
   [field]
@@ -406,9 +407,9 @@
                 :_siteQuery (and query (pr-str query)))))
 
 (defn infer-query
-  [db xt-node subject field query args]
+  [db xt-node subject field query]
   (let [type (field->type field)
-        results (pull-entities db xt-node subject (xt/q db query type) query)]
+        results (pull-entities db xt-node subject (xt/q db query) query)]
     (or (process-xt-results field results)
         (throw (ex-info "No resolver found for " type)))))
 
@@ -765,8 +766,7 @@
                          xt-node
                          subject
                          field
-                         (to-xt-query opts)
-                         argument-values)
+                         (to-xt-query opts))
 
             (get argument-values "id")
             (xt/entity db (get argument-values "id"))
