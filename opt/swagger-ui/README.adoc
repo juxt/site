@@ -1,0 +1,19 @@
+= Swagger UI
+
+== Install standard Swagger UI
+
+Configure swagger by editing the `+/dist/swagger-initializer.js+`. Then run
+
+----
+./install [path-to-site-executable]
+----
+
+== Install custom Swagger UI
+
+To use a custom Swagger UI distribution give its path as the second argument to the script
+
+----
+./install [path-to-site-executable] [path-to-custom-swagger-dist]
+----
+
+After installing, navigate to https://home.test/swagger-ui/index.html
