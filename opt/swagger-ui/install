@@ -1,0 +1,85 @@
+#!/usr/bin/env bb
+
+(require '[clojure.edn :as edn]
+         '[clojure.java.shell :refer [sh]]
+         '[babashka.fs :refer [path]])
+
+(defn error-and-exit! [exit & msg]
+  (prn msg)
+  (System/exit exit))
+
+(def args (let [[exec swagger] *command-line-args*]
+            (when (nil? exec) (error-and-exit! 1 "Need to supply path to site executable"))
+            {:path-to-site-exec exec
+             :path-to-swagger-dist swagger}))
+
+(def swagger-path (or (:path-to-swagger-dist args) "dist"))
+
+(defn get-config []
+  (case (System/getProperty "os.name")
+    ("Linux" "Mac OS X") (clojure.java.io/file (System/getProperty "user.home") ".config/site/config.edn")
+    (error-and-exit! 1 "Unsupported OS")))
+
+(defn read-config [config]
+  (edn/read-string
+   {:readers {'ig/ref identity
+              'ref identity
+              'profile #(get % :prod)
+              'env #(System/getenv (str %))
+              'join #(apply str %)}}
+   (slurp config)))
+
+(defn get-file-from-path [path]
+  (last (clojure.string/split path #"/")))
+
+(defn parse-path [path]
+  (let [file (get-file-from-path path)
+        parts (clojure.string/split file #"\.")
+        name (drop-last parts)
+        type (last parts)]
+    {:name (apply str (interpose "." name))
+     :type (str "." type)
+     :file-path path}))
+
+(def file-type->content-type
+  {".js" "application/javascript"
+   ".map" "application/json"
+   ".json" "application/json"
+   ".png" "image/png"
+   ".css" "text/css"
+   ".html" "text/html;charset=utf-8"})
+
+(defn get-content-type [file-type]
+  (get file-type->content-type file-type "text/plain"))
+
+(defn put-file-on-site! [{:keys [name type file-path]}]
+  (:out (sh (:path-to-site-exec args) "put-asset"
+            "--file" file-path
+            "--type" (get-content-type type)
+            "--path" (str "/swagger-ui/" name type))))
+
+(defn insert-base-uri! [dir-path base-uri]
+  (doall (->> (fs/list-dir dir-path)
+              (map str)
+              (map (fn [file-path]
+                     (let [content (slurp file-path)
+                           content-with-base-uri (clojure.string/replace content #"\{\{base-uri\}\}" base-uri)]
+                       (spit file-path content-with-base-uri)))))))
+
+(defn install-swagger! []
+  (let [base-uri (->> (get-config)
+                      read-config
+                      :juxt.site.alpha/base-uri)
+        temp-dir "tmp"]
+
+    (fs/copy-tree swagger-path temp-dir {:replace-existing true})
+    (insert-base-uri! temp-dir base-uri)
+
+    (doall (->> (fs/list-dir temp-dir)
+                (map str)
+                (map parse-path)
+                (map put-file-on-site!)
+                (map println)))
+    (fs/delete-tree temp-dir)))
+
+(install-swagger!)
