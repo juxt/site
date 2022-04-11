@@ -13,7 +13,9 @@
             {:path-to-site-exec exec
              :path-to-swagger-dist swagger}))
 
-(def swagger-path (or (:path-to-swagger-dist args) "dist"))
+
+(def script-dir (.getParentFile (io/file *file*)))
+(def swagger-path (or (:path-to-swagger-dist args) (str script-dir "/dist")))
 
 (defn get-config []
   (case (System/getProperty "os.name")
@@ -70,7 +72,7 @@
   (let [base-uri (->> (get-config)
                       read-config
                       :juxt.site.alpha/base-uri)
-        temp-dir "tmp"]
+        temp-dir (str script-dir "/tmp")]
 
     (fs/copy-tree swagger-path temp-dir {:replace-existing true})
     (insert-base-uri! temp-dir base-uri)
