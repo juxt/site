@@ -1,9 +1,10 @@
 #!/bin/bash
 
-site -s check-token || site get-token
+site_bin="${1:-site}"
+dir="$(dirname $0)"
 
-site put-template --dialect "selmer" --file login.html --type 'text/html;charset=utf-8' --path /_site/templates/login.html
-site put-rule -n site-login-form -r login-form-rule.edn
+"$site_bin" put-template --dialect "selmer" --file $dir/login.html --type 'text/html;charset=utf-8' --path /_site/templates/login.html
+"$site_bin" put-rule -n site-login-form -r $dir/login-form-rule.edn
 
-site put-template --dialect "selmer" --file unauthorized.html --type 'text/html;charset=utf-8' --path /_site/templates/unauthorized.html
-site post-resources -f resources.edn
+"$site_bin" put-template --dialect "selmer" --file $dir/unauthorized.html --type 'text/html;charset=utf-8' --path /_site/templates/unauthorized.html
+"$site_bin" post-resources -f $dir/resources.edn

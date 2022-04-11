@@ -736,6 +736,27 @@
               (when content-type
                 (upload-file* access-token base-uri f content-type nil nil path opts)))))))))
 
+(defn put-template
+  "Upload an template"
+  [config opts]
+  (let [{access-token "access_token"} (load-token)
+        {:keys [base-uri file type encoding language path dialect]
+         :or {base-uri (:juxt.site.alpha/base-uri config)}}
+        (:options opts)
+        type (or type (when file (content-type (.getName file))))]
+
+    (when-not base-uri (error-and-exit! 1 "Base-URI not specified"))
+    (when-not file (error-and-usage! "Asset file required" opts))
+    (when-not type (error-and-usage! "Content-type required" opts))
+    (when-not path (error-and-usage! "Path required" opts))
+    (when-not dialect (error-and-usage! "Dialect required" opts))
+
+    (upload-file*
+     access-token
+     base-uri
+     (io/file (str/replace file "{{base-uri}}" base-uri))
+     type encoding language path opts)))
+
 (defn post-resources
   "Post one or more resources"
   [config opts]
@@ -963,6 +984,16 @@
                    ["-e" "--encoding ENCODING" "The content-encoding (optional)"]
                    ["-l" "--language LANGUAGE" "The content-language (optional)"]
                    ["-c" "--classification CLASSIFICATION" "The classification (e.g PUBLIC, RESTRICTED) applied to resource"]]
+     :delegate put-asset}]
+
+   ["put-template"
+    {:description (:doc (meta #'put-template))
+     :cli-options [["-f" "--file FILE" "The template file"]
+                   ["-p" "--path PATH" "The destination path after the base-uri"]
+                   ["-t" "--type MIME_TYPE" "The content-type"]
+                   ["-e" "--encoding ENCODING" "The content-encoding (optional)"]
+                   ["-l" "--language LANGUAGE" "The content-language (optional)"]
+                   ["-d" "--dialect DIALECT" "The template dialect (e.g. selmer, mustache)"]]
      :delegate put-asset}]
 
    ["post-resources"
