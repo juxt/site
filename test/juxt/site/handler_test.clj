@@ -149,7 +149,7 @@
              {"properties"
               {"name" {"type" "string" "minLength" 1}}}}}}}}}}}]])
 
-  (let [path (str"/things/" (java.net.URLEncoder/encode "ABC/DEF"))
+  (let [path (str "/things/" (java.net.URLEncoder/encode "ABC/DEF"))
         body (json/write-value-as-string {"name" "zip"})
         r (*handler*
            {:ring.request/method :put
@@ -246,9 +246,9 @@
         emails (atom [])]
 
     (with-redefs
-      [mailer/send-mail!
-       (fn [from to subject _ _]
-         (swap! emails conj {:from from :to to :subject subject}))]
+     [mailer/send-mail!
+      (fn [_ from to subject _ _]
+        (swap! emails conj {:from from :to to :subject subject}))]
 
       (*handler*
        {:ring.request/method :put
