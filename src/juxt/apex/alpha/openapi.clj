@@ -203,7 +203,6 @@
                 message
                 (into req {:ring.response/status status})))))
 
-
         already-exists? (x/entity db id)
 
         last-modified start-date
@@ -249,7 +248,6 @@
   it matches the path. Path matching also considers path-parameters."
   [{:ring.request/keys [method]}
    [path path-item-object] openapi openapi-uri rel-request-path]
-
   (let [path-param-defs
         (merge
          ;; Path level
@@ -407,9 +405,17 @@
           (assoc
            ::site/put-fn
            (fn put-fn [req]
-             (let [rep (::site/received-representation req)
-                   {:juxt.reap.alpha.rfc7231/keys [type subtype]}
-                   (reap.decoders/content-type (::http/content-type rep))]
+             (if-let [put-fn-sym (some-> (get operation-object "juxt.site.alpha/put-fn") symbol)]
+               (do (log/debug "Calling put-fn" put-fn-sym)
+                   (let [f (try
+                             (requiring-resolve put-fn-sym)
+                             (catch IllegalArgumentException _
+                               (throw
+                                (ex-info
+                                 (str "Failed to find put-fn: " put-fn-sym)
+                                 (into req
+                                       {:ring.response/status 500})))))]
+                     (f req)))
                (put-resource-state
                 req
                 (-> req
