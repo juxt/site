@@ -265,7 +265,7 @@
     (when-not base-uri (error-and-exit! 1 "Base-URI required"))
     (when-not username (error-and-usage! "User required" opts))
 
-    (let [password (or password (get-password username))
+    (let [password (or password (get-password nil username))
           {:keys [status headers body]}
           (curl/put
            (format "%s/_site/users/%s/password" base-uri username)
@@ -331,7 +331,8 @@
           (error! "Server response: " status " " (str/trim body))
           (message! "Request id: " (get headers "site-request-id"))))
 
-      (when (#{201 204} status) (reset-password opts)))))
+      (when (#{201 204} status)
+        (reset-password config opts)))))
 
 (defn put-role
   "Create or update a role"
