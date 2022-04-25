@@ -327,6 +327,8 @@
 
             post-fn-sym (when (= method :post) (some-> (get operation-object "juxt.site.alpha/post-fn") symbol))
 
+            put-fn-sym (when (= method :put) (some-> (get operation-object "juxt.site.alpha/put-fn") symbol))
+
             get-fn-sym (when (= method :get)
                          (some-> operation-object
                                  (get "juxt.site.alpha/get-fn")
@@ -403,7 +405,23 @@
                                  {:ring.response/status 500})))))]
                (f req))))
 
-          (= method :put)
+          put-fn-sym
+          (assoc
+           ::site/put-fn
+           (fn put-fn-proxy [req]
+             (log/debug "Calling put-fn" post-fn-sym)
+             (let [f (try
+                       (requiring-resolve put-fn-sym)
+                       (catch IllegalArgumentException _
+                         (throw
+                          (ex-info
+                           (str "Failed to find put-fn: " post-fn-sym)
+                           (into req
+                                 {:ring.response/status 500})))))]
+               (f req))))
+
+          (and (not put-fn-sym)
+               (= method :put))
           (assoc
            ::site/put-fn
            (fn put-fn [req]
