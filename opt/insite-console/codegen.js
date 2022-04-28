@@ -14,7 +14,7 @@ module.exports = {
         exposeFetcher: true,
         errorType: 'Error',
         fetcher: {
-          endpoint: process.env.GRAPHQL_API_URL,
+          endpoint: '"/_site/graphql"',
           fetchParams: JSON.stringify({
             headers: {
               'Content-Type': 'application/json',

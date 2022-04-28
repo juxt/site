@@ -2,10 +2,7 @@
 
 This console contains several tools for exploring and manipulating the data in your InSite project.
 
-If you do not have direnv installed, make sure you export the graphql API variable before running the build step (this example assumes you have site running at localhost on port 2021):
-```
-export GRAPHQL_API_URL='http://localhost:2021/_site/graphql'
-```
+By default we assume your Site instance is running on the same domain as this console, if you would like to host the console elsewhere (or for local dev purposes) change the endpoint parameter in codegen.js
 
 Then to install the console, run the following command:
 
@@ -22,4 +19,4 @@ Once installed you can visit `{{base-uri}}/_site/insite/home` to view the consol
 
 If you get any graphql errors, try running (update-site-graphql) from the repl to make sure sites graphql schema is up to date.
 
-If you get errors building the console, make sure node is on the lts version and that the `GRAPHQL_API_URL` variable is set
+If you get errors building the console, make sure node is on the lts version.
