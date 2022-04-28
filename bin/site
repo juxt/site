@@ -876,6 +876,7 @@
 
 (def cli-options
   [["-b" "--base-uri BASE-URI" "The Base-URI of the server you are targetting"]
+   ["-s" "--silent" "Silent mode"]
    ["-d" "--debug" "Enable debug mode"]
    ["-v" "--verbose" "Verbose mode"]
    ["-h" "--help" "Show this summary"]
