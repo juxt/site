@@ -6,55 +6,53 @@
 ;; https://www.scottbrady91.com/openid-connect/identity-tokens
 ;; https://www.scottbrady91.com/jose/jwts-which-signing-algorithm-should-i-use
 
-
 (ns juxt.pass.alpha.openid-connect
   (:require
    [xtdb.api :as xt]
    [java-http-clj.core :as hc]
    [juxt.site.alpha.return :refer [return]]
+   [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.pass.alpha.session :as session]
    [ring.util.codec :as codec]
+   [juxt.site.alpha.response :refer [redirect]]
    [jsonista.core :as json]
-   [clojure.tools.logging :as log])
+   [clojure.tools.logging :as log]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.pass.jwt :as-alias jwt]
+   [ring.middleware.params :as params]
+   [juxt.site.alpha :as-alias site]
+   [juxt.site.alpha.code :as code]
+   [clojure.string :as str])
   (:import
    (com.auth0.jwt.exceptions JWTVerificationException)
    (com.auth0.jwt JWT)
    (com.auth0.jwt.algorithms Algorithm)
    (com.auth0.jwk Jwk)
-   (java.util Date HexFormat)))
-
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
+   (java.util Date)))
 
 (defn lookup [id db]
   (xt/entity db id))
 
-(defn make-nonce
-  "This uses java.util.HexFormat which requires Java 17 and above. If required,
-  this can be re-coded, see
-  https://stackoverflow.com/questions/9655181/how-to-convert-a-byte-array-to-a-hex-string-in-java
-  and similar. For the size parameter, try 12."
-  [size]
-  (let [nonce (byte-array size)
-        hex-format (HexFormat/of)]
-    (.nextBytes (new java.security.SecureRandom) nonce)
-    (.formatHex hex-format nonce)))
-
-;; Nonce is a hash of the session
-;; See https://openid.net/specs/openid-connect-core-1_0.html
-
 (defn login
   "Redirect to an authorization endpoint"
-  [{::site/keys [resource db] :as req}]
-  (let [{::pass/keys [oauth2-client-id redirect-uri] :as oauth2-client} (some-> resource ::pass/oauth2-client (lookup db))
-        _ (when-not oauth2-client
-            (return req 500 "No oauth2 client configuration found" {:oauth2-client (some-> resource ::pass/oauth2-client)}))
-        _ (when-not oauth2-client-id
-            (return req 500 "No oauth2 client id found" {:oauth2-client oauth2-client}))
-        _ (when-not redirect-uri
-            (return req 500 "A :juxt.pass.alpha/redirect entry must be specified" {:oauth2-client oauth2-client}))
+  [{::site/keys [resource xt-node db]
+    :ring.request/keys [query]
+    :as req}]
 
-        openid-configuration (some-> oauth2-client ::pass/openid-configuration-id (lookup db) ::pass/openid-configuration)
+  ;;  (def req req)
+
+  (let [{::pass/keys [oauth2-client]} resource
+        {::pass/keys [oauth2-client-id redirect-uri openid-issuer-id]} (xt/entity db oauth2-client)
+
+        query-params (some-> req :ring.request/query (codec/form-decode "US-ASCII") )
+        return-to (get query-params "return-to")
+
+        _ (when-not oauth2-client-id
+            (return req 500 "No oauth2 client id found" {}))
+        _ (when-not redirect-uri
+            (return req 500 "A :juxt.pass.alpha/redirect entry must be specified" {}))
+
+        openid-configuration (some-> openid-issuer-id (lookup db) ::pass/openid-configuration)
         _ (when-not openid-configuration
             (return req 500 "No openid configuration found" {:openid-configuration-id (some-> resource ::pass/openid-configuration-id)}))
 
@@ -62,23 +60,40 @@
         _ (when-not authorization-endpoint
             (return req 500 "No authorization endpoint found in OpenID configuration" {:openid-configuration openid-configuration}))
 
+        state (make-nonce 8)
+        nonce (make-nonce 12)
+
+        ;; Create a pre-auth session
+        session-token-id!
+        (session/create-session
+         xt-node
+         (cond-> {::pass/state state ::pass/nonce nonce}
+           return-to (assoc ::pass/return-to return-to)))
+
         query-string
         (codec/form-encode
          {"response_type" "code"
-          "scope" "openid name picture profile email"
+          "scope" "openid name picture profile email" ; TODO: configure in the XT entity
           "client_id" oauth2-client-id
           "redirect_uri" redirect-uri
+          "state" state
+          "nonce" nonce
           "connection" "github"})
 
         location (format "%s?%s" authorization-endpoint query-string)]
 
-    (return req 302 "Redirect to %s" {:ring.response/headers {"location" location}} location)))
+    (-> req
+        (redirect 303 location)
+        (session/set-cookie session-token-id!))))
+
+(defn login-with-github [req]
+  (login req))
 
 (defn find-key [kid jwks]
   (when kid
     (some (fn [m] (when (= kid (get m "kid")) m)) (get jwks "keys"))))
 
-(defn decode-id-token [req jwt jwks openid-configuration {::pass/keys [oauth2-client-id] :as oauth-client}]
+(defn decode-id-token [req jwt jwks openid-configuration oauth2-client-id]
   (when jwt
     (let [decoded-jwt (JWT/decode jwt)
           kid (.getKeyId decoded-jwt)
@@ -186,22 +201,106 @@
           (xt/submit-tx xt-node [[:xtdb.api/put result]])
           (::pass/jwks result))))))
 
+(defn new-subject-urn []
+  (format "urn:site:subjects:%s" (random-uuid)))
+
+;; See https://openid.net/specs/openid-connect-core-1_0.html
+(defn extract-standard-claims [claims]
+  (let [standard-claims ["iss" "sub" "aud" "exp" "iat" "auth_time" "nonce" "acr" "amr" "azp"
+                         "name" "given_name" "family_name" "middle_name" "nickname" "preferred_username"
+                         "profile" "picture" "website" "email" "email_verified" "gender" "birthdate"
+                         "zoneinfo" "locale" "phone_number" "phone_number_verified" "address" "updated_at"]]
+    (->>
+     (for [c standard-claims
+           :let [v (get claims c)]
+           :when v]
+       [(keyword "juxt.pass.jwt" (str/replace c "_" "-")) v])
+     (into {}))))
+
+(defn create-subject! [xt-node matched-identity id-token]
+  (let [subject (new-subject-urn)]
+    (xt/submit-tx
+     xt-node
+     [[::xt/put
+       (into
+        {:xt/id subject
+         ::site/type "Subject"
+         ::pass/id-token-claims (:claims id-token)
+         ::pass/identity matched-identity
+         }
+        ;; We need to index some of the common known claims in order to
+        ;; use them in our Datalog rules.
+        (extract-standard-claims (get id-token :claims)))]])
+    subject))
+
+#_(xt/q db '{:find [i]
+                        :where [[i ::site/type "Identity"]
+                                [i :juxt.pass.jwt/iss iss]
+                                [i :juxt.pass.jwt/sub sub]
+                                ]
+                        :in [iss sub]}
+                   (get id-token-claims "iss")
+                   (get id-token-claims "sub"))
+
+(defn match-identity [db id-token-claims]
+  (let [identities
+        (map first
+             (xt/q db '{:find [i]
+                        :where [[i ::site/type "Identity"]
+                                [i :juxt.pass.jwt/iss iss]
+                                [i :juxt.pass.jwt/sub sub]
+                                ]
+                        :in [iss sub]}
+                   (get id-token-claims "iss")
+                   (get id-token-claims "sub")))]
+    (cond
+      (= (count identities) 1) (first identities)
+
+      (> (count identities) 1)
+      (do
+        (log/warnf "Multiple identities match id-token-claims: %s" (pr-str id-token-claims))
+        nil)
+
+      :else nil)))
+
 (defn callback
   "OAuth2 callback"
   [{::site/keys [resource db xt-node]
+    ::pass/keys [session session-token-id!]
     :ring.request/keys [query]
     :as req}]
 
-  ;; Exchange code for JWT
-  (let [{::pass/keys [oauth2-client-id oauth2-client-secret redirect-uri] :as oauth2-client} (some-> resource ::pass/oauth2-client (lookup db))
+  (when-not session-token-id!
+    (return req 500 "No session token id" {}))
 
-        openid-configuration (some-> oauth2-client ::pass/openid-configuration-id (lookup db) ::pass/openid-configuration)
+  (when-not session
+    (return req 500 "No session found" {}))
+
+  ;; Exchange code for JWT
+  (let [{::pass/keys [oauth2-client]} resource
+        {::pass/keys [oauth2-client-id oauth2-client-secret redirect-uri openid-issuer-id]}
+        (xt/entity db oauth2-client)
+
+        openid-configuration (some-> openid-issuer-id (lookup db) ::pass/openid-configuration)
+
         _ (when-not openid-configuration
-            (return req 500 "No openid configuration found" {:openid-configuration-id (some-> resource ::pass/openid-configuration-id)}))
+            (return req 500 "No openid configuration found" {:openid-issuer-id openid-issuer-id}))
 
         token-endpoint (get openid-configuration "token_endpoint")
 
         query-params (some-> query (codec/form-decode "US-ASCII"))
+
+        state-received (when (map? query-params) (get query-params "state"))
+        state-sent (::pass/state session)
+
+        _ (when-not state-sent
+            (return req 500 "Expected to find state in session" {}))
+
+        _ (when-not (= state-sent state-received)
+            ;; This could be a CSRF attack, we should log an alert
+            (return req 500 "State mismatch" {:state-received state-received
+                                              :session session}))
+
         code (when (map? query-params) (get query-params "code"))
 
         _ (when-not code
@@ -228,11 +327,12 @@
          :uri token-endpoint
          :headers {"Content-Type" "application/json" #_"application/x-www-form-urlencoded"
                    "Accept" "application/json"}
-         :body (json/write-value-as-string {"grant_type" "authorization_code"
-                                            "client_id" oauth2-client-id
-                                            "client_secret" oauth2-client-secret
-                                            "code" code
-                                            "redirect_uri" redirect-uri})}
+         :body (json/write-value-as-string
+                {"grant_type" "authorization_code"
+                 "client_id" oauth2-client-id
+                 "client_secret" oauth2-client-secret
+                 "code" code
+                 "redirect_uri" redirect-uri})}
 
         {:keys [status headers body] :as response}
         (hc/send
@@ -241,15 +341,36 @@
 
         json-body (json/read-value body)
 
-        id-token (decode-id-token req (get json-body "id_token") jwks openid-configuration oauth2-client)]
+        id-token (decode-id-token req (get json-body "id_token") jwks openid-configuration oauth2-client-id)
 
-    (return req 500 "TODO" {:code-offered code
-                            :client-id oauth2-client-id
-                            :client-secret oauth2-client-secret
-                            :status status
-                            :token-endpoint token-endpoint
-                            :response response
-                            :json-body json-body
-                            :redirect-uri redirect-uri
-                            :id-token id-token
-                            :jwks jwks})))
+        original-nonce (::pass/nonce session)
+        claimed-nonce (get-in id-token [:claims "nonce"])
+
+        _ (when-not original-nonce
+            (return req 500 "Expected to find nonce in session" {}))
+
+        _ (when-not (=  claimed-nonce original-nonce)
+            ;; This is possibly an attack, we should log an alert
+            (return req 500 "Nonce received does not match expected"))
+
+        ;; Does the id-token match any identities in our database? If so, we create
+        ;; a subject.
+        subject (when-let [matched-identity (match-identity db (:claims id-token))]
+                  (create-subject! xt-node matched-identity id-token))]
+
+    ;; Put the ID_TOKEN into the session, cycle the session id and redirect to
+    ;; the redirect URI stored in the original session.
+
+    (if subject
+
+      (do
+        (log/warnf "Successful login! %s" (pr-str (select-keys (:claims id-token) ["iss" "sub"])))
+        (-> req
+            (redirect 303 (get session ::pass/return-to "/login-succeeded"))
+            (session/escalate-session
+             #(assoc % ::pass/subject subject))))
+
+      ;; Login unsuccessful.
+      (do
+        (log/warnf "Unsuccessful login, no known identity match for claims %s" (pr-str (select-keys (:claims id-token) ["iss" "sub"])))
+        (redirect req 303 "/login-failed")))))
