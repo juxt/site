@@ -12,14 +12,16 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 
 (defn post-rule
-  [{::site/keys [xt-node uri] ::apex/keys [request-instance] :as req}]
+  [{::site/keys [xt-node uri] ::apex/keys [request-payload] :as req}]
+
+  (assert request-payload)
 
   (let [location
-        (str uri (hash (select-keys request-instance [::pass/target ::pass/effect])))]
+        (str uri (hash (select-keys request-payload [::pass/target ::pass/effect])))]
 
     (->> (x/submit-tx
           xt-node
-          [[:xtdb.api/put (merge {:xt/id location} request-instance)]])
+          [[:xtdb.api/put (merge {:xt/id location} request-payload)]])
          (x/await-tx xt-node))
 
     (-> req
