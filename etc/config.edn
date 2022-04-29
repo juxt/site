@@ -2,7 +2,7 @@
 
 {
  ;; Used by bin/site to know where to send HTTP API requests.
- :juxt.site.alpha/base-uri "http://localhost:2021"
+ :juxt.site.alpha/base-uri "https://site.test"
 
  ;; If specified, this is used to source passwords from Unix pass.
  :juxt.site.alpha.unix-pass/password-prefix "site/local/"
