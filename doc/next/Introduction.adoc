@@ -1,0 +1,130 @@
+= Introduction
+:toc: left
+
+== What is Site?
+
+[.lead]
+Site is a place to keep records.
+
+Site provides access to records over HTTPS. To supoprt this, each record is
+identified with a Uniform Resource Identifier (URIs) and becomes a web resource.
+
+Site allows applications to manage these resources, via user-defined APIs.
+
+Site can protect resources from unauthorized access, and log access to resources
+when required.
+
+Site retains a full history.
+
+=== What specific problem does Site solve?
+
+[.lead]
+Site makes it quicker and cheaper to develop and deploy high-quality custom API
+services for data-centric applications.
+
+In our consulting work, we've found that software projects frequently require
+API services and that these are often written bespoke by teams of developers.
+
+Many API services are mere proxies to an underlying set of data resources in a
+database. Often these APIs do little more than the following repetitive tasks:
+
+* Route HTTP requests to the relevant code handling the request
+* Transform data coming in and going out, to the required format
+* Access an underlying database to store and retrieve data
+* If necessary, protect the service from unauthorized access
+* Document the API for developers of software clients and services that need
+  to access the service, e.g. OpenAPI or GraphQL
+
+Where such services can be described _declaratively_, it is possible for Site to
+host them. APIs are thereby defined in a _database_, rather than _codebase_.
+
+For this reason, API services hosted by Site should be:
+
+* faster to develop;
+* easier to secure;
+* fully auditable, able to answer questions about who did what, when;
+* more conformant with the HTTPS protocol, thereby making the API a 'good
+  citizen' when interoperating with other services and components in a wider
+  software architecture.
+
+_So, while Site offers many other features which can be found in other software,
+the ability to rapidly deploy API services from declarative specifications is
+unique to Site (to the best of our knowledge)._
+
+=== What kind of software is Site?
+
+Site is server software, written in the Clojure programming language.
+
+Site embeds JUXT's XTDB database and runs on th JVM.
+
+Site can run on a local machine or remote server, on premise or in the cloud.
+
+=== What is the relationship between Site and REST?
+
+REST is a term coined by Roy Fielding to describe a certain _architectural
+style_, one that underpins the web.
+
+The term 'RESTful' is informally applied to web APIs that try to conform to the
+principles described in Fielding's original dissertation.
+
+NOTE: TODO, we're not done here
+
+=== What is the relationship between Site and OAuth?
+
+In https://datatracker.ietf.org/doc/html/rfc6749#section-1.1[RFC 6749], OAuth defines four roles:
+
+[quote]
+____
+resource owner
+   An entity capable of granting access to a protected resource.
+   When the resource owner is a person, it is referred to as an
+   end-user.
+
+resource server
+   The server hosting the protected resources, capable of accepting
+   and responding to protected resource requests using access tokens.
+
+client
+   An application making protected resource requests on behalf of the
+   resource owner and with its authorization.  The term "client" does
+   not imply any particular implementation characteristics (e.g.,
+   whether the application executes on a server, a desktop, or other
+   devices).
+
+authorization server
+   The server issuing access tokens to the client after successfully
+   authenticating the resource owner and obtaining authorization.
+____
+
+In a wider architecture, Site can play the role of a Resource Server and is able
+to interact with other components that play the other OAuth roles.
+
+== This book
+
+This book teaches Site from 'the ground up'.
+
+This is partly for pedagogical purposes. It is a good idea to learn in depth how
+Site's builds up its secure foundation.
+
+But if you are in a hurry, there are (or will be) quicker 'install packs' and
+Docker images that provide shortcuts to setting up a Site instance.
+
+=== Conventions used in this book
+
+==== Reader interventions
+
+We use an admonition with an exclamation mark to indicate where we require that
+you act, and do something. In code, the exclamation mark is commonly used to
+indicate a side-effect. In this book, the side-effect is carried out by the
+reader!
+
+====
+IMPORTANT: Make tea!
+====
+
+==== Proper nouns
+
+Where nouns are well specified and appear in a glossary, we write them as proper
+nouns rather than common nouns. Whenever such a noun is capitalised, it has the
+formal meaning as defined in the <<glossary>> rather than its common
+meaning. This allows us to use common nouns with less risk of confusion.

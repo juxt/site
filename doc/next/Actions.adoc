@@ -1,0 +1,215 @@
+= Actions
+:toc: left
+:experimental:
+
+(((action, definition)))
+Users could be permitted to query, create, update and/or delete certain Documents.
+
+Such activities are termed Actions.
+
+== Introduction
+
+Actions authorize all reads and writes to the database. Actions also record all
+writes, and some reads from the database.
+
+////
+TODO: Use xrefs from these bullet-points to more detailed explanations, such
+that these set of items can become a launchpad for diving into the
+documentation.
+////
+
+Actions run in transaction functions to ensure atomicity and consistency.
+
+Actions can provide involve input validation.
+
+Actions define their access control in rules, which are sufficient powerful to
+model any access control policy (RBAC, ABAC, PBAC, etc.)
+
+Actions leave an audit trail and may trigger alerts.
+
+Actions can be grouped into OAuth2 scopes.
+
+Actions can be exposed to the network, using OpenAPI and/or GraphQL operations.
+
+Actions can cause side-effects (e.g. lambda functions).
+
+Actions decouple network APIs from lower-level effects. For example, an API
+implementation can use a 'send-email', without having to know the implementation
+details of sending emails.
+
+////
+(old text)
+
+A Site instance is a collection of documents, stored in XTDB.
+
+Like XTDB, Site is schemaless and requires that you define your own
+documents. However, by included document attributes known to Site (usually in
+the `juxt.site.alpha` namespace) Site is able to interpret the documents as web
+or API resources, and serve them over HTTP.
+
+We need to set up sufficient resources in the REPL so that we no longer need to
+access Site via the REPL.
+
+Secure remote access to Site resources requires an *access token*.
+
+In this section we use the REPL to build up the minimal resources required to
+acquire an access token which can let us continue setting up the server
+remotely, without requiring further REPL access.
+
+An access token is granted for a *subject* and an *application*, so we'll need
+to create those too.
+
+But first, we need to install some preliminary resources into our REPL.
+////
+
+=== Data consistency
+
+(((data consistency)))
+Actions that modify the database are run in a transaction function. This ensures
+that the authorization check is made at the latest possible point, just before
+the database is potentially modified. This avoids any potential for
+race-conditions, for example, if the authorization to perform an Action is
+revoked just before the Action is invoked.
+
+=== Audit logging
+
+(((audit logging)))
+(((do-action)))
+Whenever an Action is invoked, the `do-action` transaction function is executed
+which results in a *transaction metadata record* being created in the
+database.
+
+This makes it possible to find out when an Action was invoked, by whom, which
+entities were affected and, potentially, other details such as the 'business
+justification'.
+
+(((transaction, metadata)))
+If the Action is denied, or if errors occur when the Action is executed, details
+will be recorded in the transaction metadata.
+
+This allows us later to answer questions as to whether an Action was allowed or
+denied, with an explanation. We will also be able to answer questions regarding
+the who, when, why and how for each resource in the database.
+
+A copy of the transaction metadata record is returned as a result of the
+`do-action` function, as shown in <<transaction-metadata-record-example>>.
+
+[[transaction-metadata-record-example]]
+.A *transaction metadata record*
+====
+
+[source,clojure]
+----
+{:xt/id "urn:site:action-log:134"
+ :xtdb.api/tx-id 134
+ :juxt.pass.alpha/subject "urn:site:subjects:repl"
+ :juxt.pass.alpha/action "https://site.test/actions/create-action"
+ :juxt.pass.alpha/purpose nil
+ :juxt.pass.alpha/puts ["https://site.test/actions/grant-permission"]
+ :juxt.pass.alpha/deletes []}
+----
+====
+
+== Document structure of an Action
+
+(((action, document structure)))
+<<action-doc-structure>> lists the attributes found in Action documents.
+
+.Document structure of an Action
+[[action-doc-structure]]
+[%header,cols="2l,3d,1"]
+|===
+|Attribute|Value|Required?
+
+|:xt/id
+|Actions are resources, so this is a URI. Callers of actions use this id.
+s|Required
+
+|:juxt.site.alpha/type
+l|"https://meta.juxt.site/pass/action"
+s|Required
+
+|:juxt.pass.alpha/rules
+|A collection of Datalog rules that determine whether the action is allowed.
+s|Required
+
+|:juxt.pass.alpha.malli/args-schema
+|A Malli tuple schema that the action's arguments must conform to.
+|Optional
+
+|:juxt.pass.alpha/process
+|A vector of processing steps which are executed when the action is invoked.
+|Optional
+
+|:juxt.pass.alpha/scope
+|A _String_ representing the OAuth 2.0 scope containing the action.
+|Optional
+|===
+
+.Mixing Site attributes with your application's attributes
+****
+All documents in Site can contain any additional attributes you need.
+
+The `juxt.site`, `juxt.pass`, `juxt.http`, `xtdb.api` and `xt` namespaces are
+reserved to avoid the potential for attribute clashes.
+
+(((property graph)))
+This flexibility to compose documents from different attributes is one of the
+strengths of using a property-graph database such as XTDB under the hood.
+
+((("Halloway, Stuart")))
+See this talk segment by Stu Halloway to explain the rationale for using namespaces in attribute keywords:
+https://youtu.be/Qx0-pViyIDU?t=1464
+****
+
+== Installing a 'create-action' Action
+
+(((create-action)))
+We must install an Action which allows us to create other Actions.
+
+NOTE: This is the one Action that has to be put directly into the database because we
+don't have a way of creating actions yet!
+
+This gives us an opportunity to inspect the document structure of a real Action
+(see <<example-create-action>>).
+
+.Installing a create-action Action
+[[example-create-action]]
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=install-create-action!,indent=0]
+----
+====
+<1> The URI of the create-action Action. This may have to be modified if you have chosen a different base URI.
+<2> This Malli schema restricts the URIs of new Actions. Again, this should be modified if necessary to correspond to a different base URI.
+<3> The Action arguments will be updated such that the first (0th) argument is updated so that it contains a `:juxt.site.alpha/type` attribute with the value string "`Action`".
+<4> The arguments will then be validated according to the Malli schema in `:juxt.pass.alpha.malli/args-schema`. By this point it must be a map containing an `:xt/id` value prefixed with `https://site.test/actions/` and a `:juxt.site.alpha/type` with the constant `"Action"`.
+<5> then the arguments will be submitted, as documents, to the database.
+<6> This is a Rule. It ensures that the Action will be allowed only if there exists a Permission granting the User to invoke the Action. These concepts will be covered in <<ch-users>>. If you decide on a different data model for users, then this Rule will have to be modified to reflect that.
+
+[IMPORTANT]
+--
+. Copy the code in <<example-create-action>> into an editor.
+. Make any changes required (for example, to change the host in the URIs).
+. Copy into the REPL
+. Evaluate.
+--
+
+== Installing the transaction function
+
+(((do-action, transaction function, registration)))
+Actions can be invoked at the REPL with `do-action`.
+
+This depends on a transaction function that must be first registered in the
+database.
+
+[IMPORTANT]
+--
+Type:
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=install-do-action-fn!,indent=0]
+----
+into the REPL and evaluate.
+--

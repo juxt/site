@@ -1,0 +1,82 @@
+= Our First Application
+
+In this chapter we'll create our first application and grant it access to our
+resources.
+
+We'll also be able to control exactly which resources this application can
+access.
+
+
+== Create the application
+
+.Creating the application
+[[example-create-application]]
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=invoke-put-application!,indent=0]
+----
+====
+
+== Authorize the application
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=invoke-authorize-application!,indent=0]
+----
+====
+
+== Create a test subject
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-test-subject!,indent=0]
+----
+====
+
+== Issue the access token
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=invoke-issue-access-token!,indent=0]
+----
+====
+
+== Use the access token to access the resource
+
+NOTE: Developer note: TODO
+
+
+----
+curl -i https://site.test/private.html -H "Authorization: Bearer test-access-token"
+----
+
+== Development Notes
+
+[NOTE]
+--
+/authorize should create an 'ApplicationAuthorization' document, if one doesn't already exist, possibly it can update it too
+/token should create an 'AccessToken' document, with subject, application and scope burned into it
+--
+
+.Restricting permissions to sessions
+****
+Currently there is the concern that we're granting permissions to the User,
+which doesn't give us information about the login, so we can't grant permissions
+conditional on certain login conditions being met.
+
+Could we put an additional rules invocation against the permission? (Nope, we
+can't dynamically load rules)
+
+Alternatively, we can add two rules: if the permission has a user attribute, the first rule applies.
+If the permission has a subject attribute, the second rule applies.
+
+But that still doesn't solve our problem, since we want to restrict an action in
+certain cases to, say, 2FA, which is only available on a Session.
+
+The only solution seems to have separate actions, or even use purpose, or go
+back to having a 'special' REPL user.
+****

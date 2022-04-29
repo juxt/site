@@ -1,0 +1,15 @@
+(ns site
+  (:require
+   [clojure.edn :as edn]
+   [cheshire.core :as json]))
+
+(defn edn-to-json
+  [edn]
+  (-> (edn/read-string {:readers {'juxt.site.alpha/as-str pr-str}} edn)
+      (json/encode)))
+
+(edn-to-json (slurp (first *command-line-args*)))
+
+;; Local Variables:
+;; mode: clojure
+;; End:

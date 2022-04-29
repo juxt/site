@@ -1,0 +1,60 @@
+= Applications
+:toc: left
+
+== Create the action to create an application
+
+.Creating the action
+[[example-create-action-put-application]]
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-action-put-application!,indent=0]
+----
+====
+
+== Grant permission to create an application
+
+.Granting permission
+[[example-grant-permission-put-application]]
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-put-application!,indent=0]
+----
+====
+
+== Create the action to authorize an application
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-action-authorize-application!,indent=0]
+----
+====
+
+== Grant permission to authorize an application
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-authorize-application!,indent=0]
+----
+====
+
+== Create the action to issue an access token
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-action-issue-access-token!,indent=0]
+----
+====
+
+== Grant permission to issue an access token
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-issue-access-token!,indent=0]
+----
+====

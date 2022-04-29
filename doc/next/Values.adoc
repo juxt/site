@@ -1,0 +1,84 @@
+= Site Values
+:toc: left
+
+Here are Site's values.
+
+[[vision]]
+== Vision
+
+Site is a long-term project with a vision to become a standards-based general
+back-end resource-server that you can rely on.
+
+It has taken many years for us to design Site, and we expect the project to be a
+work-in-progress for some years to come. However, are striving hard to ensure
+early releases are useful and can be deployed into production.
+
+== Autonomy
+
+Site is designed to give you autonomy.
+
+It is highly configurable and you can choose which aspects of Site you wish to
+deploy and use.
+
+Site asks you to 'bring your own domain', which means that it isn't designed for
+one specific use-case or industry.
+
+Site is able to work well inside a cloud environment of your choice, or you can
+host it yourself.
+
+Site encourages you to build your own solutions, or adopt solutions that have
+been built on Site. It's not batteries-included, but batteries are easy to find
+and install.
+
+Where Site does make decisions, it's almost always to conform to some common
+standard.
+
+== Leverage
+
+Site gives you leverage.
+
+You can re-use and re-configure solutions for new problems.
+
+Because it's built on standards, Site is a good citizen in a healthy web
+ecosystem of endless possibilities.
+
+[[understanding]]
+== Understanding
+
+By using and working with Site, you will gain a deeper understanding of not just
+how Site works, but of web standards, how web technologies work together.
+
+Since Site is built on common internet and web standards, the understanding you
+gain will be generally valuable, over a long period of time and transferable to
+other web technologies.
+
+Every component of Site is 100% open-source, even down to its database. Each
+component is designed to be understood in isolation.
+
+We have heard that Site is used in educational establishments to teach web
+technologies to undergraduates.
+
+== Excellence
+
+Site aims to reach the highest standards of comformance, interoperability,
+performance and security.
+
+== Simplicity
+
+Site can be decomposed into a rich hierarchy of loosely-coupled components and sub-components
+which work together harmoniously.
+
+It is built in Clojure, a language that helps avoid many pitfalls when building
+large systems and keeps the code-base healthy, agile and free from getting
+'knotted up'.
+
+Site is designed to be https://www.youtube.com/watch?v=SxdOUGdseq4[simple,
+rather than easy]. If Site is too difficult, then that is resolvable by spending
+more time learning Site, trying things out and maybe getting help from experts
+in JUXT and the wider community. That said, we do strive to make things as easy
+as possible and 'developer experience' is important.
+
+But if Site is too complex, that is a much harder problem to fix!
+
+Much of the simplicity of Site comes from its emphasis on using _data_ to define
+web resources and security policies, rather than _code_.

@@ -1,0 +1,244 @@
+= Installation
+:toc: left
+
+== Requirements
+
+Before you start, you'll need to have the following installed:
+
+* Java 17+ (Site uses new Java APIs such as `java.util.HexFormat`)
+* https://clojure.org/guides/getting_started[Clojure]
+* https://github.com/babashka/babashka[Babashka]
+* https://curl.se/[curl]
+* A webserver such as Apache or Nginx
+
+== Before you start
+
+* All these instructions are for Arch Linux, please amend accordingly for your own
+platform, if different.
+
+* Run each command under your user account (i.e. not as root).
+
+* For documentation purposes, we'll assume your Site server will be set up to run
+on the host `site.test`. If you choose another hostname, or are setting up for
+production, please amend these instructions accordingly.
+
+== Preparation
+
+=== Decide on a fully qualified hostname
+
+Site is a web server and is designed to be accessed over the network. Since Site
+resources are identified by URIs, you should decide on a hostname in a domain
+that you control.
+
+For the purposes of learning, development and local testing, it is a good idea
+to use a test hostname, such as `site.test`. These instructions are written
+assuming that you've chosen `site.test` as your hostname. If you're using your
+own hostname in a domain you control, amend these instructions accordingly.
+
+=== Configure your local DNS or /etc/hosts
+
+To access Site locally for bootstrapping we need to ensure requests to
+`site.test` are directed to the local service.
+
+Edit /etc/hosts to direct requests for `site.test` to 127.0.0.1.
+
+----
+# Static table lookup for hostnames.
+# See hosts(5) for details.
+127.0.0.1	localhost site.test
+----
+
+=== mkcert
+
+// TODO: Explain why we are doing this
+
+Install mkcert
+
+----
+sudo pacman -Sy mkcert
+----
+
+----
+mkcert -install
+----
+
+----
+Created a new local CA 💥
+The local CA is now installed in the system trust store! ⚡️
+The local CA is now installed in the Firefox and/or Chrome/Chromium trust store (requires browser restart)! 🦊
+----
+
+=== Install nginx
+
+----
+sudo pacman -Sy nginx-mainline
+----
+
+=== Create private key and cert
+
+Create a new cert for the local development server, and move these into your
+nginx config directory.
+
+----
+mkcert site.test
+sudo mv site.test-key.pem site.test.pem /etc/nginx
+----
+
+=== Configure nginx
+
+Configure nginx. Use `etc/dev/nginx.conf` as a guide to what to configure. You'll need to reference your private key and cert via the `ssl_certificate` and `ssl_certificate_key` parameters.
+
+----
+ssl_certificate      site.test.pem;
+ssl_certificate_key  site.test-key.pem;
+----
+
+You'll need to increase the size of request bodies you can send through nginx,
+the default is too restrictive.
+
+----
+client_max_body_size 16M;
+----
+
+You'll also need to configure the details of your the origin server (Site).
+
+----
+http {
+  ...
+  client_max_body_size 16M;
+  ...
+  server {
+    ...
+    ssl_certificate site.test.pem;
+    ssl_certificate_key site.test-key.pem;
+    ...
+    location / {
+      proxy_pass http://localhost:2021;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+----
+
+Test your final configuration before you start nginx and fix any errors.
+
+----
+sudo nginx -t
+----
+
+=== Start nginx
+
+Start nginx
+
+----
+sudo systemctl enable nginx
+sudo systemctl start nginx
+----
+
+== Install Site
+
+=== Clone this repo
+
+----
+$ git clone https://github.com/juxt/site
+----
+
+== Configure the Site service
+
+=== Install the configuration file
+
+There's a sample configuration in `etc` you should copy to `$HOME/.config/site/config.edn`.
+
+----
+$ mkdir -p $HOME/.config/site
+$ cp site/etc/config.edn $HOME/.config/site/config.edn
+----
+
+IMPORTANT: If you're aren't using `site.test` as a hostname, edit the
+configuration to replace `https://site.test` with the URI that corresponds to
+the hostname you have chosen,
+
+== Start the Site server
+
+Start the Site server:
+
+----
+$ site/bin/site-server
+----
+
+NOTE: Alternatively, if you're familiar with Clojure development, you can start
+the server via the `deps.edn` file and simply 'jack-in' with your editor or IDE
+as normal.
+
+////
+
+(should retain this somewhere else)
+
+=== Start multiple instances of the server
+
+If you require multiple Site servers to coexist on the same machine, you can start site passing a different configuration file as follows:
+
+----
+$ SITE_CONFIG=/absolute/path/custom-site-config.edn site/bin/site-server
+----
+
+In this case please be sure to change the configuration so ports are different and XTDB files are stored in a separate folder than the ones specified in the example configuration file. You'll also need to specify Site host:port when using site commands, for example:
+
+----
+$ SITE_BASE_URI=http://localhost:5509 site/bin/site get-token -u admin
+----
+////
+
+== Connect to Site's REPL
+
+If you've run Site via your development environment and 'jacked-in' you'll
+already have a REPL. Proceed to the next step.
+
+If you're running Site with `site/bin/site-server`, you'll need to connect a
+terminal to Site to access the REPL. You can do this via port `50505`, which is a
+socket REPL that Site starts by default.
+
+How you connect to this port is up to you. One way is via `ncat`, but you can replace `ncat` with `telnet`, or `netcat`, depending on what's available for your system.
+
+[NOTE]
+--
+Arch users can install `ncat` by installing the `nmap` package:
+
+----
+$ sudo pacman -Sy nmap
+----
+--
+
+----
+$ ncat localhost 50505
+----
+
+[TIP]
+--
+Prefix the command with `rlwrap` if you have it installed.
+
+----
+$ rlwrap ncat localhost 50505
+----
+--
+
+=== Introducing Site's REPL
+
+----
+Site by JUXT. Copyright (c) 2021, JUXT LTD.
+Type :repl/quit to exit
+
+site>
+----
+
+[TIP]
+--
+There are a few useful Site REPL commands you should be familiar with:
+
+(ls):: List all resources
+(ls <pat>):: List all resources whose URIs match the pattern
+(evict! <uri>+):: Kill resource(s) across time
+(put! <doc>+)):: Put one or more resources into the database
+(factory-reset!):: Start over. (Delete everything in the database!)
+--

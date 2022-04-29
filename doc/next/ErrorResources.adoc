@@ -1,0 +1,74 @@
+= Error resources
+
+Site allows errors to be represented with custom representations.
+
+====
+First, create an error resource.
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-action-put-error-resource!,indent=0]
+----
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=grant-permission-to-put-error-resource!,indent=0]
+----
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=put-unauthorized-error-resource!,indent=0]
+----
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=put-unauthorized-error-representation-for-html!,indent=0]
+----
+====
+
+
+
+== Next Steps
+
+We have a private resource but the 401 status response tells us we are not
+authorized to access it.
+
+To authorize the subject we'll need to first determine who is trying to access
+the resource.
+
+== Improving the 401 error
+
+If the user is using a browser, it's a better user experience if we provide them
+with a button to click to take them through the authentication process, and
+return them to the original resource once they've been authenticated.
+
+<<installing-improved-401>> demonstrates how we can do this.
+
+.Installing a better 401 error page
+[[installing-improved-401]]
+====
+Remember the `401 Unauthorized` response we got back in
+<<publishing-private-resources>>? Now we can at least authenticate the end-user.
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=put-unauthorized-error-representation-for-html-with-login-link!,indent=0]
+----
+====
+
+
+.Testing the authentication
+[[testing-authentication]]
+====
+If we now nagivate to +https://site.test/private.html+ we get the following:
+
+.Unauthorized
+image::Unauthorized.png[Unauthorized,width=50%]
+
+Clicking on btn:[Login] directs us to the `Application Login URI` that we have
+installed for our `OpenID Provider`.
+
+If all goes as expected, the error should change to a 403. This means we've
+successfully _authenticated_, but still don't have the _permission_ to view the
+private resource. That's a topic for <<authorization>>.
+====

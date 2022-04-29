@@ -1,0 +1,428 @@
+= Authentication with OpenID
+:toc: left
+:experimental:
+
+Authentication is the act of establishing the identity of a person or machine.
+
+Currently, Site does not provide its own authentication service but relies on a
+third-party service known as an *OpenID Provider* that is capable of
+authenticating an end-user and providing claims about them.
+
+If Site trusts the OpenID Provider, and the OpenID Provider trusts the claims
+made by the user, then Site can trust those user claims too.
+
+== Authentication with an OpenID Provider
+
+When communicating with an OpenID Provider, Site assumes the role of a *Relying
+Party*.
+
+When an unidentified user accesses Site, Site requests an *ID Token*, which
+contains the user's claims, from the OpenID Provider. These claims are trusted
+by the OpenID Provider, which signs them with a cryptographic signature that
+Site can verify.
+
+TIP: Terminology for OpenID Connect can be found at
+https://openid.net/specs/openid-connect-core-1_0.html#Terminology
+
+<<authentication-flow>> shows the interactions between a Alice, Site and an
+OpenID Provider. Some of the details have been left out to simplify the diagram.
+
+Understanding how the ID_TOKEN is acquired is helpful in diagnosing any
+authentication issues, perhaps due to misconfiguration.
+
+.Authentication flow
+[[authentication-flow]]
+[plantuml,authentication-flow,svg]
+....
+skinparam monochrome true
+autonumber
+
+actor Alice as user
+participant browser
+
+box Site
+participant "/.../login" as login
+participant "/.../callback" as callback
+database XT
+end box
+
+box "OpenID Provider"
+participant "/authorize" as auth
+participant "/token" as token
+End box
+
+browser -> login: GET
+login <- XT: Look up config of\nOpenID Provider
+login -> XT: Create temporary session\ncookie, with state value
+login -> browser: Set session cookie,\nredirect to /authorize
+note over login: We are asking Alice to authorize Site's access to her details
+browser -> auth: GET /authorize
+auth -> browser: Do you want to authorize Site?
+user -> browser: Yes please!
+browser -> auth: Yes
+auth -> browser: Redirect to Site with this code
+browser -> callback: Here is the code and state
+callback <- XT: Check state\nvalue matches
+callback -> token: POST code
+token -> callback: ID_TOKEN containing\nAlice's details
+callback -> XT: Find matching identity
+XT -> callback: Matching identity
+callback -> XT: Add identity to session
+callback -> browser: Upgrade session cookie
+....
+
+NOTE: Describe the flow in more details here.
+
+== Requirements for authenticating with OpenID
+
+For this flow to be possible, we need the following:
+
+. An OpenID Provider must be selected.
+. An account with the OpenID Provider must be created.
+. Site needs to know about the OpenID Provider, including which endpoints to contact.
+. An OAuth 2.0 Client application needs to be created with the OpenID Provider.
+. Site needs to know some details about the OAuth 2.0 Client application's id and secret.
+. The OAuth 2.0 Client application needs to know some details about Site, such as the callback URI.
+. There needs to be at least one identity in the database that matches the ID_TOKEN.
+
+These steps will be described in more detail in subsequent sections. But before
+we get to them, we should first explain about how the identity of an end-user is
+represented in Site.
+
+[[identities]]
+== Identities
+
+Site stores details of the identity (or identities) of each user that might be
+allowed to perform privileged actions on resources.
+
+When an ID Token is received by Site, a matching identity must be located in the
+database otherwise the end-user isn't known.
+
+If a matching identity is found, Site will create a new `Subject` entity with a
+`juxt.pass.alpha/identity` attribute referencing the `Identity` entity. This
+`Subject` entity is then associated with the user's session.
+
+An identity is a document in XTDB containing `juxt.pass.jwt/iss` and
+`juxt.pass.jwt/sub` attributes which exactly match the corresponding `iss` and
+`sub` properties in the ID Token. The document must also have a
+`juxt.site.alpha/type` attribute with the value `"Identity"`.
+
+These are the only constraints. The `Identity` document may have other
+attributes required by the domain. For example, it may be that the `Identity`
+document references a particular individual, such that an individual can have
+multiple identities.
+
+The schema chosen for the `Identity` documents is important, because it will be
+coupled to the rules defined on each action.
+
+An action's rules might use facts in the documents referenced by the Identity
+document to make decisions, for example, to determine if the individual belongs
+to a particular group or has been assigned a particular role.
+
+Also, an action's rules might use facts in the `Subject` document directly, such
+as the 'strength' of the login (whether the end-user used a second factor, or
+whether their email address was verified).
+
+For example, a particularly sensitive
+action might require that the end-user used a second-factor when they
+authenticated, or otherwise deny the action to the end-user.
+
+TIP: Information about the 'strength' of a user's login can be encoded in the
+`acr` property of an ID Token, which is copied into the `Subject` document.
+
+<<identity-model>> shows an example relationship between a `Subject`, `Identity`
+and other domain-specific documents.
+
+.Possible relationships between documents
+[[identity-model]]
+====
+
+[plantuml,identity-model,svg]
+....
+skinparam monochrome true
+@startjson
+include::identity-model.json[]
+@endjson
+....
+====
+
+In summary:
+
+* a `Subject` is a document containing known facts about the end-user, including
+  their identity, but also other facts about how they were authenticated.
+
+* an `Identity` is a document that matches the `iss` and `sub` properties of a
+  standard ID Token, and typically contains many more attributes (data values
+  and references to other documents).
+
+== Preparing to create identities
+
+To allow the REPL to create the identities we require, we'll need to create an
+Action to create an identity and grant permission for the REPL user to invoke
+it.
+
+This action should enforce the `juxt.site.alpha/type`, `juxt.pass.jwt/iss` and
+`juxt.pass.jwt/sub` attributes that we discussed in <<identities>>. But of
+course we are free to amend this action to more closely reflect our domain. For
+example, we might want to ensure that it has a reference to an individual.
+
+.Creating the `put-identity` action
+[[create-put-identity-action]]
+====
+First we create the action:
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-action-put-identity!,indent=0]
+----
+
+Next, we grant the permission:
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-put-identity!,indent=0]
+----
+
+Finally, we create an action to get the identity.
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-action-get-identity!,indent=0]
+----
+====
+
+[[selecting-openid-provider]]
+== Selecting an OpenID Provider
+
+How the OpenID Provider establishes trust in the user's claims is up to the
+OpenID Provider. It's important which choose a reputable provider that you
+trust.
+
+When it comes to choosing an OpenID Provider there are many options
+available. Site is compatible with any of the many OpenID Providers that
+implements the https://openid.net/specs/openid-connect-discovery-1_0.html[OpenID
+Connect Discovery] protocol.
+
+Examples include:
+
+* https://auth0.com/[Auth0]
+* https://aws.amazon.com/cognito/[AWS Cognito]
+* https://developers.facebook.com/docs/facebook-login/limited-login/token/[Facebook]
+* https://developers.google.com/identity/protocols/oauth2/openid-connect[Google]
+* https://www.keycloak.org/[Keycloak]
+* https://www.ory.sh/kratos[Ory Kratos]
+
+NOTE: It's possible to register multiple OpenID Providers with Site, and there are
+situations where there might be a need for more than one OAuth 2.0 Client
+application to exist for a given OpenID Provider.
+
+[[registering-the-openid-provider]]
+== Registering the OpenID Provider
+
+The examples in this section explain how to configure a particular OpenID
+Provider (Auth0) but the process is similar for other providers.
+
+Site needs to be configured which each OpenID Provider via the
+`install-openid-provider!` function, as demonstrated in
+<<installing-an-openid-provider>>.
+
+Site will then download and store the OpenID Provider's configuration which will
+allow it to interact with the OpenID Provider, exchange information and verify the
+signatures when the OpenID Provider returns cryptographically signed data.
+
+[[installing-an-openid-provider]]
+.Adding Auth0 as an OpenID Provider
+====
+We first created an account with Auth0 and chose the name `juxt` in the EU
+region. Auth0 created the `juxt.eu.auth0.com` domain for us, representing the
+Issuer.
+
+|===
+|Issuer Identifier|+https://juxt.eu.auth0.com/+
+|===
+
+Then we registered Auth0 as an OpenID Provider in Site, with the *Issuer
+Identifier* as a parameter:
+
+[source,clojure]
+----
+(install-openid-provider! "https://juxt.eu.auth0.com/")
+----
+
+CAUTION: If you've decided to use Auth0 too, you'll have to decide on a tenant
+name and your Issuer Identifier will be different from ours. Make sure to
+remember this when following the examples in this section.
+
+====
+
+[[creating-the-client-application]]
+== Creating the OAuth 2.0 Client Application
+
+OpenID is built open OAuth 2.0, so we must create an OAuth 2.0 Client
+application which can represent Site in the OAuth 2.0 protocol.
+
+The instructions for registering an OAuth 2.0 Client application with an OpenID
+Provider are usually quite similar but you should follow the instructions
+provided by your chosen OpenID Provider.
+
+To communicate with the OpenID Provider, Site must provide a number of web
+resources (endpoints). Once the OAuth 2.0 Client id and secret are known, these
+can be created with the `install-openid-resources!` function.
+
+The `install-openid-resources!` function requires the following arguments:
+
+[cols="2,8"]
+|===
+|name|A unique name identifying the *OpenID Provider* and application registered in Site. This is encoded into the application's URIs so it's possible to have many such combinations.
+|issuer-id|The *Issuer Identifier*, this is a URL, always starting with `https://`.
+|client-id|The OAuth 2.0 *Client ID*
+|client-secret|The OAuth 2.0 *Client Secret*
+|===
+
+If invoked successfully, the function will return the URIs of the various Site
+resources created. These can be provided as OAuth 2.0 Client settings in the
+OpenID Provider, and some of these will be required.
+
+As a complete example, <<creating-a-client-application>> explains how we created
+our client application in Auth0.
+
+.Creating the OAuth 2.0 Client application in Auth0
+[[creating-a-client-application]]
+====
+In Auth0 we located and selected the menu:Applications[Applications] menu item.
+
+image::Auth0-Applications-Menuitem.png[width=20%]
+
+This brought us to a screen listing applications, and we clicked on the button
+`Create Application`.
+
+image::Auth0-Create-Application-Button.png[width=20%]
+
+This popped up a dialog, we chose a name of `site-test` and an application type
+of `Regular Web Applications`.
+
+image::Auth0-Create-Application.png[width=75%]
+
+After the application was created, we accessed menu:Settings[] from the application's menu bar.
+
+image::Auth0-Application-Settings.png[]
+
+We copied the `Client ID` and the `Client Secret`:
+
+|===
+|Client ID|d8X0TfEIcTl5oaltA4oy9ToEPdn5nFUK
+|Client Secret|zb86gDUf_rEnwENYJBeih-cAzICjjPvvumThTw6qIqCVvtP83vYFtjuHni_m2ndt
+|===
+
+We returned to the REPL to install the web resources required to be provided by
+the *Relying Party* (Site) by the *OpenID Provider* (Auth0), giving the
+following values:
+
+|===
+|:name|auth0-site-test
+|:issuer-id|+https://juxt.eu.auth0.com/+
+|:client-id|d8X0TfEIcTl5oaltA4oy9ToEPdn5nFUK
+|:client-secret|zb86gDUf_rEnwENYJBeih-cAzICjjPvvumThTw6qIqCVvtP83vYFtjuHni_m2ndt
+|===
+
+We created the required web resources for the application by invoking the
+`install-openid-resources!` function.
+
+[source,clojure]
+----
+(install-openid-resources!
+:name "auth0-site-test"
+:issuer-id "https://juxt.eu.auth0.com/"
+:client-id "d8X0TfEIcTl5oaltA4oy9ToEPdn5nFUK"
+:client-secret "zb86gDUf_rEnwENYJBeih-cAzICjjPvvumThTw6qIqCVvtP83vYFtjuHni_m2ndt")
+----
+
+Calling the `install-openid-resources!` function returned a map:
+
+[source,clojure]
+----
+{:login-uri "https://site.test/_site/openid/auth0-site-test/login",
+ :callback-uri "https://site.test/_site/openid/auth0-site-test/callback"}
+----
+
+This map contained the application's URIs, which we made a note of.
+
+|===
+|Application Login URI|+https://site.test/_site/openid/auth0-site-test/login+
+|Allowed Callback URLs|+https://site.test/_site/openid/auth0-site-test/callback+
+|===
+
+Then we returned to the Auth0 settings and scrolled down to the `Application URIs` section.
+
+We entered in the application URIs as shown below:
+
+image::Auth0-Application-URIs.png[]
+
+====
+
+////
+== Creating a login page
+
+<<create-login-page>> shows how we can create a simple login page to link to our
+`Application Login URI`.
+
+.Creating a login page
+[[create-login-page]]
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=put-login-page!,indent=0]
+----
+====
+////
+
+[[creating-identities]]
+== Creating identities
+
+====
+Now we can create an identity:
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-identity!,indent=0]
+----
+
+We shall also grant this identity the permission to read itself.
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=grant-permission-for-mal-to-get-mal!,indent=0]
+----
+
+We can now test this in a browser. Navigate to https://site.test/~mal
+====
+
+== Authenticating an end-user
+
+We're now ready to test our authentication.
+
+====
+Navigate to https://site.test/_site/openid/auth0-site-test/login
+====
+
+Authentication is achieved by acquiring an ID_TOKEN from the OpenID
+Provider. The ID_TOKEN is like a contact card for the user, and contains
+personal information we can consider when deciding whether to authorize an
+end-user's access to a resource.
+
+If the end-user is using a browser, we can ask them to navigate to the
+`Application Login URI` that we have installed.
+
+Site must acquire an ID_TOKEN in order to identify a
+subject. <<authentication-flow>> discusses the steps involved.
+
+The handler at the `Application Login URI` creates a session with some initial
+state before redirecting us over to the `OpenID Provider` to authenticate us.
+
+Once authenticated, the `OpenID Provider` redirects us back to the `Callback
+URI` with a code. The handler at this URI uses this code to acquire the ID_TOKEN
+from the OpenID Provider, adding this to the session before redirecting us back
+to our original resource.
+
+The session now contains the information contained in the ID_TOKEN, and we can
+move on to <<authorization>>.

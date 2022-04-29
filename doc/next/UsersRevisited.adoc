@@ -1,0 +1,53 @@
+= Users Revisited
+:toc: left
+:experimental:
+
+In <<ch-users>> we put Documents directly the database to represent an initial User.
+
+Users are required to invoke Actions, but Actions are required to create Users,
+so we had a chicken-and-egg situation that we resolved by directly inserting the
+first user by hand.
+
+However, now that we have built the capability to create Actions and
+Permissions, we can build the Actions to create new Users, Identities and
+Subjects. That's the subject of this chapter.
+
+== Create an action to create a user
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-action-put-user!,indent=0]
+----
+====
+
+IMPORTANT: Do it!
+
+== Create an action to create an identity
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-action-put-identity!,indent=0]
+----
+====
+
+IMPORTANT: Do it!
+
+== Create an action to create an subject
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-action-put-subject!,indent=0]
+----
+====
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-put-subject!,indent=0]
+----
+====
+
+IMPORTANT: Do it!

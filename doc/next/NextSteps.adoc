@@ -1,0 +1,59 @@
+= Next Steps
+
+== Run the site tool
+
+The site tool is a command-line utility that allows you to remotely administer Site.
+
+****
+If you're on MacOS, you will need to install the GNU version of `readlink`. You can do so with brew:
+```
+brew install coreutils
+ln -s /usr/local/bin/readlink /usr/local/bin/readlink
+```
+****
+
+We must first get a token that we can use for API access. This process authenticates to the site server using your password.
+
+.Here, replace `admin` with your username (or let it default to your OS username)
+----
+$ site/bin/site get-token -u admin
+----
+
+Now we can use the site tool for remote administration. Try the following:
+
+----
+$ site/bin/site list-users
+----
+
+== Configure an authorization server
+
+Site is a Resource Server, responsible for serving resources such as:
+
+- Static web pages and media
+- API responses
+- GraphQL responses
+
+As a Resource Server, Site is responsible for protecting the resources owned by
+users from unauthorized access.
+
+Rather than sending credentials, clients (applications) obtain and use
+access-tokens to access Site's resources.
+
+Site hosts the authorization server by which clients can obtain access tokens.
+
+----
+(install-authorization-server! {:name "Authorization Server"})
+(install-token-endpoint! {:xt/id "https://site.test/token"})
+(register-application! {:name "My Application"})
+----
+
+== Post installation steps
+
+=== Configure the expiry time for tokens
+
+By default, tokens last for an hour. That can sometimes mean they expire during
+work sessions. You can set the expiry time of new tokens via the REPL.
+
+----
+(put! (assoc (e "http://localhost:2021/_site/token")  ::pass/expires-in (* 24 3600)))
+----

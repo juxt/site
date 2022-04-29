@@ -1,0 +1,302 @@
+font:
+  catalog:
+    CharisSIL:
+      normal: CharisSIL-5.000/CharisSIL-R.ttf
+      bold: CharisSIL-5.000/CharisSIL-B.ttf
+      italic: CharisSIL-5.000/CharisSIL-I.ttf
+      bold_italic: CharisSIL-5.000/CharisSIL-BI.ttf
+    # M+ 1mn supports ASCII and the circled numbers used for conums
+    M+ 1mn:
+      normal: mplus1mn-regular-ascii-conums.ttf
+      bold: mplus1mn-bold-ascii.ttf
+      italic: mplus1mn-italic-ascii.ttf
+      bold_italic: mplus1mn-bold-italic-ascii.ttf
+    # M+ 1p supports Latin, Latin-1 Supplement, Latin Extended, Greek, Cyrillic, Vietnamese, Japanese & an assortment of symbols
+    # It also provides arrows for ->, <-, => and <= replacements in case these glyphs are missing from font
+    M+ 1p Fallback:
+      normal: mplus1p-regular-fallback.ttf
+      bold: mplus1p-regular-fallback.ttf
+      italic: mplus1p-regular-fallback.ttf
+      bold_italic: mplus1p-regular-fallback.ttf
+  fallbacks:
+    - M+ 1p Fallback
+page:
+  background-color: ffffff
+  layout: portrait
+  margin: [2cm, 1cm, 1.5cm, 1cm]
+  # margin-inner and margin-outer keys are used for recto/verso print margins when media=prepress
+  margin-inner: 1.5cm
+  margin-outer: 1cm
+  size: B5
+base:
+  align: left
+  # color as hex string (leading # is optional)
+  # font-color: 333333
+  font-color: 000000
+  # color as RGB array
+  #font-color: [51, 51, 51]
+  # color as CMYK array (approximated)
+  #font-color: [0, 0, 0, 0.92]
+  #font-color: [0, 0, 0, 92%]
+  font-family: CharisSIL
+  # choose one of these font-size/line-height-length combinations
+  #font-size: 14
+  #line-height-length: 20
+  #font-size: 11.25
+  #line-height-length: 18
+  #font-size: 11.2
+  #line-height-length: 16
+  font-size: 9
+  #line-height-length: 15
+  # correct line height for Noto Serif metrics
+  line-height-length: 16
+  #font-size: 11.25
+  #line-height-length: 18
+  line-height: $base-line-height-length / $base-font-size - 0.75
+  font-size-large: round($base-font-size * 1.25)
+  font-size-small: round($base-font-size * 0.85)
+  font-size-min: $base-font-size * 0.75
+  font-style: normal
+  border-color: eeeeee
+  border-radius: 4
+  border-width: 0.5
+# FIXME vertical-rhythm is weird; we should think in terms of ems
+#vertical-rhythm: $base-line-height-length * 2 / 3
+# correct line height for Noto Serif metrics (comes with built-in line height)
+vertical-rhythm: $base-line-height-length * 2 / 4
+horizontal-rhythm: $base-line-height-length
+# QUESTION should vertical-spacing be block-spacing instead?
+vertical-spacing: $vertical-rhythm
+link:
+  font-color: b05010
+# literal is currently used for inline monospaced in prose and table cells
+literal:
+  font-color: b12146
+  font-family: M+ 1mn
+menu-caret-content: " <font size=\"1.15em\"><color rgb=\"b12146\">\u203a</color></font> "
+heading:
+  align: left
+  #font-color: 181818
+  font-color: $base-font-color
+  font-family: $base-font-family
+  font-style: bold
+  # h1 is used for part titles (book doctype only)
+  h1-font-size: floor($base-font-size * 2.0)
+  # h2 is used for chapter titles (book doctype only)
+  h2-font-size: floor($base-font-size * 1.5)
+  h3-font-size: round($base-font-size * 1.4)
+  h4-font-size: $base-font-size-large
+  h5-font-size: $base-font-size
+  h6-font-size: $base-font-size-small
+  #line-height: 1.4
+  # correct line height for Noto Serif metrics (comes with built-in line height)
+  line-height: 1
+  margin-top: $vertical-rhythm * 1.8
+  margin-bottom: $vertical-rhythm * 1.2
+title-page:
+  align: right
+  logo-image: image:juxt.png[width=100,align=left]
+  logo:
+    top: 2%
+  title:
+    top: 55%
+    font-size: $heading-h1-font-size
+    font-color: 000000
+    line-height: 1.5
+  subtitle:
+    font-size: $heading-h2-font-size
+    line-height: 1
+  authors:
+    display: none
+    margin-top: $base-font-size * 1.25
+    font-size: $base-font-size-large
+    font-color: 181818
+    margin-top: $base-font-size * 7.25
+  revision:
+    font-size: $heading-h2-font-size
+    margin-top: $base-font-size * 7.25
+block:
+  margin-top: 0
+  margin-bottom: $vertical-rhythm
+caption:
+  align: left
+  font-size: $base-font-size * 0.95
+  font-style: italic
+  # FIXME perhaps set line-height instead of / in addition to margins?
+  margin-inside: $vertical-rhythm / 3
+  #margin-inside: $vertical-rhythm / 4
+  margin-outside: 0
+lead:
+  font-size: $base-font-size-large
+  line-height: 1.4
+abstract:
+  font-color: 5c6266
+  font-size: $lead-font-size
+  line-height: $lead-line-height
+  font-style: italic
+  first-line-font-style: bold
+  title:
+    align: center
+    font-color: $heading-font-color
+    font-family: $heading-font-family
+    font-size: $heading-h4-font-size
+    font-style: $heading-font-style
+admonition:
+  column-rule-color: $base-border-color
+  column-rule-width: $base-border-width
+  padding: [0, $horizontal-rhythm, 0, $horizontal-rhythm]
+  #icon:
+  #  tip:
+  #    name: fa-lightbulb-o
+  #    stroke-color: 111111
+  #    size: 24
+  label:
+    text-transform: uppercase
+    font-style: bold
+blockquote:
+  font-color: $base-font-color
+  font-size: $base-font-size-small
+  border-color: $base-border-color
+  border-width: 5
+  # FIXME disable negative padding bottom once margin collapsing is implemented
+  padding: [0, $horizontal-rhythm, $block-margin-bottom * -0.75, $horizontal-rhythm + $blockquote-border-width / 2]
+  cite-font-size: $base-font-size-small
+  cite-font-color: 999999
+# code is used for source blocks (perhaps change to source or listing?)
+code:
+  font-color: $base-font-color
+  font-family: $literal-font-family
+  font-size: ceil($base-font-size-small)
+  padding: $code-font-size
+  line-height: 1.25
+  # line-gap is an experimental property to control how a background color is applied to an inline block element
+  line-gap: 3.8
+  background-color: f5f5f5
+  border-color: cccccc
+  border-radius: 0
+  border-width: 0.75
+conum:
+  font-family: M+ 1mn
+  font-color: $literal-font-color
+  font-size: $base-font-size
+  line-height: 4 / 3
+example:
+  border-color: $base-border-color
+  border-radius: 0
+  border-width: 0.75
+  background-color: ffffff
+  # FIXME reenable padding bottom once margin collapsing is implemented
+  padding: [$vertical-rhythm, $horizontal-rhythm, 0, $horizontal-rhythm]
+image:
+  align: center
+prose:
+  margin-top: $block-margin-top
+  margin-bottom: $block-margin-bottom
+sidebar:
+  background-color: eeeeee
+  border-color: e1e1e1
+  border-radius: 0
+  border-width: $base-border-width
+  # FIXME reenable padding bottom once margin collapsing is implemented
+  padding: [$vertical-rhythm, $vertical-rhythm * 1.25, 0, $vertical-rhythm * 1.25]
+  title:
+    align: center
+    font-color: $heading-font-color
+    font-family: $heading-font-family
+    font-size: $heading-h4-font-size
+    font-style: $heading-font-style
+thematic-break:
+  border-color: $base-border-color
+  border-style: solid
+  border-width: $base-border-width
+  margin-top: $vertical-rhythm * 0.5
+  margin-bottom: $vertical-rhythm * 1.5
+description-list:
+  term-font-style: bold
+  term-spacing: $vertical-rhythm / 4
+  description-indent: $horizontal-rhythm * 1.25
+outline-list:
+  indent: $horizontal-rhythm * 1.5
+  #marker-font-color: 404040
+  # NOTE outline-list-item-spacing applies to list items that do not have complex content
+  item-spacing: $vertical-rhythm / 2
+table:
+  background-color: $page-background-color
+  #head-background-color: <hex value>
+  #head-font-color: $base-font-color
+  head-font-style: bold
+  #body-background-color: <hex value>
+  body-stripe-background-color: f9f9f9
+  foot-background-color: f0f0f0
+  border-color: dddddd
+  border-width: $base-border-width
+  cell-padding: 3
+toc:
+  indent: $horizontal-rhythm
+  line-height: 1.4
+  dot-leader:
+    #content: ". "
+    font-color: a9a9a9
+    #levels: 2 3
+# NOTE in addition to footer, header is also supported
+header:
+  font-size: $base-font-size-small
+  border-color: dddddd
+  border-width: 0.5
+  height: $base-line-height-length * 2.5
+  line-height: 1
+  padding: [$base-line-height-length, 1, 0, 1]
+  vertical-align: top
+
+  recto:
+    #columns: "<50% =0% >50%"
+    left:
+      content: '{document-title}'
+    center:
+      content: ''
+    right:
+      content: '{section-or-chapter-title}'
+  verso:
+    #columns: $header-recto-columns
+    left:
+      content: $header-recto-right-content
+    center:
+      content: $header-recto-center-content
+    right:
+      content: $header-recto-left-content
+
+footer:
+  font-size: $base-font-size-small
+  # NOTE if background-color is set, background and border will span width of page
+  border-color: dddddd
+  border-width: 0.25
+  height: $base-line-height-length * 2.5
+  line-height: 1
+  padding: [$base-line-height-length / 2, 1, 0, 1]
+  vertical-align: top
+  #image-vertical-align: <alignment> or <number>
+  # additional attributes for content:
+  # * {page-count}
+  # * {page-number}
+  # * {document-title}
+  # * {document-subtitle}
+  # * {chapter-title}
+  # * {section-title}
+  # * {section-or-chapter-title}
+
+  recto:
+    #columns: "<50% =0% >50%"
+    left:
+      content: 'Copyright © {docyear}, JUXT LTD.'
+    center:
+      content: 'Revision {revnumber}, {revdate} -- {classification}'
+    right:
+      content: '{page-number}/{page-count}'
+  verso:
+    #columns: $footer-recto-columns
+    left:
+      content: $footer-recto-left-content
+    center:
+      content: $footer-recto-center-content
+    right:
+      content: $footer-recto-right-content

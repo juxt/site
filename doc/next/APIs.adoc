@@ -1,0 +1,77 @@
+= APIs
+:toc: left
+
+== Creating an action to install an API resource
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-action-put-api-resource!,indent=0]
+----
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-put-api-resource!,indent=0]
+----
+====
+
+== Creating an action to list identities
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-action-list-identities!,indent=0]
+----
+
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=grant-permission-to-list-identities!,indent=0]
+----
+====
+
+== Exposing list-identities as an API
+
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=create-list-users-api!,indent=0]
+----
+====
+
+
+
+.Why always a _set_ of actions?
+****
+
+The reason why multiple actions are useful is that you might have a situation
+where you want /users to return different results or behaviour based on whether
+the subject is nil, a user or a manager.
+
+****
+
+
+== Development Notes
+
+Should we invoke a `api-get` action?
+
+The action `api-get` might be required to have a permission which uses scopes?
+
+The https://spec.openapis.org/oas/latest.html#security-requirement-object[OpenAPI operation can have a security scope].
+
+A policy may link the operation's scope.
+If the subject has a given scope then the permission exists.
+If a permission exists linking the subject to the scope.
+
+The resource (operation?) can declare a scope, that's
+The `api-get` action may require a permission that the
+
+=== Forget scopes
+
+The resource's :get contains actions.
+If the subject is allowed to invoke the action, then they are allowed
+
+== More development notes
+
+There must be a separate action created for calling an API operation, even if it's public.
+
+The action that calls the API function can be tied to API operation, or the API as a whole.

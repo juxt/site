@@ -1,0 +1,186 @@
+= Users
+:toc: left
+:experimental:
+
+Users are individuals with access to Site.
+
+== User documents
+
+(((user, document structure)))
+A User is a database document, with the `juxt.site.alpha/type` attribute value
+set to "+https://meta.juxt.site/pass/user+", as detailed in
+<<user-doc-structure>>.
+
+.Document structure of a User
+[[user-doc-structure]]
+[%header,cols="2l,3d,1"]
+|===
+|Attribute|Value|Required?
+
+|:xt/id
+|Users are resources, so this is a URI.
+s|Required
+
+|:juxt.site.alpha/type
+l|"https://meta.juxt.site/pass/user"
+s|Required
+|===
+
+=== Create a User
+
+Since an Action are performed by a *User*, we need to create a user to start
+invoking our actions.
+
+<<example-put-user>> demonstrates how to create a user called "Malcolm Sparks".
+
+.Create your own User
+[[example-put-user]]
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=install-user!,indent=0]
+----
+====
+
+[IMPORTANT]
+--
+. Copy the code from <<example-put-user>> and paste it into an editor.
+. Personalise it according to your own user details.
+. Copy the result into a REPL and evaluate it.
+--
+
+== User Identities
+
+(((user identity, definition)))
+An Identity contains information that can uniquely identify a User, such as the
+user's login credentials, company-wide username, email address, Twitter handle
+or a reference to an external identity issued by another authority.
+
+(((user identity, document structure)))
+An Identity always references a *User*, with the `juxt.pass.alpha/user`
+attribute, as detailed in <<identity-doc-structure>>.
+
+.Document structure of an Identity
+[[identity-doc-structure]]
+[%header,cols="2l,3d,1"]
+|===
+|Attribute|Value|Required?
+
+|:xt/id
+|Identities are resources, so this is a URI.
+s|Required
+
+|:juxt.site.alpha/type
+l|"https://meta.juxt.site/pass/identity"
+s|Required
+
+|:juxt.pass.alpha/user
+|A reference to a User.
+s|Required
+
+|:juxt.pass.jwt/iss
+|The OpenID Issuer Identifier, e.g. "+https://juxt.eu.auth0.com/+"
+|Optional
+
+|:juxt.pass.jwt/sub
+|The OpenID Subject Identifier, e.g. "+johndoe+"
+|Optional
+|===
+
+=== Create a User Identity
+
+<<example-put-user-identity>> demonstrates how to create an identity for our user.
+
+.Creating a User Identity
+[[example-put-user-identity]]
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=install-user-identity!,indent=0]
+----
+====
+
+[IMPORTANT]
+--
+. Copy the code from <<example-put-user-identity>> and paste it into an editor.
+. Personalise it according to your own user details.
+. Copy the result into a REPL and evaluate it.
+--
+
+== Subjects
+
+(((subject, definition)))
+In Site, a *Subject* is a database document automatically created when the user
+authenticates and represents a *user login*. This document has the
+`juxt.site.alpha/type` attribute value set to
+"+https://meta.juxt.site/pass/subject+".
+
+(((subject, relationship to user identity)))
+A Subject always references an *Identity*, with the `juxt.pass.alpha/identity`
+attribute.
+
+The Identity tells us _who_ the user is, but a Subject might also
+include information such as:
+
+* When the user logged in
+* Where the user logged in from
+* The number and type of authentication factors which were used
+* Whether the user's claimed email address has been verified
+
+(((user identity, document structure)))
+<<subject-doc-structure>> lists some recognised attributes of a Subject.
+
+.Document structure of a Subject
+[[subject-doc-structure]]
+[%header,cols="2l,3d,1"]
+|===
+|Attribute|Value|Required?
+
+|:xt/id
+|Subjects are resources, so this is a URI.
+s|Required
+
+|:juxt.site.alpha/type
+l|"https://meta.juxt.site/pass/subject"
+s|Required
+
+|:juxt.pass.alpha/identity
+|A reference to an Identity.
+s|Required
+|===
+
+<<user-model>> shows an example of how a Subject may relate to an Identity, and
+how an Identity, in turn, may relate to a User.
+
+.A possible relationship between a Users Subject and Identity
+[[user-model]]
+====
+[plantuml,user-model,svg]
+....
+skinparam monochrome true
+@startjson
+include::user-model.json[]
+@endjson
+....
+====
+
+=== Create a Subject
+
+<<example-put-subject>> demonstrates how a subject could be created linked to
+the User Identity when a User logs in.
+
+.Creating a Subject
+[[example-put-subject]]
+====
+[source,clojure]
+----
+include::../../dev/demo.clj[tag=install-subject!,indent=0]
+----
+====
+
+[IMPORTANT]
+--
+. Copy the code from <<example-put-subject>> and paste it into an editor.
+. Personalise it according to your own user details.
+. Copy the result into a REPL and evaluate it.
+--

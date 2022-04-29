@@ -1,0 +1,26 @@
+[colophon]
+= Colophon
+
+Copyright © 2022, JUXT LTD.
+
+Published by JUXT Text.
+
+This book is written in Asciidoctor.
+
+////
+== Alternative choices rejected
+
+=== Org Mode
+
+org-mode was considered for the following benefits
+
+* Better eediting experience in Emacs
+* texinfo output
+
+but rejected for the following reasons:
+
+* No equivalent of https://asciidoctor.org/news/2013/09/18/introducing-asciidoctor-js-live-preview/[Asciidoctor.js Live Preview]
+* JUXT's current standard is AsciiDoctor for documentation
+
+In the future, we can get to texinfo by developing a custom Asciidoctor backend.
+////
