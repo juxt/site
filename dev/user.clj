@@ -42,7 +42,6 @@
 
   (println)
   (println "Welcome to Site!")
-  (status)
 
   (println (ansi/yellow "Enter (help) for help"))
 
