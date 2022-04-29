@@ -34,7 +34,7 @@
       {:xt/id "https://example.org/test.txt"
        ::http/content-type "text/plain;charset=utf-8"
        ::http/content "Hello World!\n"
-       ::http/methods #{:get :head :options}}]])
+       ::http/methods {:get {} :head {} :options {}}}]])
 
    (:ring.response/body
     (*handler*

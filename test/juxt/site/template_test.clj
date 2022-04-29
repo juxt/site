@@ -30,14 +30,14 @@
 
       [:xtdb.api/put
        {:xt/id "https://example.org/templates/fruits.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "Fruits"}]
 
       [:xtdb.api/put
        {:xt/id "https://example.org/fruits.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::site/template "https://example.org/templates/fruits.html"}]])
 
     (let [r (*handler*
@@ -51,7 +51,7 @@
 
       [:xtdb.api/put
        {:xt/id "https://example.org/templates/fruits.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
@@ -62,7 +62,7 @@
 
       [:xtdb.api/put
        {:xt/id "https://example.org/fruits.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {} }
         ::site/template "https://example.org/templates/fruits.html"
         ::site/template-model "https://example.org/template-models/fruits"}]])
 
@@ -80,7 +80,7 @@
 
       [:xtdb.api/put
        {:xt/id "https://example.org/templates/fruits.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
@@ -95,7 +95,7 @@
 
       [:xtdb.api/put
        {:xt/id "https://example.org/fruits.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::site/template "https://example.org/templates/fruits.html"
         ::site/template-model ["https://example.org/template-models/fruits-a"
                                "https://example.org/template-models/fruits-b"]}]])
@@ -112,7 +112,7 @@
 
       [:xtdb.api/put
        {:xt/id "https://example.org/templates/fruits.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "Fruits:{% for f in fruits %} * {{f}}{% endfor %}"}]
@@ -145,7 +145,7 @@
 
       [:xtdb.api/put
        {:xt/id "https://example.org/fruits.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::site/template "https://example.org/templates/fruits.html"
         ::site/template-model ["https://example.org/template-models/fruits-a-query"
                                "https://example.org/template-models/fruits-b"]}]])
@@ -163,21 +163,21 @@
 
       [:xtdb.api/put
        {:xt/id "https://example.org/templates/outer.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "outer {% include \"https://example.org/templates/inner.html\" %}"}]
 
       [:xtdb.api/put
        {:xt/id "https://example.org/templates/inner.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "inner"}]
 
       [:xtdb.api/put
        {:xt/id "https://example.org/index.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::site/template "https://example.org/templates/outer.html"}]])
 
     (let [r (*handler*
@@ -197,21 +197,21 @@
 
       [:xtdb.api/put
        {:xt/id "https://example.org/templates/outer.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "outer {% include \"inner.html\" %}"}]
 
       [:xtdb.api/put
        {:xt/id "https://example.org/templates/inner.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "inner"}]
 
       [:xtdb.api/put
        {:xt/id "https://example.org/index.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::site/template "https://example.org/templates/outer.html"
         :selmer.util/custom-resource-path "https://example.org/templates/"}]])
 
@@ -253,21 +253,21 @@
 
       [:xtdb.api/put
        {:xt/id "https://example.org/templates/inner.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "{% for f in fruits %} * {{f}}{% endfor %}"}]
 
       [:xtdb.api/put
        {:xt/id "https://example.org/templates/outer.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::http/content-type "text/plain"
         ::site/template-dialect "selmer"
         ::http/content "outer{% include \"inner.html\" %}"}]
 
       [:xtdb.api/put
        {:xt/id "https://example.org/fruits.html"
-        ::http/methods #{:get :head :options}
+        ::http/methods {:get {} :head {} :options {}}
         ::site/template "https://example.org/templates/outer.html"
         ::site/template-model ["https://example.org/template-models/fruits-a-query"
                                "https://example.org/template-models/fruits-b"]

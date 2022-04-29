@@ -9,40 +9,74 @@
    [juxt.reap.alpha.encoders :refer [format-http-date]]
    [juxt.test.util :refer [with-xt with-handler submit-and-await!
                            *xt-node* *handler*
-                           access-all-areas access-all-apis]])
+                           install-test-resources!]]
+   [juxt.pass.alpha.v3.authorization :as authz]
+   [juxt.site.alpha.locator :as locator]
+   [juxt.apex.alpha :as-alias apex]
+   [juxt.http.alpha :as-alias http]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.site.alpha :as-alias site]
+   [xtdb.api :as xt])
   (:import
    (java.io ByteArrayInputStream)))
-
-(alias 'apex (create-ns 'juxt.apex.alpha))
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
 
 (t/use-fixtures :each with-xt with-handler)
 
 (deftest put-test
+  (install-test-resources!)
   (submit-and-await!
-   [[:xtdb.api/put access-all-apis]
-    [:xtdb.api/put
-     {:xt/id "https://example.org/_site/apis/test/openapi.json"
-      ::site/type "OpenAPI"
-      :juxt.apex.alpha/openapi
-      {"servers" [{"url" ""}]
-       "paths"
-       {"/things/foo"
-        {"put"
-         {"requestBody"
-          {"content"
-           {"application/json"
-            {"schema"
-             {"juxt.jinx.alpha/keyword-mappings"
-              {"name" "a/name"}
-              "properties"
-              {"name" {"type" "string"
-                       "minLength" 2}}}}}}}}}}}]])
+   [
+    [::xt/put
+     {:xt/id "https://example.org/_site/actions/put-things"
+      ::site/type "Action"
+      :juxt.pass.alpha.malli/args-schema
+      [:tuple
+       [:map
+        [:a/name :string]]]
+
+      :juxt.pass.alpha/process
+      [
+       [:juxt.pass.alpha.malli/validate]
+       [:xtdb.api/put]]
+
+      ::pass/rules
+      '[
+        [(allowed? permission subject action resource)
+         [permission ::pass/subject subject]
+         [(nil? resource)]]]}]
+
+    [::xt/put
+     {:xt/id "https://example.org/_site/permissions/put-things"
+      ::site/type "Permission"
+      ::pass/subject :tester
+      ::pass/action "https://example.org/_site/actions/put-things"
+      ::pass/purpose nil}]])
+
+  (submit-and-await!
+    [
+     [:xtdb.api/put
+      {:xt/id "https://example.org/_site/apis/test/openapi.json"
+       ::site/type "OpenAPI"
+       :juxt.apex.alpha/openapi
+       {"servers" [{"url" ""}]
+        "paths"
+        {"/things/foo"
+         {"put"
+          {"requestBody"
+           {"content"
+            {"application/json"
+             {"schema"
+              {"juxt.jinx.alpha/keyword-mappings"
+               {"name" "a/name"}
+               "properties"
+               {"name" {"type" "string"
+                        "minLength" 2}}}}}}
+           "x-juxt-site-action" "https://example.org/_site/actions/put-things"}}}}}]])
+
   (let [body (json/write-value-as-string {"name" "foo"})
         _ (*handler*
-           {:ring.request/method :put
+           {::pass/subject :tester
+            :ring.request/method :put
             :ring.request/path "/things/foo"
             :ring.request/body (ByteArrayInputStream. (.getBytes body))
             :ring.request/headers
@@ -55,12 +89,150 @@
             (x/entity db "https://example.org/things/foo")
             (dissoc ::site/request))))))
 
+#_((t/join-fixtures [with-xt with-handler])
+ (fn []
+   (install-test-resources!)
+
+   (submit-and-await!
+    [
+     [::xt/put
+      {:xt/id "https://example.org/_site/actions/put-things"
+       ::site/type "Action"
+       :juxt.pass.alpha.malli/args-schema
+       [:tuple
+        [:map
+         [:a/name :string]]]
+
+       :juxt.pass.alpha/process
+       [
+        [:juxt.pass.alpha.malli/validate]
+        [:xtdb.api/put]]
+
+       ::pass/rules
+       '[
+         [(allowed? permission subject action resource)
+          [permission ::pass/subject subject]
+          [(nil? resource)]]]}]
+
+     [::xt/put
+      {:xt/id "https://example.org/_site/permissions/put-things"
+       ::site/type "Permission"
+       ::pass/subject :tester
+       ::pass/action "https://example.org/_site/actions/put-things"
+       ::pass/purpose nil}]])
+
+   (submit-and-await!
+    [
+     [:xtdb.api/put
+      {:xt/id "https://example.org/_site/apis/test/openapi.json"
+       ::site/type "OpenAPI"
+       :juxt.apex.alpha/openapi
+       {"servers" [{"url" ""}]
+        "paths"
+        {"/things/foo"
+         {"put"
+          {"requestBody"
+           {"content"
+            {"application/json"
+             {"schema"
+              {"juxt.jinx.alpha/keyword-mappings"
+               {"name" "a/name"}
+               "properties"
+               {"name" {"type" "string"
+                        "minLength" 2}}}}}}
+           "x-juxt-site-action" "https://example.org/_site/actions/put-things"}}}}}]
+
+     ])
+
+   #_(let [body (json/write-value-as-string {"name" "foo"})
+         req {::site/xt-node *xt-node*
+              ::site/db (xt/db *xt-node*)
+              ::site/base-uri "https://example.org"
+              ::site/uri-prefix "https://example.org"
+              ::site/uri "https://example.org/things/foo"
+              ::pass/subject :tester
+              :ring.request/method :put
+              :ring.request/body (ByteArrayInputStream. (.getBytes body))
+              :ring.request/headers
+              {"content-length" (str (count body))
+               "content-type" "application/json"}
+              }]
+     (locator/locate-resource req))
+
+   #_(authz/check-permissions
+    (xt/db *xt-node*)
+    #{"https://example.org/_site/actions/put-things"}
+    (cond-> {:subject :tester}
+      ;; When the resource is in the database, we can add it to the
+      ;; permission checking in case there's a specific permission for
+      ;; this resource.
+      ;;(:xt/id resource) (assoc :resource (:xt/id resource))
+      ))
+
+   #_(xt/entity (xt/db *xt-node*) "https://example.org/_site/actions/put-things")
+
+   (let [body (json/write-value-as-string {"name" "foo"})
+         response
+         (*handler*
+          {::pass/subject :tester
+           :ring.request/method :put
+           :ring.request/path "/things/foo"
+           :ring.request/body (ByteArrayInputStream. (.getBytes body))
+           :ring.request/headers
+           {"content-length" (str (count body))
+            "content-type" "application/json"}})]
+
+     response
+
+     (x/entity (xt/db *xt-node*) "https://example.org/things/foo")
+
+     (is (= {:a/name "foo", :xt/id "https://example.org/things/foo"}
+              (->
+               (x/entity db "https://example.org/things/foo")
+               (dissoc ::site/request)))))
+
+   #_(let [body "Hello"]
+       (*handler*
+        {:ring.request/method :put
+         :ring.request/body (ByteArrayInputStream. (.getBytes body))
+         :ring.request/headers
+         {"content-length" (str (count body))
+          "content-type" "application/json"
+          "if-match" "*"}
+         :ring.request/path "/test.png"}))))
+
 ;; Evoke "Throwing Multiple API paths match"
 
 (deftest two-path-parameter-path-preferred-test
+  (install-test-resources!)
   (submit-and-await!
-   [[:xtdb.api/put access-all-apis]
-    [:xtdb.api/put
+   [
+    [::xt/put
+     {:xt/id "https://example.org/_site/actions/put-things"
+      ::site/type "Action"
+      :juxt.pass.alpha.malli/args-schema
+      [:tuple [:map]]
+
+      :juxt.pass.alpha/process
+      [
+       [:juxt.pass.alpha.malli/validate]
+       [:xtdb.api/put]]
+
+      ::pass/rules
+      '[
+        [(allowed? permission subject action resource)
+         [permission ::pass/subject subject]
+         [(nil? resource)]]]}]
+
+    [::xt/put
+     {:xt/id "https://example.org/_site/permissions/put-things"
+      ::site/type "Permission"
+      ::pass/subject :tester
+      ::pass/action "https://example.org/_site/actions/put-things"
+      ::pass/purpose nil}]])
+
+  (submit-and-await!
+   [[:xtdb.api/put
      {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
@@ -77,7 +249,8 @@
            {"application/json"
             {"schema"
              {"properties"
-              {"name" {"type" "string" "minLength" 1}}}}}}}}
+              {"name" {"type" "string" "minLength" 1}}}}}}
+          "x-juxt-site-action" "https://example.org/_site/actions/put-things"}}
 
         "/things/{a}/{b}"
         {"parameters"
@@ -92,10 +265,12 @@
            {"application/json"
             {"schema"
              {"properties"
-              {"name" {"type" "string" "minLength" 1}}}}}}}}}}}]])
+              {"name" {"type" "string" "minLength" 1}}}}}}
+          "x-juxt-site-action" "https://example.org/_site/actions/put-things"}}}}}]])
   (let [body (json/write-value-as-string {"name" "foo"})
         r (*handler*
-           {:ring.request/method :put
+           {::pass/subject :tester
+            :ring.request/method :put
             ;; Matches both {a} and {b}
             :ring.request/path "/things/foo/bar"
             :ring.request/body (ByteArrayInputStream. (.getBytes body))
@@ -106,14 +281,38 @@
     (is (= "putAB"
            (get-in r [::site/resource ::apex/operation "operationId"])))))
 
-
 (deftest inject-path-parameter-with-forward-slash-test
   ;; PUT a project code of ABC/DEF (with Swagger) and ensure the / is
   ;; preserved. This test tests an edge case where we want a path parameter to contain a /.
-  (log/trace "")
+  (install-test-resources!)
   (submit-and-await!
-   [[:xtdb.api/put access-all-apis]
-    [:xtdb.api/put
+   [
+    [::xt/put
+     {:xt/id "https://example.org/_site/actions/put-things"
+      ::site/type "Action"
+      :juxt.pass.alpha.malli/args-schema
+      [:tuple [:map]]
+
+      :juxt.pass.alpha/process
+      [
+       [:juxt.pass.alpha.malli/validate]
+       [:xtdb.api/put]]
+
+      ::pass/rules
+      '[
+        [(allowed? permission subject action resource)
+         [permission ::pass/subject subject]
+         [(nil? resource)]]]}]
+
+    [::xt/put
+     {:xt/id "https://example.org/_site/permissions/put-things"
+      ::site/type "Permission"
+      ::pass/subject :tester
+      ::pass/action "https://example.org/_site/actions/put-things"
+      ::pass/purpose nil}]])
+
+  (submit-and-await!
+   [[:xtdb.api/put
      {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
@@ -132,7 +331,8 @@
            {"application/json"
             {"schema"
              {"properties"
-              {"name" {"type" "string" "minLength" 1}}}}}}}}
+              {"name" {"type" "string" "minLength" 1}}}}}}
+          "x-juxt-site-action" "https://example.org/_site/actions/put-things"}}
 
         "/things/{a}/{n}"
         {"parameters"
@@ -147,12 +347,14 @@
            {"application/json"
             {"schema"
              {"properties"
-              {"name" {"type" "string" "minLength" 1}}}}}}}}}}}]])
+              {"name" {"type" "string" "minLength" 1}}}}}}
+          "x-juxt-site-action" "https://example.org/_site/actions/put-things"}}}}}]])
 
   (let [path (str"/things/" (java.net.URLEncoder/encode "ABC/DEF"))
         body (json/write-value-as-string {"name" "zip"})
         r (*handler*
-           {:ring.request/method :put
+           {::pass/subject :tester
+            :ring.request/method :put
             :ring.request/path path
             :ring.request/body (ByteArrayInputStream. (.getBytes body))
             :ring.request/headers
@@ -169,12 +371,11 @@
 
 (deftest if-modified-since-test
   (submit-and-await!
-   [[:xtdb.api/put access-all-areas]
-    [:xtdb.api/put
+   [[:xtdb.api/put
      {:xt/id "https://example.org/test.png"
       ::http/last-modified #inst "2020-03-01"
       ::http/content-type "image/png"
-      ::http/methods #{:get}}]])
+      ::http/methods {:get {}}}]])
   (are [if-modified-since status]
       (= status
          (:ring.response/status
@@ -193,12 +394,11 @@
 
 (deftest if-none-match-test
   (submit-and-await!
-   [[:xtdb.api/put access-all-areas]
-    [:xtdb.api/put
+   [[:xtdb.api/put
      {:xt/id "https://example.org/test.png"
       ::http/etag "\"abc\""
       ::http/content-type "image/png"
-      ::http/methods #{:get :head :options}}]])
+      ::http/methods {:get {} :head {} :options {}}}]])
   (are [if-none-match status]
       (= status
          (:ring.response/status
@@ -217,13 +417,13 @@
 
 ;; 3.1: If-Match
 (deftest if-match-wildcard-test
-  (submit-and-await!
-   [[:xtdb.api/put access-all-areas]])
+  (install-test-resources!)
   (is (= 412
          (:ring.response/status
           (let [body "Hello"]
             (*handler*
-             {:ring.request/method :put
+             {::pass/subject :tester
+              :ring.request/method :put
               :ring.request/body (ByteArrayInputStream. (.getBytes body))
               :ring.request/headers
               {"content-length" (str (count body))
@@ -231,20 +431,44 @@
                "if-match" "*"}
               :ring.request/path "/test.png"}))))))
 
+#_((t/join-fixtures [with-xt with-handler])
+ (fn []
+   (install-test-resources!)
+   ;; Install a VirtualResource for any top-level png files
+   (let [body "Hello"
+         req {::pass/subject :tester
+              :ring.request/method :put
+              :ring.request/body (ByteArrayInputStream. (.getBytes body))
+              :ring.request/headers
+              {"content-length" (str (count body))
+               "content-type" "application/json"
+               "if-match" "*"}
+              ::site/base-uri "https://example.org"
+              ::site/uri "https://example.org/test.png"
+              ::site/db (xt/db *xt-node*)
+              :ring.request/path "/test.png"}]
+     (locator/locate-resource req)
+     #_(*handler*
+      req
+      ))
+   )
+ )
+
 (defn if-match-run [if-match]
+  (install-test-resources!)
   (submit-and-await!
-   [[:xtdb.api/put access-all-areas]
-    [:xtdb.api/put
+   [[:xtdb.api/put
      {:xt/id "https://example.org/test.png"
       ::site/type "StaticRepresentation"
       ::http/etag "\"abc\""
       ::http/content-type "image/png"
-      ::http/methods #{:put}
+      ::http/methods {:put {::pass/actions #{:test}}}
       }]])
   (:ring.response/status
    (let [body "Hello"]
      (*handler*
-      {:ring.request/method :put
+      {::pass/subject :tester
+       :ring.request/method :put
        :ring.request/body (ByteArrayInputStream. (.getBytes body))
        :ring.request/headers
        {"content-length" (str (count body))
@@ -274,13 +498,15 @@
      (is (= 302 (:ring.response/status response)))
      (is (= "/test.html" (get-in response [:ring.response/headers "location"])))))
 
-(deftest content-negotiation-test
-  (submit-and-await!
-   [[:xtdb.api/put access-all-areas]
 
-    [:xtdb.api/put
+
+
+(deftest content-negotiation-test
+  (install-test-resources!)
+  (submit-and-await!
+   [[:xtdb.api/put
      {:xt/id "https://example.org/report"
-      ::http/methods #{:get :head :options}
+      ::http/methods {:get {::pass/actions #{:test}} :head {} :options {}}
       ::http/representations
       #{{::http/content-type "text/html;charset=utf-8"
          ::http/content "<h1>Latest sales figures</h1>"}
@@ -289,7 +515,8 @@
 
   (let [response
         (*handler*
-         {:ring.request/method :get
+         {::pass/subject :tester
+          :ring.request/method :get
           :ring.request/path "/report"
           :ring.request/headers {"accept" "text/html"}})]
     (is (= 200 (:ring.response/status response)))
@@ -297,7 +524,8 @@
 
   (let [response
         (*handler*
-         {:ring.request/method :get
+         {::pass/subject :tester
+          :ring.request/method :get
           :ring.request/path "/report"
           :ring.request/headers {"accept" "text/plain"}})]
 
@@ -306,19 +534,17 @@
 
   ;; TODO: Enable test when 406 is re-instated
   #_(let [response
-        (*handler*
-         {:ring.request/method :get
-          :ring.request/path "/report"
-          :ring.request/headers {"accept" "image/png"}})]
-    (is (= 406 (:ring.response/status response)))))
+          (*handler*
+           {:ring.request/method :get
+            :ring.request/path "/report"
+            :ring.request/headers {"accept" "image/png"}})]
+      (is (= 406 (:ring.response/status response)))))
 
 (deftest variants-test
   (submit-and-await!
-   [[:xtdb.api/put access-all-areas]
-
-    [:xtdb.api/put
+   [[:xtdb.api/put
      {:xt/id "https://example.org/report"
-      ::http/methods #{:get :head :options}}]
+      ::http/methods {:get {} :head {} :options {}}}]
 
     [:xtdb.api/put
      {:xt/id "https://example.org/report.html"
@@ -359,12 +585,11 @@
 #_((t/join-fixtures [with-xt with-handler])
  (fn []
    (submit-and-await!
-    [ ;;[:xtdb.api/put access-all-areas]
-     [:xtdb.api/put
+    [[:xtdb.api/put
       {:xt/id "https://example.org/sensitive-report.html"
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "Latest sales figures"
-       ::http/methods #{:get :head :options}}]
+       ::http/methods {:get {} :head {} :options {}}}]
 
      [:xtdb.api/put
       {:xt/id "https://example.org/401.html"
@@ -386,7 +611,7 @@
        ::http/status #{406}
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "<h1>Unacceptable</h1>"
-       ::http/methods #{:get :head :options}}]])
+       ::http/methods {:get {} :head {} :options {}}}]])
 
    (let [db (x/db *xt-node*)]
      (x/q db '{:find [er]
@@ -401,12 +626,11 @@
 #_((t/join-fixtures [with-xt with-handler])
  (fn []
    (submit-and-await!
-    [[:xtdb.api/put access-all-areas]
-     [:xtdb.api/put
+    [[:xtdb.api/put
       {:xt/id "https://example.org/report.html"
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "Latest figures"
-       ::http/methods #{:get :head :options}
+       ::http/methods {:get {} :head {} :options {}}
        ::http/cache-directives #{:no-store}
        }]])
 
@@ -427,11 +651,9 @@
 
 #_(deftest app-test
   (submit-and-await!
-   [[:xtdb.api/put access-all-areas]
-
-    [:xtdb.api/put
+   [[:xtdb.api/put
      {:xt/id "https://example.org/view/index.html"
-      ::http/methods #{:get}
+      ::http/methods {:get {}}
       ::http/content-type "text/html;charset=utf-8"
       ::http/content "<h1>Hello!</h1>"}]])
 
@@ -442,3 +664,39 @@
           :ring.request/headers {"accept" "text/html"}})]
     (is (= 200 (:ring.response/status response)))
     (is (= "<h1>Hello!</h1>" (:ring.response/body response)))))
+
+
+#_((t/join-fixtures [with-xt with-handler])
+ (fn []
+   (install-test-resources!)
+
+   (let [db (xt/db *xt-node*)]
+     (xt/entity db :tester)
+
+     (authz/actions->rules db #{:test})
+     (authz/check-permissions
+        (xt/db *xt-node*)
+        #{:test}
+        (cond-> {:subject :tester}
+          ;; When the resource is in the database, we can add it to the
+          ;; permission checking in case there's a specific permission for
+          ;; this resource.
+          ;;(:xt/id resource) (assoc :resource (:xt/id resource))
+          )))
+
+   (submit-and-await!
+    [
+     [:xtdb.api/put
+      {:xt/id "https://example.org/report"
+       ::http/methods {:get {::pass/actions #{:test}}
+                       :head {}
+                       :options {}}
+       ::http/representations
+       #{{::http/content-type "text/html;charset=utf-8"
+          ::http/content "<h1>Latest sales figures</h1>"}
+         {::http/content-type "text/plain;charset=utf-8"
+          ::http/content "Latest sales figures"}}}]])
+   (*handler*
+    {:ring.request/method :get
+     :ring.request/path "/report"
+     :ring.request/headers {"accept" "text/html"}})))

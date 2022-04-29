@@ -1,0 +1,131 @@
+= Authorization
+
+[NOTE]
+--
+Deprecated, replaced by doc/next/Site.adoc but remains here until Site.adoc
+fully explains permissions.
+--
+
+Authorization in Site is designed to be both flexible and tractable.
+
+It is flexible because it allows Site adopters to provide their own
+authorization policies.
+
+It is tractable because it allows authorized Site administrators to understand
+how decisions are reached.
+
+The authorization system takes many of the ideas of other systems (XACML,
+Zanzibar, OPA) and adds some ideas that are not known to be present in existing
+systems.
+
+== Subjects
+
+A _subject_ is the person making the request.
+
+== Resources
+
+All requests in HTTP are made with a URI, and the URI identifies a specific
+resource. There is no concept of being 'authorized to use the system'.
+
+== Actions
+
+HTTP methods are uniform across resources, such as GET, PUT, POST. In the
+context of a resource, the method may be defined with more granularity, such as
+'create:user', 'read:policy, 'move:funds'.
+
+== Applications
+
+Subjects make requests on resources through an application. The application must
+be first registered against the API they seek to access.
+
+== Access tokens
+
+Requests made by an application on behalf of a subject provide an access
+token.
+
+Access tokens are sent as part of each request (for example, as bearer tokens)
+or stored on the server on the subject's behalf (as part of the subject's
+session).
+
+Access tokens are granted by the system for use by a specific application and
+specific subject, for a limited time.
+
+As a special case for providing non-authorized public APIs, requests that don't
+provide an access token are associated with the API's default application.
+
+== Scope
+
+The actions allowed by a request is partially governed by the effective scope of
+the request, which may be more limited that the actions a subject is allowed to
+request.
+
+An application may be registered with a reduced scope, and a subject may
+restrict the scope further when authorizing an application to act on its behalf.
+
+== Rulesets
+
+Every resource references a _ruleset_ which determines access to the resource.
+
+A ruleset is a collection of documents which contain rules. This allows some
+flexibility in the definition of new rulesets, variants may be created which mix
+new rules with pre-existing ones.
+
+.Discussion
+****
+A ruleset is broadly the same as a _namespace configuration_ in Zanzibar.
+****
+
+== Permissions
+
+A datalog query finds Permissions that are _applicable_ to the request.
+
+Whether a Permission is _applicable_ to a request depends on the requesting subject,
+requested action and resource.
+
+====
+For example, in the statement 'Can the cat sit on the mat?', the _subject_ is
+the cat, the _action_ is 'sit', and the _resource_ is the mat.
+
+The subject is relevant because the child may not be allowed to sit on the mat.
+
+The action is relevant because the cat may not be allowed to eat a mouse on the mat.
+
+The resource is relevant because the cat may not be allowed to sit on the sofa.
+====
+
+An Permission may be selected on the basis of indirect relationships between the
+subject, action, resource and the Permission.
+
+For example, there may be another document creating a relationship between the
+subject and a role, and between the role and Permission. Or, there may be a complex
+relationship between sets of subjects and sets of resources. Defining how Permissions
+apply to subjects and resources is left to the Site adopter to specify, via
+Datalog rules specified in 'rule sets'.
+
+If there is no applicable Permission, the request is always denied, as per best
+practice.
+
+If applicable Permissions exist, the authorization process proceeds. The applicable
+Permissions may yet cause the request to be denied, or approved with certain
+qualifications and constraints.
+
+For example, the scope of access-token may include the ability of a subject to
+add a document to the database. The document may be subject to type validation
+(e.g. from a JSON schema required on request bodies by an API operation
+document). However, the Permissions will work to ensure that the document is valid with
+respect to its values. For example, a document might require a ruleset yet it's
+critical that the ruleset given is allowed, otherwise it might compromise
+security. Or a Permission might enforce ownership of a document, default the owner to
+the subject, and may restrict attempts to assign ownership to someone other than
+the subject.
+
+.Discussion
+****
+An Permission in Site is broadly similar to an ACL in Zanzibar.
+
+A key benefit of a Permission is that it is represented by an XT document. This means
+it can represent a permission which can be granted and revoked across time, and
+such changes can be tracked and audited. So, questions of the type 'at a given
+time, who had access to this resource?' can be answered with a high degree of
+certainty.
+****

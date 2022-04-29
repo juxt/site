@@ -159,7 +159,7 @@
       [:xtdb.api/put
        {:xt/id "https://example.org/graphql"
         :doc "A GraphQL endpoint"
-        :juxt.http.alpha/methods #{:post :put :options}
+        :juxt.http.alpha/methods {:post {} :put {} :options {}}
         :juxt.http.alpha/acceptable "application/graphql"
         :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/put-handler
         :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/post-handler}]
@@ -167,7 +167,7 @@
       [:xtdb.api/put
        {:xt/id "https://example.org/get-persons"
         :doc "A GraphQL stored query"
-        :juxt.http.alpha/methods #{:put :post}
+        :juxt.http.alpha/methods {:put {} :post {}}
         :juxt.http.alpha/acceptable #{"application/graphql" "application/json"}
         :juxt.site.alpha/graphql-schema "https://example.org/graphql"
         :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/stored-document-put-handler
@@ -244,7 +244,7 @@ type Mutation {
       [:xtdb.api/put
        {:xt/id "https://example.org/graphql"
         :doc "A GraphQL endpoint"
-        :juxt.http.alpha/methods #{:post :put :options}
+        :juxt.http.alpha/methods {:post {} :put {} :options {}}
         :juxt.http.alpha/acceptable "application/graphql"
         :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/put-handler
         :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/post-handler}]])
