@@ -13,33 +13,28 @@
    [juxt.dave.alpha.methods :as dave.methods]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha.authentication :as authn]
-   [juxt.pass.alpha.pdp :as pdp]
+   [juxt.pass.alpha.v3.authorization :as authz]
+   [juxt.pass.alpha.session :as session]
    [juxt.pick.alpha.core :refer [rate-representation]]
    [juxt.pick.alpha.ring :refer [decode-maybe]]
-   [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
    [juxt.reap.alpha.regex :as re]
-   [juxt.reap.alpha.rfc7231 :as rfc7231]
-   [juxt.reap.alpha.rfc7232 :as rfc7232]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.conditional :as conditional]
    [juxt.site.alpha.content-negotiation :as conneg]
-   [juxt.site.alpha.debug :as debug]
    [juxt.site.alpha.locator :as locator]
    [juxt.site.alpha.util :as util]
    [juxt.site.alpha.response :as response]
    [juxt.site.alpha.triggers :as triggers]
-   [juxt.site.alpha.rules :as rules])
+   [juxt.site.alpha.rules :as rules]
+   [juxt.apex.alpha :as-alias apex]
+   [juxt.http.alpha :as-alias http]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.site.alpha :as-alias site]
+   [juxt.reap.alpha.rfc7230 :as-alias rfc7230])
   (:import (java.net URI)))
-
-(alias 'apex (create-ns 'juxt.apex.alpha))
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'pick (create-ns 'juxt.pick.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
-(alias 'rfc7230 (create-ns 'juxt.reap.alpha.rfc7230))
 
 (defn join-keywords
   "Join method keywords into a single comma-separated string. Used for the Allow
@@ -211,15 +206,15 @@
       (response/add-payload)))
 
 (defn post-variant [{::site/keys [xt-node db uri]
-                     ::apex/keys [request-instance]
+                     ::apex/keys [request-payload]
                      :as req}]
   (let [location
-        (str uri (hash (select-keys request-instance [::site/resource ::site/variant])))
+        (str uri (hash (select-keys request-payload [::site/resource ::site/variant])))
         existing (xt/entity db location)]
 
     (->> (xt/submit-tx
           xt-node
-          [[:xtdb.api/put (merge {:xt/id location} request-instance)]])
+          [[:xtdb.api/put (merge {:xt/id location} request-payload)]])
          (xt/await-tx xt-node))
 
     (into req {:ring.response/status (if existing 204 201)
@@ -227,7 +222,7 @@
 
 (defn post-redirect [{::site/keys [xt-node db]
                       :as req}]
-  (let [resource-state (::apex/request-instance (openapi/validate-request-payload req))
+  (let [resource-state (::apex/request-payload (openapi/validate-request-payload req))
         {::site/keys [resource]} resource-state
         existing (xt/entity db resource)]
     (->> (xt/submit-tx
@@ -397,7 +392,7 @@
             [[:xtdb.api/put
               {:xt/id uri
                ::dave/resource-type :collection
-               ::http/methods #{:get :head :options :propfind}
+               ::http/methods {:get {} :head {} :options {} :propfind {}}
                ::http/content-type "text/html;charset=utf-8"
                ::http/content "<h1>Index</h1>\r\n"
                ::http/options {"DAV" "1"}}]])]
@@ -468,54 +463,113 @@
 
 (defn wrap-authenticate [h]
   (fn [{:ring.request/keys [method] :as req}]
+    ;; @mal: TODO: I think we can authenticate OPTIONS now, authenticate doesn't
+    ;; prevent access, authorization does.
     (let [sub (when-not (= method :options) (authn/authenticate req))]
       (h (cond-> req sub (assoc ::pass/subject sub))))))
 
-(defn wrap-authorize
+#_(defn wrap-authorize-with-acls [h]
+  (fn [{::pass/keys [session] ::site/keys [resource] :as req}]
+    (when (::pass/authorization resource)
+      (log/trace "Already authorized")
+      )
+    (h (cond-> req
+         ;; Only authorize if not already authorized
+         (not (::pass/authorization resource))
+         authz/authorize-resource))))
+
+#_(defn wrap-authorize-with-pdp
   ;; Do authorization as late as possible (in order to have as much data
   ;; as possible to base the authorization decision on. However, note
   ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
   ;; before checking any HTTP conditional header.".
   [h]
-  (fn [{:ring.request/keys [method] ::site/keys [db resource] ::pass/keys [subject] :as req}]
-    (let [request-context
-          {'subject subject
-           'resource (dissoc resource ::http/body ::http/content)
-           'request (select-keys
-                     req
-                     [:ring.request/headers :ring.request/method :ring.request/path
-                      :ring.request/query :ring.request/protocol :ring.request/remote-addr
-                      :ring.request/scheme :ring.request/server-name :ring.request/server-post
-                      :ring.request/ssl-client-cert
-                      ::site/uri])
-           'representation (dissoc resource ::http/body ::http/content)
-           'environment {}}
+  (fn [{:ring.request/keys [method] ::site/keys [db resource] ::pass/keys [subject session] :as req}]
+    (if (::pass/authorization resource)
+      ;; If authorization already established, this is sufficient
+      (do
+        (log/tracef "pre-authorized: %s" (::pass/authorization resource))
+        (h req))
+      ;; Otherwise, authorize with PDP
+      (let [request-context
+            {'subject subject
+             'resource (dissoc resource ::http/body ::http/content)
+             'request (select-keys
+                       req
+                       [:ring.request/headers :ring.request/method :ring.request/path
+                        :ring.request/query :ring.request/protocol :ring.request/remote-addr
+                        :ring.request/scheme :ring.request/server-name :ring.request/server-post
+                        :ring.request/ssl-client-cert
+                        ::site/uri])
+             'representation (dissoc resource ::http/body ::http/content)
+             'environment {}}
 
-          authz (when (not= method :options)
-                  (pdp/authorization db request-context))
+            authz (when (not= method :options)
+                    (pdp/authorization db request-context))
 
-          req (cond-> req
-                true (assoc ::pass/request-context request-context)
-                authz (assoc ::pass/authorization authz)
-                ;; If the max-content-length has been modified, update that in the
-                ;; resource
-                (::http/max-content-length authz)
-                (update ::site/resource
-                        assoc ::http/max-content-length (::http/max-content-length authz)))]
+            req (cond-> req
+                  true (assoc ::pass/request-context request-context)
+                  authz (update ::site/resource assoc ::pass/authorization authz)
+                  ;; If the max-content-length has been modified, update that in the
+                  ;; resource
+                  (::http/max-content-length authz)
+                  (update ::site/resource
+                          assoc ::http/max-content-length (::http/max-content-length authz)))]
 
-      (when (and (not= method :options)
-                 (not= (::pass/access authz) ::pass/approved))
-        (let [status (if-not (::pass/user subject) 401 403)]
+        (when (and (not= method :options)
+                   (not= (::pass/access authz) ::pass/approved))
+          (let [status
+                (if (or
+                     (::pass/user subject)
+                     ;; This is temporarily coupled to the new authz in order to
+                     ;; generate a correct 403 response. We need to rework this
+                     ;; to give these two authorization mechanisms independence
+                     ;; from each other.
+                     (:juxt.pass.jwt/sub session))
+                  403
+                  401)]
+            (throw
+             (ex-info
+              (case status 401  "Unauthorized" 403 "Forbidden")
+              {::site/request-context (assoc req :ring.response/status status)}))))
+        (h req)))))
+
+(defn wrap-authorize-with-actions [h]
+  (fn [{::pass/keys [subject]
+        ::site/keys [db resource]
+        :ring.request/keys [method]
+        :as req}]
+
+    (log/infof "AUTHORIZE: subject is %s" subject)
+
+    (let [actions (get-in resource [::http/methods method ::pass/actions])
+          permissions
+          (authz/check-permissions
+           db
+           actions
+           (cond-> {:subject (:xt/id subject)}
+             ;; When the resource is in the database, we can add it to the
+             ;; permission checking in case there's a specific permission for
+             ;; this resource.
+             (:xt/id resource) (assoc :resource (:xt/id resource))))]
+
+      (if (seq permissions)
+        (h (assoc req ::pass/permissions permissions))
+        (let [status (if subject 403 401)]
           (throw
            (ex-info
-            (case status 401  "Unauthorized" 403 "Forbidden")
-            {::site/request-context (assoc req :ring.response/status status)}))))
-      (h req))))
+            (case status
+              401 (format "No permission for actions: %s" (pr-str actions))
+              403 "No permission")
+            {::site/request-context (assoc req :ring.response/status status)})))))))
 
 (defn wrap-method-not-allowed? [h]
   (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
+    (when-not (map? (::http/methods resource))
+      (throw (ex-info "resource methods not map" {:resource resource
+                                                  ::site/request-context req})))
     (if resource
-      (let [allowed-methods (set (::http/methods resource))]
+      (let [allowed-methods (set (keys (::http/methods resource)))]
         (when-not (contains? allowed-methods method)
           (throw
            (ex-info
@@ -914,13 +968,7 @@
               {::http/content-type "text/html;charset=utf-8"
                ::http/content-length (count content)
                ::http/content content})
-            (let [content
-                  (str (status-message status)
-                       ;; For text/plain we might be using the site tool. Here,
-                       ;; we decide that providing a little more context to the
-                       ;; user outweighs the need to restrict information about
-                       ;; the underlying implementation.
-                       " – " (.getMessage e) "\r\n\r\n")]
+            (let [content (str (status-message status) "\r\n")]
               {::http/content-type "text/plain;charset=utf-8"
                ::http/content-length (count content)
                ::http/content content})])
@@ -962,8 +1010,7 @@
         ;; request (which is more recent), predominates but a catcher can always
         ;; override aspects, such as the ring.response/status.
 
-        #_(log/tracef e "wrap-error-handling, message: %s" (.getMessage e))
-        #_(log/tracef e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
+        (log/errorf e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
 
         (let [ex-data
               (-> (ex-data e)
@@ -979,7 +1026,7 @@
                 (let [ex-data (->storable ex-data)]
                   (log/errorf e "%s: %s" (.getMessage e) (pr-str (dissoc ex-data ::site/request-context)))))
 
-              (assert (::site/start-date rc) "HERE")
+              (assert (::site/start-date rc))
               (error-response rc e))
 
             (error-response
@@ -1205,17 +1252,24 @@
    ;; 501
    wrap-method-not-implemented?
 
+   ;; Authenticate
+   session/wrap-associate-session
+   wrap-authenticate
+
    ;; Locate resources
    wrap-locate-resource
    wrap-redirect
+
+   ;; We authorize the resource, prior to finding representations.
+   wrap-authorize-with-actions
 
    ;; Find representations and possibly do content negotiation
    wrap-find-current-representations
    wrap-negotiate-representation
 
-   ;; Authentication, authorization
-   wrap-authenticate
-   wrap-authorize
+   ;; Authorize - deprecated
+   #_wrap-authorize-with-acls
+   #_wrap-authorize-with-pdp
 
    ;; 405
    wrap-method-not-allowed?
@@ -1227,10 +1281,7 @@
    wrap-initialize-response
 
    ;; Methods (GET, PUT, POST, etc.)
-   wrap-invoke-method
-
-   ])
-
+   wrap-invoke-method])
 
 (defn make-handler [opts]
   ((apply comp (make-pipeline opts)) identity))

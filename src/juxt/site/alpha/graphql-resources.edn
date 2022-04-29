@@ -2,7 +2,7 @@
 ;; GraphQL SDL format)
 {:xt/id "{{base-uri}}/_site/graphql"
  :juxt.http.alpha/content-type "text/plain;charset=utf-8"
- :juxt.http.alpha/methods #{:get :head :post :put :options}
+ :juxt.http.alpha/methods {:get {} :head {} :post {} :put {} :options {}}
  :juxt.http.alpha/acceptable-on-put "application/graphql"
  :juxt.http.alpha/acceptable-on-post "application/json"
 

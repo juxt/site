@@ -7,11 +7,10 @@
    [juxt.site.alpha.debug :as debug]
    [juxt.site.alpha.static :as static]
    [juxt.site.alpha.cache :as cache]
-   [xtdb.api :as x]))
-
-(alias 'site (create-ns 'juxt.site.alpha))
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
+   [xtdb.api :as x]
+   [juxt.site.alpha :as-alias site]
+   [juxt.http.alpha :as-alias http]
+   [juxt.pass.alpha :as-alias pass]))
 
 (defn locate-with-locators [db req]
   (let [uri (::site/uri req)]
@@ -21,8 +20,20 @@
                      '{:find [r
                               grps]
 
-                       :where [(or [r ::site/type "ResourceLocator"]
-                                   [r ::site/type "AppRoutes"] )
+                       :where [(or [r ::site/type "AppRoutes"]
+
+                                   ;; Same as AppRoutes, but a more appropriate
+                                   ;; name in the case of a resource that isn't
+                                   ;; found in the database but does need to
+                                   ;; exist for the purposes of defining PUT
+                                   ;; semantics.
+                                   [r ::site/type "VirtualResource"]
+
+                                   ;; Deprecated because it relies on code
+                                   ;; deployed and we want to avoid this unless
+                                   ;; no alternative is possible.
+                                   [r ::site/type "ResourceLocator"])
+
                                [r ::site/pattern p]
                                [(first grps) grp0]
                                [(some? grp0)]
@@ -64,7 +75,7 @@
               (log/debugf "Calling locator-fn %s: %s" locator-fn description)
               (f {:db db :request req :locator locator :grps grps})))
 
-          "AppRoutes" locator)))))
+          ("AppRoutes" "VirtualResource") locator)))))
 
 (comment
   (put!
@@ -72,7 +83,7 @@
     ::site/type "AppRoutes"
     ::site/pattern (re-pattern "http://localhost:2021/ui/.*")
     ::pass/classification "PUBLIC"
-    ::http/methods #{:get :head :options}
+    ::http/methods {:get {} :head {} :options {}}
     ::http/content-type "text/html;charset=utf-8"
     ::http/content "<h1>App</h1>"}))
 
@@ -82,9 +93,12 @@
   "Call each locate-resource defmethod, in a particular order, ending
   in :default."
   [{::site/keys [db uri base-uri] :as req}]
+  (assert uri)
+  (assert base-uri)
+  (assert db)
   (or
    ;; We call OpenAPI location here, because a resource can be defined in
-   ;; OpenAPI, and exist in Xtdb, simultaneously.
+   ;; OpenAPI, and exist in XT, simultaneously.
    (openapi/locate-resource db uri req)
 
    ;; Is it in XTDB?
@@ -107,12 +121,14 @@
                                  :in [uri]}
                             uri))]
      {::site/uri uri
-      ::http/methods #{:get :head :options}
+      ::http/methods {:get {} :head {} :options {}}
       ::site/resource-provider r
       ::http/redirect (cond-> loc (.startsWith loc base-uri)
                               (subs (count base-uri)))})
 
    ;; Return a back-stop resource
-   {::site/resource-provider ::default-empty-resource
-    ::http/methods #{:get :head :options :put :post}
+   ;; TODO: I think this needs to be nil
+   nil
+   #_{::site/resource-provider ::default-empty-resource
+    ::http/methods {:get {} :head {} :options {} :put {} :post {}}
     ::site/put-fn static/put-static-resource}))

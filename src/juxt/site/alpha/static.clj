@@ -5,11 +5,10 @@
    [clojure.string :as str]
    [juxt.site.alpha.conditional :as conditional]
    [juxt.site.alpha.util :as util]
-   [xtdb.api :as xt]))
-
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
+   [xtdb.api :as xt]
+   [juxt.http.alpha :as-alias http]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.site.alpha :as-alias site]))
 
 (defn put-static-resource
   "PUT a new representation of the target resource. All other representations are
@@ -24,7 +23,7 @@
         pattern (get-in req [:ring.request/headers "site-pattern"])
         new-rep (merge
                  {:xt/id uri
-                  ::http/methods #{:get :head :options :put :patch}
+                  ::http/methods {:get {} :head {} :options {} :put {} :patch {}}
                   ::site/type "StaticRepresentation"}
                  existing
                  (cond->

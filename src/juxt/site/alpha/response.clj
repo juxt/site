@@ -6,12 +6,9 @@
    [juxt.site.alpha.selmer :as selmer]
    [clojure.walk :refer [postwalk]]
    [juxt.site.alpha.graphql.templating :as graphql-templating]
-   [clojure.tools.logging :as log]
-   [xtdb.api :as xt]))
-
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
+   [xtdb.api :as xt]
+   [juxt.http.alpha :as-alias http]
+   [juxt.site.alpha :as-alias site]))
 
 (declare add-payload)
 
@@ -70,6 +67,13 @@
 (defn process-template-model [template-model {::site/keys [db] :as req}]
   ;; A template model can be a stored query.
   (let [f (cond
+            (nil? template-model)
+            (throw
+             (ex-info
+              "Nil template-model. Template resources must have a :juxt.site.alpha/template-model attribute."
+              {:resource (::site/resource req)
+               ::site/request-context (assoc req :ring.response/status 500)}))
+
             ;; If a symbol, it is expected to be a resolvable internal function
             ;; (to support basic templates built on the request and internal
             ;; Site data).
@@ -165,9 +169,20 @@
          ::site/request-context (assoc req :ring.response/status 500)})))))
 
 (defn add-payload [{::site/keys [selected-representation db] :as req}]
-  (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
+  (let [{::http/keys [body content] ::site/keys [get-fn body-fn]} selected-representation
         template (some->> selected-representation ::site/template (xt/entity db))]
     (cond
+      get-fn
+      (if-let [f (cond-> get-fn (symbol? get-fn) requiring-resolve)]
+        (do
+          (log/debugf "Calling get-fn: %s %s" get-fn (type get-fn))
+          (f req))
+        (throw
+         (ex-info
+          (format "get-fn cannot be resolved: %s" body-fn)
+          {:get-fn get-fn
+           ::site/request-context (assoc req :ring.response/status 500)})))
+
       body-fn
       (if-let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
         (do
@@ -184,3 +199,9 @@
       content (assoc req :ring.response/body content)
       body (assoc req :ring.response/body body)
       :else req)))
+
+
+(defn redirect [req status location]
+  (-> req
+      (assoc :ring.response/status status)
+      (update :ring.response/headers assoc "location" location)))

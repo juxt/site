@@ -79,6 +79,9 @@
         ;; implements the relevant standards so any OAuth2 provided should work.
         com.auth0/java-jwt {:mvn/version "3.18.3"}
         com.auth0/jwks-rsa {:mvn/version "0.20.1"}
+
+        ;; Malli is used for authorization only
+        metosin/malli {:mvn/version "0.8.3"}
         }
 
  :aliases

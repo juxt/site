@@ -10,7 +10,9 @@
    [jsonista.core :as json]
    [clojure.java.shell :as sh]
    [io.aviso.ansi :as ansi]
+   [juxt.pass.alpha.application :as application]
    [juxt.pass.alpha.authentication :as authn]
+   [juxt.pass.alpha.v3.authorization :as authz]
    [juxt.site.alpha.graphql :as graphql]
    [juxt.grab.alpha.schema :as graphql.schema]
    [juxt.grab.alpha.document :as graphql.document]
@@ -21,13 +23,13 @@
    [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.init :as init]
    [clojure.string :as str]
-   [juxt.grab.alpha.parser :as parser])
+   [juxt.grab.alpha.parser :as parser]
+   [juxt.dave.alpha :as-alias dave]
+   [juxt.http.alpha :as-alias http]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.site.alpha :as-alias site]
+   [juxt.site.alpha.util :as util])
   (:import (java.util Date)))
-
-(alias 'dave (create-ns 'juxt.dave.alpha))
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
 
 (defn base64-reader [form]
   {:pre [(string? form)]}
@@ -131,7 +133,13 @@
    (->> (q '{:find [(pull e [:xt/id ::site/type])]
              :where [[e :xt/id]]})
         (map first)
-        (filter #(not= (::site/type %) "Request"))
+        (filter (fn [e]
+                  (not (#{"Request"
+                          "ActionLogEntry"
+                          "Session"
+                          "SessionToken"
+                          }
+                        (::site/type e)))))
         (map :xt/id)
         (sort-by str)))
   ([pat]
@@ -160,8 +168,6 @@
     (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd-HHmmss")
     (java.time.ZoneId/systemDefault))
    (java.time.Instant/now)))
-
-;; Start import at 00:35
 
 (defn resources-from-stream [in]
   (let [record (try
@@ -252,12 +258,12 @@
            (let [line (pr-str ent)]
              ;; Test the line can be read
              #_(try
-               (validate-resource-line line)
-               (catch Exception e
-                 (throw
-                  (ex-info
-                   (format "Serialization of entity '%s' will not be readable" (:xt/id ent))
-                   {:xt/id (:xt/id ent)} e))))
+                 (validate-resource-line line)
+                 (catch Exception e
+                   (throw
+                    (ex-info
+                     (format "Serialization of entity '%s' will not be readable" (:xt/id ent))
+                     {:xt/id (:xt/id ent)} e))))
              (.write w line)
              (.write w (System/lineSeparator))))
          (let [n (inc (first (last batch)))
@@ -269,7 +275,7 @@
      (printf "Dumped %d resources\n" (count resources)))))
 
 
-(defn cat-type
+#_(defn cat-type
   [t]
   (->> (q '{:find [(pull e [*])]
             :where [[e :xt/id]
@@ -278,13 +284,13 @@
        (map first)
        (sort-by str)))
 
-(defn rules []
+#_(defn rules []
   (sort-by
    str
    (map first
         (q '{:find [(pull e [*])] :where [[e ::site/type "Rule"]]}))))
 
-(defn uuid
+#_(defn uuid
   ([] (str (java.util.UUID/randomUUID)))
   ([s]
    (cond
@@ -323,66 +329,87 @@
        (println "Evicting" (count batch) "records")
        (println (apply evict! batch))))))
 
-(defn sessions []
+#_(defn sessions []
   (authn/expire-sessions! (java.util.Date.))
   (deref authn/sessions-by-access-token))
 
-(defn clear-sessions []
+#_(defn clear-sessions []
   (reset! authn/sessions-by-access-token {}))
 
-(defn superusers
+#_(defn superusers
   ([] (superusers (config)))
   ([{::site/keys [base-uri]}]
    (map first
         (xt/q (db) '{:find [user]
-                    :where [[user ::site/type "User"]
-                            [mapping ::site/type "UserRoleMapping"]
-                            [mapping ::pass/assignee user]
-                            [mapping ::pass/role superuser]]
-                    :in [superuser]}
-             (str base-uri "/_site/roles/superuser")))))
+                     :where [[user ::site/type "User"]
+                             [mapping ::site/type "UserRoleMapping"]
+                             [mapping ::pass/assignee user]
+                             [mapping ::pass/role superuser]]
+                     :in [superuser]}
+              (str base-uri "/_site/roles/superuser")))))
 
-(defn steps
+#_(defn admin-access-tokens
+  ([] (admin-access-tokens (db) (base-uri)))
+  ([db base-uri]
+   (map
+    first
+    (xt/q db {:find '[e]
+              :where [['e ::pass/client (str base-uri "/_site/apps/admin")]
+                      ['e ::site/type "AccessToken"]]}))))
+
+#_(defn steps
   ([] (steps (config)))
   ([opts]
    (let [{::site/keys [base-uri]} opts
          _ (assert base-uri)
          db (xt/db (xt-node))]
-     [;; Awaiting a fix to https://github.com/juxt/xtdb/issues/1480
+     [ ;; Awaiting a fix to https://github.com/juxt/xtdb/issues/1480
       #_{:complete? (and
-                   (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
-                   (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
-       :happy-message "Site transaction functions installed."
-       :sad-message "Site transaction functions not installed. "
-       :fix "Enter (put-site-txfns!) to fix this."}
+                     (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
+                     (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
+         :happy-message "Site transaction functions installed."
+         :sad-message "Site transaction functions not installed. "
+         :fix "Enter (put-site-txfns!) to fix this."}
 
-      {:complete? (xt/entity db (str base-uri "/_site/apis/site/openapi.json"))
-       :happy-message "Site API resources installed."
-       :sad-message "Site API not installed. "
-       :fix "Enter (put-site-api!) to fix this."}
+      #_{:complete? (xt/entity db (str base-uri "/_site/apis/site/openapi.json"))
+         :happy-message "Site API resources installed."
+         :sad-message "Site API not installed. "
+         :fix "Enter (put-site-api!) to fix this."}
 
-      {:complete? (xt/entity db (str base-uri "/_site/token"))
-       :happy-message "Authentication resources installed."
-       :sad-message "Authentication resources not installed. "
-       :fix "Enter (put-auth-resources!) to fix this."}
+      #_{:complete? (xt/entity db (str base-uri "/_site/token"))
+         :happy-message "Authentication resources installed."
+         :sad-message "Authentication resources not installed. "
+         :fix "Enter (put-auth-resources!) to fix this."}
 
-      {:complete? (xt/entity db (str base-uri "/_site/roles/superuser"))
-       :happy-message "Role of superuser exists."
-       :sad-message "Role of superuser not yet created."
-       :fix "Enter (put-superuser-role!) to fix this."}
+      #_{:complete? (xt/entity db (str base-uri "/_site/roles/superuser"))
+         :happy-message "Role of superuser exists."
+         :sad-message "Role of superuser not yet created."
+         :fix "Enter (put-superuser-role!) to fix this."}
 
-      {:complete? (pos? (count (superusers opts)))
-       :happy-message "At least one superuser exists."
-       :sad-message "No superusers exist."
-       :fix "Enter (put-superuser! <username> <fullname>) or (put-superuser! <username> <fullname> <password>) to fix this."}])))
+      #_{:complete? (pos? (count (superusers opts)))
+         :happy-message "At least one superuser exists."
+         :sad-message "No superusers exist."
+         :fix "Enter (put-superuser! <username> <fullname>) or (put-superuser! <username> <fullname> <password>) to fix this."}
 
-(defn status
+      #_{:complete? (xt/entity db (str base-uri "/_site/apps/admin"))
+       :happy-message "Admin app exists."
+       :sad-message "Admin app does not yet exist."
+       :fix "Enter (install-admin-app!) to fix this."}
+
+      #_{:complete? (seq (admin-access-tokens db base-uri))
+       :happy-message "Local admin access-token exists."
+       :sad-message "Local admin access-token does not yet exist."
+       :fix "Enter (create-local-admin-access-token! <subject>) to fix this."}
+
+      ])))
+
+#_(defn status
   ([] (status (steps (config))))
   ([steps]
    (println)
    (doseq [{:keys [complete? happy-message sad-message fix]} steps]
      (if complete?
-       (println "[✔] " (ansi/green happy-message))
+       (println "[X] " (ansi/green happy-message))
        (println
         "[ ] "
         (ansi/red sad-message)
@@ -390,90 +417,103 @@
    (println)
    (if (every? :complete? steps) :ok :incomplete)))
 
-(defn put-site-api! []
+#_(defn put-site-api! []
   (let [config (config)
         xt-node (xt-node)]
     (init/put-site-api! xt-node config)
     (status (steps config))))
 
-(defn put-auth-resources! []
+#_(defn install-admin-app! []
   (let [config (config)
         xt-node (xt-node)]
-    (init/put-openid-token-endpoint! xt-node config)
-    (init/put-login-endpoint! xt-node config)
-    (init/put-logout-endpoint! xt-node config)
+    (init/install-admin-app! xt-node config)
     (status (steps config))))
 
-(defn put-superuser-role! []
+#_(defn create-admin-access-token! [subject]
   (let [config (config)
         xt-node (xt-node)]
-    (init/put-superuser-role! xt-node config)
+    (init/create-admin-access-token! xt-node subject config)
     (status (steps config))))
 
-(defn get-password [pass-name]
-  (println "Getting password" pass-name)
-  (let [{:keys [exit out err]} (sh/sh "pass" "show" pass-name)]
-    (if (zero? exit) (str/trim out) (println (ansi/red "Failed to get password")))))
+#_(defn put-auth-resources! []
+    (let [config (config)
+          xt-node (xt-node)]
+      ;;(init/put-openid-token-endpoint! xt-node config)
+      ;;(init/put-login-endpoint! xt-node config)
+      ;;(init/put-logout-endpoint! xt-node config)
+      (status (steps config))))
 
-(defn put-superuser!
-  ([username fullname]
-   (if-let [password-prefix (:juxt.site.alpha.unix-pass/password-prefix (config))]
-     (if-let [password (get-password (str password-prefix username))]
-       (put-superuser! username fullname password)
-       (println (ansi/red "Failed to get password")))
-     (println (ansi/red "Password required!"))))
-  ([username fullname password]
-   (let [config (config)
-         xt-node (xt-node)]
-     (init/put-superuser!
-      xt-node
-      {:username username
-       :fullname fullname
-       :password password}
-      config)
-     (status (steps config)))))
+#_(defn put-superuser-role! []
+    (let [config (config)
+          xt-node (xt-node)]
+      (init/put-superuser-role! xt-node config)
+      (status (steps config))))
 
-(defn update-site-graphql
+#_(defn get-password [pass-name]
+    (println "Getting password" pass-name)
+    (let [{:keys [exit out err]} (sh/sh "pass" "show" pass-name)]
+      (if (zero? exit) (str/trim out) (println (ansi/red "Failed to get password")))))
+
+#_(defn put-superuser!
+    ([username fullname]
+     (if-let [password-prefix (:juxt.site.alpha.unix-pass/password-prefix (config))]
+       (if-let [password (get-password (str password-prefix username))]
+         (put-superuser! username fullname password)
+         (println (ansi/red "Failed to get password")))
+       (println (ansi/red "Password required!"))))
+    ([username fullname password]
+     (let [config (config)
+           xt-node (xt-node)]
+       (init/put-superuser!
+        xt-node
+        {:username username
+         :fullname fullname
+         :password password}
+        config)
+       (status (steps config)))))
+
+#_(defn update-site-graphql
   []
   (init/put-graphql-schema-endpoint! (xt-node) (config)))
 
-(defn init!
-  [username password]
-  (let [xt-node (xt-node)
-        config (config)]
-    (put-site-api!)
-    (put-auth-resources!)
-    (put-superuser-role!)
-    (put-superuser! username "Administrator" password)
-    (init/put-graphql-operations! xt-node config)
-    (init/put-graphql-schema-endpoint! xt-node config)
-    (init/put-request-template! xt-node config)))
+;; No longer any users so no username/password
+#_(defn init!
+    [username password]
+    (let [xt-node (xt-node)
+          config (config)]
+      (put-site-api!)
+      (put-auth-resources!)
+      (put-superuser-role!)
+      (put-superuser! username "Administrator" password)
+      (init/put-graphql-operations! xt-node config)
+      (init/put-graphql-schema-endpoint! xt-node config)
+      (init/put-request-template! xt-node config)))
 
-(defn allow-public-access-to-public-resources! []
+#_(defn allow-public-access-to-public-resources! []
   (let [config (config)
         xt-node (xt-node)]
     (init/allow-public-access-to-public-resources! xt-node config)))
 
-(defn put-site-txfns! []
+#_(defn put-site-txfns! []
   (let [config (config)
         xt-node (xt-node)]
     (init/put-site-txfns! xt-node config)
     (status)))
 
-(defn reset-password! [username password]
-  (let [user (str (::site/base-uri (config))  "/_site/users/" username)]
+#_(defn reset-password! [username password]
+  (let [user (str (::site/base-uri (config)) "/_site/users/" username)]
     (put!
      {:xt/id (str user "/password")
       ::site/type "Password"
-      ::http/methods #{:post}
+      ::http/methods {:post {}}
       ::pass/user user
       ::pass/password-hash (password/encrypt password)
       ::pass/classification "RESTRICTED"})))
 
-(defn user [username]
+#_(defn user [username]
   (e (format "%s/_site/users/%s" (::site/base-uri (config)) username)))
 
-(defn user-apps [username]
+#_(defn user-apps [username]
   (q '{:find [(pull application [*])]
        :keys [app]
        :where [[grant :juxt.site.alpha/type "Grant"]
@@ -485,8 +525,187 @@
        :in [username]}
      username))
 
-(defn introspect-graphql []
+#_(defn introspect-graphql []
   (let [config (config)
         schema (:juxt.grab.alpha/schema (e (format "%s/_site/graphql" (::site/base-uri config))))
         document (graphql.document/compile-document (graphql.parser/parse (slurp (io/file "opt/graphql/graphiql-introspection-query.graphql"))) schema)]
     (graphql/query schema document "IntrospectionQuery" {} {::site/db (db)})))
+
+(defn do-action [subject action & args]
+  (apply init/do-action (xt-node) subject action args))
+
+#_(defn do-action-with-purpose [action purpose & args]
+  (apply init/do-action-with-purpose (xt-node) action purpose args))
+
+(defn install-do-action-fn! []
+  (put! (authz/install-do-action-fn)))
+
+#_(defn install-repl-user! []
+  (put! {:xt/id (repl-subject)
+         ::site/type "Subject"
+         ::pass/identity (repl-identity)})
+  (put! {:xt/id (repl-identity)
+         ::site/type "Identity"}))
+
+(defn check-permissions [actions options]
+  (authz/check-permissions (db) actions options))
+
+#_(defn install-create-action! []
+  (init/install-create-action! (xt-node) (config)))
+
+#_(defn permit-create-action! []
+  (init/permit-create-action! (xt-node) (config)))
+
+#_(defn install-grant-permission-action! []
+  (init/install-grant-permission-action! (xt-node) (config)))
+
+#_(defn permit-grant-permission-action! []
+  (init/permit-grant-permission-action! (xt-node) (config)))
+
+#_(defn create-action! [action]
+  (init/create-action! (xt-node) (config) action))
+
+#_(defn grant-permission! [permission]
+  (init/grant-permission! (xt-node) (config) permission))
+
+(defn install-openid-provider! [issuer]
+  (init/install-openid-provider! (xt-node) issuer))
+
+(defn install-openid-resources!
+  [& options]
+  (apply init/install-openid-resources! (xt-node) (config) options))
+
+;; Needs a review
+#_(defn bootstrap-actions! []
+  (install-do-action-fn!)
+  (install-repl-user!)
+  ;;(install-create-action!)
+  (permit-create-action!)
+  (install-grant-permission-action!)
+  (permit-grant-permission-action!))
+
+
+#_(defn example-bootstrap! []
+  (bootstrap-actions!)
+
+  ;; Create create-person action
+  (create-action!
+   {:xt/id (str (base-uri) "/actions/create-person")
+    :juxt.pass.alpha/scope "write:admin"
+
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re (str (base-uri) "/people/\\p{Alpha}{2,}")]]
+      [:example/type [:= "Person"]]
+      [:example/name [:string]]]]
+
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0] 'merge {:example/type "Person"}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
+
+    ::pass/rules
+    '[
+      [(allowed? permission subject action resource)
+       [permission ::pass/subject subject]]]})
+
+  (grant-permission!
+   {:xt/id (str (base-uri) "/permissions/repl/create-person")
+    ::pass/subject (me)
+    ::pass/action #{(str (base-uri) "/actions/create-person")}
+    ::pass/purpose nil})
+
+  (do-action
+   (str (base-uri) "/actions/create-person")
+   {:xt/id (str (base-uri) "/people/alice")
+    :example/name "Alice"})
+
+  ;; Create the create-identity action
+  (create-action!
+   {:xt/id (str (base-uri) "/actions/create-identity")
+    :juxt.pass.alpha/scope "write:admin"
+
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:juxt.site.alpha/type [:= "Identity"]]
+      [:example/person [:re (str (base-uri) "/people/\\p{Alpha}{2,}")]]]]
+
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0] 'merge {:juxt.site.alpha/type "Identity"}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [permission :juxt.pass.alpha/subject subject]]]})
+
+  (grant-permission!
+   {:xt/id (str (base-uri) "/permissions/repl/create-identity")
+    :juxt.pass.alpha/subject "urn:site:subjects:repl"
+    :juxt.pass.alpha/action #{(str (base-uri) "/actions/create-identity")}
+    :juxt.pass.alpha/purpose nil})
+
+  (do-action
+   (str (base-uri) "/actions/create-identity")
+   {:xt/id (str (base-uri) "/identities/alice")
+    :example/person "https://site.test/people/alice"
+    :juxt.pass.jwt/iss "https://juxt.eu.auth0.com/"
+    :juxt.pass.jwt/sub "github|123456"}))
+
+(defn factory-reset! []
+  (apply evict! (->> (q '{:find [(pull e [:xt/id ::site/type])]
+                          :where [[e :xt/id]]})
+                     (map first)
+                     (map :xt/id))))
+
+(defn sessions []
+  (let [db (db)]
+    (for [tok (->> (q '{:find [e]
+                        :where [[e :xt/id]
+                                [e ::site/type "SessionToken"]]
+                        :in [t]} t)
+                   (map first)
+                   )
+          :let [session-id (::pass/session (xt/entity db tok))
+                session (xt/entity db session-id)
+                subject-id (::pass/subject session)
+                subject (xt/entity db subject-id)]]
+      {:session-token tok
+       :session session
+       :subject subject})))
+
+(defn evict-sessions! []
+  (let [db (db)]
+    (->>
+     (for [tok (->> (q '{:find [e]
+                         :where [[e :xt/id]
+                                 [e ::site/type "SessionToken"]]
+                         :in [t]} t)
+                    (map first)
+                    )
+           :let [session-id (::pass/session (xt/entity db tok))
+                 session (xt/entity db session-id)
+                 subject (::pass/subject session)]]
+       (remove nil? [tok session-id subject]))
+     (mapcat seq)
+     (apply evict!))))
+
+(defn make-application-doc [& options]
+  (apply application/make-application-doc options))
+
+(defn make-application-authorization-doc [& options]
+  (apply application/make-application-authorization-doc options))
+
+(defn make-access-token-doc [& options]
+  (apply application/make-access-token-doc options))
+
+(defn random-bytes [size]
+  (util/random-bytes size))
+
+(defn as-hex-str [bytes]
+  (util/as-hex-str bytes))
