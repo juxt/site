@@ -4,23 +4,23 @@
   (:require
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [xtdb.api :as x]
+   [xtdb.api :as xt]
    [jsonista.core :as json]
    [juxt.jinx.alpha :as jinx]
    [juxt.jinx.alpha.api :as jinx.api]
    [juxt.jinx.alpha.vocabularies.keyword-mapping :refer [process-keyword-mappings]]
    [juxt.jinx.alpha.vocabularies.transformation :refer [process-transformations]]
-   [juxt.pass.alpha.pdp :as pdp]
+   [juxt.pass.alpha.v3.authorization :as authz]
    [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha.perf :refer [fast-get-in]]
+   [juxt.site.alpha.return :refer [return]]
    [juxt.site.alpha.util :as util]
-   [ring.util.codec :refer [form-decode url-decode]])
+   [juxt.http.alpha :as-alias http]
+   [juxt.apex.alpha :as-alias apex]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.site.alpha :as-alias site]
+   [ring.util.codec :refer [form-decode]])
   (:import (java.net URLDecoder)))
-
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'apex (create-ns 'juxt.apex.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
 
 (defn put-openapi
   [{::site/keys [xt-node uri resource received-representation start-date] :as req}]
@@ -37,12 +37,12 @@
                        (.getBytes (pr-str openapi) "UTF-8")) 0 32))]
 
     (->>
-     (x/submit-tx
+     (xt/submit-tx
       xt-node
       [[:xtdb.api/put
         (merge
          {:xt/id uri
-          ::http/methods #{:get :head :options :put}
+          ::http/methods {:get {} :head {} :options {} :put {}}
           ::http/etag etag
           ::http/last-modified start-date
           ::site/type "OpenAPI"
@@ -52,7 +52,7 @@
           :title (get-in openapi ["info" "title"])
           :version (get-in openapi ["info" "version"])
           :description (get-in openapi ["info" "description"])})]])
-     (x/await-tx xt-node))
+     (xt/await-tx xt-node))
 
     (assoc req
            :ring.response/status
@@ -123,7 +123,7 @@
         openapi-ref (get resource ::apex/openapi)
         _ (assert openapi-ref)
 
-        openapi-resource (x/entity db openapi-ref)
+        openapi-resource (xt/entity db openapi-ref)
         _ (assert openapi-resource)
 
         instance (validate-instance req instance schema (::apex/openapi openapi-resource))
@@ -179,15 +179,19 @@
         openapi-ref (get resource ::apex/openapi)
         _ (assert openapi-ref)
 
-        openapi-resource (x/entity db openapi-ref)
+        openapi-resource (xt/entity db openapi-ref)
         _ (assert openapi-resource)
 
         instance (validate-instance req instance schema (::apex/openapi openapi-resource))]
 
     (assoc req ::apex/request-payload instance)))
 
-;; TODO: Should have some way of passing it 'raw' to some processing function
-;; that is able to turn it into resource state (a XT resource)?
+(condp (fn [pred els] (pred (count els))) []
+  zero? :zero
+  #(= 1 %) :one
+  #(< 1 %) :many)
+
+
 (defn put-resource-state
   "Put some new resource state into XT, if authorization checks pass. The new
   resource state should be a valid XT entity, with a :xt/id"
@@ -200,30 +204,8 @@
 
   (let [id (:xt/id new-resource-state)
         _ (assert id)
-        authorization
-        (pdp/authorization
-         db
-         {'subject subject
-          'resource resource
-          ;; might change to 'action' at
-          ;; this point
-          'request (select-keys req [:ring.request/method :ring.request/path])
-          'environment {}
-          'new-state new-resource-state})
 
-        _ (when-not (= (::pass/access authorization) ::pass/approved)
-            (log/debug "Unauthorized OpenAPI JSON instance"
-                       new-resource-state authorization)
-            (let [status (if-not (::pass/user subject) 401 403)
-                  message (case status
-                            401 "Unauthorized"
-                            403 "Forbidden")]
-              (throw
-               (ex-info
-                message
-                {::site/request-context (assoc req :ring.response/status status)}))))
-
-        already-exists? (x/entity db id)
+        already-exists? (xt/entity db id)
 
         last-modified start-date
         etag (format "\"%s\"" (-> received-representation
@@ -231,7 +213,15 @@
 
         ;; Link the resource state with the request that supplied it, for audit
         ;; and other purposes.
-        new-resource-state (assoc new-resource-state ::site/request request-id)]
+        new-resource-state (assoc new-resource-state ::site/request request-id)
+
+        pass-ctx (select-keys req [::pass/subject ::pass/purpose
+                                   ;; Wait, won't this be the resource xt/id? i.e. not the whole resource?
+                                   ::pass/resource
+                                   ])
+        action (get-in req [::site/resource ::apex/operation-action])
+        action-result (authz/do-action xt-node pass-ctx action new-resource-state)
+        _ (log/tracef "action result is %s" action-result)]
 
     ;; Since this resource is 'managed' by the locate-resource in this ns, we
     ;; don't have to worry about http attributes - these will be provided by
@@ -241,10 +231,9 @@
     ;; representation into the db anyway, if only to store the last-modified and
     ;; etag validators?
 
-    (->> (x/submit-tx
-          xt-node
-          [[:xtdb.api/put new-resource-state]])
-         (x/await-tx xt-node))
+    ;; Handle any error
+    (when-let [{:keys [message ex-data] :as error} (::site/error action-result)]
+      (return req (:ring.response/status error 500) message ex-data))
 
     (-> req
         (assoc :ring.response/status (if-not already-exists? 201 204)
@@ -270,7 +259,7 @@
 (defn path-entry->resource
   "From an OpenAPI path-to-path-object entry, return the corresponding resource if
   it matches the path. Path matching also considers path-parameters."
-  [{:ring.request/keys [method]}
+  [{:ring.request/keys [method] ::site/keys [base-uri] :as req}
    [path path-item-object] openapi openapi-uri rel-request-path]
 
   (let [path-param-defs
@@ -336,77 +325,129 @@
                              (assoc :inject-property inject-property))]))
 
             operation-object (get path-item-object (name method))
+            action (get operation-object "x-juxt-site-action")
 
             acceptable (str/join ", " (map first (get-in operation-object ["requestBody" "content"])))
 
-            methods (set
-                     (keep
-                      #{:get :head :post :put :delete :options :trace :connect}
-                      (let [methods (set
-                                     (conj (map keyword (keys path-item-object)) :options))]
-                        (cond-> methods
-                          (contains? methods :get)
-                          (conj :head)))))
+            ;; These methods are derived from the operations declared for each
+            ;; path, and the actions required.
+            methods
+            (let [methods
+                  (into
+                   {}
+                   (for [[mth operation-object] path-item-object]
+                     [(keyword mth)
+                      ;; We fish out the action and make the call conditional on
+                      ;; permission to call it. This will mean that permissions
+                      ;; will be searched for twice, once by the authorization
+                      ;; middlware, once in the do-action transaction. The
+                      ;; latter is necessary as it's in the tx-fn and defends
+                      ;; against inconsistency. Perhaps we don't need to
+                      ;; duplicate here, but then we need some other way of
+                      ;; ushering the request through the authorization
+                      ;; middleware.
+                      {::pass/actions #{(get operation-object "x-juxt-site-action")}}]))]
+              (cond-> methods
+                (contains? methods :get)
+                (conj [:head (get methods :get)])
+                (not (contains? methods :options))
+                (conj [:options
+                       {::pass/actions
+                        ;; The ability to request OPTIONS is required
+                        ;; for a number of use-cases (CORS pre-flight
+                        ;; requests) and should be separately
+                        ;; authorized. Here, we use a well-known
+                        ;; action.
+                        #{(format "%s/_site/actions/http-options" base-uri)}}])))
 
-            post-fn-sym (when (= method :post) (some-> (get operation-object "juxt.site.alpha/post-fn") symbol))
+            post-fn (when (= method :post)
+                      (let [post-fn-sym (some-> (get operation-object "juxt.site.alpha/post-fn") symbol)
+                            _ (when-not post-fn-sym
+                                (return req 500 "A POST method operation definition must include a juxt.site.alpha/post-fn" {:operation-object operation-object}))
+                            post-fn (try
+                                      (requiring-resolve post-fn-sym)
+                                      (catch IllegalArgumentException _
+                                        (return req 500 "Failed to resolve post-fn: %s" post-fn-sym)))]
+                        (when-not post-fn
+                          (return req 500 "The post-fn for the operation is nil" {:operation-object operation-object}))
+                        post-fn))
+
+            ;; TODO: Replace this convention with something more robust.
+            #_required-scope
+            #_(or
+             (some-> (get-in operation-object ["security" "oauth"]) set)
+             ;; If the security entry is an empty map, it means 'no scopes'
+             (when (= {} (get-in operation-object ["security"])) #{})
+             ;; otherwise, nil means no authorization (which means 'deny access')
+             )
 
             resource
-            {::site/resource-provider ::apex/openapi-path
+            (cond-> {::site/resource-provider ::apex/openapi-path
 
-             ;; This is useful, because it is the base document for any relative
-             ;; json pointers.
-             ;; TODO: Search for instances of apex/openapi and ensure they do (x/entity)
-             ::apex/openapi openapi-uri
+                     ;; This is useful, because it is the base document for any relative
+                     ;; json pointers.
+                     ;; TODO: Search for instances of apex/openapi and ensure they do (x/entity)
+                     ::apex/openapi openapi-uri
 
-             ::apex/operation operation-object
-             ::apex/openapi-path path
-             ::apex/openapi-path-params path-params
+                     ::apex/operation operation-object
+                     ::apex/openapi-path path
+                     ::apex/openapi-path-params path-params
+                     ::apex/operation-action action
 
-             ::http/methods methods
+                     ::http/methods methods
 
-             ::http/representations
-             (for [[media-type media-type-object]
-                   (fast-get-in path-item-object ["get" "responses" "200" "content"])]
-               (into
-                media-type-object
-                {::http/content-type media-type
-                 ;; Wait a second, if this doesn't get logged then we
-                 ;; can use a 'proper' function right?
-                 ::site/body-fn 'juxt.apex.alpha.representation-generation/entity-bytes-generator}))
+                     ;; TODO: Pull out the scopes from the document, find a grant for
+                     ;;each scope. The scope doesn't necessarily provide access to the
+                     ;;data, only the operation.
 
-             ;; TODO: The allowed origins ought to be specified in the top-level
-             ;; of the openapi document, or under the security section. This is
-             ;; just for testing.
-             ::site/access-control-allow-origins
-             {"http://localhost:8000"
-              {::site/access-control-allow-methods #{:get :put :post :delete}
-               ::site/access-control-allow-headers #{"authorization" "content-type"}
-               ::site/access-control-allow-credentials true}}
+                     ::http/representations
+                     (for [[media-type media-type-object]
+                           (fast-get-in path-item-object ["get" "responses" "200" "content"])]
+                       (into
+                        media-type-object
+                        {::http/content-type media-type
+                         ;; Wait a second, if this doesn't get logged then we
+                         ;; can use a 'proper' function right?
+                         ::site/body-fn 'juxt.apex.alpha.representation-generation/entity-bytes-generator}))
 
-             ;; TODO: Merge in any properties of a resource that is in
-             ;; XT - e.g. if this resource is a collection, what type
-             ;; of collection is it? Some properties that can be used in
-             ;; the PDP.
-             }]
+                     ;; TODO: The allowed origins ought to be specified in the top-level
+                     ;; of the openapi document, or under the security section. This is
+                     ;; just for testing.
+                     ::site/access-control-allow-origins
+                     {"http://localhost:8000"
+                      {::site/access-control-allow-methods #{:get :put :post :delete}
+                       ::site/access-control-allow-headers #{"authorization" "content-type"}
+                       ::site/access-control-allow-credentials true}}
+
+                     ;; TODO: Merge in any properties of a resource that is in
+                     ;; XT - e.g. if this resource is a collection, what type
+                     ;; of collection is it? Some properties that can be used in
+                     ;; the PDP.
+                     }
+              ;;required-scope (assoc ::apex/required-scope required-scope)
+              ;;true (authorize req)
+              )]
 
         ;; Add conditional entries to the resource
         (cond-> resource
           (seq acceptable) (assoc ::http/acceptable {"accept" acceptable})
 
-          post-fn-sym
-          (assoc
-           ::site/post-fn
-           (fn post-fn-proxy [req]
-             (assert ::site/start-date req)
-             (log/debug "Calling post-fn" post-fn-sym)
-             (let [f (try
-                       (requiring-resolve post-fn-sym)
-                       (catch IllegalArgumentException _
-                         (throw
-                          (ex-info
-                           (str "Failed to find post-fn: " post-fn-sym)
-                           {::site/request-context (assoc req :ring.response/status 500)}))))]
-               (f (validate-request-payload req)))))
+          post-fn (assoc ::site/post-fn post-fn)
+          ;; We no longer validate-request-payload so post-fn functions should do that
+          #_post-fn-sym
+          #_(assoc
+             ::site/post-fn
+             (fn post-fn-proxy [req]
+               (assert ::site/start-date req)
+               (log/debug "Calling post-fn" post-fn-sym)
+               (let [f (try
+                         (requiring-resolve post-fn-sym)
+                         (catch IllegalArgumentException _
+                           (throw
+                            (ex-info
+                             (str "Failed to find post-fn: " post-fn-sym)
+                             {::site/request-context (assoc req :ring.response/status 500)}))))]
+                 (f (validate-request-payload req)))))
 
           (= method :put)
           (assoc
@@ -434,6 +475,10 @@
    ;; could make this change.
    {::site/keys [base-uri] :as req}]
 
+  (assert uri)
+  (assert base-uri)
+  (assert db)
+
   ;; Do we have any OpenAPIs in the database?
   (or
    ;; The OpenAPI document
@@ -443,7 +488,7 @@
    (when (re-matches (re-pattern (format "%s/_site/apis/\\w+/openapi.json" base-uri)) uri)
      (or
       ;; It might exist
-      (some-> (x/entity db uri)
+      (some-> (xt/entity db uri)
               (assoc ::site/resource-provider ::openapi-document
                      ::site/put-fn put-openapi))
 
@@ -452,11 +497,11 @@
       {::site/resource-provider ::openapi-empty-document-resource
        ::site/description
        "Resource with no representations accepting a PUT of an OpenAPI JSON document."
-       ::http/methods #{:get :head :options :put}
-       ::http/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.0.2"}
+       ::http/methods {:get {} :head {} :options {} :put {}}
+       ::http/acceptable {"accept" "application/vnd.oai.openapi+json;version=3.1.0"}
        ::site/put-fn put-openapi}))
 
-   (let [openapis (x/q db '{:find [openapi-uri openapi]
+   (let [openapis (xt/q db '{:find [openapi-uri openapi]
                             :where [[openapi-uri ::apex/openapi openapi]]})
          matches
          (for [[openapi-uri openapi] openapis
@@ -482,7 +527,7 @@
 
        (if (= (count matches) 1)        ; this is the most common case
          (let [openapi-resource (first matches)
-               resource (merge openapi-resource (x/entity db uri))]
+               resource (merge openapi-resource (xt/entity db uri))]
            (if (every? ::jinx/valid? (vals (::apex/openapi-path-params openapi-resource)))
              resource
              (throw
