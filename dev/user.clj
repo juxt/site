@@ -46,3 +46,8 @@
   (println (ansi/yellow "Enter (help) for help"))
 
   :ready)
+
+(defn demo []
+  (require 'demo)
+  (in-ns 'demo)
+  )
