@@ -1,7 +1,7 @@
 ;; Copyright © 2021, JUXT LTD.
 
 {:paths ["src"]
- :deps {org.clojure/clojure {:mvn/version "1.10.1"}
+ :deps {org.clojure/clojure {:mvn/version "1.11.0"}
 
         ;; Project skeleton - also see src/config.edn
         integrant/integrant {:mvn/version "0.7.0"}
@@ -91,14 +91,18 @@
                 org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
               "-Dclojure.server.site={:port,50505,:accept,juxt.site.alpha.repl-server/repl}"
-              "-Dclojure.spec.check-asserts=true"]}
+              "-Dclojure.spec.check-asserts=true"
+              "--add-opens" "java.base/java.util.concurrent=ALL-UNNAMED"]}
 
   :test
   {:extra-paths ["test"]
    :extra-deps
    {lambdaisland/kaocha {:mvn/version "1.0.887"}
     lambdaisland/kaocha-junit-xml {:mvn/version "0.0.76"}
-    nrepl/nrepl {:mvn/version "0.9.0-beta4"}}}
+    nrepl/nrepl {:mvn/version "0.9.0"}
+    }
+   :jvm-opts ["--add-opens" "java.base/java.util.concurrent=ALL-UNNAMED"]
+   }
 
   :prod
   {:extra-paths ["prod"]
@@ -108,5 +112,6 @@
               "-Dcom.sun.management.jmxremote.port=8001"
               "--illegal-access=warn"]
    ;; nREPL can be useful debugging prod
-   :extra-deps {nrepl/nrepl {:mvn/version "0.9.0-beta4"}
-                org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}}}}}
+   :extra-deps {nrepl/nrepl {:mvn/version "0.9.0"}
+                org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}
+                }}}}
