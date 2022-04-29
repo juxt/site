@@ -1,6 +1,6 @@
 ;; Copyright © 2021, JUXT LTD.
 
-(ns juxt.site.graphql-test
+(ns juxt.site.deprecated.graphql-test
   (:require
    [xtdb.api :as x]
    [jsonista.core :as json]
