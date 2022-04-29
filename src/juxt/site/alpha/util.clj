@@ -30,6 +30,36 @@
      (let [digest (.digest hash)]
        (apply str (map #(format "%02x" (bit-and % 0xff)) digest))))))
 
+(defn uuid-str []
+  (str (java.util.UUID/randomUUID)))
+
+(defn uuid-bytes []
+  (.getBytes (uuid-str)))
+
+(defn sha
+  "Return a byte-array"
+  ([bytes] (sha bytes "SHA3-224"))
+  ([bytes algo]
+   (let [hash (java.security.MessageDigest/getInstance algo)]
+     (. hash update bytes)
+     (.digest hash))))
+
+(defn random-bytes [size]
+  (let [result (byte-array size)]
+    (.nextBytes (java.security.SecureRandom/getInstanceStrong) result)
+    result))
+
+(defn as-hex-str
+  "This uses java.util.HexFormat which requires Java 17 and above. If required,
+  this can be re-coded, see
+  https://stackoverflow.com/questions/9655181/how-to-convert-a-byte-array-to-a-hex-string-in-java
+  and similar. For the size parameter, try 12."
+  [bytes]
+  (.formatHex (java.util.HexFormat/of) bytes))
+
+(defn as-b64-str [bytes]
+  (.encodeToString (java.util.Base64/getEncoder) bytes))
+
 (def mime-types
   {"html" "text/html;charset=utf-8"
    "js" "application/javascript"
