@@ -357,19 +357,17 @@
               :where [['e ::pass/client (str base-uri "/_site/apps/admin")]
                       ['e ::site/type "AccessToken"]]}))))
 
-#_(defn steps
+(defn steps
   ([] (steps (config)))
   ([opts]
    (let [{::site/keys [base-uri]} opts
          _ (assert base-uri)
          db (xt/db (xt-node))]
      [ ;; Awaiting a fix to https://github.com/juxt/xtdb/issues/1480
-      #_{:complete? (and
-                     (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
-                     (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
-         :happy-message "Site transaction functions installed."
-         :sad-message "Site transaction functions not installed. "
-         :fix "Enter (put-site-txfns!) to fix this."}
+      {:complete? (xt/entity db "urn:site:tx-fns:do-action")
+       :happy-message "Site do-action transaction function installed."
+       :sad-message "Site do-action transaction function not installed. "
+       :fix "Enter (install-do-action-fn!) to fix this."}
 
       #_{:complete? (xt/entity db (str base-uri "/_site/apis/site/openapi.json"))
          :happy-message "Site API resources installed."
@@ -392,18 +390,18 @@
          :fix "Enter (put-superuser! <username> <fullname>) or (put-superuser! <username> <fullname> <password>) to fix this."}
 
       #_{:complete? (xt/entity db (str base-uri "/_site/apps/admin"))
-       :happy-message "Admin app exists."
-       :sad-message "Admin app does not yet exist."
-       :fix "Enter (install-admin-app!) to fix this."}
+         :happy-message "Admin app exists."
+         :sad-message "Admin app does not yet exist."
+         :fix "Enter (install-admin-app!) to fix this."}
 
       #_{:complete? (seq (admin-access-tokens db base-uri))
-       :happy-message "Local admin access-token exists."
-       :sad-message "Local admin access-token does not yet exist."
-       :fix "Enter (create-local-admin-access-token! <subject>) to fix this."}
+         :happy-message "Local admin access-token exists."
+         :sad-message "Local admin access-token does not yet exist."
+         :fix "Enter (create-local-admin-access-token! <subject>) to fix this."}
 
       ])))
 
-#_(defn status
+(defn status
   ([] (status (steps (config))))
   ([steps]
    (println)
