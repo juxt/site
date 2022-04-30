@@ -64,11 +64,6 @@
         ;; Time
         tick/tick {:mvn/version "0.5.0-RC4"}
 
-        ;; Removing AWS means we now need a direct dependency on this jar for an
-        ;; internal Nippy function. This is provided by later versions of XT, so
-        ;; we can remove this entry once an upgrade has been achieved.
-        pro.juxt.clojars-mirrors.com.taoensso/nippy {:mvn/version "3.1.1"}
-
         ;; Required for Slack integration
         lt.tokenmill/timewords {:mvn/version "0.5.0"}
 
