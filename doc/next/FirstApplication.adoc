@@ -14,7 +14,7 @@ access.
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=invoke-put-application!,indent=0]
+include::../../test/juxt/demo.clj[tag=invoke-put-application!,indent=0]
 ----
 ====
 
@@ -23,7 +23,7 @@ include::../../dev/demo.clj[tag=invoke-put-application!,indent=0]
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=invoke-authorize-application!,indent=0]
+include::../../test/juxt/demo.clj[tag=invoke-authorize-application!,indent=0]
 ----
 ====
 
@@ -32,7 +32,7 @@ include::../../dev/demo.clj[tag=invoke-authorize-application!,indent=0]
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-test-subject!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-test-subject!,indent=0]
 ----
 ====
 
@@ -41,7 +41,7 @@ include::../../dev/demo.clj[tag=create-test-subject!,indent=0]
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=invoke-issue-access-token!,indent=0]
+include::../../test/juxt/demo.clj[tag=invoke-issue-access-token!,indent=0]
 ----
 ====
 

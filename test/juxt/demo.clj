@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns demo
+(ns juxt.demo
   (:require
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]

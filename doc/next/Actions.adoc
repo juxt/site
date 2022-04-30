@@ -178,7 +178,7 @@ This gives us an opportunity to inspect the document structure of a real Action
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=install-create-action!,indent=0]
+include::../../test/juxt/demo.clj[tag=install-create-action!,indent=0]
 ----
 ====
 <1> The URI of the create-action Action. This may have to be modified if you have chosen a different base URI.
@@ -209,7 +209,7 @@ database.
 Type:
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=install-do-action-fn!,indent=0]
+include::../../test/juxt/demo.clj[tag=install-do-action-fn!,indent=0]
 ----
 into the REPL and evaluate.
 --

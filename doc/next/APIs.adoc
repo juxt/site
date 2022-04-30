@@ -6,12 +6,12 @@
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-put-api-resource!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-put-api-resource!,indent=0]
 ----
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-put-api-resource!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-api-resource!,indent=0]
 ----
 ====
 
@@ -20,12 +20,12 @@ include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-put-api-resour
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-list-identities!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-list-identities!,indent=0]
 ----
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=grant-permission-to-list-identities!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-list-identities!,indent=0]
 ----
 ====
 
@@ -34,7 +34,7 @@ include::../../dev/demo.clj[tag=grant-permission-to-list-identities!,indent=0]
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-list-users-api!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-list-users-api!,indent=0]
 ----
 ====
 

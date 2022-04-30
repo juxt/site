@@ -65,7 +65,7 @@ Permission (see <<example-put-permission-to-create-action>>).
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=permit-create-action!,indent=0]
+include::../../test/juxt/demo.clj[tag=permit-create-action!,indent=0]
 ----
 <1> Permissions are individual resources, and must have unique URIs.
 <2> Each Permission must have a `:juxt.site.alpha/type` attribute of "`Permission`".
@@ -107,7 +107,7 @@ action.
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-grant-permission-action!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-grant-permission-action!,indent=0]
 ----
 ====
 
@@ -132,7 +132,7 @@ This is shown in <<ex-permit-grant-permission-action>>.
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=permit-grant-permission-action!,indent=0]
+include::../../test/juxt/demo.clj[tag=permit-grant-permission-action!,indent=0]
 ----
 ====
 

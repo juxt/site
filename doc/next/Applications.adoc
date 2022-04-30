@@ -8,7 +8,7 @@
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-put-application!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-put-application!,indent=0]
 ----
 ====
 
@@ -19,7 +19,7 @@ include::../../dev/demo.clj[tag=create-action-put-application!,indent=0]
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-put-application!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-application!,indent=0]
 ----
 ====
 
@@ -28,7 +28,7 @@ include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-put-applicatio
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-authorize-application!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-authorize-application!,indent=0]
 ----
 ====
 
@@ -37,7 +37,7 @@ include::../../dev/demo.clj[tag=create-action-authorize-application!,indent=0]
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-authorize-application!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-authorize-application!,indent=0]
 ----
 ====
 
@@ -46,7 +46,7 @@ include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-authorize-appl
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-issue-access-token!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-issue-access-token!,indent=0]
 ----
 ====
 
@@ -55,6 +55,6 @@ include::../../dev/demo.clj[tag=create-action-issue-access-token!,indent=0]
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-issue-access-token!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-issue-access-token!,indent=0]
 ----
 ====

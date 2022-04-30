@@ -17,7 +17,7 @@ Subjects. That's the subject of this chapter.
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-put-user!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-put-user!,indent=0]
 ----
 ====
 
@@ -28,7 +28,7 @@ IMPORTANT: Do it!
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-put-identity!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-put-identity!,indent=0]
 ----
 ====
 
@@ -39,14 +39,14 @@ IMPORTANT: Do it!
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-put-subject!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-put-subject!,indent=0]
 ----
 ====
 
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-put-subject!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-subject!,indent=0]
 ----
 ====
 

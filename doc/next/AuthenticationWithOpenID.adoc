@@ -173,21 +173,21 @@ First we create the action:
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-put-identity!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-put-identity!,indent=0]
 ----
 
 Next, we grant the permission:
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-put-identity!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-identity!,indent=0]
 ----
 
 Finally, we create an action to get the identity.
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-get-identity!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-get-identity!,indent=0]
 ----
 ====
 
@@ -371,7 +371,7 @@ image::Auth0-Application-URIs.png[]
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=put-login-page!,indent=0]
+include::../../test/juxt/demo.clj[tag=put-login-page!,indent=0]
 ----
 ====
 ////
@@ -384,14 +384,14 @@ Now we can create an identity:
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-identity!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-identity!,indent=0]
 ----
 
 We shall also grant this identity the permission to read itself.
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=grant-permission-for-mal-to-get-mal!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-for-mal-to-get-mal!,indent=0]
 ----
 
 We can now test this in a browser. Navigate to https://site.test/~mal

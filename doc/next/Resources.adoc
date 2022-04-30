@@ -94,7 +94,7 @@ OPTIONS methods are allowed, and that these map onto the correct actions.
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-put-immutable-public-resource!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-put-immutable-public-resource!,indent=0]
 ----
 <1> We'll put this action in the `write:resource` scope
 <2> We add (or override) the HTTP methods allowed on this resource. Each entry is a mapping from an allowed method to a set of actions. This restricts the search for permissions to a set of actions. The fact that we don't specify any methods such as PUT, POST or DELETE that will change the resource is the reason we've named this action as creating an immutable public resource.
@@ -111,7 +111,7 @@ Now we must grant permission for our REPL user to use this action:
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=grant-permission-to-invoke-action-put-immutable-public-resource!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-immutable-public-resource!,indent=0]
 ----
 
 [IMPORTANT]
@@ -132,7 +132,7 @@ that now.
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-get-public-resource!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-get-public-resource!,indent=0]
 ----
 <1> We use a more appropriate scope that better reflects this action.
 <2> This is a very weak rule that matches a particular permission.
@@ -147,7 +147,7 @@ The rule of the `http://site.test/actions/get-public-resource` requires a specif
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=grant-permission-to-invoke-get-public-resource!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-get-public-resource!,indent=0]
 ----
 
 IMPORTANT: Do it!
@@ -165,7 +165,7 @@ resource that will print `Hello World!` on a web page.
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-hello-world-resource!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-hello-world-resource!,indent=0]
 ----
 
 [IMPORTANT]

@@ -17,7 +17,7 @@ Again, let's complete the following steps:
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-action-put-immutable-private-resource!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-put-immutable-private-resource!,indent=0]
 ----
 
 [IMPORTANT]
@@ -29,7 +29,7 @@ We'll grant this permission to our REPL user.
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=grant-permission-to-put-immutable-private-resource!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-put-immutable-private-resource!,indent=0]
 ----
 
 [IMPORTANT]
@@ -44,7 +44,7 @@ subject is not nil.
 [source,clojure]
 .Creating the `get-private-resource` action
 ----
-include::../../dev/demo.clj[tag=create-action-get-private-resource,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-get-private-resource,indent=0]
 ----
 
 [IMPORTANT]
@@ -61,7 +61,7 @@ But we must rememeber to create that single global permission:
 [source,clojure]
 .Creating the global grant on `get-private-resource` to authenticated users
 ----
-include::../../dev/demo.clj[tag=grant-permission-to-get-private-resource!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-get-private-resource!,indent=0]
 ----
 
 [IMPORTANT]
@@ -73,7 +73,7 @@ Now to create a private resource.
 
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=create-immutable-private-resource!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-immutable-private-resource!,indent=0]
 ----
 
 [IMPORTANT]

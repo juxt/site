@@ -38,7 +38,7 @@ invoking our actions.
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=install-user!,indent=0]
+include::../../test/juxt/demo.clj[tag=install-user!,indent=0]
 ----
 ====
 
@@ -96,7 +96,7 @@ s|Required
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=install-user-identity!,indent=0]
+include::../../test/juxt/demo.clj[tag=install-user-identity!,indent=0]
 ----
 ====
 
@@ -174,7 +174,7 @@ the User Identity when a User logs in.
 ====
 [source,clojure]
 ----
-include::../../dev/demo.clj[tag=install-subject!,indent=0]
+include::../../test/juxt/demo.clj[tag=install-subject!,indent=0]
 ----
 ====
 
