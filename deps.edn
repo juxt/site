@@ -9,10 +9,10 @@
         io.aviso/pretty {:mvn/version "0.1.35"}
 
         ;; XT
-        com.xtdb/xtdb-core {:mvn/version "1.20.0"}
-        com.xtdb/xtdb-rocksdb {:mvn/version "1.20.0"}
-        com.xtdb/xtdb-lucene {:mvn/version "1.20.0"}
-        com.xtdb/xtdb-http-server {:mvn/version "1.20.0"}
+        com.xtdb/xtdb-core {:mvn/version "1.21.0-beta3"}
+        com.xtdb/xtdb-rocksdb {:mvn/version "1.21.0-beta3"}
+        com.xtdb/xtdb-lucene {:mvn/version "1.21.0-beta3"}
+        com.xtdb/xtdb-http-server {:mvn/version "1.21.0-beta3"}
 
         ;; Jetty
         ring/ring-jetty-adapter {:mvn/version "1.9.5"}
