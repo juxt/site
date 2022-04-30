@@ -107,8 +107,7 @@
    :jvm-opts ["-Dcom.sun.management.jmxremote"
               "-Dcom.sun.management.jmxremote.ssl=false"
               "-Dcom.sun.management.jmxremote.authenticate=false"
-              "-Dcom.sun.management.jmxremote.port=8001"
-              "--illegal-access=warn"]
+              "-Dcom.sun.management.jmxremote.port=8001"]
    ;; nREPL can be useful debugging prod
    :extra-deps {nrepl/nrepl {:mvn/version "0.9.0"}
                 org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}
