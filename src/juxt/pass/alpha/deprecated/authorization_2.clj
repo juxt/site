@@ -2,7 +2,7 @@
 
 ;; Deprecated, kept because of make-access-token-doc and others
 
-(ns juxt.pass.alpha.authorization-2
+(ns juxt.pass.alpha.deprecated.authorization-2
   (:require
    [clojure.set :as set]
    [clojure.tools.logging :as log]

@@ -12,7 +12,7 @@
    [io.aviso.ansi :as ansi]
    [juxt.pass.alpha.application :as application]
    [juxt.pass.alpha.authentication :as authn]
-   [juxt.pass.alpha.v3.authorization :as authz]
+   [juxt.pass.alpha.authorization :as authz]
    [juxt.site.alpha.graphql :as graphql]
    [juxt.grab.alpha.schema :as graphql.schema]
    [juxt.grab.alpha.document :as graphql.document]

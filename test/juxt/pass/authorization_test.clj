@@ -9,7 +9,7 @@
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.malli :as-alias pass.malli]
    [juxt.pass.alpha.process :as-alias pass.process]
-   [juxt.pass.alpha.v3.authorization :as authz]
+   [juxt.pass.alpha.authorization :as authz]
    [juxt.site.alpha :as-alias site]
    [juxt.test.util :refer [with-xt submit-and-await! *xt-node*]]
    [xtdb.api :as xt]))

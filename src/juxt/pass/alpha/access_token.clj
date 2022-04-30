@@ -1,11 +1,10 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.alpha.v3.access-token
+(ns juxt.pass.alpha.access-token
   (:require
-   [juxt.site.alpha.util :refer [sha random-bytes as-hex-str as-b64-str uuid-bytes]]))
-
-(alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
+   [juxt.site.alpha.util :refer [random-bytes as-hex-str]]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.site.alpha :as-alias site]))
 
 (defn access-token-id->xt-id [token-id]
   (format "urn:site:access-token:%s" token-id))

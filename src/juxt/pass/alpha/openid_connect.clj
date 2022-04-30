@@ -39,8 +39,6 @@
     :ring.request/keys [query]
     :as req}]
 
-  ;;  (def req req)
-
   (let [{::pass/keys [oauth2-client]} resource
         {::pass/keys [oauth2-client-id redirect-uri openid-issuer-id]} (xt/entity db oauth2-client)
 

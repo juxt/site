@@ -10,7 +10,7 @@
    [juxt.jinx.alpha.api :as jinx.api]
    [juxt.jinx.alpha.vocabularies.keyword-mapping :refer [process-keyword-mappings]]
    [juxt.jinx.alpha.vocabularies.transformation :refer [process-transformations]]
-   [juxt.pass.alpha.v3.authorization :as authz]
+   [juxt.pass.alpha.authorization :as authz]
    [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha.perf :refer [fast-get-in]]
    [juxt.site.alpha.return :refer [return]]
