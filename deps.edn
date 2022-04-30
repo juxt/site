@@ -56,7 +56,7 @@
         json-html/json-html {:mvn/version "0.4.0"}
 
         ;; Selmer templating
-        selmer/selmer {:mvn/version "1.12.40"}
+        selmer/selmer {:mvn/version "1.12.50"}
 
         ;; REPL highlighting
         mvxcvi/puget {:mvn/version "1.3.1"}
