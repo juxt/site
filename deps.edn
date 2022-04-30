@@ -81,7 +81,7 @@
 
  :aliases
  {:dev
-  {:extra-paths ["dev" "test"]
+  {:extra-paths ["dev" "test" "repl"]
    :extra-deps { ;; Convenience libraries made available during development
                 org.clojure/test.check {:mvn/version "0.9.0"}
                 org.clojure/alpha.spec {:git/url "https://github.com/clojure/spec-alpha2.git"
@@ -103,7 +103,7 @@
    }
 
   :prod
-  {:extra-paths ["prod"]
+  {:extra-paths ["prod" "repl"]
    :jvm-opts ["-Dcom.sun.management.jmxremote"
               "-Dcom.sun.management.jmxremote.ssl=false"
               "-Dcom.sun.management.jmxremote.authenticate=false"
