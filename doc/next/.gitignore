@@ -1,7 +1,8 @@
 .asciidoctor/
 *.pdf
-authorization-flow.png
-authentication-flow.png
-*.png
 *.svg
-identity.json
+identity-model.json
+user-model.json
+cat.json
+fonts/
+stem-*.png

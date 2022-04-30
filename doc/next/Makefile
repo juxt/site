@@ -1,6 +1,9 @@
 .PHONY: watch
 
-Site.pdf:	$(wildcard *.adoc) identity-model.json user-model.json cat.json
+Site.pdf:	$(wildcard *.adoc) fonts identity-model.json user-model.json cat.json
+
+fonts:
+	cp -r ~/src/github.com/juxt/look/stationery/resources/fonts .
 
 %.json: %.edn
 	bb -o edn2json $< > $@
