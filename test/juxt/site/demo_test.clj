@@ -7,10 +7,11 @@
    [juxt.site.alpha.repl :as repl]
    [clojure.test :refer [deftest is are testing use-fixtures] :as t]
    [juxt.demo :as demo]
-   [juxt.test.util :refer [with-system-xt with-db submit-and-await! *xt-node* *db*]]
-   [xtdb.api :as xt]))
+   [juxt.test.util :refer [with-system-xt with-db submit-and-await! *xt-node* *db* *handler*] :as tutil]
+   [xtdb.api :as xt]
+   [juxt.site.alpha :as-alias site]))
 
-(defn with-initial-setup [f]
+(defn with-site-book-setup [f]
   (demo/demo-put-user!)
   (demo/demo-put-user-identity!)
   (demo/demo-put-subject!)
@@ -35,22 +36,39 @@
   (demo/demo-grant-permission-to-invoke-get-public-resource!)
   (demo/demo-create-hello-world-resource!)
 
-  ;; curl -i https://site.test/hello
-
   (f))
 
-(use-fixtures :each with-system-xt with-initial-setup with-db)
+(defn with-handler [f]
+  (binding [*handler*
+            (tutil/make-handler
+             {::site/xt-node *xt-node*
+              ::site/base-uri "https://site.test"
+              ::site/uri-prefix "https://site.test"})]
+    (f)))
 
-((t/join-fixtures [with-system-xt with-initial-setup with-db])
+(use-fixtures :each with-system-xt with-site-book-setup with-handler with-db)
+
+(deftest hello-test
+  ;; First, as something that can easily fail, we test the hello resource exists
+  ;; in the db
+  (is (xt/entity *db* "https://site.test/hello"))
+
+  (let [{:ring.response/keys [body]}
+        (*handler* {:ring.request/method :get
+                    :ring.request/path "/hello"})]
+    ;; Can we see the body of the resource?
+    (is (= "Hello World!\r\n" body))))
+
+
+#_((t/join-fixtures [with-system-xt with-site-book-setup with-handler with-db])
  (fn []
    ;;(:xtdb.kv/estimate-num-keys (xt/status *xt-node*))
    ;;(xt/entity (xt/db *xt-node*) "https://site.test/users/mal")
    *db*
    (repl/ls)
-   ))
 
-(deftest graphql-test
-  (is (xt/entity *db* "https://site.test/users/mal"))
-  (is (xt/entity *db* "https://site.test/identities/mal"))
-  (is (xt/entity *db* "https://site.test/subjects/repl-default"))
-  )
+   (*handler* {:ring.request/method :get
+                     :ring.request/path "/hello"})
+
+   ;; curl -i https://site.test/hello
+   ))
