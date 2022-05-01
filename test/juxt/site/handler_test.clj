@@ -10,7 +10,7 @@
    [juxt.test.util :refer [with-xt with-handler submit-and-await!
                            *xt-node* *handler*
                            install-test-resources!]]
-   [juxt.pass.alpha.v3.authorization :as authz]
+   [juxt.pass.alpha.authorization :as authz]
    [juxt.site.alpha.locator :as locator]
    [juxt.apex.alpha :as-alias apex]
    [juxt.http.alpha :as-alias http]

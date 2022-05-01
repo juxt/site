@@ -59,6 +59,8 @@
     ;; Can we see the body of the resource?
     (is (= "Hello World!\r\n" body))))
 
+;; Test private
+
 
 #_((t/join-fixtures [with-system-xt with-site-book-setup with-handler with-db])
  (fn []
