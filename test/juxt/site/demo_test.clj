@@ -70,21 +70,23 @@
 
 (deftest private-resource-test
   (is (xt/entity *db* "https://site.test/private.html"))
-  (let [{:ring.response/keys [status]}
-        (*handler* {:ring.request/method :get
-                    :ring.request/path "/private.html"})]
-    (is (= 401 status)))
+  (let [request {:ring.request/method :get
+                 :ring.request/path "/private.html"}]
 
-  (let [{:ring.response/keys [status]}
-        (*handler* {:ring.request/method :get
-                    :ring.request/path "/private.html"
-                    :ring.request/headers {"authorization" "Bearer test-access-token"}})]
-    (is (= 200 status))))
+    (is (= 401 (:ring.response/status (*handler* request))))
+
+    (is (= 200 (:ring.response/status
+                (*handler*
+                 (assoc
+                  request
+                  :ring.request/headers
+                  ;; Adding the bearer token should be all that is required
+                  {"authorization" "Bearer test-access-token"})))))))
 
 #_((t/join-fixtures [with-system-xt with-site-book-setup with-handler with-db])
- (fn []
-   (let [response
-         (*handler* {:ring.request/method :get
-                     :ring.request/path "/private.html"
-                     :ring.request/headers {"authorization" "Bearer test-access-token"}})]
-     (:ring.response/status response))))
+   (fn []
+     (let [response
+           (*handler* {:ring.request/method :get
+                       :ring.request/path "/private.html"
+                       :ring.request/headers {"authorization" "Bearer test-access-token"}})]
+       (:ring.response/status response))))
