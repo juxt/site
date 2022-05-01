@@ -4,6 +4,7 @@
   (:require
    [juxt.site.alpha.handler :as h]
    [xtdb.api :as xt]
+   [juxt.site.alpha.main :as main]
    [juxt.pass.alpha.authorization :as authz]
    [juxt.apex.alpha :as-alias apex]
    [juxt.http.alpha :as-alias http]
@@ -21,6 +22,12 @@
 (defn with-xt [f]
   (with-open [node (xt/start-node *opts*)]
     (binding [*xt-node* node]
+      (f))))
+
+(defn with-system-xt [f]
+  (with-open [node (xt/start-node *opts*)]
+    (binding [*xt-node* node
+              main/*system* {:juxt.site.alpha.db/xt-node node}]
       (f))))
 
 (defn submit-and-await! [transactions]
