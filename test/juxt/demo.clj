@@ -559,6 +559,92 @@
      ;; end::create-hello-world-with-html-template![]
      ))))
 
+;; Protecting Resources
+
+(defn demo-create-action-put-immutable-private-resource! []
+  ;; tag::create-action-put-immutable-private-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-immutable-private-resource"
+    :juxt.pass.alpha/scope "write:resource"
+
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/.*"]]]]
+
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in
+      [0] 'merge
+      {::http/methods
+       {:get {::pass/actions #{"https://site.test/actions/get-private-resource"}}
+        :head {::pass/actions #{"https://site.test/actions/get-private-resource"}}
+        :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
+
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]]]})
+  ;; end::create-action-put-immutable-private-resource![]
+  )
+
+(defn demo-grant-permission-to-put-immutable-private-resource! []
+  ;; tag::grant-permission-to-put-immutable-private-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/mal/put-immutable-private-resource"
+    :juxt.pass.alpha/user "https://site.test/users/mal"
+    :juxt.pass.alpha/action "https://site.test/actions/put-immutable-private-resource"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-put-immutable-private-resource![]
+  )
+
+(defn demo-create-action-get-private-resource! []
+  ;; tag::create-action-get-private-resource[]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/get-private-resource"
+    :juxt.pass.alpha/scope "read:resource"
+
+    :juxt.pass.alpha/rules
+    [
+     ['(allowed? permission subject action resource)
+      ['permission :juxt.pass.alpha/action "https://site.test/actions/get-private-resource"]
+      ['subject :juxt.pass.alpha/identity]]]})
+  ;; end::create-action-get-private-resource[]
+  )
+
+(defn demo-grant-permission-to-get-private-resource! []
+  ;; tag::grant-permission-to-get-private-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/any-subject/get-private-resource"
+    :juxt.pass.alpha/action "https://site.test/actions/get-private-resource"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-get-private-resource![]
+  )
+
+(defn demo-create-immutable-private-resource! []
+  ;; tag::create-immutable-private-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-immutable-private-resource"
+   {:xt/id "https://site.test/private.html"
+    :juxt.http.alpha/content-type "text/html;charset=utf-8"
+    :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"})
+  ;; end::create-immutable-private-resource![]
+  )
+
 
 #_(defn demo-grant-permission-to-invoke-action-put-identity! []
   (eval
@@ -781,110 +867,17 @@
      ;; end::create-list-users-api![]
      ))))
 
-;; Why 401? where is this coming from? perhaps if we gave permission to everyone to list-identities?
 
-;; Perhaps do private resources and authentication first
 
-;; Private resources and authentication
 
-(defn demo-create-action-put-immutable-private-resource! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-put-immutable-private-resource![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/put-immutable-private-resource"
-       :juxt.pass.alpha/scope "write:resource"
 
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/.*"]]]]
 
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in
-         [0] 'merge
-         {::http/methods
-          {:get {::pass/actions #{"https://site.test/actions/get-private-resource"}}
-           :head {::pass/actions #{"https://site.test/actions/get-private-resource"}}
-           :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
 
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]]
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? permission subject action resource)
-          [subject :juxt.pass.alpha/identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})
-     ;; end::create-action-put-immutable-private-resource![]
-     ))))
 
-(defn demo-grant-permission-to-put-immutable-private-resource! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-put-immutable-private-resource![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/grant-permission"
-      {:xt/id "https://site.test/permissions/mal/put-immutable-private-resource"
-       :juxt.pass.alpha/user "https://site.test/users/mal"
-       :juxt.pass.alpha/action "https://site.test/actions/put-immutable-private-resource"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-put-immutable-private-resource![]
-     ))))
 
-(defn demo-create-action-get-private-resource! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-get-private-resource[]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/get-private-resource"
-       :juxt.pass.alpha/scope "read:resource"
 
-       :juxt.pass.alpha/rules
-       [
-        ['(allowed? permission subject action resource)
-         ['permission :juxt.pass.alpha/action "https://site.test/actions/get-private-resource"]
-         ['subject :juxt.pass.alpha/identity]]]})
-     ;; end::create-action-get-private-resource[]
-     ))))
 
-(defn demo-grant-permission-to-get-private-resource! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-get-private-resource![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/grant-permission"
-      {:xt/id "https://site.test/permissions/any-subject/get-private-resource"
-       :juxt.pass.alpha/action "https://site.test/actions/get-private-resource"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-get-private-resource![]
-     ))))
-
-(defn demo-create-immutable-private-resource! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-immutable-private-resource![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/put-immutable-private-resource"
-      {:xt/id "https://site.test/private.html"
-       :juxt.http.alpha/content-type "text/html;charset=utf-8"
-       :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"})
-     ;; end::create-immutable-private-resource![]
-     ))))
 
 (defn demo-create-action-put-error-resource! []
   (eval

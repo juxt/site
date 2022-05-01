@@ -35,6 +35,11 @@
   (demo/demo-create-action-get-public-resource!)
   (demo/demo-grant-permission-to-invoke-get-public-resource!)
   (demo/demo-create-hello-world-resource!)
+  (demo/demo-create-action-put-immutable-private-resource!)
+  (demo/demo-grant-permission-to-put-immutable-private-resource!)
+  (demo/demo-create-action-get-private-resource!)
+  (demo/demo-grant-permission-to-get-private-resource!)
+  (demo/demo-create-immutable-private-resource!)
 
   (f))
 
@@ -59,18 +64,22 @@
     ;; Can we see the body of the resource?
     (is (= "Hello World!\r\n" body))))
 
+
+
 ;; Test private
+;;https://site.test/private.html
 
+(deftest private-resource-test
+  (is (xt/entity *db* "https://site.test/private.html"))
+  (let [{:ring.response/keys [status]}
+        (*handler* {:ring.request/method :get
+                    :ring.request/path "/private.html"})]
+    (is (= 401 status))))
 
-#_((t/join-fixtures [with-system-xt with-site-book-setup with-handler with-db])
- (fn []
-   ;;(:xtdb.kv/estimate-num-keys (xt/status *xt-node*))
-   ;;(xt/entity (xt/db *xt-node*) "https://site.test/users/mal")
-   *db*
-   (repl/ls)
+((t/join-fixtures [with-system-xt with-site-book-setup with-handler with-db])
+   (fn []
+     (*handler* {:ring.request/method :get
+                 :ring.request/path "/private.html"})
 
-   (*handler* {:ring.request/method :get
-                     :ring.request/path "/hello"})
-
-   ;; curl -i https://site.test/hello
-   ))
+     ;; curl -i https://site.test/hello
+     ))
