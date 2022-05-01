@@ -8,7 +8,7 @@
    [clojure.walk :refer [postwalk]]
    [clojure.string :as str]
    [malli.core :as m]
-   [juxt.site.alpha.repl :refer [base-uri put! install-do-action-fn!]]))
+   [juxt.site.alpha.repl :refer [base-uri put! install-do-action-fn! do-action]]))
 
 (defn substitute-actual-base-uri [form]
   (postwalk
@@ -46,36 +46,33 @@
   )
 
 (defn demo-install-create-action! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::install-create-action![]
-     (put!
-      {:xt/id "https://site.test/actions/create-action" ; <1>
-       :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
-       :juxt.pass.alpha/scope "write:admin"
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/actions/(.+)"]] ; <2>
-         [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/action"]]
-         [:juxt.pass.alpha/rules [:vector [:vector :any]]]]]
+  ;; tag::install-create-action![]
+  (put!
+   {:xt/id "https://site.test/actions/create-action" ; <1>
+    :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
+    :juxt.pass.alpha/scope "write:admin"
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/actions/(.+)"]] ; <2>
+      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/action"]]
+      [:juxt.pass.alpha/rules [:vector [:vector :any]]]]]
 
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in [0] ; <3>
-         'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/action"}]
-        [:juxt.pass.alpha.malli/validate] ; <4>
-        [:xtdb.api/put]] ; <5>
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0] ; <3>
+      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/action"}]
+     [:juxt.pass.alpha.malli/validate] ; <4>
+     [:xtdb.api/put]] ; <5>
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? permission subject action resource) ; <6>
-          [subject :juxt.pass.alpha/identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})
-     ;; end::install-create-action![]
-     ))))
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource) ; <6>
+       [subject :juxt.pass.alpha/identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]]]})
+  ;; end::install-create-action![]
+  )
 
 (defn demo-install-do-action-fn! []
   ;; tag::install-do-action-fn![]
@@ -84,55 +81,49 @@
   )
 
 (defn demo-permit-create-action! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::permit-create-action![]
-     (put!
-      {:xt/id "https://site.test/permissions/mal/create-action" ; <1>
-       :juxt.site.alpha/type "https://meta.juxt.site/pass/permission" ; <2>
-       :juxt.pass.alpha/user "https://site.test/users/mal" ; <3>
-       :juxt.pass.alpha/action "https://site.test/actions/create-action" ; <4>
-       :juxt.pass.alpha/purpose nil}) ; <5>
-     ;; end::permit-create-action![]
-     ))))
+  ;; tag::permit-create-action![]
+  (put!
+   {:xt/id "https://site.test/permissions/mal/create-action" ; <1>
+    :juxt.site.alpha/type "https://meta.juxt.site/pass/permission" ; <2>
+    :juxt.pass.alpha/user "https://site.test/users/mal" ; <3>
+    :juxt.pass.alpha/action "https://site.test/actions/create-action" ; <4>
+    :juxt.pass.alpha/purpose nil}) ; <5>
+  ;; end::permit-create-action![]
+  )
 
 (defn demo-create-grant-permission-action! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-grant-permission-action![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/grant-permission"
-       :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
-       :juxt.pass.alpha/scope "write:admin"
+  ;; tag::create-grant-permission-action![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/grant-permission"
+    :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
+    :juxt.pass.alpha/scope "write:admin"
 
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/permissions/(.+)"]]
-         [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/permission"]]
-         [:juxt.pass.alpha/action [:re "https://site.test/actions/(.+)"]]
-         [:juxt.pass.alpha/purpose [:maybe :string]]
-         ]]
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/permissions/(.+)"]]
+      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/permission"]]
+      [:juxt.pass.alpha/action [:re "https://site.test/actions/(.+)"]]
+      [:juxt.pass.alpha/purpose [:maybe :string]]
+      ]]
 
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in [0]
-         'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/permission"}]
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]]
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0]
+      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/permission"}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? permission subject action resource)
-          [subject :juxt.pass.alpha/identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})
-     ;; end::create-grant-permission-action![]
-     ))))
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]]]})
+  ;; end::create-grant-permission-action![]
+  )
 
 (defn demo-permit-grant-permission-action! []
   ;; tag::permit-grant-permission-action![]
@@ -145,239 +136,334 @@
   ;; end::permit-grant-permission-action![]
   )
 
+;; Users Revisited
+
 (defn demo-create-action-put-user! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-put-user![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/put-user"
-       :juxt.pass.alpha/scope "write:users"
+  ;; tag::create-action-put-user![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-user"
+    :juxt.pass.alpha/scope "write:users"
 
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/users/.*"]]
-         [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/user"]]]]
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/users/.*"]]
+      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/user"]]]]
 
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in [0]
-         'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/user"
-                 :juxt.http.alpha/methods
-                 {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user"}}
-                  :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user"}}
-                  :options {}}}]
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]]
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0]
+      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/user"
+              :juxt.http.alpha/methods
+              {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user"}}
+               :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user"}}
+               :options {}}}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? permission subject action resource)
-          [subject :juxt.pass.alpha/identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})
-     ;; end::create-action-put-user![]
-     ))))
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]]]})
+  ;; end::create-action-put-user![]
+  )
 
 (defn demo-create-action-put-identity! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-put-identity![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/put-identity"
-       :juxt.pass.alpha/scope "write:users"
+  ;; tag::create-action-put-identity![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-identity"
+    :juxt.pass.alpha/scope "write:users"
 
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/.*"]]
-         [:juxt.pass.alpha/user [:re "https://site.test/users/.+"]]
-         [:juxt.pass.jwt/iss {:optional true} [:re "https://.+"]]
-         [:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]]]
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/.*"]]
+      [:juxt.pass.alpha/user [:re "https://site.test/users/.+"]]
+      [:juxt.pass.jwt/iss {:optional true} [:re "https://.+"]]
+      [:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]]]
 
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in
-         [0] 'merge
-         {:juxt.site.alpha/type "https://meta.juxt.site/pass/identity"
-          :juxt.http.alpha/methods
-          {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-identity"}}
-           :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-identity"}}
-           :options {}}}]
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]]
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in
+      [0] 'merge
+      {:juxt.site.alpha/type "https://meta.juxt.site/pass/identity"
+       :juxt.http.alpha/methods
+       {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-identity"}}
+        :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-identity"}}
+        :options {}}}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? permission subject action resource)
-          [subject :juxt.pass.alpha/identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})
-     ;; end::create-action-put-identity![]
-     ))))
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]]]})
+  ;; end::create-action-put-identity![]
+  )
 
 (defn demo-create-action-put-subject! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-put-subject![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/put-subject"
-       ;;:juxt.pass.alpha/scope "write:users"
+  ;; tag::create-action-put-subject![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-subject"
+    ;;:juxt.pass.alpha/scope "write:users"
 
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/.*"]]
-         [:juxt.pass.alpha/identity [:re "https://site.test/identities/.+"]]
-         ]]
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/.*"]]
+      [:juxt.pass.alpha/identity [:re "https://site.test/identities/.+"]]
+      ]]
 
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in
-         [0] 'merge
-         {:juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}]
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]]
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in
+      [0] 'merge
+      {:juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? permission subject action resource)
-          [subject :juxt.pass.alpha/identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})
-     ;; end::create-action-put-subject![]
-     ))))
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]]]})
+  ;; end::create-action-put-subject![]
+  )
 
 (defn demo-grant-permission-to-invoke-action-put-subject! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-invoke-action-put-subject![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/grant-permission"
-      {:xt/id "https://site.test/permissions/mal/put-subject"
-       :juxt.pass.alpha/user "https://site.test/users/mal"
-       :juxt.pass.alpha/action "https://site.test/actions/put-subject"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-invoke-action-put-subject![]
-     ))))
+  ;; tag::grant-permission-to-invoke-action-put-subject![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/mal/put-subject"
+    :juxt.pass.alpha/user "https://site.test/users/mal"
+    :juxt.pass.alpha/action "https://site.test/actions/put-subject"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-invoke-action-put-subject![]
+  )
 
-#_(defn demo-bootstrap-actions! []
-  (demo-install-do-action-fn!)
-  (demo-put-repl-user!)
-  (demo-install-create-action!)
-  (demo-permit-create-action!)
-  (demo-create-grant-permission-action!)
-  (demo-permit-grant-permission-action!))
+;; Applications
+
+(defn demo-create-action-put-application! []
+  ;; tag::create-action-put-application![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-application"
+    :juxt.pass.alpha/scope "write:application"
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/applications/(.+)"]]
+      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/application"]]
+      [:juxt.pass.alpha/oauth2-client-id [:string {:min 10}]]
+      [:juxt.pass.alpha/oauth2-client-secret [:string {:min 16}]]]]
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0]
+      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/application"}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]
+     ]
+    :juxt.pass.alpha/rules
+    '[[(allowed? permission subject action resource)
+       [id :juxt.pass.alpha/user user]
+       [subject :juxt.pass.alpha/identity id]
+       [permission :juxt.pass.alpha/user user]]]})
+  ;; end::create-action-put-application![]
+  )
+
+(defn demo-grant-permission-to-invoke-action-put-application!! []
+  ;; tag::grant-permission-to-invoke-action-put-application![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/mal/put-application"
+    :juxt.pass.alpha/user "https://site.test/users/mal"
+    :juxt.pass.alpha/action "https://site.test/actions/put-application"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-invoke-action-put-application![]
+  )
+
+(defn demo-create-action-authorize-application! []
+  ;; tag::create-action-authorize-application![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/authorize-application"
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/authorizations/(.+)"]]
+      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/authorization"]]
+      [:juxt.pass.alpha/user [:re "https://site.test/users/(.+)"]]
+      [:juxt.pass.alpha/application [:re "https://site.test/applications/(.+)"]]
+      ;; A space-delimited list of permissions that the application requires.
+      [:juxt.pass.alpha/scope {:optional true} :string]]]
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0]
+      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/authorization"}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]
+     ]
+    :juxt.pass.alpha/rules
+    '[[(allowed? permission subject action resource)
+       [id :juxt.pass.alpha/user user]
+       [subject :juxt.pass.alpha/identity id]
+       [permission :juxt.pass.alpha/user user]]]})
+  ;; end::create-action-authorize-application![]
+  )
+
+(defn demo-grant-permission-to-invoke-action-authorize-application! []
+  ;; tag::grant-permission-to-invoke-action-authorize-application![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/mal/authorize-application"
+    :juxt.pass.alpha/user "https://site.test/users/mal"
+    :juxt.pass.alpha/action "https://site.test/actions/authorize-application"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-invoke-action-authorize-application![]
+  )
+
+(defn demo-create-action-issue-access-token! []
+  ;; tag::create-action-issue-access-token![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/issue-access-token"
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/access-tokens/(.+)"]]
+      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/access-token"]]
+      [:juxt.pass.alpha/subject [:re "https://site.test/subjects/(.+)"]]
+      [:juxt.pass.alpha/application [:re "https://site.test/applications/(.+)"]]
+      [:juxt.pass.alpha/scope {:optional true} :string]]]
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0]
+      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/access-token"}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]
+     ]
+    :juxt.pass.alpha/rules
+    '[[(allowed? permission subject action resource)
+       [id :juxt.pass.alpha/user user]
+       [subject :juxt.pass.alpha/identity id]
+       [permission :juxt.pass.alpha/user user]]]})
+  ;; end::create-action-issue-access-token![]
+  )
+
+(defn demo-grant-permission-to-invoke-action-issue-access-token! []
+  ;; tag::grant-permission-to-invoke-action-issue-access-token![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/mal/authorize-application"
+    :juxt.pass.alpha/user "https://site.test/users/mal"
+    :juxt.pass.alpha/action "https://site.test/actions/issue-access-token"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-invoke-action-issue-access-token![]
+  )
+
+;; Resources
 
 (defn demo-create-action-put-immutable-public-resource! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-put-immutable-public-resource![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/put-immutable-public-resource"
-       :juxt.pass.alpha/scope "write:resource" ; <1>
+  ;; tag::create-action-put-immutable-public-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-immutable-public-resource"
+    :juxt.pass.alpha/scope "write:resource" ; <1>
 
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/.*"]]]]
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/.*"]]]]
 
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in
-         [0] 'merge
-         {::http/methods                 ; <2>
-          {:get {::pass/actions #{"https://site.test/actions/get-public-resource"}}
-           :head {::pass/actions #{"https://site.test/actions/get-public-resource"}}
-           :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in
+      [0] 'merge
+      {::http/methods                 ; <2>
+       {:get {::pass/actions #{"https://site.test/actions/get-public-resource"}}
+        :head {::pass/actions #{"https://site.test/actions/get-public-resource"}}
+        :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
 
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? permission subject action resource) ; <3>
-          [subject :juxt.pass.alpha/identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})
-     ;; end::create-action-put-immutable-public-resource![]
-     ))))
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource) ; <3>
+       [subject :juxt.pass.alpha/identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]]]})
+  ;; end::create-action-put-immutable-public-resource![]
+  )
 
 (defn demo-grant-permission-to-invoke-action-put-immutable-public-resource! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-invoke-action-put-immutable-public-resource![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/grant-permission"
-      {:xt/id "https://site.test/permissions/mal/put-immutable-public-resource"
-       :juxt.pass.alpha/user "https://site.test/users/mal"
-       :juxt.pass.alpha/action "https://site.test/actions/put-immutable-public-resource"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-invoke-action-put-immutable-public-resource![]
-     ))))
+  ;; tag::grant-permission-to-invoke-action-put-immutable-public-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/mal/put-immutable-public-resource"
+    :juxt.pass.alpha/user "https://site.test/users/mal"
+    :juxt.pass.alpha/action "https://site.test/actions/put-immutable-public-resource"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-invoke-action-put-immutable-public-resource![]
+  )
 
 (defn demo-create-action-get-public-resource! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-get-public-resource![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/get-public-resource"
-       :juxt.pass.alpha/scope "read:resource" ; <1>
+  ;; tag::create-action-get-public-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/get-public-resource"
+    :juxt.pass.alpha/scope "read:resource" ; <1>
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? permission subject action resource)
-          [permission :xt/id "https://site.test/permissions/public-resources-to-all"] ; <2>
-          ]]})
-     ;; end::create-action-get-public-resource![]
-     ))))
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [permission :xt/id "https://site.test/permissions/public-resources-to-all"] ; <2>
+       ]]})
+  ;; end::create-action-get-public-resource![]
+  )
 
 (defn demo-grant-permission-to-invoke-get-public-resource! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-invoke-get-public-resource![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/grant-permission"
-      {:xt/id "https://site.test/permissions/public-resources-to-all"
-       :juxt.pass.alpha/action "https://site.test/actions/get-public-resource"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-invoke-get-public-resource![]
-     ))))
+  ;; tag::grant-permission-to-invoke-get-public-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/public-resources-to-all"
+    :juxt.pass.alpha/action "https://site.test/actions/get-public-resource"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-invoke-get-public-resource![]
+  )
 
 (defn demo-create-hello-world-resource! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-hello-world-resource![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/put-immutable-public-resource"
-      {:xt/id "https://site.test/hello"
-       :juxt.http.alpha/content-type "text/plain"
-       :juxt.http.alpha/content "Hello World!\r\n"})
-     ;; end::create-hello-world-resource![]
-     ))))
+  ;; tag::create-hello-world-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-immutable-public-resource"
+   {:xt/id "https://site.test/hello"
+    :juxt.http.alpha/content-type "text/plain"
+    :juxt.http.alpha/content "Hello World!\r\n"})
+  ;; end::create-hello-world-resource![]
+  )
 
 (defn demo-create-hello-world-html-representation! []
   (eval
@@ -920,52 +1006,9 @@
 
 ;; Applications
 
-(defn demo-create-action-put-application! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-put-application![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/put-application"
-       :juxt.pass.alpha/scope "write:application"
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/applications/(.+)"]]
-         [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/application"]]
-         [:juxt.pass.alpha/oauth2-client-id [:string {:min 10}]]
-         [:juxt.pass.alpha/oauth2-client-secret [:string {:min 16}]]]]
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in [0]
-         'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/application"}]
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]
-        ]
-       :juxt.pass.alpha/rules
-       '[[(allowed? permission subject action resource)
-          [id :juxt.pass.alpha/user user]
-          [subject :juxt.pass.alpha/identity id]
-          [permission :juxt.pass.alpha/user user]]]})
-     ;; end::create-action-put-application![]
-     ))))
 
-(defn demo-grant-permission-to-invoke-action-put-application!! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-invoke-action-put-application![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/grant-permission"
-      {:xt/id "https://site.test/permissions/mal/put-application"
-       :juxt.pass.alpha/user "https://site.test/users/mal"
-       :juxt.pass.alpha/action "https://site.test/actions/put-application"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-invoke-action-put-application![]
-     ))))
+
+
 
 (defn demo-invoke-put-application!! []
   (eval
@@ -982,53 +1025,9 @@
      ;; end::invoke-put-application![]
      ))))
 
-(defn demo-create-action-authorize-application! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-authorize-application![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/authorize-application"
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/authorizations/(.+)"]]
-         [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/authorization"]]
-         [:juxt.pass.alpha/user [:re "https://site.test/users/(.+)"]]
-         [:juxt.pass.alpha/application [:re "https://site.test/applications/(.+)"]]
-         ;; A space-delimited list of permissions that the application requires.
-         [:juxt.pass.alpha/scope {:optional true} :string]]]
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in [0]
-         'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/authorization"}]
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]
-        ]
-       :juxt.pass.alpha/rules
-       '[[(allowed? permission subject action resource)
-          [id :juxt.pass.alpha/user user]
-          [subject :juxt.pass.alpha/identity id]
-          [permission :juxt.pass.alpha/user user]]]})
-     ;; end::create-action-authorize-application![]
-     ))))
 
-(defn demo-grant-permission-to-invoke-action-authorize-application!! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-invoke-action-authorize-application![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/grant-permission"
-      {:xt/id "https://site.test/permissions/mal/authorize-application"
-       :juxt.pass.alpha/user "https://site.test/users/mal"
-       :juxt.pass.alpha/action "https://site.test/actions/authorize-application"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-invoke-action-authorize-application![]
-     ))))
+
+
 
 (defn demo-invoke-authorize-application!! []
   (eval
@@ -1045,52 +1044,7 @@
      ;; end::invoke-authorize-application![]
      ))))
 
-(defn demo-create-action-issue-access-token! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-issue-access-token![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/issue-access-token"
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/access-tokens/(.+)"]]
-         [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/access-token"]]
-         [:juxt.pass.alpha/subject [:re "https://site.test/subjects/(.+)"]]
-         [:juxt.pass.alpha/application [:re "https://site.test/applications/(.+)"]]
-         [:juxt.pass.alpha/scope {:optional true} :string]]]
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in [0]
-         'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/access-token"}]
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]
-        ]
-       :juxt.pass.alpha/rules
-       '[[(allowed? permission subject action resource)
-          [id :juxt.pass.alpha/user user]
-          [subject :juxt.pass.alpha/identity id]
-          [permission :juxt.pass.alpha/user user]]]})
-     ;; end::create-action-issue-access-token![]
-     ))))
-
-(defn demo-grant-permission-to-invoke-action-issue-access-token! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-invoke-action-issue-access-token![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/grant-permission"
-      {:xt/id "https://site.test/permissions/mal/authorize-application"
-       :juxt.pass.alpha/user "https://site.test/users/mal"
-       :juxt.pass.alpha/action "https://site.test/actions/issue-access-token"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-invoke-action-issue-access-token![]
-     ))))
+;; First Application
 
 (defn demo-create-test-subject! []
   (eval

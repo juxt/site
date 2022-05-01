@@ -11,8 +11,32 @@
    [xtdb.api :as xt]))
 
 (defn with-initial-setup [f]
-  (demo/demo-install-do-action-fn!)
   (demo/demo-put-user!)
+  (demo/demo-put-user-identity!)
+  (demo/demo-put-subject!)
+  (demo/demo-install-create-action!)
+  (demo/demo-install-do-action-fn!)
+  (demo/demo-permit-create-action!)
+  (demo/demo-create-grant-permission-action!)
+  (demo/demo-permit-grant-permission-action!)
+  (demo/demo-create-action-put-user!)
+  (demo/demo-create-action-put-identity!)
+  (demo/demo-create-action-put-subject!)
+  (demo/demo-grant-permission-to-invoke-action-put-subject!)
+  (demo/demo-create-action-put-application!)
+  (demo/demo-grant-permission-to-invoke-action-put-application!!)
+  (demo/demo-create-action-authorize-application!)
+  (demo/demo-grant-permission-to-invoke-action-authorize-application!)
+  (demo/demo-create-action-issue-access-token!)
+  (demo/demo-grant-permission-to-invoke-action-issue-access-token!)
+  (demo/demo-create-action-put-immutable-public-resource!)
+  (demo/demo-grant-permission-to-invoke-action-put-immutable-public-resource!)
+  (demo/demo-create-action-get-public-resource!)
+  (demo/demo-grant-permission-to-invoke-get-public-resource!)
+  (demo/demo-create-hello-world-resource!)
+
+  ;; curl -i https://site.test/hello
+
   (f))
 
 (use-fixtures :each with-system-xt with-initial-setup with-db)
@@ -27,4 +51,6 @@
 
 (deftest graphql-test
   (is (xt/entity *db* "https://site.test/users/mal"))
+  (is (xt/entity *db* "https://site.test/identities/mal"))
+  (is (xt/entity *db* "https://site.test/subjects/repl-default"))
   )
