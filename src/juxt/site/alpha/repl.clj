@@ -44,7 +44,7 @@
   (main/config))
 
 (defn system []
-  main/system)
+  main/*system*)
 
 (defn base-uri []
   (::site/base-uri (config)))
@@ -57,7 +57,7 @@
   :ok)
 
 (defn xt-node []
-  (:juxt.site.alpha.db/xt-node main/system))
+  (:juxt.site.alpha.db/xt-node (system)))
 
 (defn db []
   (xt/db (xt-node)))

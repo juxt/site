@@ -7,7 +7,7 @@
    [clojure.tools.logging :as log]
    [integrant.core :as ig]))
 
-(def system nil)
+(def ^:dynamic *system* nil)
 
 (def profile :prod)
 
@@ -64,5 +64,5 @@
      (Thread.
       (fn []
         (ig/halt! system))))
-    (alter-var-root #'system (constantly system)))
+    (alter-var-root #'*system* (constantly system)))
   @(promise))
