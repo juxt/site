@@ -43,7 +43,7 @@
   (println)
   (println "Welcome to Site!")
 
-  (println (ansi/yellow "Enter (help) for help"))
+  (println (ansi/yellow "Enter (help) for help, or (status) for status"))
 
   :ready)
 
