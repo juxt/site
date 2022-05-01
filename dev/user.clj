@@ -28,7 +28,7 @@
       (.delete f))))
 
 (defn start []
-  (println "Site by JUXT. Copyright (c) 2021, JUXT LTD.")
+  (println "Site by JUXT. Copyright (c) 2021-2022, JUXT LTD.")
   (println "Compiling code, please wait...")
   (delete-local-access-token)
   (log/info "Starting development system")
