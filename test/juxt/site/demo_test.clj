@@ -40,6 +40,10 @@
   (demo/demo-create-action-get-private-resource!)
   (demo/demo-grant-permission-to-get-private-resource!)
   (demo/demo-create-immutable-private-resource!)
+  (demo/demo-invoke-put-application!)
+  (demo/demo-invoke-authorize-application!)
+  (demo/demo-create-test-subject!)
+  (demo/demo-invoke-access-token!)
 
   (f))
 
@@ -64,22 +68,23 @@
     ;; Can we see the body of the resource?
     (is (= "Hello World!\r\n" body))))
 
-
-
-;; Test private
-;;https://site.test/private.html
-
 (deftest private-resource-test
   (is (xt/entity *db* "https://site.test/private.html"))
   (let [{:ring.response/keys [status]}
         (*handler* {:ring.request/method :get
                     :ring.request/path "/private.html"})]
-    (is (= 401 status))))
+    (is (= 401 status)))
 
-((t/join-fixtures [with-system-xt with-site-book-setup with-handler with-db])
-   (fn []
-     (*handler* {:ring.request/method :get
-                 :ring.request/path "/private.html"})
+  (let [{:ring.response/keys [status]}
+        (*handler* {:ring.request/method :get
+                    :ring.request/path "/private.html"
+                    :ring.request/headers {"authorization" "Bearer test-access-token"}})]
+    (is (= 200 status))))
 
-     ;; curl -i https://site.test/hello
-     ))
+#_((t/join-fixtures [with-system-xt with-site-book-setup with-handler with-db])
+ (fn []
+   (let [response
+         (*handler* {:ring.request/method :get
+                     :ring.request/path "/private.html"
+                     :ring.request/headers {"authorization" "Bearer test-access-token"}})]
+     (:ring.response/status response))))

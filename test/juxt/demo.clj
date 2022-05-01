@@ -8,7 +8,8 @@
    [clojure.walk :refer [postwalk]]
    [clojure.string :as str]
    [malli.core :as m]
-   [juxt.site.alpha.repl :refer [base-uri put! install-do-action-fn! do-action]]))
+   [juxt.site.alpha.repl :refer [base-uri put! install-do-action-fn! do-action make-application-doc make-application-authorization-doc make-access-token-doc]]
+   [juxt.site.alpha.util :refer [as-hex-str random-bytes]]))
 
 (defn substitute-actual-base-uri [form]
   (postwalk
@@ -645,6 +646,63 @@
   ;; end::create-immutable-private-resource![]
   )
 
+;; First Application
+
+(defn demo-invoke-put-application! []
+  ;; tag::invoke-put-application![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-application"
+   (make-application-doc
+    :prefix "https://site.test/applications/"
+    :client-id "local-terminal"
+    :client-secret (as-hex-str (random-bytes 20))))
+  ;; end::invoke-put-application![]
+  )
+
+(defn demo-invoke-authorize-application! []
+  ;; tag::invoke-authorize-application![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/authorize-application"
+   (make-application-authorization-doc
+    :prefix "https://site.test/authorizations/"
+    :user "https://site.test/users/mal"
+    :application "https://site.test/applications/local-terminal"))
+  ;; end::invoke-authorize-application![]
+  )
+
+(defn demo-create-test-subject! []
+  ;; tag::create-test-subject![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-subject"
+   {:xt/id "https://site.test/subjects/test"
+    :juxt.pass.alpha/identity "https://site.test/identities/mal"}
+   )
+  ;; end::create-test-subject![]
+  )
+
+(defn demo-invoke-access-token! []
+  ;; tag::invoke-issue-access-token![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/issue-access-token"
+   (make-access-token-doc
+    :token "test-access-token"
+    :prefix "https://site.test/access-tokens/"
+    :subject "https://site.test/subjects/test"
+    :application "https://site.test/applications/local-terminal"
+    :scope "read:admin"
+    :expires-in-seconds (* 5 60)))
+  ;; end::invoke-issue-access-token![]
+  )
+
+
+
+
+
+
 
 #_(defn demo-grant-permission-to-invoke-action-put-identity! []
   (eval
@@ -963,25 +1021,6 @@
      )))
   )
 
-(defn demo-bootstrap-resources! []
-  (demo-create-action-put-immutable-public-resource!)
-  (demo-grant-permission-to-invoke-action-put-immutable-public-resource!)
-  (demo-create-action-get-public-resource!)
-  (demo-grant-permission-to-invoke-get-public-resource!)
-
-  (demo-create-action-put-immutable-private-resource!)
-  (demo-grant-permission-to-put-immutable-private-resource!)
-  (demo-create-action-get-private-resource!)
-
-  ;; This is 'just' an example showing how to create a /privte.html resource. We
-  ;; don't want this resource part of every install!
-  ;; (demo-create-immutable-private-resource!)
-
-  (demo-create-action-put-error-resource!)
-  (demo-grant-permission-to-put-error-resource!)
-  (demo-put-unauthorized-error-resource!)
-  (demo-put-unauthorized-error-representation-for-html!))
-
 (defn demo-put-unauthorized-error-representation-for-html-with-login-link! []
   (eval
    (substitute-actual-base-uri
@@ -995,78 +1034,4 @@
        :juxt.http.alpha/content-type "text/html;charset=utf-8"
        :juxt.http.alpha/content (slurp "dev/unauthorized.html")})
      ;; end::put-unauthorized-error-representation-for-html-with-login-link![]
-     ))))
-
-;; Applications
-
-
-
-
-
-(defn demo-invoke-put-application!! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::invoke-put-application![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/put-application"
-      (make-application-doc
-       :prefix "https://site.test/applications/"
-       :client-id "local-terminal"
-       :client-secret (as-hex-str (random-bytes 20))))
-     ;; end::invoke-put-application![]
-     ))))
-
-
-
-
-
-(defn demo-invoke-authorize-application!! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::invoke-authorize-application![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/authorize-application"
-      (make-application-authorization-doc
-       :prefix "https://site.test/authorizations/"
-       :user "https://site.test/users/mal"
-       :application "https://site.test/applications/local-terminal"))
-     ;; end::invoke-authorize-application![]
-     ))))
-
-;; First Application
-
-(defn demo-create-test-subject! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-test-subject![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/put-subject"
-      {:xt/id "https://site.test/subjects/test"
-       :juxt.pass.alpha/identity "https://site.test/identities/mal"}
-      )
-     ;; end::create-test-subject![]
-     ))))
-
-(defn demo-invoke-access-token! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::invoke-issue-access-token![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/issue-access-token"
-      (make-access-token-doc
-       :token "test-access-token"
-       :prefix "https://site.test/access-tokens/"
-       :subject "https://site.test/subjects/test"
-       :application "https://site.test/applications/local-terminal"
-       :scope "read:admin"
-       :expires-in-seconds (* 5 60)))
-     ;; end::invoke-issue-access-token![]
      ))))
