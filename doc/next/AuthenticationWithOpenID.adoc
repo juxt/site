@@ -89,6 +89,7 @@ These steps will be described in more detail in subsequent sections. But before
 we get to them, we should first explain about how the identity of an end-user is
 represented in Site.
 
+////
 [[identities]]
 == Identities
 
@@ -190,6 +191,7 @@ Finally, we create an action to get the identity.
 include::../../test/juxt/demo.clj[tag=create-action-get-identity!,indent=0]
 ----
 ====
+////
 
 [[selecting-openid-provider]]
 == Selecting an OpenID Provider
@@ -376,6 +378,7 @@ include::../../test/juxt/demo.clj[tag=put-login-page!,indent=0]
 ====
 ////
 
+////
 [[creating-identities]]
 == Creating identities
 
@@ -396,6 +399,7 @@ include::../../test/juxt/demo.clj[tag=grant-permission-for-mal-to-get-mal!,inden
 
 We can now test this in a browser. Navigate to https://site.test/~mal
 ====
+////
 
 == Authenticating an end-user
 
