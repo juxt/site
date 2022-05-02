@@ -80,13 +80,13 @@ s|Required
 |A reference to a User.
 s|Required
 
-|:juxt.pass.jwt/iss
-|The OpenID Issuer Identifier, e.g. "+https://juxt.eu.auth0.com/+"
-|Optional
+// |:juxt.pass.jwt/iss
+// |The OpenID Issuer Identifier, e.g. "+https://juxt.eu.auth0.com/+"
+// |Optional
 
-|:juxt.pass.jwt/sub
-|The OpenID Subject Identifier, e.g. "+johndoe+"
-|Optional
+// |:juxt.pass.jwt/sub
+// |The OpenID Subject Identifier, e.g. "+johndoe+"
+// |Optional
 |===
 
 === Create a User Identity
