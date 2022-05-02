@@ -1,9 +1,22 @@
 = Applications
 :toc: left
 
-NOTE: In OAuth, Applications are created and authorized by an authorization
+[NOTE]
+--
+In OAuth, Applications are created and authorized by an authorization
 server. The actions described in this chapter could be part of another Site
 instance which carries out the duties of an OAuth Authorization Server.
+
+[quote,https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05#section-1.3.3]
+____
+The authorization server
+may be the same server as the resource server…
+____
+
+Should we consider having a different hostname for entities managed by the
+Authorization Server, e.g. `auth.site.test` ?
+--
+
 
 == Create the action to create an application
 
