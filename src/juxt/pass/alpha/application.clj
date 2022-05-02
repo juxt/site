@@ -8,8 +8,8 @@
 
 (defn make-application-doc [& {:keys [prefix client-id client-secret]}]
   {:xt/id (str prefix client-id)
-   ::pass/oauth2-client-id client-id
-   ::pass/oauth2-client-secret client-secret})
+   ::pass/oauth-client-id client-id
+   ::pass/oauth-client-secret client-secret})
 
 (defn make-application-authorization-doc [& {:keys [prefix user application]}]
   {:xt/id (str prefix (as-hex-str (random-bytes 10)))

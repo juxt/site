@@ -39,14 +39,14 @@
     :ring.request/keys [query]
     :as req}]
 
-  (let [{::pass/keys [oauth2-client]} resource
-        {::pass/keys [oauth2-client-id redirect-uri openid-issuer-id]} (xt/entity db oauth2-client)
+  (let [{::pass/keys [oauth-client]} resource
+        {::pass/keys [oauth-client-id redirect-uri openid-issuer-id]} (xt/entity db oauth-client)
 
         query-params (some-> req :ring.request/query (codec/form-decode "US-ASCII") )
         return-to (get query-params "return-to")
 
-        _ (when-not oauth2-client-id
-            (return req 500 "No oauth2 client id found" {}))
+        _ (when-not oauth-client-id
+            (return req 500 "No oauth client id found" {}))
         _ (when-not redirect-uri
             (return req 500 "A :juxt.pass.alpha/redirect entry must be specified" {}))
 
@@ -72,7 +72,7 @@
         (codec/form-encode
          {"response_type" "code"
           "scope" "openid name picture profile email" ; TODO: configure in the XT entity
-          "client_id" oauth2-client-id
+          "client_id" oauth-client-id
           "redirect_uri" redirect-uri
           "state" state
           "nonce" nonce
@@ -91,7 +91,7 @@
   (when kid
     (some (fn [m] (when (= kid (get m "kid")) m)) (get jwks "keys"))))
 
-(defn decode-id-token [req jwt jwks openid-configuration oauth2-client-id]
+(defn decode-id-token [req jwt jwks openid-configuration oauth-client-id]
   (when jwt
     (let [decoded-jwt (JWT/decode jwt)
           kid (.getKeyId decoded-jwt)
@@ -127,10 +127,10 @@
 
       ;; Also see https://openid.net/specs/openid-connect-core-1_0.html section
       ;; 2, aud MUST be the OAuth 2.0 client_id.
-      (when-not (= oauth2-client-id (get claims "aud"))
+      (when-not (= oauth-client-id (get claims "aud"))
         (return req 500
                 "Audience claim must be the OAuth 2.0 client id"
-                {:client-id oauth2-client-id
+                {:client-id oauth-client-id
                  :aud (get claims "aud")}))
 
       ;; 6. The Client MUST validate the signature of all other ID Tokens
@@ -275,9 +275,9 @@
     (return req 500 "No session found" {}))
 
   ;; Exchange code for JWT
-  (let [{::pass/keys [oauth2-client]} resource
-        {::pass/keys [oauth2-client-id oauth2-client-secret redirect-uri openid-issuer-id]}
-        (xt/entity db oauth2-client)
+  (let [{::pass/keys [oauth-client]} resource
+        {::pass/keys [oauth-client-id oauth-client-secret redirect-uri openid-issuer-id]}
+        (xt/entity db oauth-client)
 
         openid-configuration (some-> openid-issuer-id (lookup db) ::pass/openid-configuration)
 
@@ -304,11 +304,11 @@
         _ (when-not code
             (return req 500 "No code returned from provider" {}))
 
-        _ (when-not oauth2-client-id
-            (return req 500 "The required OAuth2 client id was not found" {}))
+        _ (when-not oauth-client-id
+            (return req 500 "The required OAuth client id was not found" {}))
 
-        _ (when-not oauth2-client-secret
-            (return req 500 "The required OAuth2 client secret was not found" {}))
+        _ (when-not oauth-client-secret
+            (return req 500 "The required OAuth client secret was not found" {}))
 
         ;; TODO: Check state - need to think about sessions?
 
@@ -327,8 +327,8 @@
                    "Accept" "application/json"}
          :body (json/write-value-as-string
                 {"grant_type" "authorization_code"
-                 "client_id" oauth2-client-id
-                 "client_secret" oauth2-client-secret
+                 "client_id" oauth-client-id
+                 "client_secret" oauth-client-secret
                  "code" code
                  "redirect_uri" redirect-uri})}
 
@@ -339,7 +339,7 @@
 
         json-body (json/read-value body)
 
-        id-token (decode-id-token req (get json-body "id_token") jwks openid-configuration oauth2-client-id)
+        id-token (decode-id-token req (get json-body "id_token") jwks openid-configuration oauth-client-id)
 
         original-nonce (::pass/nonce session)
         claimed-nonce (get-in id-token [:claims "nonce"])

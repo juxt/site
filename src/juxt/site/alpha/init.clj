@@ -587,8 +587,8 @@
      xt-node
      {:xt/id client
       :juxt.pass.alpha/openid-issuer-id issuer-id
-      :juxt.pass.alpha/oauth2-client-id client-id
-      :juxt.pass.alpha/oauth2-client-secret client-secret
+      :juxt.pass.alpha/oauth-client-id client-id
+      :juxt.pass.alpha/oauth-client-secret client-secret
       :juxt.pass.alpha/redirect-uri callback})
 
     (let [login
@@ -596,14 +596,14 @@
            {:xt/id login
             :juxt.http.alpha/content-type "text/plain"
             :juxt.site.alpha/get-fn 'juxt.pass.alpha.openid-connect/login
-            :juxt.pass.alpha/oauth2-client client})
+            :juxt.pass.alpha/oauth-client client})
 
           callback
           (put-immutable-public-resource
            {:xt/id callback
             :juxt.http.alpha/content-type "text/plain"
             :juxt.site.alpha/get-fn 'juxt.pass.alpha.openid-connect/callback
-            :juxt.pass.alpha/oauth2-client client})
+            :juxt.pass.alpha/oauth-client client})
           ]
       {:login-uri (get-in login [::pass/puts 0])
        :callback-uri (get-in callback [::pass/puts 0])})

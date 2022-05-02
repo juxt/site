@@ -268,8 +268,8 @@
      [:map
       [:xt/id [:re "https://site.test/applications/(.+)"]]
       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/application"]]
-      [:juxt.pass.alpha/oauth2-client-id [:string {:min 10}]]
-      [:juxt.pass.alpha/oauth2-client-secret [:string {:min 16}]]]]
+      [:juxt.pass.alpha/oauth-client-id [:string {:min 10}]]
+      [:juxt.pass.alpha/oauth-client-secret [:string {:min 16}]]]]
     :juxt.pass.alpha/process
     [
      [:juxt.pass.alpha.process/update-in [0]
