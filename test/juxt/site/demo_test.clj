@@ -43,7 +43,7 @@
   (demo/demo-invoke-put-application!)
   (demo/demo-invoke-authorize-application!)
   (demo/demo-create-test-subject!)
-  (demo/demo-invoke-access-token!)
+  (demo/demo-invoke-issue-access-token!)
 
   (f))
 

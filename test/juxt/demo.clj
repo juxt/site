@@ -683,7 +683,7 @@
   ;; end::create-test-subject![]
   )
 
-(defn demo-invoke-access-token! []
+(defn demo-invoke-issue-access-token! []
   ;; tag::invoke-issue-access-token![]
   (do-action
    "https://site.test/subjects/repl-default"
