@@ -1,5 +1,0 @@
-#!/bin/bash
-
-site -s check-token || site get-token
-
-site post-resources --file resources.edn
