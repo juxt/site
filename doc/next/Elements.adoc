@@ -28,6 +28,8 @@ Names are 'keywords', which identifiers prefixed with a colon (:).
 
 Values can be strings, numbers, sets, collections, nested documents and more.
 
+All documents in Site can contain any additional attributes you need.
+
 == Entities
 
 Before being stored in the database, each document is identified with an entity
@@ -61,6 +63,20 @@ and, at a later date…
 ====
 
 TIP: For more information about Documents and Entities, see https://xtdb.com.
+
+The `juxt.site`, `juxt.pass`, `juxt.http`, `xtdb.api` and `xt` namespaces are
+reserved to avoid the potential for attribute clashes.
+
+[TIP]
+--
+(((property graph)))
+This flexibility to compose documents from different attributes is one of the
+strengths of using a property-graph database such as XTDB under the hood.
+
+((("Halloway, Stuart")))
+See this talk segment by Stu Halloway to explain the rationale for using namespaces in attribute keywords:
+https://youtu.be/Qx0-pViyIDU?t=1464
+--
 
 == Users
 

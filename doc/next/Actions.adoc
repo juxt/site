@@ -146,22 +146,6 @@ s|Required
 |Optional
 |===
 
-.Mixing Site attributes with your application's attributes
-****
-All documents in Site can contain any additional attributes you need.
-
-The `juxt.site`, `juxt.pass`, `juxt.http`, `xtdb.api` and `xt` namespaces are
-reserved to avoid the potential for attribute clashes.
-
-(((property graph)))
-This flexibility to compose documents from different attributes is one of the
-strengths of using a property-graph database such as XTDB under the hood.
-
-((("Halloway, Stuart")))
-See this talk segment by Stu Halloway to explain the rationale for using namespaces in attribute keywords:
-https://youtu.be/Qx0-pViyIDU?t=1464
-****
-
 == Installing a 'create-action' Action
 
 (((create-action)))

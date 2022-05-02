@@ -130,3 +130,17 @@ Where nouns are well specified and appear in a glossary, we write them as proper
 nouns rather than common nouns. Whenever such a noun is capitalised, it has the
 formal meaning as defined in the <<glossary>> rather than its common
 meaning. This allows us to use common nouns with less risk of confusion.
+
+
+==== Keyword namespaces
+
+Many of the examples in this document use Clojure keywords.
+
+Keywords can have namespaces. For example, the keyword `:a.b/c` is a keyword
+with the namespace is `a.b`.
+
+As a convention in this document, keyword namespaces are only used for
+_reserved_ keywords that have some meaning to Site. The majority of other
+keywords are not namespaced, to indicate that they are _arbitary_. However, it
+is recommended that you use keyword namespaces that reflect their origin
+(e.g. using a domain name that is owned by you or your organisation).
