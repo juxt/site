@@ -1,6 +1,10 @@
 = Applications
 :toc: left
 
+NOTE: In OAuth, Applications are created and authorized by an authorization
+server. The actions described in this chapter could be part of another Site
+instance which carries out the duties of an OAuth Authorization Server.
+
 == Create the action to create an application
 
 .Creating the action

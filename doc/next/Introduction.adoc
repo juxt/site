@@ -36,7 +36,9 @@ database. Often these APIs do little more than the following repetitive tasks:
   to access the service, e.g. OpenAPI or GraphQL
 
 Where such services can be described _declaratively_, it is possible for Site to
-host them. APIs are thereby defined in a _database_, rather than _codebase_.
+host them, just like HTML pages.
+
+APIs are thereby defined in a _database_, rather than _codebase_.
 
 For this reason, API services hosted by Site should be:
 
