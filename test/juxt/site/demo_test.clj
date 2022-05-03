@@ -56,31 +56,40 @@
 
 (use-fixtures :each with-system-xt with-site-book-setup with-handler)
 
-(deftest hello-test
-  ;; First, as something that can easily fail, we test the hello resource exists
-  ;; in the db
-  (is (xt/entity (xt/db *xt-node*) "https://site.test/hello"))
+(deftest public-resource-test
+  (is (xt/entity (xt/db *xt-node*) "https://site.test/hello")) ;; Assert the entity exists in the db
 
-  (let [{:ring.response/keys [body]}
-        (*handler* {:ring.request/method :get
-                    :ring.request/path "/hello"})]
-    ;; Can we see the body of the resource?
-    (is (= "Hello World!\r\n" body))))
+  (testing "Can retrieve a public immutable resource"
+    (let [{:ring.response/keys [status body]}
+          (*handler* {:ring.request/method :get
+                      :ring.request/path "/hello"})]
+      (is (= 200 status))
+      (is (= "Hello World!\r\n" body))))
+  )
 
 (deftest private-resource-test
   (is (xt/entity (xt/db *xt-node*) "https://site.test/private.html"))
   (let [request {:ring.request/method :get
                  :ring.request/path "/private.html"}]
 
-    (is (= 401 (:ring.response/status (*handler* request))))
+    (testing "Cannot be accessed without a bearer token"
+      (is (= 401 (:ring.response/status (*handler* request)))))
 
-    (is (= 200 (:ring.response/status
-                (*handler*
-                 (assoc
-                  request
-                  :ring.request/headers
-                  ;; Adding the bearer token should be all that is required
-                  {"authorization" "Bearer test-access-token"})))))))
+    (testing "Can be accessed with a valid bearer token"
+      (is (= 200 (:ring.response/status
+                  (*handler*
+                   (assoc
+                    request
+                    :ring.request/headers
+                    {"authorization" "Bearer test-access-token"}))))))
+
+    (testing "Cannot be accessed with an invalid bearer token"
+      (is (= 401 (:ring.response/status
+                  (*handler*
+                   (assoc
+                    request
+                    :ring.request/headers
+                    {"authorization" "Bearer not-test-access-token"}))))))))
 
 #_((t/join-fixtures [with-system-xt with-site-book-setup with-handler with-db])
    (fn []
