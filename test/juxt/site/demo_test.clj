@@ -54,12 +54,12 @@
               ::site/uri-prefix "https://site.test"})]
     (f)))
 
-(use-fixtures :each with-system-xt with-site-book-setup with-handler with-db)
+(use-fixtures :each with-system-xt with-site-book-setup with-handler)
 
 (deftest hello-test
   ;; First, as something that can easily fail, we test the hello resource exists
   ;; in the db
-  (is (xt/entity *db* "https://site.test/hello"))
+  (is (xt/entity (xt/db *xt-node*) "https://site.test/hello"))
 
   (let [{:ring.response/keys [body]}
         (*handler* {:ring.request/method :get
@@ -68,7 +68,7 @@
     (is (= "Hello World!\r\n" body))))
 
 (deftest private-resource-test
-  (is (xt/entity *db* "https://site.test/private.html"))
+  (is (xt/entity (xt/db *xt-node*) "https://site.test/private.html"))
   (let [request {:ring.request/method :get
                  :ring.request/path "/private.html"}]
 
