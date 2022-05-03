@@ -1,4 +1,5 @@
 = Our First Application
+:toc: left
 
 In this chapter we'll create our first application and grant it access to our
 resources.

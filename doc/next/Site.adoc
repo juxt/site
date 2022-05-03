@@ -76,13 +76,23 @@ include::ProtectingResources.adoc[leveloffset=+1]
 
 include::BasicAuthentication.adoc[leveloffset=+1]
 
-= Applications
+= Applications and APIs
 
 [[ch-first-application]]
 include::FirstApplication.adoc[leveloffset=+1]
 
+[[ch-openapi]]
+include::OpenAPI.adoc[leveloffset=+1]
+
+[[ch-graphql]]
+include::GraphQL.adoc[leveloffset=+1]
+
+= OpenID
+
 [[ch-authentication-with-openid]]
 include::AuthenticationWithOpenID.adoc[leveloffset=+1]
+
+= Going further
 
 include::ErrorResources.adoc[leveloffset=+1]
 

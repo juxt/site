@@ -41,7 +41,10 @@ invoking our actions.
 include::../../test/juxt/demo.clj[tag=install-user!,indent=0]
 ----
 <1> Some arbitary data associated with this user
-<2> Here, we'll assign Malcolm to two roles. However, these roles are _not_ a Site concept. You can design whatever access control scheme fits your requirements.
+<2> Here, we'll assign Malcolm to two roles. However, these roles are _not_ a
+Site concept. You can design whatever access control scheme fits your
+requirements, referencing data in your Documents from rules you write in
+Actions.
 ====
 
 [IMPORTANT]
