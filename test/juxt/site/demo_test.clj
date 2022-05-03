@@ -58,17 +58,29 @@
 
 (deftest public-resource-test
   (is (xt/entity (xt/db *xt-node*) "https://site.test/hello")) ;; Assert the entity exists in the db
+  (is (not (xt/entity (xt/db *xt-node*) "https://site.test/not-hello"))) ;; Assert that out 404 entity is not in the db
 
-  (testing "Can retrieve a public immutable resource"
-    (let [{:ring.response/keys [status body]}
-          (*handler* {:ring.request/method :get
-                      :ring.request/path "/hello"})]
-      (is (= 200 status))
-      (is (= "Hello World!\r\n" body))))
-  )
+  (let [req {:ring.request/method :get
+             :ring.request/path "/hello"}]
+
+    (testing "Can retrieve a public immutable resource"
+      (let [{:ring.response/keys [status body]} (*handler* req)]
+        (is (= 200 status))
+        (is (= "Hello World!\r\n" body))))
+
+    (testing "Receive 405 when method not allowed"
+      (let [invalid-req (assoc req :ring.request/method :put)
+            {:ring.response/keys [status]} (*handler* invalid-req)]
+        (is (= 405 status))))
+
+    (testing "Receive 404 when resource does not exist"
+      (let [invalid-req (assoc req :ring.request/path "/not-hello")
+            {:ring.response/keys [status]} (*handler* invalid-req)]
+        (is (= 404 status))))))
 
 (deftest private-resource-test
   (is (xt/entity (xt/db *xt-node*) "https://site.test/private.html"))
+
   (let [request {:ring.request/method :get
                  :ring.request/path "/private.html"}]
 
