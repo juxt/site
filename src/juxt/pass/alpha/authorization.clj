@@ -344,6 +344,10 @@
         {::xt/tx-id tx-id
          ::pass/action action})))
 
-    (xt/entity
-     (xt/db xt-node)
-     (format "urn:site:action-log:%s" tx-id))))
+    (let [result
+          (xt/entity
+           (xt/db xt-node)
+           (format "urn:site:action-log:%s" tx-id))]
+      (if (::site/error result)
+        (throw (ex-info "Failed to do action" (merge {:action action} pass-ctx (dissoc result ::site/type))))
+        result))))
