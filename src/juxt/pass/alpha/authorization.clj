@@ -180,8 +180,7 @@
 
         pull-expr (vec (mapcat (comp ::pass/pull :action) results))]
 
-    results
-    #_(->> results
+    (->> results
          (map :resource)
          (xt/pull-many db pull-expr))))
 
