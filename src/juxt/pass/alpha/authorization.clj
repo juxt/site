@@ -16,7 +16,6 @@
   "Determine rules for the given action ids. Each rule is bound to the given
   action."
   [db actions]
-
   (vec (for [action actions
              :let [e (xt/entity db action)]
              rule (::pass/rules e)]
@@ -150,41 +149,39 @@
   (let [rules (actions->rules db actions)
         _ (when-not (seq rules)
             (throw (ex-info "No rules found for actions" {:actions actions})))
+        query {:find '[resource (pull action [::xt/id ::pass/pull]) purpose permission]
+               :keys '[resource action purpose permission]
+               :where
+               (cond-> '[
+                         ;; Only consider given actions
+                         [action ::site/type "https://meta.juxt.site/pass/action"]
+                         [(contains? actions action)]
+
+                         ;; Only consider allowed permssions
+                         [permission ::site/type "https://meta.juxt.site/pass/permission"]
+                         [permission ::pass/action action]
+                         (allowed? permission subject action resource)
+
+                         ;; Only permissions that match our purpose
+                         [permission ::pass/purpose purpose]]
+
+                 include-rules
+                 (conj '(include? subject action resource))
+
+                 resources-in-scope
+                 (conj '[(contains? resources-in-scope resource)]
+                       ))
+
+               :rules (vec (concat rules include-rules))
+
+               :in '[subject actions purpose resources-in-scope]}
         results
-        (xt/q
-         db
-         {:find '[resource (pull action [::xt/id ::pass/pull]) purpose permission]
-          :keys '[resource action purpose permission]
-          :where
-          (cond-> '[
-                    ;; Only consider given actions
-                    [action ::site/type "https://meta.juxt.site/pass/action"]
-                    [(contains? actions action)]
-
-                    ;; Only consider allowed permssions
-                    [permission ::site/type "https://meta.juxt.site/pass/permission"]
-                    [permission ::pass/action action]
-                    (allowed? permission subject action resource)
-
-                    ;; Only permissions that match our purpose
-                    [permission ::pass/purpose purpose]]
-
-            include-rules
-            (conj '(include? subject action resource))
-
-            resources-in-scope
-            (conj '[(contains? resources-in-scope resource)]
-                  ))
-
-          :rules (vec (concat rules include-rules))
-
-          :in '[subject actions purpose resources-in-scope]}
-
-         subject actions purpose (or resources-in-scope #{}))
+        (xt/q db query subject actions purpose (or resources-in-scope #{}))
 
         pull-expr (vec (mapcat (comp ::pass/pull :action) results))]
 
-    (->> results
+    results
+    #_(->> results
          (map :resource)
          (xt/pull-many db pull-expr))))
 
