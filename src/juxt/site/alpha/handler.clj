@@ -421,6 +421,15 @@
 (defn wrap-locate-resource [h]
   (fn [req]
     (let [res (locator/locate-resource req)]
+      (when-not res
+        (throw
+           (ex-info
+            "Not Found"
+            {::site/request-context
+             (into
+              req
+              {:ring.response/status 404})})))
+
       (log/debugf "Resource provider: %s" (::site/resource-provider res))
       (h (assoc req ::site/resource res)))))
 
@@ -1260,6 +1269,9 @@
    wrap-locate-resource
    wrap-redirect
 
+   ;; 405
+   wrap-method-not-allowed?
+
    ;; We authorize the resource, prior to finding representations.
    wrap-authorize-with-actions
 
@@ -1270,9 +1282,6 @@
    ;; Authorize - deprecated
    #_wrap-authorize-with-acls
    #_wrap-authorize-with-pdp
-
-   ;; 405
-   wrap-method-not-allowed?
 
    ;; Custom middleware for Site
    #_wrap-triggers
