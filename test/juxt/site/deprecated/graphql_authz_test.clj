@@ -1,6 +1,6 @@
 ;; Copyright © 2021, JUXT LTD.
 
-(ns juxt.site.graphql-authz-test
+(ns juxt.site.deprecated.graphql-authz-test
   (:require
    [clojure.test :refer [deftest is are testing] :as t]
    [juxt.test.util :refer [with-xt with-handler submit-and-await!
