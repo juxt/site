@@ -40,11 +40,10 @@
   (demo/demo-create-action-get-private-resource!)
   (demo/demo-grant-permission-to-get-private-resource!)
   (demo/demo-create-immutable-private-resource!)
-  (demo/demo-invoke-put-application!)
-  (demo/demo-invoke-authorize-application!)
+  ;;(demo/demo-invoke-put-application!)
+  ;;(demo/demo-invoke-authorize-application!)
   (demo/demo-create-test-subject!)
   (demo/demo-invoke-issue-access-token!)
-
   (f))
 
 (defn with-handler [f]
