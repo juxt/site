@@ -87,7 +87,7 @@
    (let [response
          (*handler*
           {:ring.request/method :get
-           :ring.request/path "/private.html"
+           :ring.request/path "/privatej.html"
            :ring.request/headers {"authorization" "Bearer test-access-token"}
            })]
      (:ring.response/status response)
