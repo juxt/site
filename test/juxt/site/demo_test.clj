@@ -9,7 +9,34 @@
    [juxt.demo :as demo]
    [juxt.test.util :refer [with-system-xt with-db submit-and-await! *xt-node* *db* *handler*] :as tutil]
    [xtdb.api :as xt]
-   [juxt.site.alpha :as-alias site]))
+   [juxt.site.alpha :as-alias site]
+   [juxt.http.alpha :as-alias http]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.pass.alpha.authorization :as authz]
+   [clojure.string :as str]
+   [xtdb.api :as x]))
+
+(defn install-not-found []
+  (repl/do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/get-not-found"
+    :juxt.pass.alpha/scope "read:resource"
+    :juxt.pass.alpha/rules
+    [
+     ['(allowed? permission subject action resource)
+      ['permission :xt/id]]]})
+
+  (repl/do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/get-not-found"
+    :juxt.pass.alpha/action "https://site.test/actions/get-not-found"
+    :juxt.pass.alpha/purpose nil})
+
+  (repl/put! {:xt/id "urn:site:resources:not-found"
+              ::http/methods
+              {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}}}))
 
 (defn with-site-book-setup [f]
   (demo/demo-put-user!)
@@ -44,6 +71,10 @@
   ;;(demo/demo-invoke-authorize-application!)
   (demo/demo-create-test-subject!)
   (demo/demo-invoke-issue-access-token!)
+
+  ;; This tackles the '404' problem.
+  (install-not-found)
+
   (f))
 
 (defn with-handler [f]
@@ -103,10 +134,76 @@
                     :ring.request/headers
                     {"authorization" "Bearer not-test-access-token"}))))))))
 
-#_((t/join-fixtures [with-system-xt with-site-book-setup with-handler with-db])
-   (fn []
-     (let [response
-           (*handler* {:ring.request/method :get
-                       :ring.request/path "/private.html"
-                       :ring.request/headers {"authorization" "Bearer test-access-token"}})]
-       (:ring.response/status response))))
+(deftest not-found-test
+  (let [req {:ring.request/method :get
+             :ring.request/path "/hello"}
+        invalid-req (assoc req :ring.request/path "/not-hello")]
+    (is (= 404 (:ring.response/status (*handler* invalid-req))))))
+
+
+(deftest user-directory-test
+  (repl/do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-user-owned-content"
+    :juxt.pass.alpha/scope "write:user-content"
+    :juxt.pass.alpha/rules
+    [
+     '[(allowed? permission subject action resource)
+       [permission ::pass/user user]
+       [subject ::pass/identity id]
+       [id ::pass/user user]
+       [resource ::pass/owner user]]]})
+
+  (repl/do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/put-user-owned-content"
+    :juxt.pass.alpha/action "https://site.test/actions/put-user-owned-content"
+    :juxt.pass.alpha/user "https://site.test/users/mal"
+    :juxt.pass.alpha/purpose nil})
+
+  ;; Both @cwi and @mal have user directories
+  (doseq [user #{"cwi" "mal"}]
+    (repl/put!
+     {:xt/id (format "https://site.test/~%s/{path}" user)
+      ;; This needs to return a resource 'owned' by the user, then the action can
+      ;; unify on the subject's user and the resource's owner.
+      ::pass/owner (format "https://site.test/users/%s" user)
+      ::site/uri-template true
+      ::http/methods
+      {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}
+       :put {::pass/actions #{"https://site.test/actions/put-user-owned-content"}}}}))
+
+  ;; 404 on GET, doesn't exist yet!
+  (let [req {:ring.request/method :get
+             :ring.request/path "/~cwi/index.html"}]
+    (is (= 404 (:ring.response/status (*handler* req)))))
+
+  ;; @mal can't write to @cwi's area
+  (let [req {:ring.request/method :put
+             :ring.request/path "/~cwi/index.html"
+             :ring.request/headers
+             {"authorization" "Bearer test-access-token"}}]
+    (is (= 403 (:ring.response/status(*handler* req)))))
+
+  ;; When @mal writing to @mal's user directory, we get through security.
+  (let [req {:ring.request/method :put
+             :ring.request/path "/~mal/index.html"
+             :ring.request/headers
+             {"authorization" "Bearer test-access-token"}}]
+    (is (= 411 (:ring.response/status(*handler* req))))))
+
+;; An empty resource in @cwi's area
+#_((t/join-fixtures [with-system-xt with-site-book-setup with-handler])
+ (fn []
+))
+
+;; /~cwi/index.html -> default-empty-resource
+
+;; This is the resource that matches https://site.test/~cwi/me.jpg
+
+#_{:xt/id "https://site.test/~cwi/{path}" ;; this needs to return a resource 'owned' by the user, then the action can unify on the subject's user and the resource's owner.
+   ::pass/user "https://site.test/users/cwi"
+   ::site/uri-template true
+   ::http/methods {:put {::pass/actions #{"upload-user-content"}}}}

@@ -3,91 +3,129 @@
 (ns juxt.site.alpha.locator
   (:require
    [clojure.tools.logging :as log]
-   [juxt.apex.alpha.openapi :as openapi]
-   [juxt.site.alpha.debug :as debug]
-   [juxt.site.alpha.static :as static]
-   [juxt.site.alpha.cache :as cache]
-   [xtdb.api :as x]
+   [clojure.string :as str]
+   [xtdb.api :as xt]
    [juxt.site.alpha :as-alias site]
-   [juxt.http.alpha :as-alias http]
-   [juxt.pass.alpha :as-alias pass]))
+   [juxt.http.alpha :as-alias http]))
 
-(defn locate-with-locators [db req]
-  (let [uri (::site/uri req)]
-    (when-let [locators
-               (seq (x/q
-                     db
-                     '{:find [r
-                              grps]
+#_(defn locate-with-locators [db req]
+    (let [uri (::site/uri req)]
+      (when-let [locators
+                 (seq (xt/q
+                       db
+                       '{:find [r
+                                grps]
 
-                       :where [(or [r ::site/type "AppRoutes"]
+                         :where [(or [r ::site/type "AppRoutes"]
 
-                                   ;; Same as AppRoutes, but a more appropriate
-                                   ;; name in the case of a resource that isn't
-                                   ;; found in the database but does need to
-                                   ;; exist for the purposes of defining PUT
-                                   ;; semantics.
-                                   [r ::site/type "VirtualResource"]
+                                     ;; Same as AppRoutes, but a more appropriate
+                                     ;; name in the case of a resource that isn't
+                                     ;; found in the database but does need to
+                                     ;; exist for the purposes of defining PUT
+                                     ;; semantics.
+                                     [r ::site/type "VirtualResource"]
 
-                                   ;; Deprecated because it relies on code
-                                   ;; deployed and we want to avoid this unless
-                                   ;; no alternative is possible.
-                                   [r ::site/type "ResourceLocator"])
+                                     ;; Deprecated because it relies on code
+                                     ;; deployed and we want to avoid this unless
+                                     ;; no alternative is possible.
+                                     [r ::site/type "ResourceLocator"])
 
-                               [r ::site/pattern p]
-                               [(first grps) grp0]
-                               [(some? grp0)]
-                               [(re-pattern p) pat]
-                               [(re-matches pat uri) grps]]
+                                 [r ::site/pattern p]
+                                 [(first grps) grp0]
+                                 [(some? grp0)]
+                                 [(re-pattern p) pat]
+                                 [(re-matches pat uri) grps]]
 
-                       :in [uri]} uri))]
+                         :in [uri]} uri))]
 
-      (when (> (count locators) 1)
-        (throw
-         (ex-info
-          "Multiple resource locators returned from query that match URI"
-          {::locators (map :xt/id locators)
-           ::site/request-context (assoc req :ring.response/status 500)})))
+        (when (> (count locators) 1)
+          (throw
+           (ex-info
+            "Multiple resource locators returned from query that match URI"
+            {::locators (map :xt/id locators)
+             ::site/request-context (assoc req :ring.response/status 500)})))
 
-      (let [[e grps] (first locators)
-            {typ ::site/type :as locator} (x/entity db e)]
-        (case typ
-          "ResourceLocator"
-          (let [{::site/keys [locator-fn description]} locator]
-            (when-not locator-fn
-              (throw
-               (ex-info
-                "Resource locator must have a :juxt.site.alpha/locator attribute"
-                {::locator locator
-                 ::site/request-context (assoc req :ring.response/status 500)})))
+        (let [[e grps] (first locators)
+              {typ ::site/type :as locator} (xt/entity db e)]
+          (case typ
+            "ResourceLocator"
+            (let [{::site/keys [locator-fn description]} locator]
+              (when-not locator-fn
+                (throw
+                 (ex-info
+                  "Resource locator must have a :juxt.site.alpha/locator attribute"
+                  {::locator locator
+                   ::site/request-context (assoc req :ring.response/status 500)})))
 
-            (when-not (symbol? locator-fn)
-              (throw
-               (ex-info
-                "Resource locator must be a symbol"
-                {::locator locator
-                 ::locator-fn locator-fn
-                 ::site/request-context (assoc req :ring.response/status 500)})))
+              (when-not (symbol? locator-fn)
+                (throw
+                 (ex-info
+                  "Resource locator must be a symbol"
+                  {::locator locator
+                   ::locator-fn locator-fn
+                   ::site/request-context (assoc req :ring.response/status 500)})))
 
 
-            (log/debug "Requiring resolve of" locator-fn)
-            (let [f (requiring-resolve locator-fn)]
-              (log/debugf "Calling locator-fn %s: %s" locator-fn description)
-              (f {:db db :request req :locator locator :grps grps})))
+              (log/debug "Requiring resolve of" locator-fn)
+              (let [f (requiring-resolve locator-fn)]
+                (log/debugf "Calling locator-fn %s: %s" locator-fn description)
+                (f {:db db :request req :locator locator :grps grps})))
 
-          ("AppRoutes" "VirtualResource") locator)))))
+            ("AppRoutes" "VirtualResource") locator)))))
 
-(comment
-  (put!
-   {:xt/id "http://localhost:2021/ui/app.html"
-    ::site/type "AppRoutes"
-    ::site/pattern (re-pattern "http://localhost:2021/ui/.*")
-    ::pass/classification "PUBLIC"
-    ::http/methods {:get {} :head {} :options {}}
-    ::http/content-type "text/html;charset=utf-8"
-    ::http/content "<h1>App</h1>"}))
 
-(def SITE_REQUEST_ID_PATTERN #"(.*/_site/requests/\p{Alnum}+)(\.[a-z]+)?")
+(memoize
+ (defn to-regex [uri-template]
+   (re-pattern
+    (str/replace
+     uri-template
+     #"\{([^\}]+)\}"                      ; e.g. {id}
+     (fn replacer [[_ group]]
+       ;; Instead of using the regex of path parameter's schema, we use a
+       ;; weak regex that includes anything except forward slashes, question
+       ;; marks, or hashes (as described in the Path Templating section of
+       ;; the OpenAPI Specification (version 3.0.2). We are just locating
+       ;; the resource in this step, if the regex were too strong and we
+       ;; reject the path then locate-resource would yield nil, and we might
+       ;; consequently end up creating a static resource (or whatever other
+       ;; resource locators are tried after this one). That might surprise
+       ;; the user so instead (prinicple of least surprise) we are more
+       ;; liberal in what we accept at this stage and leave validation
+       ;; against the path parameter to later (potentially yielding a 400).
+       (format "(?<%s>[^/#\\?]+)" group))))))
+
+
+
+
+(defn match-uri-templated-uris [db uri]
+  #_(first
+     (xt/q
+      db
+      '{:find [(pull r [*]) grps]
+        :keys [e groups]
+        :where [[r ::site/uri-template true]
+                [(first grps) grp0]
+                [(some? grp0)]
+                [(juxt.site.alpha.locator/to-regex r) pat]
+                [(re-matches pat uri) grps]]
+        :in [uri]}
+      uri))
+
+  (when-let [{:keys [e groups]}
+             (first
+              (xt/q
+               db
+               '{:find [(pull r [*]) grps]
+                 :keys [e groups]
+                 :where [[r ::site/uri-template true]
+                         [(first grps) grp0]
+                         [(some? grp0)]
+                         [(juxt.site.alpha.locator/to-regex r) pat]
+                         [(re-matches pat uri) grps]]
+                 :in [uri]}
+               uri))]
+    (assoc e ::site/path-params (zipmap (map second (re-seq #"\{(\p{Alpha}+)\}" (:xt/id e)))
+                                        (next groups)))))
 
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
@@ -97,35 +135,36 @@
   (assert base-uri)
   (assert db)
   (or
-   ;; We call OpenAPI location here, because a resource can be defined in
-   ;; OpenAPI, and exist in XT, simultaneously.
-   (openapi/locate-resource db uri req)
+   ;; Deprecated. Will be replaced with simple resources that contain enough
+   ;; OpenAPI metadata to render a openapi.json document. Isomorphic.
+   ;; (openapi/locate-resource db uri req)
 
    ;; Is it in XTDB?
-   (when-let [r (x/entity db uri)]
-     (cond-> (assoc r ::site/resource-provider ::db)
-       (or (= (get r ::site/type) "StaticRepresentation")
-           (= (get r ::site/type) "AppRoutes"))
-       (assoc ::site/put-fn static/put-static-resource
-              ::site/patch-fn static/patch-static-resource)))
+   (when-let [e (some-> (xt/entity db uri) (assoc ::site/resource-provider ::db))]
+     (when-not (::site/uri-template e)
+       e))
 
    ;; Is it found by any resource locators registered in the database?
-   (locate-with-locators db req)
+   (match-uri-templated-uris db uri)
 
    ;; Is it a redirect?
    (when-let [[r loc] (first
-                       (x/q db '{:find [r loc]
-                                 :where [[r ::site/resource uri]
-                                         [r ::site/location loc]
-                                         [r ::site/type "Redirect"]]
-                                 :in [uri]}
-                            uri))]
+                       (xt/q db '{:find [r loc]
+                                  :where [[r ::site/resource uri]
+                                          [r ::site/location loc]
+                                          [r ::site/type "Redirect"]]
+                                  :in [uri]}
+                             uri))]
      {::site/uri uri
       ::http/methods {:get {} :head {} :options {}}
       ::site/resource-provider r
       ::http/redirect (cond-> loc (.startsWith loc base-uri)
                               (subs (count base-uri)))})
 
+
+   ;; This can be put into the database to override the ::default-empty-resource
+   ;; default.
+   (xt/entity db "urn:site:resources:not-found")
+
    {::site/resource-provider ::default-empty-resource
-    ::http/methods {:get {} :head {} :options {} :put {} :post {}}
-    ::site/put-fn static/put-static-resource}))
+    ::http/methods {:get {} :head {} :options {} :put {} :post {}}}))
