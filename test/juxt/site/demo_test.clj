@@ -194,16 +194,6 @@
              {"authorization" "Bearer test-access-token"}}]
     (is (= 411 (:ring.response/status(*handler* req))))))
 
-;; An empty resource in @cwi's area
 #_((t/join-fixtures [with-system-xt with-site-book-setup with-handler])
  (fn []
 ))
-
-;; /~cwi/index.html -> default-empty-resource
-
-;; This is the resource that matches https://site.test/~cwi/me.jpg
-
-#_{:xt/id "https://site.test/~cwi/{path}" ;; this needs to return a resource 'owned' by the user, then the action can unify on the subject's user and the resource's owner.
-   ::pass/user "https://site.test/users/cwi"
-   ::site/uri-template true
-   ::http/methods {:put {::pass/actions #{"upload-user-content"}}}}
