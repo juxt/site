@@ -566,8 +566,9 @@
 (defn wrap-method-not-allowed? [h]
   (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
     (when-not (map? (::http/methods resource))
-      (throw (ex-info "resource methods not map" {:resource resource
-                                                  ::site/request-context req})))
+      (throw (ex-info "Resource :juxt.http.alpha/methods must be a map"
+                      {:resource resource
+                       ::site/request-context req})))
     (if resource
       (let [allowed-methods (set (keys (::http/methods resource)))]
         (when-not (contains? allowed-methods method)
