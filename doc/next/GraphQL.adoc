@@ -1,4 +1,74 @@
 = GraphQL
 :toc: left
 
+GraphQL is a query language created by Facebook that is popular with UI
+developers.
+
 == Introduction
+
+NOTE: TODO
+
+== Lifecycle
+
+Supporting GraphQL in Site requires us to do the following:
+
+. Decide on the location for a GraphQL endpoint.
+. Create the endpoint.
+. Create a GraphQL schema, with directives that map the GraphQL types onto XT documents.
+. Upload the GraphQL schema to our GraphQL endpoint.
+. Post a GraphQL query, mutation or subscription to the endpoint.
+
+== Roles
+
+Administrator:: admin
+
+Developer:: developer
+
+User:: user
+
+<<graphql-roles>> shows the different roles and how they might interact with Site via Actions.
+
+.GraphQL roles
+[[graphql-roles]]
+[plantuml,graphql-roles,svg]
+....
+skinparam monochrome true
+autonumber
+
+actor Administrator
+actor Developer
+actor User
+participant Application
+
+box Site
+participant REPL
+participant "/graphql" as endpoint
+end box
+
+Administrator -> REPL: Action: put-graphql-endpoint
+REPL -> endpoint: creates endpoint
+Developer -> endpoint: Method: PUT, Action: put-graphql-schema
+User -> Application: View info
+Application -> endpoint: Method POST, Action: post-graphql-request
+....
+
+== Installing the required Actions
+
+We need:
+
+. An Action to create the GraphQL endpoint (`put-graphql-endpoint`), typically
+restricted to authorized Site administrators.
+
+. An Action to upload a GraphQL schema to the endpoint (`put-graphql-schema`),
+typically available to authorized developers or schema authors.
+
+. A Action to post a GraphQL query, mutation or subscription
+(`post-graphql-request`), typically available to all users.
+
+== Creating the endpoint
+
+An endpoint represents a web resource to which we can PUT a GraphQL schema.
+
+Once configured with a schema,
+
+NOTE: TODO
