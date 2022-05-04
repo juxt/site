@@ -421,15 +421,6 @@
 (defn wrap-locate-resource [h]
   (fn [req]
     (let [res (locator/locate-resource req)]
-      (when-not res
-        (throw
-           (ex-info
-            "Not Found"
-            {::site/request-context
-             (into
-              req
-              {:ring.response/status 404})})))
-
       (log/debugf "Resource provider: %s" (::site/resource-provider res))
       (h (assoc req ::site/resource res)))))
 

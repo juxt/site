@@ -126,9 +126,6 @@
       ::http/redirect (cond-> loc (.startsWith loc base-uri)
                               (subs (count base-uri)))})
 
-   ;; Return a back-stop resource
-   ;; TODO: I think this needs to be nil
-   nil
-   #_{::site/resource-provider ::default-empty-resource
+   {::site/resource-provider ::default-empty-resource
     ::http/methods {:get {} :head {} :options {} :put {} :post {}}
     ::site/put-fn static/put-static-resource}))
