@@ -82,10 +82,13 @@
                   ;; Adding the bearer token should be all that is required
                   {"authorization" "Bearer test-access-token"})))))))
 
-#_((t/join-fixtures [with-system-xt with-site-book-setup with-handler with-db])
-   (fn []
-     (let [response
-           (*handler* {:ring.request/method :get
-                       :ring.request/path "/private.html"
-                       :ring.request/headers {"authorization" "Bearer test-access-token"}})]
-       (:ring.response/status response))))
+((t/join-fixtures [with-system-xt with-site-book-setup with-handler with-db])
+ (fn []
+   (let [response
+         (*handler*
+          {:ring.request/method :get
+           :ring.request/path "/private.html"
+           :ring.request/headers {"authorization" "Bearer test-access-token"}
+           })]
+     (:ring.response/status response)
+     )))

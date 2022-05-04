@@ -62,9 +62,6 @@ include::Permissions.adoc[leveloffset=+1]
 [[ch-creating-users]]
 include::UsersRevisited.adoc[leveloffset=+1]
 
-[[ch-applications]]
-include::Applications.adoc[leveloffset=+1]
-
 = Resources
 
 [[ch-resources]]
@@ -72,14 +69,9 @@ include::Resources.adoc[leveloffset=+1]
 
 include::Representations.adoc[leveloffset=+1]
 
-include::ProtectingResources.adoc[leveloffset=+1]
+= APIs
 
-include::BasicAuthentication.adoc[leveloffset=+1]
-
-= Applications and APIs
-
-[[ch-first-application]]
-include::FirstApplication.adoc[leveloffset=+1]
+// include::APIs.adoc[leveloffset=+1]
 
 [[ch-openapi]]
 include::OpenAPI.adoc[leveloffset=+1]
@@ -87,28 +79,25 @@ include::OpenAPI.adoc[leveloffset=+1]
 [[ch-graphql]]
 include::GraphQL.adoc[leveloffset=+1]
 
-= OpenID
+= Security
+
+include::ProtectingResources.adoc[leveloffset=+1]
+
+include::BasicAuthentication.adoc[leveloffset=+1]
 
 [[ch-authentication-with-openid]]
 include::AuthenticationWithOpenID.adoc[leveloffset=+1]
+
+[[ch-applications]]
+include::Applications.adoc[leveloffset=+1]
 
 = Going further
 
 include::ErrorResources.adoc[leveloffset=+1]
 
-// Create an action to list-identities
-// Create a resource at /users that is attached to list-identities
-
-// include::APIs.adoc[leveloffset=+1]
-
-// [[authorization]]
-// include::Authorization.adoc[leveloffset=+1]
-
 include::NextSteps.adoc[leveloffset=+1]
 
 include::AppDevelopment.adoc[leveloffset=+1]
-
-= Websites with Site
 
 include::Templates.adoc[leveloffset=+1]
 

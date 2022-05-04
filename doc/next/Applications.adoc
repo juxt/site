@@ -1,77 +1,256 @@
 = Applications
 :toc: left
 
+A user often wants to let a third-party application access protected resources
+on their behalf, but in such a way that they don't disclose their credentials to
+the application.
+
+In this chapter we introduce OAuth, which provides a separation between the user
+and the application, and explain how OAuth is implemented in Site to restrict
+access to protected resources.
+
+[[applications-intro]]
+== Introduction
+
+The purpose of OAuth is quite simple:
+
+[quote]
+____
+The OAuth 2.1 authorization framework enables a third-party
+application to obtain limited access to a protected resource
+
+-- https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05
+____
+
+OAuth defines a
+https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05#section-1.1[number
+of roles], including that of a Resource Server and an Authorization Server:
+
+[quote]
+____
+
+Resource Owner:: The server hosting the protected resources, capable of
+accepting and responding to protected resource requests using access tokens.
+The resource server is often accessible via an API.
+
+Authorization Server:: The server issuing access tokens to the client after
+successfully authenticating the resource owner and obtaining authorization.
+____
+
+The job of an Authorization Server is to issue _access tokens_ to _clients_,
+applications which will access resources, often via an API, on behalf of a user.
+
+[quote]
+____
+Access tokens are credentials used to access protected resources.
+
+-- https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05#section-1.4
+____
+
+In addition to serving resources (as a Resource Server), Site can be configured
+as an Authorization Server.
+
 [NOTE]
 --
-In OAuth, Applications are created and authorized by an authorization
-server. The actions described in this chapter could be part of another Site
-instance which carries out the duties of an OAuth Authorization Server.
+As specified in OAuth 2.1, Site can carry out the duties of both a Resource
+Server and Authorization Server on the same server.
 
-[quote,https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05#section-1.3.3]
+[quote]
 ____
-The authorization server
-may be the same server as the resource server…
+The authorization server may be the same server as the resource server…
+
+-- https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05#section-1.3.3
 ____
 
-Should we consider having a different hostname for entities managed by the
-Authorization Server, e.g. `auth.site.test` ?
+However, you may elect to deploy multiple instances of Site, with different
+roles.
 --
 
+== Installing the required Actions
 
-== Create the action to create an application
+TIP: If you are setting up Site from scratch, you may need to install some specific
+Actions. This section explains what Actions are needed and why.
 
-.Creating the action
-[[example-create-action-put-application]]
+As explained in <<applications-intro>>, an Authorization Server is required to
+obtain authorization from a user before granting an application access to a
+user's resources.
+
+This responsibility can be decomposed into these Actions:
+
+. An Action to *register* an application, typically restricted to authorized users.
+. An Action for a user to *authorize* an application, typically available to all users.
+. An Action to *issue* an access token for a given application, typically available to all users.
+
+The following sub-sections will cover each of these Actions.
+
+=== Application registration
+
+Site will hold a Document for each Application registered with it, with the
+`juxt.site.alpha/type` attribute value set to
+"+https://meta.juxt.site/pass/application+", as detailed in
+<<application-doc-structure>>.
+
+.Document structure of an Application
+[[application-doc-structure]]
+[%header,cols="3l,3d,1"]
+|===
+|Attribute|Value|Required?
+
+|:xt/id
+|Applications are resources, so this is a URI.
+s|Required
+
+|:juxt.site.alpha/type
+l|"https://meta.juxt.site/pass/application"
+s|Required
+
+|:juxt.pass.alpha/oauth-client-id
+|A string that uniquely identifies the Application
+s|Required
+
+|:juxt.pass.alpha/oauth-client-secret
+|A secret string associated with the Application
+s|Required
+|===
+
+<<example-put-application>> demonstrates creating an Action that can be used
+when registering an Application.
+
+.Creating an action to register an application
+[[example-put-application]]
 ====
+Here is an expression that can be evaluated at the REPL:
+
 [source,clojure]
 ----
 include::../../test/juxt/demo.clj[tag=create-action-put-application!,indent=0]
 ----
-====
+<1> The application must have an OAuth *client-id*. We set this to be a string
+of minimum 10 characters.
+<2> The OAuth *client-secret* is also required. We have to rely on the caller of
+this action to generate the secret, but we can restrict its type and length.
+<3> We insist on a user having _explicit_ permission to call this Action, it is
+not an Action that anyone can call.
 
-== Grant permission to create an application
+We must also add the corresponding permission so that we can at least register
+an application at the REPL.
 
-.Granting permission
-[[example-grant-permission-put-application]]
-====
 [source,clojure]
 ----
 include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-application!,indent=0]
 ----
 ====
 
-== Create the action to authorize an application
+=== Application authorization
 
+A user must authorize an application before an access-token can be issued for
+it.
+
+Typically, any user can authorize any application.
+
+WARNING: but not for any user!!
+
+An example of creating an Action for this is shown in
+<<example-authorize-application>>.
+
+.Creating an action to authorize an application
+[[example-authorize-application]]
 ====
 [source,clojure]
 ----
 include::../../test/juxt/demo.clj[tag=create-action-authorize-application!,indent=0]
 ----
-====
 
-== Grant permission to authorize an application
-
-====
 [source,clojure]
 ----
 include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-authorize-application!,indent=0]
 ----
 ====
 
-== Create the action to issue an access token
+=== Issuing a token to an application
 
 ====
 [source,clojure]
 ----
 include::../../test/juxt/demo.clj[tag=create-action-issue-access-token!,indent=0]
 ----
-====
 
-== Grant permission to issue an access token
-
-====
 [source,clojure]
 ----
 include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-issue-access-token!,indent=0]
 ----
 ====
+
+== Registering an application
+
+.Registering an application
+[[example-register-application]]
+====
+[source,clojure]
+----
+include::../../test/juxt/demo.clj[tag=invoke-put-application!,indent=0]
+----
+====
+
+=== Authorize the application
+
+====
+[source,clojure]
+----
+include::../../test/juxt/demo.clj[tag=invoke-authorize-application!,indent=0]
+----
+====
+
+=== Create a test subject
+
+====
+[source,clojure]
+----
+include::../../test/juxt/demo.clj[tag=create-test-subject!,indent=0]
+----
+====
+
+=== Issue the access token
+
+====
+[source,clojure]
+----
+include::../../test/juxt/demo.clj[tag=invoke-issue-access-token!,indent=0]
+----
+====
+
+=== Use the access token to access the resource
+
+NOTE: Developer note: TODO
+
+
+----
+curl -i https://site.test/private.html -H "Authorization: Bearer test-access-token"
+----
+
+=== Development Notes
+
+[NOTE]
+--
+/authorize should create an 'ApplicationAuthorization' document, if one doesn't already exist, possibly it can update it too
+/token should create an 'AccessToken' document, with subject, application and scope burned into it
+--
+
+.Restricting permissions to sessions
+****
+Currently there is the concern that we're granting permissions to the User,
+which doesn't give us information about the login, so we can't grant permissions
+conditional on certain login conditions being met.
+
+Could we put an additional rules invocation against the permission? (Nope, we
+can't dynamically load rules)
+
+Alternatively, we can add two rules: if the permission has a user attribute, the first rule applies.
+If the permission has a subject attribute, the second rule applies.
+
+But that still doesn't solve our problem, since we want to restrict an action in
+certain cases to, say, 2FA, which is only available on a Session.
+
+The only solution seems to have separate actions, or even use purpose, or go
+back to having a 'special' REPL user.
+****

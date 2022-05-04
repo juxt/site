@@ -23,7 +23,7 @@
   ;; tag::install-user![]
   (put! {:xt/id "https://site.test/users/mal"
          :juxt.site.alpha/type "https://meta.juxt.site/pass/user"
-         :juxtcode "mal"
+         :juxtcode "mal" ; <1>
          :name "Malcolm Sparks"})
   ;; end::install-user![]
   )
@@ -268,8 +268,8 @@
      [:map
       [:xt/id [:re "https://site.test/applications/(.+)"]]
       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/application"]]
-      [:juxt.pass.alpha/oauth-client-id [:string {:min 10}]]
-      [:juxt.pass.alpha/oauth-client-secret [:string {:min 16}]]]]
+      [:juxt.pass.alpha/oauth-client-id [:string {:min 10}]] ; <1>
+      [:juxt.pass.alpha/oauth-client-secret [:string {:min 16}]]]] ; <2>
     :juxt.pass.alpha/process
     [
      [:juxt.pass.alpha.process/update-in [0]
@@ -278,7 +278,7 @@
      [:xtdb.api/put]
      ]
     :juxt.pass.alpha/rules
-    '[[(allowed? permission subject action resource)
+    '[[(allowed? permission subject action resource) ; <3>
        [id :juxt.pass.alpha/user user]
        [subject :juxt.pass.alpha/identity id]
        [permission :juxt.pass.alpha/user user]]]})
@@ -1035,3 +1035,38 @@
        :juxt.http.alpha/content (slurp "dev/unauthorized.html")})
      ;; end::put-unauthorized-error-representation-for-html-with-login-link![]
      ))))
+
+
+(defn demo-create-action-put-graphql-resource! []
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-graphql-resource"
+
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/.*"]]]]
+
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]]]})
+  )
+
+(defn demo-grant-permission-to-invoke-action-put-graphql-resource! []
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/mal/put-graphql-resource"
+    :juxt.pass.alpha/user "https://site.test/users/mal"
+    :juxt.pass.alpha/action "https://site.test/actions/put-graphql-resource"
+    :juxt.pass.alpha/purpose nil})
+  )

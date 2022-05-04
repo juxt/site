@@ -488,7 +488,7 @@
           (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn put-graphql
-  "Put a GraphQL document"
+  "Put a GraphQL schema"
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri file path]
@@ -522,7 +522,7 @@
           (message! "Request id:" (get headers "site-request-id")))))))
 
 (defn post-graphql
-  "Post a GraphQL schema"
+  "Post a GraphQL request"
   [opts]
   (let [{access-token "access_token"} (load-token)
         {:keys [base-uri file path]

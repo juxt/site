@@ -2,3 +2,8 @@
 :toc: left
 
 == Introduction
+
+[NOTE]
+--
+Now that we can create resources, we can group them into collections, making up APIs.
+--

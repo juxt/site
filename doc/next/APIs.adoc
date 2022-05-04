@@ -1,6 +1,9 @@
 = APIs
 :toc: left
 
+// Create an action to list-identities
+// Create a resource at /users that is attached to list-identities
+
 == Creating an action to install an API resource
 
 ====
