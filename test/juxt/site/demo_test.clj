@@ -154,7 +154,7 @@
        [permission ::pass/user user]
        [subject ::pass/identity id]
        [id ::pass/user user]
-       [resource ::pass/owner user]]]})
+       [resource :owner user]]]})
 
   (repl/do-action
    "https://site.test/subjects/repl-default"
@@ -170,7 +170,7 @@
      {:xt/id (format "https://site.test/~%s/{path}" user)
       ;; This needs to return a resource 'owned' by the user, then the action can
       ;; unify on the subject's user and the resource's owner.
-      ::pass/owner (format "https://site.test/users/%s" user)
+      :owner (format "https://site.test/users/%s" user)
       ::site/uri-template true
       ::http/methods
       {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}
