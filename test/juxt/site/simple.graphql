@@ -3,5 +3,13 @@ schema {
 }
 
 type Query {
-  foo: String
+  accounts: [Account]
+}
+
+type Account {
+  transactions: [Transaction]
+}
+
+type Transaction {
+  amount: String
 }
