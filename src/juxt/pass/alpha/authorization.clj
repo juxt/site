@@ -184,6 +184,9 @@
 
         pull-expr (vec (mapcat (comp ::pass/pull :action) results))]
 
+    ;; TODO: dedupe the resources- some resources may be allowed via more than
+    ;; one action
+
     (->> results
          (map :resource)
          (xt/pull-many db pull-expr))))
