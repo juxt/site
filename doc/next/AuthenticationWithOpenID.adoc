@@ -394,10 +394,10 @@ We shall also grant this identity the permission to read itself.
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-for-mal-to-get-mal!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-for-alice-to-get-alice!,indent=0]
 ----
 
-We can now test this in a browser. Navigate to https://site.test/~mal
+We can now test this in a browser. Navigate to https://site.test/~alice
 ====
 ////
 
