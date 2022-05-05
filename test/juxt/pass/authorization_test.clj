@@ -584,6 +584,26 @@
         BOB_SUBJECT {::username "alice" ::secret "foo"}
         CARLOS_SUBJECT {::username "alice"}))))
 
+;; In this test, Alice and Bob communicate with each other and can see the
+;; content of each other's messages.  Faythe is tasked with monitoring
+;; conversations between Alice and Bob, so can read the metadata (when a message
+;; was sent, between which participants, etc.) but for privacy reasons cannot
+;; see the content of each message.
+;;
+;; This test tests the ::pass/pull feature which restricts what documents
+;; attributes can be read.
+;;
+;; Permissions are modelled here as 'group membership', meaning that if a
+;; participant is a member of a group, that alone gives them permission to the
+;; actions. However, this feels wrong: it is not intuitively obvious what is
+;; going on.
+;;
+;; TODO (@cwi): Revisit, remove the idea of groups in this test and have an
+;; explicit permission. Perhaps the demonstration/testing of 'complex'
+;; permissions which apply only to a certain group should be extracted into a
+;; different test.
+;;
+;; TODO: Let's rename person to user to align with the book
 (deftest pull-allowed-resources-test
   (let [READ_MESSAGE_CONTENT_ACTION
         {:xt/id "https://example.org/actions/read-message-content"
