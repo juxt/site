@@ -74,6 +74,8 @@
             ("AppRoutes" "VirtualResource") locator)))))
 
 
+;; TODO: Definitely a candidate for clojure.core.cache (or memoize). Always be
+;; careful using memoize, but in case performance is scarcer than memory.
 (memoize
  (defn to-regex [uri-template]
    (re-pattern
@@ -94,43 +96,35 @@
        ;; against the path parameter to later (potentially yielding a 400).
        (format "(?<%s>[^/#\\?]+)" group))))))
 
-
-
-
 (defn match-uri-templated-uris [db uri]
-  #_(first
-     (xt/q
-      db
-      '{:find [(pull r [*]) grps]
-        :keys [e groups]
-        :where [[r ::site/uri-template true]
-                [(first grps) grp0]
-                [(some? grp0)]
-                [(juxt.site.alpha.locator/to-regex r) pat]
-                [(re-matches pat uri) grps]]
-        :in [uri]}
-      uri))
-
-  (when-let [{:keys [e groups]}
+  (when-let [{:keys [resource groups]}
              (first
               (xt/q
                db
-               '{:find [(pull r [*]) grps]
-                 :keys [e groups]
-                 :where [[r ::site/uri-template true]
+               '{:find [(pull resource [*]) grps]
+                 :keys [resource groups]
+                 :where [[resource ::site/uri-template true]
+                         ;; Compile the URI to a java.util.regex.Pattern
+                         [(juxt.site.alpha.locator/to-regex resource) pat]
+                         [(re-matches pat uri) grps]
                          [(first grps) grp0]
-                         [(some? grp0)]
-                         [(juxt.site.alpha.locator/to-regex r) pat]
-                         [(re-matches pat uri) grps]]
+                         [(some? grp0)]]
                  :in [uri]}
                uri))]
-    (assoc e ::site/path-params (zipmap (map second (re-seq #"\{(\p{Alpha}+)\}" (:xt/id e)))
-                                        (next groups)))))
+    (assoc
+     resource
+     ::site/path-params
+     (zipmap
+      ;; Keys
+      (map second (re-seq #"\{(\p{Alpha}+)\}" (:xt/id resource)))
+      ;; Values
+      (next groups)))))
 
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
   in :default."
   [{::site/keys [db uri base-uri] :as req}]
+
   (assert uri)
   (assert base-uri)
   (assert db)
@@ -160,7 +154,6 @@
       ::site/resource-provider r
       ::http/redirect (cond-> loc (.startsWith loc base-uri)
                               (subs (count base-uri)))})
-
 
    ;; This can be put into the database to override the ::default-empty-resource
    ;; default.
