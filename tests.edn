@@ -5,7 +5,7 @@
  :tests [{:id :test
           :test-paths ["test"]
           :ns-patterns ["juxt.site.demo-test"
-                        ;;"juxt.pass.authorization-test"
+                        "juxt.pass.authorization-test"
                         ]}]
 
  :reporter kaocha.report/documentation}
