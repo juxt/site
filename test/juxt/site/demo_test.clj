@@ -34,9 +34,10 @@
     :juxt.pass.alpha/action "https://site.test/actions/get-not-found"
     :juxt.pass.alpha/purpose nil})
 
-  (repl/put! {:xt/id "urn:site:resources:not-found"
-              ::http/methods
-              {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}}}))
+  (repl/put!
+   {:xt/id "urn:site:resources:not-found"
+    ::http/methods
+    {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}}}))
 
 (defn with-site-book-setup [f]
   (demo/demo-put-user!)
@@ -185,14 +186,14 @@
              :ring.request/path "/~cwi/index.html"
              :ring.request/headers
              {"authorization" "Bearer test-access-token"}}]
-    (is (= 403 (:ring.response/status(*handler* req)))))
+    (is (= 403 (:ring.response/status (*handler* req)))))
 
   ;; When @mal writing to @mal's user directory, we get through security.
   (let [req {:ring.request/method :put
              :ring.request/path "/~mal/index.html"
              :ring.request/headers
              {"authorization" "Bearer test-access-token"}}]
-    (is (= 411 (:ring.response/status(*handler* req))))))
+    (is (= 411 (:ring.response/status (*handler* req))))))
 
 #_((t/join-fixtures [with-system-xt with-site-book-setup with-handler])
  (fn []
