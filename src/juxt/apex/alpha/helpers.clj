@@ -14,7 +14,7 @@
   (let [;; Operation can contain extra config, such as uri-templates
         operation (::apex/operation resource)
 
-        resource-state (openapi/received-body->resource-state req)
+        resource-state (openapi/validate-request-payload req)
 
         ;; TODO: This is just a hack to get a demo working - the method of
         ;; determining the identifier for the new resource needs to be more
