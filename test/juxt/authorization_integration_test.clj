@@ -159,11 +159,32 @@
                            :ring.request/path "/hello"})]
       (is (= 401 (:ring.response/status resp))))))
 
+(deftest forbidden-test
+  (add-action (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
+                                                          '[[(allowed? permission subject action resource)
+                                                             [permission :xt/id]
+                                                             [subject :juxt.pass.alpha/identity ident]
+                                                             [ident :juxt.pass.alpha/user "https://test.example.com/users/alice"]]]}))
+  (repl/put! (merge (make-permission "get-public-resource")))
+  (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
+  (repl/put! (make-user "bob"))
+  (repl/put! (make-identity "bob"))
+  (repl/put! (make-subject "bob" "bob-subj"))
+  (let [access-token-doc (make-access-token "bob-subj")
+        access-token (:juxt.pass.alpha/token access-token-doc)]
+    (repl/put! access-token-doc)
+
+    (testing "403 Forbidden - When a user is authenticated but not authorized to access the resource 403 status is returned"
+      (let [resp (*handler* {:ring.request/method :get
+                             :ring.request/headers {"authorization" (str "Bearer " access-token)}
+                             :ring.request/path "/hello"})]
+        (is (= 403 (:ring.response/status resp)))))))
+
 (deftest method-not-allowed-test
+  (add-action (make-action "get-public-resource"))
+  (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
+  (repl/put! (make-permission "get-public-resource"))
   (testing "405 Method Not Allowed - When a resource does not support the provided method 405 status is returned"
-    (add-action (make-action "get-public-resource"))
-    (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
-    (repl/put! (make-permission "get-public-resource"))
     (let [resp (*handler* {:ring.request/method :post
                            :ring.request/path "/hello"})]
       (is (= 405 (:ring.response/status resp))))
@@ -224,9 +245,7 @@
       (let [resp (*handler* {:ring.request/method :get
                              :ring.request/headers {"authorization" (str "Bearer " access-token)}
                              :ring.request/path "/hello"})]
-        (is (= 403 (:ring.response/status resp))))))
-
-  )
+        (is (= 403 (:ring.response/status resp)))))))
 
 ;;;; TESTS END ;;;;
 
