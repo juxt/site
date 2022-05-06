@@ -7,7 +7,8 @@
              [juxt.http.alpha :as-alias http]
              [juxt.site.alpha.repl :as repl]
              [clojure.string :as str]
-             [xtdb.api :as xt]))
+             [xtdb.api :as xt]
+             [juxt.pass.alpha.application :as application]))
 
 (def site-prefix "https://test.example.com")
 
@@ -116,6 +117,15 @@
    [['(allowed? permission subject action resource)
      ['permission :xt/id]]]})
 
+(defn make-access-token
+  [subject-id]
+  (merge
+   (application/make-access-token-doc {
+                                       :prefix (str site-prefix "/tokens/")
+                                       :subject (str site-prefix "/subjects/" subject-id)
+                                       :expires-in-seconds 160})
+   {:juxt.site.alpha/type "https://meta.juxt.site/pass/access-token"}))
+
 
 ;;;; TESTS START ;;;;
 
@@ -144,9 +154,10 @@
                                                              [ident :juxt.pass.alpha/user user]]]}))
   (repl/put! (merge (make-permission "get-public-resource") {:juxt.pass.alpha/user (str site-prefix "/users/unauthorized-user")}))
   (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
-  (let [resp (*handler* {:ring.request/method :get
-                         :ring.request/path "/hello"})]
-    (is (= 401 (:ring.response/status resp)))))
+  (testing "401 Unauthorized - When a resource requires authentication credentials that are not available 401 status is returned"
+    (let [resp (*handler* {:ring.request/method :get
+                           :ring.request/path "/hello"})]
+      (is (= 401 (:ring.response/status resp))))))
 
 (deftest method-not-allowed-test
   (testing "405 Method Not Allowed - When a resource does not support the provided method 405 status is returned"
@@ -169,17 +180,74 @@
                            :ring.request/path "/hello"})]
       (is (= 404 (:ring.response/status resp))))))
 
+
+(deftest issue-bearer-token-test
+  (add-action (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
+                                                          '[[(allowed? permission subject action resource)
+                                                             [permission :xt/id]
+                                                             [subject :juxt.pass.alpha/identity ident]
+                                                             [ident :juxt.pass.alpha/user "https://test.example.com/users/alice"]]]}))
+  (repl/put! (merge (make-permission "get-public-resource")))
+  (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
+  (repl/put! (make-user "alice"))
+  (repl/put! (make-identity "alice"))
+  (repl/put! (make-subject "alice" "alice-subj"))
+  (repl/put! (make-user "bob"))
+  (repl/put! (make-identity "bob"))
+  (repl/put! (make-subject "bob" "bob-subj"))
+
+  (testing "Access to a resource which requires authorization is denied when no bearer token provided"
+    (let [resp (*handler* {:ring.request/method :get
+                           :ring.request/path "/hello"})]
+      (is (= 401 (:ring.response/status resp)))))
+
+  (let [access-token-doc (make-access-token "alice-subj")
+        access-token (:juxt.pass.alpha/token access-token-doc)]
+    (repl/put! access-token-doc)
+
+    (testing "Access to a resource which requires authorization is permitted when a valid bearer token is provided"
+      (let [resp (*handler* {:ring.request/method :get
+                             :ring.request/headers {"authorization" (str "Bearer " access-token)}
+                             :ring.request/path "/hello"})]
+        (is (= 200 (:ring.response/status resp)))))
+
+    (testing "Access to a resource which requires authorization is denied when an invalid bearer token is provided"
+      (let [resp (*handler* {:ring.request/method :get
+                             :ring.request/headers {"authorization" (str "Bearer " "invalid-access-token")}
+                             :ring.request/path "/hello"})]
+        (is (= 401 (:ring.response/status resp))))))
+  (let [access-token-doc (make-access-token "bob-subj")
+        access-token (:juxt.pass.alpha/token access-token-doc)]
+    (repl/put! access-token-doc)
+
+    (testing "Access to a resource which requires authorization is denied when a valid bearer token is provided but for a user without permission"
+      (let [resp (*handler* {:ring.request/method :get
+                             :ring.request/headers {"authorization" (str "Bearer " access-token)}
+                             :ring.request/path "/hello"})]
+        (is (= 403 (:ring.response/status resp))))))
+
+  )
+
 ;;;; TESTS END ;;;;
 
 (comment
 
-  #_((t/join-fixtures fixtures)
+  ((t/join-fixtures fixtures)
    (fn []
 
-     (add-action "get-public-resource")
-     (repl/put! (make-permission "get-public-resource"))
-     (add-public-resource "/hello/{id}/world" { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" })
-     (juxt.site.alpha.locator/match-uri-templated-uris (xt/db *xt-node*) (str site-prefix "/hello/{id}/world"))
-     #_(juxt.pass.alpha.authorization/check-permissions (xt/db *xt-node*) #{"https://test.example.com/actions/get-public-resource"} {:resource "https://test.example.com/hello"})
+     (add-action (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
+                                                             '[[(allowed? permission subject action resource)
+                                                                [permission :xt/id]
+                                                                [subject :juxt.pass.alpha/identity ident]]]}))
+     (repl/put! (merge (make-permission "get-public-resource") {:juxt.pass.alpha/user (str site-prefix "/users/unauthorized-user")}))
+     (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
+     (repl/put! (make-user "alice"))
+     (repl/put! (make-identity "alice"))
+     (repl/put! (make-subject "alice" "alice-subj"))
+     (let [access-token-doc (make-access-token "alice-subj")
+        access-token (:juxt.pass.alpha/token access-token-doc)]
+       (repl/put! access-token-doc)
+       (juxt.pass.alpha.authentication/lookup-subject-from-bearer (xt/db *xt-node*) access-token))
+     #_(juxt.pass.alpha.authorization/check-permissions (xt/db *xt-node*) #{"https://test.example.com/actions/get-public-resource"} {:resource "https://test.example.com/hello" :subject "https://test.example.com/subjects/alice-subj"})
      ))
 )
