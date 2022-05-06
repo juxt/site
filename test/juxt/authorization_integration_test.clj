@@ -20,32 +20,6 @@
               ::site/uri-prefix site-prefix})]
     (f)))
 
-(defn make-create-action-helper
-  []
-  {:xt/id (str site-prefix "/actions/create-action")
-   :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
-   :juxt.pass.alpha/scope "write:admin"
-   :juxt.pass.alpha.malli/args-schema
-   [:tuple
-    [:map
-     [:xt/id [:re (str site-prefix "/actions/(.+)")]]
-     [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/action"]]
-     [:juxt.pass.alpha/rules [:vector [:vector :any]]]]]
-
-   :juxt.pass.alpha/process
-   [
-    [:juxt.pass.alpha.process/update-in [0]
-     'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/action"}]
-    [:juxt.pass.alpha.malli/validate]
-    [:xtdb.api/put]]
-
-   :juxt.pass.alpha/rules
-   '[
-     [(allowed? permission subject action resource)
-      [subject :juxt.pass.alpha/identity id]
-      [id :juxt.pass.alpha/user user]
-      [permission :juxt.pass.alpha/user user]]]})
-
 (defn make-user
   [user-id]
   {:xt/id (str site-prefix "/users/" user-id)
@@ -72,8 +46,6 @@
 
 (defn with-site-helpers
   [f]
-  (repl/install-do-action-fn!)
-  (repl/put! (make-create-action-helper))
   (repl/put! (merge (make-user "host") {:name "Test Host User"}))
   (repl/put! (make-identity "host"))
   (repl/put! (make-subject "host" "host-test"))
@@ -89,17 +61,11 @@
 (defn make-action
   [action-id]
   {:xt/id (str site-prefix "/actions/" action-id)
+   :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
    :juxt.pass.alpha/scope "read:resource"
    :juxt.pass.alpha/rules
    [['(allowed? permission subject action resource)
      ['permission :xt/id]]]})
-
-(defn add-action
-  [action]
-  (repl/do-action
-   test-host-subject
-   (str site-prefix "/actions/create-action")
-   action))
 
 (defn add-not-found-resource
   []
@@ -129,7 +95,7 @@
 ;;;; TESTS START ;;;;
 
 (deftest ok-test
-  (add-action (make-action "get-public-resource"))
+  (repl/put! (make-action "get-public-resource"))
   (repl/put! (make-permission "get-public-resource"))
   (testing "200 OK - When a resource can be retrieved from the uri 200 status is returned"
     (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
@@ -146,7 +112,7 @@
       (is (= "Hello World" (:ring.response/body resp))))))
 
 (deftest unauthorized-test
-  (add-action (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
+  (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
                                                           '[[(allowed? permission subject action resource)
                                                              [permission :juxt.pass.alpha/user user]
                                                              [subject :juxt.pass.alpha/identity ident]
@@ -159,11 +125,11 @@
       (is (= 401 (:ring.response/status resp))))))
 
 (deftest forbidden-test
-  (add-action (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
-                                                          '[[(allowed? permission subject action resource)
-                                                             [permission :xt/id]
-                                                             [subject :juxt.pass.alpha/identity ident]
-                                                             [ident :juxt.pass.alpha/user "https://test.example.com/users/alice"]]]}))
+  (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
+                                                     '[[(allowed? permission subject action resource)
+                                                        [permission :xt/id]
+                                                        [subject :juxt.pass.alpha/identity ident]
+                                                        [ident :juxt.pass.alpha/user "https://test.example.com/users/alice"]]]}))
   (repl/put! (merge (make-permission "get-public-resource")))
   (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
   (repl/put! (make-user "bob"))
@@ -180,7 +146,7 @@
         (is (= 403 (:ring.response/status resp)))))))
 
 (deftest method-not-allowed-test
-  (add-action (make-action "get-public-resource"))
+  (repl/put! (make-action "get-public-resource"))
   (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
   (repl/put! (make-permission "get-public-resource"))
   (testing "405 Method Not Allowed - When a resource does not support the provided method 405 status is returned"
@@ -193,7 +159,7 @@
 
 (deftest not-found-test
   (testing "404 Not Found - When no resource exists at the uri 404 status is returned"
-    (add-action (make-action "get-not-found"))
+    (repl/put! (make-action "get-not-found"))
     (add-not-found-resource)
     (repl/put! (make-permission "get-not-found"))
     (let [resp (*handler* {:ring.request/method :get
@@ -202,7 +168,7 @@
 
 
 (deftest issue-bearer-token-test
-  (add-action (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
+  (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
                                                           '[[(allowed? permission subject action resource)
                                                              [permission :xt/id]
                                                              [subject :juxt.pass.alpha/identity ident]
@@ -253,7 +219,7 @@
   ((t/join-fixtures fixtures)
    (fn []
 
-     (add-action (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
+     (repl/put!(merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
                                                              '[[(allowed? permission subject action resource)
                                                                 [permission :xt/id]
                                                                 [subject :juxt.pass.alpha/identity ident]]]}))
