@@ -90,16 +90,20 @@
 
 (def test-host-subject (str site-prefix "/subjects/host-test"))
 
-(defn add-action
+(defn make-action
   [action-id]
+  {:xt/id (str site-prefix "/actions/" action-id)
+   :juxt.pass.alpha/scope "read:resource"
+   :juxt.pass.alpha/rules
+   [['(allowed? permission subject action resource)
+     ['permission :xt/id]]]})
+
+(defn add-action
+  [action]
   (repl/do-action
    test-host-subject
    (str site-prefix "/actions/create-action")
-   {:xt/id (str site-prefix "/actions/" action-id)
-    :juxt.pass.alpha/scope "read:resource"
-    :juxt.pass.alpha/rules
-    [['(allowed? permission subject action resource)
-      ['permission :xt/id]]]}))
+   action))
 
 (defn add-not-found-resource
   []
@@ -119,7 +123,7 @@
 ;;;; TESTS START ;;;;
 
 (deftest ok-test
-  (add-action "get-public-resource")
+  (add-action (make-action "get-public-resource"))
   (repl/put! (make-permission "get-public-resource"))
   (testing "200 OK - When a resource can be retrieved from the uri 200 status is returned"
     (add-public-resource "/hello" { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" })
@@ -135,9 +139,21 @@
       (is (= 200 (:ring.response/status resp)))
       (is (= "Hello World" (:ring.response/body resp))))))
 
+(deftest unauthorized-test
+  (add-action (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
+                                                          '[[(allowed? permission subject action resource)
+                                                             [permission :juxt.pass.alpha/user user]
+                                                             [subject :juxt.pass.alpha/identity ident]
+                                                             [ident :juxt.pass.alpha/user user]]]}))
+  (repl/put! (make-permission "get-public-resource" {:juxt.pass.alpha/user (str site-prefix "/users/unauthorized-user")}))
+      (add-public-resource "/hello" { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" })
+  (let [resp (*handler* {:ring.request/method :get
+                         :ring.request/path "/hello"})]
+    (is (= 401 (:ring.response/status resp)))))
+
 (deftest method-not-allowed-test
   (testing "405 Method Not Allowed - When a resource does not support the provided method 405 status is returned"
-    (add-action "get-public-resource")
+    (add-action (make-action "get-public-resource"))
     (add-public-resource "/hello" { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" })
     (repl/put! (make-permission "get-public-resource"))
     (let [resp (*handler* {:ring.request/method :post
@@ -149,7 +165,7 @@
 
 (deftest not-found-test
   (testing "404 Not Found - When no resource exists at the uri 404 status is returned"
-    (add-action "get-not-found")
+    (add-action (make-action "get-not-found"))
     (add-not-found-resource)
     (repl/put! (make-permission "get-not-found"))
     (let [resp (*handler* {:ring.request/method :get
