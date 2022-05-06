@@ -46,12 +46,10 @@
       [permission :juxt.pass.alpha/user user]]]})
 
 (defn make-user
-  [user-id additional-info]
-  (merge
-   {:xt/id (str site-prefix "/users/" user-id)
-    :juxt.site.alpha/type "https://meta.juxt.site/pass/user"
-    :juxtcode user-id}
-   additional-info))
+  [user-id]
+  {:xt/id (str site-prefix "/users/" user-id)
+   :juxt.site.alpha/type "https://meta.juxt.site/pass/user"
+   :juxtcode user-id})
 
 (defn make-identity
   [user-id]
@@ -66,22 +64,20 @@
    :juxt.pass.alpha/identity (str site-prefix "/identities/" user-id)})
 
 (defn make-permission
-  ([action-id]
-   {:xt/id (str site-prefix "/permissions/" action-id)
-          :juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
-    :juxt.pass.alpha/action (str site-prefix "/actions/" action-id)
-    :juxt.pass.alpha/purpose nil})
-  ([action-id additional-info]
-   (merge (make-permission action-id) additional-info)))
+  [action-id]
+  {:xt/id (str site-prefix "/permissions/" action-id)
+   :juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
+   :juxt.pass.alpha/action (str site-prefix "/actions/" action-id)
+   :juxt.pass.alpha/purpose nil})
 
 (defn with-site-helpers
   [f]
   (repl/install-do-action-fn!)
   (repl/put! (make-create-action-helper))
-  (repl/put! (make-user "host" {:name "Test Host User"}))
+  (repl/put! (merge (make-user "host") {:name "Test Host User"}))
   (repl/put! (make-identity "host"))
   (repl/put! (make-subject "host" "host-test"))
-  (repl/put! (make-permission "create-action" { :juxt.pass.alpha/user (str site-prefix "/users/host") }))
+  (repl/put! (merge (make-permission "create-action") { :juxt.pass.alpha/user (str site-prefix "/users/host") }))
   (f))
 
 (def fixtures [tutil/with-system-xt with-handler with-site-helpers])
@@ -112,13 +108,14 @@
     ::http/methods
     {:get {:juxt.pass.alpha/actions #{(str site-prefix "/actions/get-not-found")}}}}))
 
-(defn add-public-resource
-  [path additional-info]
-  (repl/put! (merge {:xt/id (str site-prefix path)
-                     ::http/methods {:get {:juxt.pass.alpha/actions #{(str site-prefix "/actions/get-public-resource")}}}
-                     :juxt.pass.alpha/rules
-                     [['(allowed? permission subject action resource)
-                       ['permission :xt/id]]]} additional-info)))
+(defn make-resource
+  [path]
+  {:xt/id (str site-prefix path)
+   ::http/methods {:get {:juxt.pass.alpha/actions #{(str site-prefix "/actions/get-public-resource")}}}
+   :juxt.pass.alpha/rules
+   [['(allowed? permission subject action resource)
+     ['permission :xt/id]]]})
+
 
 ;;;; TESTS START ;;;;
 
@@ -126,14 +123,14 @@
   (add-action (make-action "get-public-resource"))
   (repl/put! (make-permission "get-public-resource"))
   (testing "200 OK - When a resource can be retrieved from the uri 200 status is returned"
-    (add-public-resource "/hello" { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" })
+    (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
     (let [resp (*handler* {:ring.request/method :get
                            :ring.request/path "/hello"})]
       (is (= 200 (:ring.response/status resp)))
       (is (= "Hello World" (:ring.response/body resp)))))
 
   (testing "200 OK - When a resource can be retrieved from a templated uri 200 status is returned"
-    (add-public-resource "/hello/{id}/world" { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" :juxt.site.alpha/uri-template true })
+    (repl/put! (merge (make-resource "/hello/{id}/world") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" :juxt.site.alpha/uri-template true }))
     (let [resp (*handler* {:ring.request/method :get
                            :ring.request/path "/hello/1234/world"})]
       (is (= 200 (:ring.response/status resp)))
@@ -145,8 +142,8 @@
                                                              [permission :juxt.pass.alpha/user user]
                                                              [subject :juxt.pass.alpha/identity ident]
                                                              [ident :juxt.pass.alpha/user user]]]}))
-  (repl/put! (make-permission "get-public-resource" {:juxt.pass.alpha/user (str site-prefix "/users/unauthorized-user")}))
-      (add-public-resource "/hello" { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" })
+  (repl/put! (merge (make-permission "get-public-resource") {:juxt.pass.alpha/user (str site-prefix "/users/unauthorized-user")}))
+  (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
   (let [resp (*handler* {:ring.request/method :get
                          :ring.request/path "/hello"})]
     (is (= 401 (:ring.response/status resp)))))
@@ -154,7 +151,7 @@
 (deftest method-not-allowed-test
   (testing "405 Method Not Allowed - When a resource does not support the provided method 405 status is returned"
     (add-action (make-action "get-public-resource"))
-    (add-public-resource "/hello" { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" })
+    (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
     (repl/put! (make-permission "get-public-resource"))
     (let [resp (*handler* {:ring.request/method :post
                            :ring.request/path "/hello"})]
