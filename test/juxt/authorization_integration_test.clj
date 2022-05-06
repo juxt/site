@@ -49,8 +49,7 @@
 (defn make-user
   [user-id]
   {:xt/id (str site-prefix "/users/" user-id)
-   :juxt.site.alpha/type "https://meta.juxt.site/pass/user"
-   :juxtcode user-id})
+   :juxt.site.alpha/type "https://meta.juxt.site/pass/user"})
 
 (defn make-identity
   [user-id]
