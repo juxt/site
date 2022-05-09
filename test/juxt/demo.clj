@@ -373,7 +373,7 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/alice/authorize-application"
+   {:xt/id "https://site.test/permissions/mal/issue-access-token"
     :juxt.pass.alpha/user "https://site.test/users/alice"
     :juxt.pass.alpha/action "https://site.test/actions/issue-access-token"
     :juxt.pass.alpha/purpose nil})

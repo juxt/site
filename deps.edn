@@ -101,6 +101,11 @@
     }
    :jvm-opts ["--add-opens" "java.base/java.util.concurrent=ALL-UNNAMED"]
    }
+  :coverage
+  {:extra-paths ["test"]
+   :extra-deps {
+                lambdaisland/kaocha-cloverage {:mvn/version "1.0.75"}
+                org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}}}
 
   :prod
   {:extra-paths ["prod"]
