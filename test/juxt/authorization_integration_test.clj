@@ -210,7 +210,20 @@
       (let [resp (*handler* {:ring.request/method :get
                              :ring.request/headers {"authorization" (str "Bearer " access-token)}
                              :ring.request/path "/hello"})]
-        (is (= 403 (:ring.response/status resp)))))))
+        (is (= 403 (:ring.response/status resp)))))
+
+
+    (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
+                                                           '[[(allowed? permission subject action resource)
+                                                              [permission :xt/id]
+                                                              [subject :juxt.pass.alpha/identity ident]
+                                                              [ident :juxt.pass.alpha/user #{"https://test.example.com/users/alice" "https://test.example.com/users/bob"}]]]}))
+
+    (testing "Access to a resource which requires authorization is permitted when a valid bearer token is provided for a user with permission (when multiple users are specified)"
+      (let [resp (*handler* {:ring.request/method :get
+                             :ring.request/headers {"authorization" (str "Bearer " access-token)}
+                             :ring.request/path "/hello"})]
+        (is (= 200 (:ring.response/status resp)))))))
 
 ;;;; TESTS END ;;;;
 
