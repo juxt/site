@@ -173,7 +173,7 @@
                                                              [permission :xt/id]
                                                              [subject :juxt.pass.alpha/identity ident]
                                                              [ident :juxt.pass.alpha/user "https://test.example.com/users/alice"]]]}))
-  (repl/put! (merge (make-permission "get-public-resource")))
+  (repl/put! (make-permission "get-public-resource"))
   (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
   (repl/put! (make-user "alice"))
   (repl/put! (make-identity "alice"))
@@ -232,7 +232,7 @@
                                                              [subject :juxt.pass.alpha/identity ident]
                                                              [ident :juxt.pass.alpha/user user]
                                                              [user :roles :developer]]]}))
-  (repl/put! (merge (make-permission "get-public-resource")))
+  (repl/put! (make-permission "get-public-resource"))
   (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
   (repl/put! (assoc (make-user "alice") :roles #{:developer :admin}))
   (repl/put! (make-identity "alice"))
@@ -279,6 +279,7 @@
 
         (testing "A user who is not in one of the permitted roles cannot access the resource"
           (is (= 403 (:ring.response/status (attempt-access-fn bob-access-token)))))))
+
 
 ;;;; TESTS END ;;;;
 
