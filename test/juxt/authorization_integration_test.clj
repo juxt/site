@@ -225,6 +225,61 @@
                              :ring.request/path "/hello"})]
         (is (= 200 (:ring.response/status resp)))))))
 
+(deftest arbitrary-field-permission-test
+  (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
+                                                          '[[(allowed? permission subject action resource)
+                                                             [permission :xt/id]
+                                                             [subject :juxt.pass.alpha/identity ident]
+                                                             [ident :juxt.pass.alpha/user user]
+                                                             [user :roles :developer]]]}))
+  (repl/put! (merge (make-permission "get-public-resource")))
+  (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
+  (repl/put! (assoc (make-user "alice") :roles #{:developer :admin}))
+  (repl/put! (make-identity "alice"))
+  (repl/put! (make-subject "alice" "alice-subj"))
+  (repl/put! (assoc (make-user "bob") :roles #{:developer}))
+  (repl/put! (make-identity "bob"))
+  (repl/put! (make-subject "bob" "bob-subj"))
+  (repl/put! (assoc (make-user "carlos") :roles #{:infrastructure}))
+  (repl/put! (make-identity "carlos"))
+  (repl/put! (make-subject "carlos" "carlos-subj"))
+
+  (let [resp (*handler* {:ring.request/method :get
+                         :ring.request/path "/hello"})
+        alice-access-token-doc (make-access-token "alice-subj")
+        alice-access-token (:juxt.pass.alpha/token alice-access-token-doc)
+        bob-access-token-doc (make-access-token "bob-subj")
+        bob-access-token (:juxt.pass.alpha/token bob-access-token-doc)
+        carlos-access-token-doc (make-access-token "carlos-subj")
+        carlos-access-token (:juxt.pass.alpha/token carlos-access-token-doc)
+        attempt-access-fn (fn [access-token] (*handler* {:ring.request/method :get
+                             :ring.request/headers {"authorization" (str "Bearer " access-token)}
+                             :ring.request/path "/hello"}))]
+        (repl/put! alice-access-token-doc)
+        (repl/put! bob-access-token-doc)
+        (repl/put! carlos-access-token-doc)
+
+        (testing "A user who is in the single permitted role can access the resource"
+          (is (= 200 (:ring.response/status (attempt-access-fn alice-access-token))))
+          (is (= 200 (:ring.response/status (attempt-access-fn bob-access-token)))))
+
+        (testing "A user who is not in the single permitted role cannot access the resource"
+          (is (= 403 (:ring.response/status (attempt-access-fn carlos-access-token)))))
+
+        (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
+                                                               '[[(allowed? permission subject action resource)
+                                                                  [permission :xt/id]
+                                                                  [subject :juxt.pass.alpha/identity ident]
+                                                                  [ident :juxt.pass.alpha/user user]
+                                                                  [user :roles #{:admin :infrastructure}]]]}))
+
+        (testing "A user who is in one of the multiple permitted roles can access the resource"
+          (is (= 200 (:ring.response/status (attempt-access-fn alice-access-token))))
+          (is (= 200 (:ring.response/status (attempt-access-fn carlos-access-token)))))
+
+        (testing "A user who is not in one of the permitted roles cannot access the resource"
+          (is (= 403 (:ring.response/status (attempt-access-fn bob-access-token)))))))
+
 ;;;; TESTS END ;;;;
 
 (comment
