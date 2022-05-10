@@ -74,8 +74,7 @@
           "client_id" oauth-client-id
           "redirect_uri" redirect-uri
           "state" state
-          "nonce" nonce
-          "connection" "github"})
+          "nonce" nonce})
 
         location (format "%s?%s" authorization-endpoint query-string)]
 
