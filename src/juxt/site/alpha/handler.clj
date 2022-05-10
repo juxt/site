@@ -14,6 +14,7 @@
    [juxt.dave.alpha.methods :as dave.methods]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha.authentication :as authn]
+   [juxt.pass.alpha.session :as session]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.pick.alpha.core :refer [rate-representation]]
    [juxt.pick.alpha.ring :refer [decode-maybe pick]]
@@ -1366,6 +1367,7 @@
    wrap-negotiate-representation
 
    ;; Authentication, authorization
+   session/wrap-associate-session
    wrap-authenticate
    wrap-authorize
 
