@@ -2,15 +2,12 @@
 
 (ns juxt.site.alpha.init
   (:require
-   [clojure.edn :as edn]
-   [clojure.java.io :as io]
    [clojure.tools.logging :as log]
-   [clojure.walk :refer [postwalk]]
    [crux.api :as x]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
+   [juxt.pass.alpha.authorization :as authz]
    [juxt.reap.alpha.combinators :as p]
-   [juxt.reap.alpha.regex :as re]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.site.alpha.util :as util])
   (:import
@@ -239,6 +236,75 @@
 (def base-uri-parser
   (p/complete
    (p/into {}
-    (p/sequence-group
-     (p/pattern-parser #"(?<scheme>https?)://" {:group {:juxt.reap.alpha.rfc7230/scheme "scheme"}})
-     host-parser))))
+           (p/sequence-group
+            (p/pattern-parser #"(?<scheme>https?)://" {:group {:juxt.reap.alpha.rfc7230/scheme "scheme"}})
+            host-parser))))
+
+(defn do-action [crux-node subject action & args]
+  (apply authz/do-action crux-node {::pass/subject subject} action args))
+
+(defn openid-provider-configuration-url
+  "Returns the URL of the OpenID Provider Configuration Information."
+  [issuer-id]
+  ;; See https://openid.net/specs/openid-connect-discovery-1_0.html#rfc.section.4.1
+  ;;
+  ;; "If the Issuer value contains a path component, any terminating / MUST be
+  ;; removed before appending /.well-known/openid-configuration."
+  ;;
+  ;; This uses a reluctant regex qualifier.
+  (str (second (re-matches #"(.*?)/?" issuer-id)) "/.well-known/openid-configuration"))
+
+(comment
+  (openid-provider-configuration-url "dev-14bkigf7.us.auth0.com"))
+
+(defn install-openid-provider! [crux-node issuer-id]
+  (let [;; https://openid.net/specs/openid-connect-discovery-1_0.html#rfc.section.4
+        ;; tells us we rely on the configuration information being available at
+        ;; the path <issuer-id>/.well-known/openid-configuration.
+        config-uri (openid-provider-configuration-url issuer-id)
+        _ (printf "Loading OpenID configuration from %s\n" config-uri)
+        config (json/read-value (slurp config-uri))]
+    (printf "Issuer added: %s\n" (get config "issuer"))
+    (put!
+     crux-node
+     {:crux.db/id issuer-id
+      :juxt.pass.alpha/openid-configuration config})))
+
+(comment
+  (require 'sc.api)
+  (sc.api/defsc 85))
+
+(defn install-openid-resources!
+  [crux-node {::site/keys [base-uri] :as config}
+   & {:keys [name issuer-id client-id client-secret]}]
+
+  (assert name)
+  #_(install-put-immutable-public-resource-action! crux-node config)
+  (let [client (format "%s/_site/openid/%s/client" base-uri name)
+        login (format "%s/_site/openid/%s/login" base-uri name)
+        callback (format "%s/_site/openid/%s/callback" base-uri name)]
+
+    (put!
+     crux-node
+     {:crux.db/id client
+      :juxt.pass.alpha/openid-issuer-id issuer-id
+      :juxt.pass.alpha/oauth-client-id client-id
+      :juxt.pass.alpha/oauth-client-secret client-secret
+      :juxt.pass.alpha/redirect-uri callback}
+
+     {:crux.db/id login
+      :juxt.http.alpha/methods #{:head :get :options}
+      :juxt.pass.alpha/classification "PUBLIC"
+      :juxt.http.alpha/content-type "text/plain"
+      :juxt.site.alpha/get-fn 'juxt.pass.alpha.openid-connect/login
+      :juxt.pass.alpha/oauth-client client}
+
+     {:crux.db/id callback
+      :juxt.http.alpha/methods #{:head :get :options}
+      :juxt.pass.alpha/classification "PUBLIC"
+      :juxt.http.alpha/content-type "text/plain"
+      :juxt.site.alpha/get-fn 'juxt.pass.alpha.openid-connect/callback
+      :juxt.pass.alpha/oauth-client client})
+
+    {:login-uri login
+     :callback-uri callback}))

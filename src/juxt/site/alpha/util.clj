@@ -65,3 +65,16 @@
      (cond-> form
        (not (freezable? form))
        ((fn [_] ::site/unfreezable))))))
+
+(defn as-hex-str
+  "This uses java.util.HexFormat which requires Java 17 and above. If required,
+  this can be re-coded, see
+  https://stackoverflow.com/questions/9655181/how-to-convert-a-byte-array-to-a-hex-string-in-java
+  and similar. For the size parameter, try 12."
+  [bytes]
+  (.formatHex (java.util.HexFormat/of) bytes))
+
+(defn random-bytes [size]
+  (let [result (byte-array size)]
+    (.nextBytes (java.security.SecureRandom/getInstanceStrong) result)
+    result))
