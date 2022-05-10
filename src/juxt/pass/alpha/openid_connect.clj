@@ -195,7 +195,7 @@
                ::pass/jwks (json/read-value body)
                :expiry (Date/from (.plusSeconds (.toInstant (java.util.Date.)) expiry-in-seconds))}]
           (log/infof "Storing JWKS in database: %s" uri)
-          (crux/submit-tx crux-node [[:xtdb.api/put result]])
+          (crux/submit-tx crux-node [[:crux.tx/put result]])
           (::pass/jwks result))))))
 
 (defn new-subject-urn []
