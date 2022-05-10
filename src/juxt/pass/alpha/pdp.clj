@@ -5,7 +5,6 @@
    [clojure.walk :refer [postwalk-replace]]
    [clojure.tools.logging :as log]
    [crux.api :as crux]
-   [juxt.site.alpha.util :as util]
    [juxt.site.alpha.rules :as rules]
    [clojure.string :as str]))
 
