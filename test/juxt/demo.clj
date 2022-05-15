@@ -86,9 +86,10 @@
   (put!
    {:xt/id "https://site.test/permissions/alice/create-action" ; <1>
     :juxt.site.alpha/type "https://meta.juxt.site/pass/permission" ; <2>
-    :role "Administrator" ; <3>
-    :juxt.pass.alpha/action "https://site.test/actions/create-action" ; <4>
-    :juxt.pass.alpha/purpose nil}) ; <5>
+    :juxt.pass.alpha/action "https://site.test/actions/create-action" ; <3>
+    :juxt.pass.alpha/purpose nil ; <4>
+    :role "Administrator" ; <5>
+    })
   ;; end::permit-create-action![]
   )
 
