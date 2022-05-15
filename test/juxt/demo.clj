@@ -23,8 +23,9 @@
   ;; tag::install-user![]
   (put! {:xt/id "https://site.test/users/alice"
          :juxt.site.alpha/type "https://meta.juxt.site/pass/user"
-         :juxtcode "ali"
-         :name "Alice"})
+         :name "Alice" ; <1>
+         :role #{"User" "Administrator"} ; <2>
+         })
   ;; end::install-user![]
   )
 
@@ -32,9 +33,7 @@
   ;; tag::install-user-identity![]
   (put! {:xt/id "https://site.test/identities/alice"
          :juxt.site.alpha/type "https://meta.juxt.site/pass/identity"
-         :juxt.pass.alpha/user "https://site.test/users/alice"
-         :juxt.pass.jwt/iss "https://juxt.eu.auth0.com/"
-         :juxt.pass.jwt/sub "github|163131"})
+         :juxt.pass.alpha/user "https://site.test/users/alice"})
   ;; end::install-user-identity![]
   )
 
@@ -71,7 +70,8 @@
       [(allowed? permission subject action resource) ; <6>
        [subject :juxt.pass.alpha/identity id]
        [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]]]})
+       [user :role role]
+       [permission :role role]]]})
   ;; end::install-create-action![]
   )
 
@@ -86,7 +86,7 @@
   (put!
    {:xt/id "https://site.test/permissions/alice/create-action" ; <1>
     :juxt.site.alpha/type "https://meta.juxt.site/pass/permission" ; <2>
-    :juxt.pass.alpha/user "https://site.test/users/alice" ; <3>
+    :role "Administrator" ; <3>
     :juxt.pass.alpha/action "https://site.test/actions/create-action" ; <4>
     :juxt.pass.alpha/purpose nil}) ; <5>
   ;; end::permit-create-action![]
@@ -107,8 +107,7 @@
       [:xt/id [:re "https://site.test/permissions/(.+)"]]
       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/permission"]]
       [:juxt.pass.alpha/action [:re "https://site.test/actions/(.+)"]]
-      [:juxt.pass.alpha/purpose [:maybe :string]]
-      ]]
+      [:juxt.pass.alpha/purpose [:maybe :string]]]]
 
     :juxt.pass.alpha/process
     [
@@ -122,7 +121,8 @@
       [(allowed? permission subject action resource)
        [subject :juxt.pass.alpha/identity id]
        [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]]]})
+       [user :role role]
+       [permission :role role]]]})
   ;; end::create-grant-permission-action![]
   )
 
@@ -131,7 +131,7 @@
   (put!
    {:xt/id "https://site.test/permissions/alice/grant-permission"
     :juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
-    :juxt.pass.alpha/user "https://site.test/users/alice"
+    :role "Administrator"
     :juxt.pass.alpha/action "https://site.test/actions/grant-permission"
     :juxt.pass.alpha/purpose nil})
   ;; end::permit-grant-permission-action![]
@@ -169,7 +169,8 @@
       [(allowed? permission subject action resource)
        [subject :juxt.pass.alpha/identity id]
        [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]]]})
+       [user :role role]
+       [permission :role role]]]})
   ;; end::create-action-put-user![]
   )
 
@@ -206,7 +207,8 @@
       [(allowed? permission subject action resource)
        [subject :juxt.pass.alpha/identity id]
        [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]]]})
+       [user :role role]
+       [permission :role role]]]})
   ;; end::create-action-put-identity![]
   )
 
@@ -238,7 +240,8 @@
       [(allowed? permission subject action resource)
        [subject :juxt.pass.alpha/identity id]
        [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]]]})
+       [user :role role]
+       [permission :role role]]]})
   ;; end::create-action-put-subject![]
   )
 
@@ -248,7 +251,7 @@
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/alice/put-subject"
-    :juxt.pass.alpha/user "https://site.test/users/alice"
+    :role "Administrator"
     :juxt.pass.alpha/action "https://site.test/actions/put-subject"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-put-subject![]
@@ -281,7 +284,8 @@
     '[[(allowed? permission subject action resource)
        [id :juxt.pass.alpha/user user]
        [subject :juxt.pass.alpha/identity id]
-       [permission :juxt.pass.alpha/user user]]]})
+       [user :role role]
+       [permission :role role]]]})
   ;; end::create-action-put-application![]
   )
 
@@ -291,7 +295,7 @@
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/alice/put-application"
-    :juxt.pass.alpha/user "https://site.test/users/alice"
+    :role "Administrator"
     :juxt.pass.alpha/action "https://site.test/actions/put-application"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-put-application![]
@@ -323,7 +327,8 @@
     '[[(allowed? permission subject action resource)
        [id :juxt.pass.alpha/user user]
        [subject :juxt.pass.alpha/identity id]
-       [permission :juxt.pass.alpha/user user]]]})
+       [user :role role]
+       [permission :role role]]]})
   ;; end::create-action-authorize-application![]
   )
 
@@ -333,7 +338,7 @@
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/alice/authorize-application"
-    :juxt.pass.alpha/user "https://site.test/users/alice"
+    :role "User"
     :juxt.pass.alpha/action "https://site.test/actions/authorize-application"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-authorize-application![]
@@ -364,7 +369,8 @@
     '[[(allowed? permission subject action resource)
        [id :juxt.pass.alpha/user user]
        [subject :juxt.pass.alpha/identity id]
-       [permission :juxt.pass.alpha/user user]]]})
+       [permission :role role]
+       [user :role role]]]})
   ;; end::create-action-issue-access-token![]
   )
 
@@ -374,7 +380,7 @@
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/mal/issue-access-token"
-    :juxt.pass.alpha/user "https://site.test/users/alice"
+    :role "User" ; <1>
     :juxt.pass.alpha/action "https://site.test/actions/issue-access-token"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-issue-access-token![]
@@ -412,7 +418,8 @@
       [(allowed? permission subject action resource) ; <3>
        [subject :juxt.pass.alpha/identity id]
        [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]]]})
+       [user :role role]
+       [permission :role role]]]})
   ;; end::create-action-put-immutable-public-resource![]
   )
 
@@ -422,7 +429,7 @@
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/alice/put-immutable-public-resource"
-    :juxt.pass.alpha/user "https://site.test/users/alice"
+    :role "Administrator"
     :juxt.pass.alpha/action "https://site.test/actions/put-immutable-public-resource"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-put-immutable-public-resource![]
@@ -592,7 +599,8 @@
       [(allowed? permission subject action resource)
        [subject :juxt.pass.alpha/identity id]
        [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]]]})
+       [permission :role role]
+       [user :role role]]]})
   ;; end::create-action-put-immutable-private-resource![]
   )
 
@@ -602,7 +610,7 @@
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/alice/put-immutable-private-resource"
-    :juxt.pass.alpha/user "https://site.test/users/alice"
+    :role "Administrator"
     :juxt.pass.alpha/action "https://site.test/actions/put-immutable-private-resource"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-put-immutable-private-resource![]
@@ -617,22 +625,13 @@
     :juxt.pass.alpha/scope "read:resource"
 
     :juxt.pass.alpha/rules
-    [
-     ['(allowed? permission subject action resource)
-      ['permission :juxt.pass.alpha/action "https://site.test/actions/get-private-resource"]
-      ['subject :juxt.pass.alpha/identity]]]})
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]
+       [permission :juxt.site.alpha/uri resource]]]})
   ;; end::create-action-get-private-resource[]
-  )
-
-(defn demo-grant-permission-to-get-private-resource! []
-  ;; tag::grant-permission-to-get-private-resource![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/any-subject/get-private-resource"
-    :juxt.pass.alpha/action "https://site.test/actions/get-private-resource"
-    :juxt.pass.alpha/purpose nil})
-  ;; end::grant-permission-to-get-private-resource![]
   )
 
 (defn demo-create-immutable-private-resource! []
@@ -644,6 +643,20 @@
     :juxt.http.alpha/content-type "text/html;charset=utf-8"
     :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"})
   ;; end::create-immutable-private-resource![]
+  )
+
+(defn demo-grant-permission-to-get-private-resource! []
+  ;; tag::grant-permission-to-get-private-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/any-subject/get-private-resource"
+    :juxt.pass.alpha/action "https://site.test/actions/get-private-resource"
+    :juxt.pass.alpha/user "https://site.test/users/alice"
+    :juxt.site.alpha/uri "https://site.test/private.html"
+    :juxt.pass.alpha/purpose nil
+    })
+  ;; end::grant-permission-to-get-private-resource![]
   )
 
 ;; First Application

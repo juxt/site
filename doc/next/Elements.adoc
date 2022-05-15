@@ -213,6 +213,10 @@ We can designate the 'cat' as the Subject, and the 'mat' as the object, which is
 
 The verb 'sat' relates to the Action.
 
+Actions are described in <<ch-actions>>.
+
+== Rules
+
 Actions also define what the cat can do, and can optionally include the
 object.
 
@@ -248,10 +252,6 @@ Rules are applied to queries as well as to mutating writes.
   [permission :user user]]}
 ----
 ====
-
-Actions are described in <<ch-actions>>.
-
-== Rules
 
 Rules can be as simple or as complex as the domain requires. The power and
 expressiveness of Datalog allows for a wide range of possibilities.

@@ -100,7 +100,7 @@ We have now created a `create-action` Action and granted a Permission for our
 User to invoke it. Let's invoke this action to create a new `grant-permission`
 action.
 
-<<ex-create-grant-permission-action>> demonstrates
+<<ex-create-grant-permission-action>> demonstrates how this is achieved.
 
 .Creating the grant-permission action
 [[ex-create-grant-permission-action]]

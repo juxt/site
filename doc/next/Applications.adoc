@@ -74,4 +74,8 @@ include::../../test/juxt/demo.clj[tag=create-action-issue-access-token!,indent=0
 ----
 include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-issue-access-token!,indent=0]
 ----
+
+<1> All users are permitted to issue access tokens to applications that have
+authorized to access resources on their behalf.
+
 ====
