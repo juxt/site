@@ -178,11 +178,15 @@ Now we create the Action that can be used to create public resources. The Action
 ensures that the resources it creates set the correct methods (GET, HEAD and
 OPTIONS) and the corresponding Actions those methods map onto.
 
-<<ex-create-public-resource>> demonstrates the creation of such an Action at the
+For instance, a `GET` request on resources created with this Action would
+correspond to the `https://site.test/actions/get-public-resource` action we
+created in <<ex-get-public-resource>>.
+
+<<ex-create-public-resource>> demonstrates the creation of our Action at the
 REPL.
 
 .Creating the Action to create a public resource
-[[ex-create-public-resource]]
+[[ex-create-action-to-create-public-resource]]
 ====
 [source,clojure]
 ----
@@ -218,13 +222,10 @@ Copy the code above, paste it into a REPL and evaluate.
 --
 
 
-A `GET` request on our Hello World resource implies will correspond to the
-`https://site.test/actions/get-public-resource` action, so we'll need to create
-that now.
-
-
 [[hello-world]]
 === Hello World!
+
+Finally we can demonstrate that the action we created in <<ex-create-action-to-create-public-resource>>.
 
 To demonstrate our new `put-immutable-public-resource` action, let's publish a
 resource that will print `Hello World!` on a web page.
@@ -236,22 +237,19 @@ resource that will print `Hello World!` on a web page.
 ----
 include::../../test/juxt/demo.clj[tag=create-hello-world-resource!,indent=0]
 ----
+====
 
 [IMPORTANT]
 --
-Do it
+Copy the code in <<hello-world-example>> above, paste it into a REPL and evaluate.
 --
 
 Now we can test access with `curl`:
 
+====
 ----
 curl -i https://site.test/hello
 ----
-
-[IMPORTANT]
---
-Do it
---
 
 You should get a `200` response similar to this:
 
