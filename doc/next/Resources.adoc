@@ -1,7 +1,8 @@
 = Resources
 :toc: left
 
-Resources in Site are web resources, as per https://httpwg.org/specs/rfc7231.html#resources[RFC 7231].
+Resources in Site are web resources, as per
+https://httpwg.org/specs/rfc7231.html#resources[RFC 7231].
 
 Resourse are identified by a URI. When resources are stored in XT, the
 resource's URI is the `:xt/id` attribute.
@@ -64,34 +65,125 @@ with additional non-conflicting attributes recognised by Site.
 |OPTIONS|`:juxt.http.alpha/options`
 |===
 
-In fact, you can think of XT as the a file-system to a static web-server. But
-rather than encoding web metadata in filename conventions and convoluted
-configuration, a web resource (its state, configuration and metadata) is stored
-in a database, where it can be more easily managed, queried and updated. _A
-database is simply a better place for this data than a file-system._ In the same
-way you'd run an Apache web server over a file-system to publish to the web, you
-run Site over an XTDB database.
+XT is to Site what a file-system is to a static web-server, such as Apache.
+
+Apache encodes web metadata in the filename. For example, the filename
+`foo.en.html.gz` encodes the language (English), media-type (HTML) and encoding
+(gzip) into the filename.
+
+Site takes a different approach, using the database to encode web metadata where
+it can be more easily managed, queried and updated.
+
+_A database is simply a better place for web resource metadata than a
+file-system._
+
+For the remainder of this section we'll discuss a selection of these special
+Site attributes.
+
+=== Methods
+
+(((web methods)))
+The `:juxt.http.alpha/methods` attribute value is a map of entries, one for each
+web method.
+
+The value of each entry is another map, which contains configuration data for
+the web method.
+
+(((status, 405)))
+Only methods included in this map are allowed by the resource. If not specified, a request method will be met with a `405 No Such Method` response.
+
+(((Allow header)))
+These methods are also used to generate the `Allow` header in web responses,
+where applicable.
+
+For instance, the actions that are used for each method are listed in the
+`juxt.pass.alpha/actions` entry.
+
+When Site receives a web request for a resource it will look for a
+`juxt.site.alpha/methods` entry which indicates which action or actions should
+be used when seeking permission.
+
+In effect, this allows the resource to indicate which rules are to be used in
+determining whether a user can access the resource.
+
+<<ex-http-methods>> shows an example of a `:juxt.http.alpha/methods` entry.
+
+[[ex-http-methods]]
+.A `:juxt.http.alpha/methods` entry
+====
+[source,clojure]
+----
+{:juxt.http.alpha/methods
+  {:get
+    {:juxt.pass.alpha/actions
+      #{"https://site.test/actions/get-shopping-list"}}
+   :post
+    {:juxt.pass.alpha/actions
+      #{"https://site.test/actions/post-shopping-list-item"}}}}
+----
+====
 
 == Publishing a public resource
 
-Before we can create the resource, we need to define an action that lets us do so.
+Let's publish a resource to Site that everyone can see.
 
-In many organisations, publishing information to the public web may well be a
-restricted operation so <<create-action-put-immutable-public-resource>> shows
-how to do so.
+NOTE: In many organisations, publishing information to the public web may well be
+a restricted operation, so the action might be restricted to authorized users.
 
-.Creating a public resource
+We'll need to perform these steps:
+
+. Create an action for accessing a public resource
+. Grant the permission for anyone to perform this action
+. Create an action for creating a public resource
+. Grant the permission for the REPL user to perform this action
+
+Let's start with the first action, shown in <<ex-get-public-resource>>.
+
+.Accessing a public resource
+[[ex-get-public-resource]]
+====
+[source,clojure]
+----
+include::../../test/juxt/demo.clj[tag=create-action-get-public-resource!,indent=0]
+----
+<1> We use a more appropriate scope that better reflects this action.
+<2> This is a very weak rule that matches a particular permission.
+====
+
+[IMPORTANT]
+--
+Copy the code in <<ex-get-public-resource>>, paste it into a REPL and evaluate.
+--
+
+A Permission _must_ exist for an Action to be allowed.
+
+Note in <<ex-get-public-resource>> the Rules referenced the existence of a Permission, `https://site.test/permissions/public-resources-to-all`. This is created in <<ex-permit-get-public-resource>>.
+
+.Creating the permission for everyone to access public resources
+[[ex-permit-get-public-resource]]
+====
+[source,clojure]
+----
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-get-public-resource!,indent=0]
+----
+
+====
+
+[IMPORTANT]
+--
+Copy the code in <<ex-permit-get-public-resource>>, paste it into a REPL and evaluate.
+--
+
+Now we create the Action that can be used to create public resources. The Action
+ensures that the resources it creates set the correct methods (GET, HEAD and
+OPTIONS) and the corresponding Actions those methods map onto.
+
+<<ex-create-public-resource>> demonstrates the creation of such an Action at the
+REPL.
+
+.Creating the Action to create a public resource
 [[ex-create-public-resource]]
 ====
-We'll do the following steps:
-
-. Create an action
-. Grant permission to invoke the action
-. Call the action
-
-The action contains both the validation rules to ensure that only GET, HEAD and
-OPTIONS methods are allowed, and that these map onto the correct actions.
-
 [source,clojure]
 ----
 include::../../test/juxt/demo.clj[tag=create-action-put-immutable-public-resource!,indent=0]
@@ -103,56 +195,33 @@ include::../../test/juxt/demo.clj[tag=create-action-put-immutable-public-resourc
 
 [IMPORTANT]
 --
-Copy the code in the <<ex-create-public-resource>>, paste it into a REPL and evaluate.
+Copy the code in <<ex-create-public-resource>>, paste it into a REPL and evaluate.
 --
 
+We mustn't forget to grant permission for our REPL user to perform this
+action. This is shown in <<ex-permit-create-public-resource>>.
+
+.Granting permission to create a public resource
+[[ex-permit-create-public-resource]]
 ====
-Now we must grant permission for our REPL user to use this action:
+In this example, we allow anyone with the role of `Administrator` to perform the action of creating public resources.
 
 [source,clojure]
 ----
 include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-immutable-public-resource!,indent=0]
 ----
+====
 
 [IMPORTANT]
 --
-Do it!
+Copy the code above, paste it into a REPL and evaluate.
 --
 
-When Site receives a web request for a resource it will look for a `juxt.site.alpha/methods`
-entry which indicates which action or actions should be used when seeking
-permission.
-
-In effect, this allows the resource to indicate which rules are to be used
-in determining whether a user can access the resource.
 
 A `GET` request on our Hello World resource implies will correspond to the
 `https://site.test/actions/get-public-resource` action, so we'll need to create
 that now.
 
-[source,clojure]
-----
-include::../../test/juxt/demo.clj[tag=create-action-get-public-resource!,indent=0]
-----
-<1> We use a more appropriate scope that better reflects this action.
-<2> This is a very weak rule that matches a particular permission.
-
-[IMPORTANT]
---
-Do it
---
-
-A permission document _must_ exist for every case.
-The rule of the `http://site.test/actions/get-public-resource` requires a specific permission to exist, so we need to create that now.
-
-[source,clojure]
-----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-get-public-resource!,indent=0]
-----
-
-IMPORTANT: Do it!
-
-====
 
 [[hello-world]]
 === Hello World!
