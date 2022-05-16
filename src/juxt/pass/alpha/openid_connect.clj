@@ -217,12 +217,12 @@
   (let [subject (new-subject-urn)]
     (crux/submit-tx
      crux-node
-     [[::crux/put
+     [[:crux.tx/put
        (into
         {:crux.db/id subject
          ::site/type "Subject"
          ::pass/id-token-claims (:claims id-token)
-         ::pass/identity matched-identity}
+         ::pass/user matched-identity}
         ;; We need to index some of the common known claims in order to
         ;; use them in our Datalog rules.
         (extract-standard-claims (get id-token :claims)))]])
@@ -240,7 +240,7 @@
   (let [identities
         (map first
              (crux/q db '{:find [i]
-                          :where [[i ::site/type "Identity"]
+                          :where [[i :juxt.site.alpha/type "User"]
                                   [i :juxt.pass.jwt/iss iss]
                                   [i :juxt.pass.jwt/sub sub]]
                           :in [iss sub]}

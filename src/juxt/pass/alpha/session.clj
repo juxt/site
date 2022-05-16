@@ -78,7 +78,7 @@
 
 (defn escalate-session
   "Update the session by applying f and return the result of rotating the session id."
-  [{::site/keys [db xt-node] ::pass/keys [session-token-id!] :as req} f]
+  [{::site/keys [db crux-node] ::pass/keys [session-token-id!] :as req} f]
   (let [session (lookup-session db session-token-id!)
         _ (assert session)
         new-session-token-id! (make-nonce 16)
@@ -90,7 +90,7 @@
                        ::pass/session (:crux.db/id session)}
 
         tx (xt/submit-tx
-            xt-node
+            crux-node
             [[:crux.tx/match (:crux.db/id session) session]
              [:crux.tx/put new-session]
 
@@ -101,9 +101,9 @@
 
              [:crux.tx/put session-token]])
 
-        _ (xt/await-tx xt-node tx)]
+        _ (xt/await-tx crux-node tx)]
 
-    (if (xt/tx-committed? xt-node tx)
+    (if (xt/tx-committed? crux-node tx)
       (-> req
           (set-cookie new-session-token-id!))
       (throw (ex-info "Session wasn't escalated" {})))))
