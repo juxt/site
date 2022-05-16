@@ -84,7 +84,7 @@
 (defn demo-permit-create-action! []
   ;; tag::permit-create-action![]
   (put!
-   {:xt/id "https://site.test/permissions/alice/create-action" ; <1>
+   {:xt/id "https://site.test/permissions/administrators/create-action" ; <1>
     :juxt.site.alpha/type "https://meta.juxt.site/pass/permission" ; <2>
     :juxt.pass.alpha/action "https://site.test/actions/create-action" ; <3>
     :juxt.pass.alpha/purpose nil ; <4>
@@ -130,7 +130,7 @@
 (defn demo-permit-grant-permission-action! []
   ;; tag::permit-grant-permission-action![]
   (put!
-   {:xt/id "https://site.test/permissions/alice/grant-permission"
+   {:xt/id "https://site.test/permissions/administrators/grant-permission"
     :juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
     :role "Administrator"
     :juxt.pass.alpha/action "https://site.test/actions/grant-permission"
@@ -251,7 +251,7 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/alice/put-subject"
+   {:xt/id "https://site.test/permissions/administrators/put-subject"
     :role "Administrator"
     :juxt.pass.alpha/action "https://site.test/actions/put-subject"
     :juxt.pass.alpha/purpose nil})
@@ -295,7 +295,7 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/alice/put-application"
+   {:xt/id "https://site.test/permissions/administrators/put-application"
     :role "Administrator"
     :juxt.pass.alpha/action "https://site.test/actions/put-application"
     :juxt.pass.alpha/purpose nil})
@@ -338,7 +338,7 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/alice/authorize-application"
+   {:xt/id "https://site.test/permissions/users/authorize-application"
     :role "User"
     :juxt.pass.alpha/action "https://site.test/actions/authorize-application"
     :juxt.pass.alpha/purpose nil})
@@ -429,7 +429,7 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/alice/put-immutable-public-resource"
+   {:xt/id "https://site.test/permissions/administrators/put-immutable-public-resource"
     :role "Administrator"
     :juxt.pass.alpha/action "https://site.test/actions/put-immutable-public-resource"
     :juxt.pass.alpha/purpose nil})
@@ -610,7 +610,7 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/alice/put-immutable-private-resource"
+   {:xt/id "https://site.test/permissions/administrators/put-immutable-private-resource"
     :role "Administrator"
     :juxt.pass.alpha/action "https://site.test/actions/put-immutable-private-resource"
     :juxt.pass.alpha/purpose nil})
@@ -651,7 +651,7 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/any-subject/get-private-resource"
+   {:xt/id "https://site.test/permissions/alice/private-html"
     :juxt.pass.alpha/action "https://site.test/actions/get-private-resource"
     :juxt.pass.alpha/user "https://site.test/users/alice"
     :juxt.site.alpha/uri "https://site.test/private.html"
