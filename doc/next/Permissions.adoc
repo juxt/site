@@ -58,7 +58,10 @@ We must install a Permission which will allow our user to call our
 `create-action` Action.
 
 This gives us an opportunity to inspect the document structure of a real
-Permission (see <<example-put-permission-to-create-action>>).
+Permission.
+
+<<example-put-permission-to-create-action>> demonstrates creating a Permission
+that works with the Action we created in <<example-create-action>>.
 
 .Permitting the create-action action
 [[example-put-permission-to-create-action]]
@@ -67,11 +70,21 @@ Permission (see <<example-put-permission-to-create-action>>).
 ----
 include::../../test/juxt/demo.clj[tag=permit-create-action!,indent=0]
 ----
+
 <1> Permissions are individual resources, and must have unique URIs.
-<2> Each Permission must have a `:juxt.site.alpha/type` attribute of "`Permission`".
-<3> The Permission relates to a User, directly or indirectly, as specified in the Action's Rule.
-<4> The Permission must be tied to a specific Action.
-<5> The Permission can be granted for a particular purpose. More on this later.
+
+<2> Each Permission must have a `:juxt.site.alpha/type` attribute of
+"`Permission`".
+
+<3> The Permission must be tied to a specific Action.
+
+<4> The Permission can be granted for a particular purpose, but if not, this
+attribute must be nil.
+
+<5> In this case, the Permission references the `Administrator` role. All Users
+with this `Administrator` role will be able to call the
+`+https://site.test/actions/create-action+` action.
+
 ====
 
 [NOTE]
@@ -89,7 +102,7 @@ authorized users.
 Grant your user the Permission to invoke the create-action function you created in <<example-create-action>>:
 
 . Copy the code in <<example-put-permission-to-create-action>> to an editor.
-. Update it according to the Base URI you have chosen and the URI of the user you created in <<example-put-user>>.
+. Update it according to the Base URI you have chosen.
 . Copy the modified code into the REPL.
 . Evaluate!
 --
@@ -100,7 +113,7 @@ We have now created a `create-action` Action and granted a Permission for our
 User to invoke it. Let's invoke this action to create a new `grant-permission`
 action.
 
-<<ex-create-grant-permission-action>> demonstrates
+<<ex-create-grant-permission-action>> demonstrates how this is achieved.
 
 .Creating the grant-permission action
 [[ex-create-grant-permission-action]]

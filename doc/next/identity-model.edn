@@ -10,7 +10,7 @@
   {
    :juxt.site.alpha/type "…/pass/user"
    :type "Person"
-   :name "Malcolm Sparks"
+   :name "Alice"
    :company "JUXT"
    :position "CTO"
    :role [{:type "Developer"}

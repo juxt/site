@@ -3,7 +3,7 @@
 :experimental:
 
 (((action, definition)))
-Users could be permitted to query, create, update and/or delete certain Documents.
+Users can be permitted to query, create, update and/or delete certain Documents.
 
 Such activities are termed Actions.
 
@@ -164,13 +164,31 @@ This gives us an opportunity to inspect the document structure of a real Action
 ----
 include::../../test/juxt/demo.clj[tag=install-create-action!,indent=0]
 ----
-====
-<1> The URI of the create-action Action. This may have to be modified if you have chosen a different base URI.
-<2> This Malli schema restricts the URIs of new Actions. Again, this should be modified if necessary to correspond to a different base URI.
-<3> The Action arguments will be updated such that the first (0th) argument is updated so that it contains a `:juxt.site.alpha/type` attribute with the value string "`Action`".
-<4> The arguments will then be validated according to the Malli schema in `:juxt.pass.alpha.malli/args-schema`. By this point it must be a map containing an `:xt/id` value prefixed with `https://site.test/actions/` and a `:juxt.site.alpha/type` with the constant `"Action"`.
+<1> The URI of the create-action Action. This may have to be modified if you
+have chosen a different base URI.
+
+<2> This Malli schema restricts the URIs of new Actions. Again, this should be
+modified if necessary to correspond to a different base URI.
+
+<3> The Action arguments will be updated such that the first (0th) argument is
+updated so that it contains a `:juxt.site.alpha/type` attribute with the value
+string "`Action`".
+
+<4> The arguments will then be validated according to the Malli schema in
+`:juxt.pass.alpha.malli/args-schema`. By this point it must be a map containing
+an `:xt/id` value prefixed with `https://site.test/actions/` and a
+`:juxt.site.alpha/type` with the constant `"Action"`.
+
 <5> then the arguments will be submitted, as documents, to the database.
-<6> This is a Rule. It ensures that the Action will be allowed only if there exists a Permission granting the User to invoke the Action. These concepts will be covered in <<ch-users>>. If you decide on a different data model for users, then this Rule will have to be modified to reflect that.
+
+<6> This is a Rule. It ensures that the Action will be allowed only if there
+exists a Permission granting users of a given role to invoke the Action. These
+concepts will be covered in <<ch-users>>. If you decide on a different data
+model for users, then this Rule will have to be modified to reflect
+that. Granting Permissions indirectly to Users via a role or group, rather than
+directly to a specific User, can make it easier to manage when there are lot of
+Users added.
+====
 
 [IMPORTANT]
 --

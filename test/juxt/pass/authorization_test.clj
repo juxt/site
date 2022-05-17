@@ -1068,11 +1068,11 @@
 
   ;; This fails because we haven't provided the ::username
 
-  (authz/do-action
-   *xt-node*
-   {::pass/subject (:xt/id CREATE_PERSON_ACTION)}
-   (:xt/id ALICE_SUBJECT)
-   BOB)
+  (is (thrown? clojure.lang.ExceptionInfo (authz/do-action
+                *xt-node*
+                {::pass/subject (:xt/id ALICE_SUBJECT)}
+                (:xt/id CREATE_PERSON_ACTION)
+                BOB)))
 
   (is (not (xt/entity (xt/db *xt-node*) (:xt/id BOB))))
 

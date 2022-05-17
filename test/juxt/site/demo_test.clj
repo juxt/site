@@ -68,8 +68,8 @@
   (demo/demo-create-action-get-private-resource!)
   (demo/demo-grant-permission-to-get-private-resource!)
   (demo/demo-create-immutable-private-resource!)
-  ;;(demo/demo-invoke-put-application!)
-  ;;(demo/demo-invoke-authorize-application!)
+  (demo/demo-invoke-put-application!)
+  (demo/demo-invoke-authorize-application!)
   (demo/demo-create-test-subject!)
   (demo/demo-invoke-issue-access-token!)
 
@@ -154,23 +154,23 @@
        [permission ::pass/user user]
        [subject ::pass/identity id]
        [id ::pass/user user]
-       [resource ::pass/owner user]]]})
+       [resource :owner user]]]})
 
   (repl/do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/put-user-owned-content"
     :juxt.pass.alpha/action "https://site.test/actions/put-user-owned-content"
-    :juxt.pass.alpha/user "https://site.test/users/mal"
+    :juxt.pass.alpha/user "https://site.test/users/alice"
     :juxt.pass.alpha/purpose nil})
 
-  ;; Both @cwi and @mal have user directories
-  (doseq [user #{"cwi" "mal"}]
+  ;; Both bob and alice have user directories
+  (doseq [user #{"bob" "alice"}]
     (repl/put!
      {:xt/id (format "https://site.test/~%s/{path}" user)
       ;; This needs to return a resource 'owned' by the user, then the action can
       ;; unify on the subject's user and the resource's owner.
-      ::pass/owner (format "https://site.test/users/%s" user)
+      :owner (format "https://site.test/users/%s" user)
       ::site/uri-template true
       ::http/methods
       {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}
@@ -178,19 +178,19 @@
 
   ;; 404 on GET, doesn't exist yet!
   (let [req {:ring.request/method :get
-             :ring.request/path "/~cwi/index.html"}]
+             :ring.request/path "/~bob/index.html"}]
     (is (= 404 (:ring.response/status (*handler* req)))))
 
-  ;; @mal can't write to @cwi's area
+  ;; Alice can't write to Bob's area
   (let [req {:ring.request/method :put
-             :ring.request/path "/~cwi/index.html"
+             :ring.request/path "/~bob/index.html"
              :ring.request/headers
              {"authorization" "Bearer test-access-token"}}]
     (is (= 403 (:ring.response/status (*handler* req)))))
 
-  ;; When @mal writing to @mal's user directory, we get through security.
+  ;; When Alice writing to Alice's user directory, we get through security.
   (let [req {:ring.request/method :put
-             :ring.request/path "/~mal/index.html"
+             :ring.request/path "/~alice/index.html"
              :ring.request/headers
              {"authorization" "Bearer test-access-token"}}]
     (is (= 411 (:ring.response/status (*handler* req))))))

@@ -31,7 +31,7 @@ s|Required
 Since an Action are performed by a *User*, we need to create a user to start
 invoking our actions.
 
-<<example-put-user>> demonstrates how to create a user called "Malcolm Sparks".
+<<example-put-user>> demonstrates how to create a user called "Alice".
 
 .Create your own User
 [[example-put-user]]
@@ -40,11 +40,14 @@ invoking our actions.
 ----
 include::../../test/juxt/demo.clj[tag=install-user!,indent=0]
 ----
-<1> Some arbitary data associated with this user
-<2> Here, we'll assign Malcolm to two roles. However, these roles are _not_ a
-Site concept. You can design whatever access control scheme fits your
-requirements, referencing data in your Documents from rules you write in
+
+<1> The user's name (arbitary data associated with this user).
+
+<2> Here, we'll assign Alice a couple of roles. These roles is arbitary data and
+_not_ built-in to Site. You can design whatever access control scheme fits your
+requirements, so long as you reference this data from Rules you write into the
 Actions.
+
 ====
 
 [IMPORTANT]

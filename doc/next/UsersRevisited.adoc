@@ -4,9 +4,9 @@
 
 In <<ch-users>> we put Documents directly the database to represent an initial User.
 
-Users are required to invoke Actions, but Actions are required to create Users,
-so we had a chicken-and-egg situation that we resolved by directly inserting the
-first user by hand.
+Actions can't be invoked without a User, yet Actions, but Actions are required
+to create Users. We had a chicken-and-egg situation that we resolved by directly
+inserting the first user by hand.
 
 However, now that we have built the capability to create Actions and
 Permissions, we can build the Actions to create new Users, Identities and
