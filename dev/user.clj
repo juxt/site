@@ -9,7 +9,8 @@
    [clojure.java.io :as io]
    [juxt.site.alpha.repl :refer :all]
    [integrant.core :as ig]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   [juxt.demo :as demo]))
 
 (apply require clojure.main/repl-requires)
 
@@ -46,8 +47,3 @@
   (println (ansi/yellow "Enter (help) for help"))
 
   :ready)
-
-(defn demo []
-  (require 'juxt.demo)
-  (in-ns 'juxt.demo)
-  )
