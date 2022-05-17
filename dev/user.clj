@@ -48,6 +48,6 @@
   :ready)
 
 (defn demo []
-  (require 'demo)
-  (in-ns 'demo)
+  (require 'juxt.demo)
+  (in-ns 'juxt.demo)
   )
