@@ -29,13 +29,19 @@ authentication scheme is in place, such as OpenID.
 
 --
 
+== Setting up a password
 
-[[ex-put-basic-auth-identity]]
+To login via Basic Authentication, Alice needs a password.
+
+<<ex-put-basic-auth-user-identity>> demonstrates how we can call the Action we created in <<ex-create-action-put-user-identity>> to give Alice an extra identity.
+
+[[ex-put-basic-auth-user-identity]]
+.Adding a password for Alice
 ====
 Add a password for Alice:
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=put-basic-auth-identity!,indent=0]
+include::../../test/juxt/demo.clj[tag=put-basic-auth-user-identity!,indent=0]
 ----
 ====

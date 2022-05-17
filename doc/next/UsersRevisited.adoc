@@ -9,10 +9,18 @@ to create Users. We had a chicken-and-egg situation that we resolved by directly
 inserting the first user by hand.
 
 However, now that we have built the capability to create Actions and
-Permissions, we can build the Actions to create new Users, Identities and
+Permissions, we can build the Actions to create new Users, User Identities and
 Subjects. That's the subject of this chapter.
 
 == Create an action to create a user
+
+An Action to create a User should take a new Document describing the User,
+validate that the `:juxt.site.alpha/type` attribute is set to
+`https://meta.juxt.site/pass/user` and other required checks. For example, a
+User might be required to have a name and other required attributes.
+
+<<ex-create-action-put-user>> demonstrates the creation of an Action that
+fulfils these criteria.
 
 [[ex-create-action-put-user]]
 .Creating an action to put a user
@@ -21,6 +29,25 @@ Subjects. That's the subject of this chapter.
 ----
 include::../../test/juxt/demo.clj[tag=create-action-put-user!,indent=0]
 ----
+
+Here we grant the REPL user access to perform this Action.
+
+[source,clojure]
+----
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-user!,indent=0]
+----
+
+<1> Check the format of the id.
+
+<2> Check the type.
+
+<3> Default the type, if not given in the argument.
+
+<4> Allow the user details to be retrieved via the GET method, with the
+`https://site.test/actions/get-user` Action.
+
+<5> Ensure only roles with a Permission are able to perform this Action.
+
 ====
 
 [IMPORTANT]
@@ -30,19 +57,26 @@ Copy the code in <<ex-create-action-put-user>>, paste it into a REPL and evaluat
 
 == Create an Action to create a User Identity
 
-An Action to create a user should
+In the same way, we may also need the ability to create a User Identity. For
+this Action it is important that the Document given in the document refers to
+the User it is identifying.
+
+See <<ex-create-action-put-user-identity>> for a demonstration of creating and
+permitting an Action that meets these requirements.
 
 [[ex-create-action-put-user-identity]]
 .Creating an Action to put a User Identity
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-action-put-identity!,indent=0]
+include::../../test/juxt/demo.clj[tag=create-action-put-user-identity!,indent=0]
 ----
+
+Here we grant the REPL user access to perform this Action.
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-identity!,indent=0]
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-user-identity!,indent=0]
 ----
 ====
 
@@ -60,6 +94,8 @@ Copy the code in <<ex-create-action-put-identity>>, paste it into a REPL and eva
 ----
 include::../../test/juxt/demo.clj[tag=create-action-put-subject!,indent=0]
 ----
+
+Here we grant the REPL user access to perform this Action.
 
 [source,clojure]
 ----
