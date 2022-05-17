@@ -49,7 +49,7 @@
   (demo/demo-create-grant-permission-action!)
   (demo/demo-permit-grant-permission-action!)
   (demo/demo-create-action-put-user!)
-  (demo/demo-create-action-put-identity!)
+  (demo/demo-create-action-put-user-identity!)
   (demo/demo-create-action-put-subject!)
   (demo/demo-grant-permission-to-invoke-action-put-subject!)
   (demo/demo-create-action-put-application!)
@@ -152,7 +152,7 @@
     [
      '[(allowed? permission subject action resource)
        [permission ::pass/user user]
-       [subject ::pass/identity id]
+       [subject ::pass/user-identity id]
        [id ::pass/user user]
        [resource :owner user]]]})
 

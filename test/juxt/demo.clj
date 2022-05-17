@@ -31,8 +31,8 @@
 
 (defn demo-put-user-identity! []
   ;; tag::install-user-identity![]
-  (put! {:xt/id "https://site.test/identities/alice"
-         :juxt.site.alpha/type "https://meta.juxt.site/pass/identity"
+  (put! {:xt/id "https://site.test/user-identities/alice"
+         :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"
          :juxt.pass.alpha/user "https://site.test/users/alice"})
   ;; end::install-user-identity![]
   )
@@ -41,7 +41,7 @@
   ;; tag::install-subject![]
   (put! {:xt/id "https://site.test/subjects/repl-default"
          :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"
-         :juxt.pass.alpha/identity "https://site.test/identities/alice"})
+         :juxt.pass.alpha/user-identity "https://site.test/user-identities/alice"})
   ;; end::install-subject![]
   )
 
@@ -68,7 +68,7 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? permission subject action resource) ; <6>
-       [subject :juxt.pass.alpha/identity id]
+       [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
        [permission :role role]]]})
@@ -120,7 +120,7 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? permission subject action resource)
-       [subject :juxt.pass.alpha/identity id]
+       [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
        [permission :role role]]]})
@@ -168,19 +168,20 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? permission subject action resource)
-       [subject :juxt.pass.alpha/identity id]
+       [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
        [permission :role role]]]})
   ;; end::create-action-put-user![]
   )
 
-(defn demo-create-action-put-identity! []
-  ;; tag::create-action-put-identity![]
+
+(defn demo-create-action-put-user-identity! []
+  ;; tag::create-action-put-user-identity![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/put-identity"
+   {:xt/id "https://site.test/actions/put-user-identity"
     :juxt.pass.alpha/scope "write:users"
 
     :juxt.pass.alpha.malli/args-schema
@@ -195,10 +196,10 @@
     [
      [:juxt.pass.alpha.process/update-in
       [0] 'merge
-      {:juxt.site.alpha/type "https://meta.juxt.site/pass/identity"
+      {:juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"
        :juxt.http.alpha/methods
-       {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-identity"}}
-        :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-identity"}}
+       {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
+        :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
         :options {}}}]
      [:juxt.pass.alpha.malli/validate]
      [:xtdb.api/put]]
@@ -206,11 +207,23 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? permission subject action resource)
-       [subject :juxt.pass.alpha/identity id]
+       [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
        [permission :role role]]]})
-  ;; end::create-action-put-identity![]
+  ;; end::create-action-put-user-identity![]
+  )
+
+(defn demo-grant-permission-to-invoke-action-put-user-identity! []
+  ;; tag::grant-permission-to-invoke-action-put-user-identity![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/administrators/put-user-identity"
+    :role "Administrator"
+    :juxt.pass.alpha/action "https://site.test/actions/put-user-identity"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-invoke-action-put-user-identity![]
   )
 
 (defn demo-create-action-put-subject! []
@@ -225,7 +238,7 @@
     [:tuple
      [:map
       [:xt/id [:re "https://site.test/.*"]]
-      [:juxt.pass.alpha/identity [:re "https://site.test/identities/.+"]]
+      [:juxt.pass.alpha/user-identity [:re "https://site.test/user-identities/.+"]]
       ]]
 
     :juxt.pass.alpha/process
@@ -239,7 +252,7 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? permission subject action resource)
-       [subject :juxt.pass.alpha/identity id]
+       [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
        [permission :role role]]]})
@@ -284,7 +297,7 @@
     :juxt.pass.alpha/rules
     '[[(allowed? permission subject action resource)
        [id :juxt.pass.alpha/user user]
-       [subject :juxt.pass.alpha/identity id]
+       [subject :juxt.pass.alpha/user-identity id]
        [user :role role]
        [permission :role role]]]})
   ;; end::create-action-put-application![]
@@ -327,7 +340,7 @@
     :juxt.pass.alpha/rules
     '[[(allowed? permission subject action resource)
        [id :juxt.pass.alpha/user user]
-       [subject :juxt.pass.alpha/identity id]
+       [subject :juxt.pass.alpha/user-identity id]
        [user :role role]
        [permission :role role]]]})
   ;; end::create-action-authorize-application![]
@@ -369,7 +382,7 @@
     :juxt.pass.alpha/rules
     '[[(allowed? permission subject action resource)
        [id :juxt.pass.alpha/user user]
-       [subject :juxt.pass.alpha/identity id]
+       [subject :juxt.pass.alpha/user-identity id]
        [permission :role role]
        [user :role role]]]})
   ;; end::create-action-issue-access-token![]
@@ -417,7 +430,7 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? permission subject action resource) ; <3>
-       [subject :juxt.pass.alpha/identity id]
+       [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
        [permission :role role]]]})
@@ -520,8 +533,8 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? permission subject action resource)
-          [permission :juxt.pass.alpha/identity i]
-          [subject :juxt.pass.alpha/identity i]]]})
+          [permission :juxt.pass.alpha/user-identity i]
+          [subject :juxt.pass.alpha/user-identity i]]]})
      ;; end::create-put-template-action![]
      ))))
 
@@ -598,7 +611,7 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? permission subject action resource)
-       [subject :juxt.pass.alpha/identity id]
+       [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [permission :role role]
        [user :role role]]]})
@@ -628,7 +641,7 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? permission subject action resource)
-       [subject :juxt.pass.alpha/identity id]
+       [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [permission :juxt.pass.alpha/user user]
        [permission :juxt.site.alpha/uri resource]]]})
@@ -692,7 +705,7 @@
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/put-subject"
    {:xt/id "https://site.test/subjects/test"
-    :juxt.pass.alpha/identity "https://site.test/identities/alice"}
+    :juxt.pass.alpha/user-identity "https://site.test/user-identities/alice"}
    )
   ;; end::create-test-subject![]
   )
@@ -740,8 +753,8 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? permission subject action resource)
-          [permission :juxt.pass.alpha/identity i]
-          [subject :juxt.pass.alpha/identity i]]]})
+          [permission :juxt.pass.alpha/user-identity i]
+          [subject :juxt.pass.alpha/user-identity i]]]})
      ;; end::create-action-put-error-resource![]
      ))))
 
@@ -803,3 +816,54 @@
        :juxt.http.alpha/content (slurp "dev/unauthorized.html")})
      ;; end::put-unauthorized-error-representation-for-html-with-login-link![]
      ))))
+
+;; Complete all tasks thus far directed by the book
+(defn init! []
+  (demo-put-user!)
+  (demo-put-user-identity!)
+  (demo-put-subject!)
+  (demo-install-create-action!)
+  (demo-install-do-action-fn!)
+  (demo-permit-create-action!)
+  (demo-create-grant-permission-action!)
+  (demo-permit-grant-permission-action!)
+  (demo-create-action-put-user!)
+  (demo-create-action-put-user-identity!)
+  (demo-create-action-put-subject!)
+  (demo-grant-permission-to-invoke-action-put-subject!)
+  (demo-create-action-put-application!)
+  (demo-grant-permission-to-invoke-action-put-application!!)
+  (demo-create-action-authorize-application!)
+  (demo-grant-permission-to-invoke-action-authorize-application!)
+  (demo-create-action-issue-access-token!)
+  (demo-grant-permission-to-invoke-action-issue-access-token!)
+  (demo-create-action-put-immutable-public-resource!)
+  (demo-grant-permission-to-invoke-action-put-immutable-public-resource!)
+  (demo-create-action-get-public-resource!)
+  (demo-grant-permission-to-invoke-get-public-resource!)
+  (demo-create-hello-world-resource!)
+  (demo-create-action-put-immutable-private-resource!)
+  (demo-grant-permission-to-put-immutable-private-resource!)
+  (demo-create-action-get-private-resource!)
+  (demo-grant-permission-to-get-private-resource!)
+  (demo-create-immutable-private-resource!)
+  (demo-invoke-put-application!)
+  (demo-invoke-authorize-application!)
+  (demo-create-test-subject!)
+  (demo-invoke-issue-access-token!)
+
+  ;; Needs documenting
+  ;;(install-not-found)
+  )
+
+(defn demo-put-basic-auth-user-identity! []
+  ;; tag::put-basic-auth-user-identity![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-user-identity"
+   {:xt/id "https://site.test/user-identities/alice/basic"
+    ;;:juxt.pass.alpha/user "https://site.test/users/alice"
+
+    })
+
+  )

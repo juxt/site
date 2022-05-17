@@ -123,7 +123,7 @@ the `:xt/id` of the User entity it relates to. This is shown in
 ====
 [source,clojure]
 ----
-{:xt/id "https://example.org/identities/arya"
+{:xt/id "https://example.org/user-identities/arya"
  :username "arya"
  :password "meow" <1>
  :juxt.pass.alpha/user "https://example.org/cats/arya" <2>
@@ -160,7 +160,7 @@ include::cat.json[]
 ....
 ====
 
-Users, identities and subjects are described in <<ch-users>>.
+Users, user identities and subjects are described in <<ch-users>>.
 
 == Resources
 

@@ -14,6 +14,8 @@ Subjects. That's the subject of this chapter.
 
 == Create an action to create a user
 
+[[ex-create-action-put-user]]
+.Creating an action to put a user
 ====
 [source,clojure]
 ----
@@ -21,33 +23,51 @@ include::../../test/juxt/demo.clj[tag=create-action-put-user!,indent=0]
 ----
 ====
 
-IMPORTANT: Do it!
+[IMPORTANT]
+--
+Copy the code in <<ex-create-action-put-user>>, paste it into a REPL and evaluate.
+--
 
-== Create an action to create an identity
+== Create an Action to create a User Identity
 
+An Action to create a user should
+
+[[ex-create-action-put-user-identity]]
+.Creating an Action to put a User Identity
 ====
 [source,clojure]
 ----
 include::../../test/juxt/demo.clj[tag=create-action-put-identity!,indent=0]
 ----
+
+[source,clojure]
+----
+include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-identity!,indent=0]
+----
 ====
 
-IMPORTANT: Do it!
+[IMPORTANT]
+--
+Copy the code in <<ex-create-action-put-identity>>, paste it into a REPL and evaluate.
+--
 
-== Create an action to create an subject
+== Create an Action to create an Subject
 
+[[ex-create-action-put-subject]]
+.Creating an action to put a subject
 ====
 [source,clojure]
 ----
 include::../../test/juxt/demo.clj[tag=create-action-put-subject!,indent=0]
 ----
-====
 
-====
 [source,clojure]
 ----
 include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-subject!,indent=0]
 ----
 ====
 
-IMPORTANT: Do it!
+[IMPORTANT]
+--
+Copy the code in <<ex-create-action-put-subject>>, paste it into a REPL and evaluate.
+--

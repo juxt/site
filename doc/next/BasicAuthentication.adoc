@@ -28,3 +28,14 @@ The Basic Auth 'Identity' can be simply deleted once an alternative
 authentication scheme is in place, such as OpenID.
 
 --
+
+
+[[ex-put-basic-auth-identity]]
+====
+Add a password for Alice:
+
+[source,clojure]
+----
+include::../../test/juxt/demo.clj[tag=put-basic-auth-identity!,indent=0]
+----
+====
