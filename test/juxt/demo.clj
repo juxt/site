@@ -612,10 +612,11 @@
     [
      [:juxt.pass.alpha.process/update-in
       [0] 'merge
-      {::http/methods
+      {:juxt.http.alpha/methods
        {:get {::pass/actions #{"https://site.test/actions/get-private-resource"}}
         :head {::pass/actions #{"https://site.test/actions/get-private-resource"}}
-        :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
+        :options {::pass/actions #{"https://site.test/actions/get-options"}}}
+       :juxt.http.alpha.basic-auth/realm "Wonderland"}]
 
      [:juxt.pass.alpha.malli/validate]
      [:xtdb.api/put]]
@@ -667,7 +668,8 @@
    "https://site.test/actions/put-immutable-private-resource"
    {:xt/id "https://site.test/private.html"
     :juxt.http.alpha/content-type "text/html;charset=utf-8"
-    :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"})
+    :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"
+    })
   ;; end::create-immutable-private-resource![]
   )
 
@@ -878,7 +880,8 @@
    {:xt/id "https://site.test/user-identities/alice/basic"
     :juxt.pass.alpha/user "https://site.test/users/alice"
     :juxt.pass.alpha.basic-auth/username "alice"
-    :juxt.pass.alpha.basic-auth/password "wonderland"
+    :juxt.pass.alpha.basic-auth/password "garden"
+    :juxt.pass.alpha.basic-auth/realm "Wonderland"
     })
   ;; end::put-basic-auth-user-identity![]
   )

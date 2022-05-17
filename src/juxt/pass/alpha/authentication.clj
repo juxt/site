@@ -233,7 +233,7 @@
       (cookies-response)
       ((fn [req] (assoc-in req [:ring.response/headers "set-cookie"] (get-in req [:headers "Set-Cookie"]))))))
 
-(defn lookup-subject-from-bearer [db bearer-token]
+(defn lookup-subject-from-bearer [db token68]
   (:subject
    (first
     (xt/q db '{:find [(pull sub [*])]
@@ -242,7 +242,25 @@
                        [at ::site/type "https://meta.juxt.site/pass/access-token"]
                        [at ::pass/subject sub]
                        [sub ::site/type "https://meta.juxt.site/pass/subject"]]
-               :in [tok]} bearer-token))))
+               :in [tok]} token68))))
+
+(defn lookup-subject-from-basic [db token68]
+  (try
+    (let [[_ username password]
+          (re-matches
+           #"([^:]*):([^:]*)"
+           (String. (.decode (java.util.Base64/getDecoder) token68)))
+
+          [user pwhash] (lookup-user db username)]
+
+      (when (and password pwhash (password/check password pwhash))
+        ;; TODO: Now this needs to return the subject that is in the
+        ;; database
+        {::pass/user user
+         ::pass/username username
+         ::pass/auth-scheme "Basic"}))
+    (catch Exception e
+      (log/error e))))
 
 (defn authenticate
   "Authenticate a request. Return a pass subject, with information about user,
@@ -263,24 +281,7 @@
             (reap/authorization authorization-header)]
 
         (case (.toLowerCase auth-scheme)
-          "basic"
-          (try
-            (let [[_ username password]
-                  (re-matches
-                   #"([^:]*):([^:]*)"
-                   (String. (.decode (java.util.Base64/getDecoder) token68)))
-
-                  [user pwhash] (lookup-user db username)]
-
-              (when (and password pwhash (password/check password pwhash))
-                ;; TODO: Now this needs to return the subject that is in the
-                ;; database
-                {::pass/user user
-                 ::pass/username username
-                 ::pass/auth-scheme "Basic"}))
-            (catch Exception e
-              (log/error e)))
-
+          "basic" (lookup-subject-from-basic db token68)
           "bearer" (lookup-subject-from-bearer db token68)
 
           #_(when-let [session (lookup-session token68 now)]
