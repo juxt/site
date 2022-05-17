@@ -25,7 +25,7 @@ Authorization Server, e.g. `auth.site.test` ?
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-action-put-application!,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-put-application!,indent=0]
 ----
 ====
 
@@ -36,7 +36,7 @@ include::../../test/juxt/demo.clj[tag=create-action-put-application!,indent=0]
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-application!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-put-application!,indent=0]
 ----
 ====
 
@@ -45,7 +45,7 @@ include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-appl
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-action-authorize-application!,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-authorize-application!,indent=0]
 ----
 ====
 
@@ -54,7 +54,7 @@ include::../../test/juxt/demo.clj[tag=create-action-authorize-application!,inden
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-authorize-application!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-authorize-application!,indent=0]
 ----
 ====
 
@@ -63,7 +63,7 @@ include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-authoriz
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-action-issue-access-token!,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-issue-access-token!,indent=0]
 ----
 ====
 
@@ -72,7 +72,7 @@ include::../../test/juxt/demo.clj[tag=create-action-issue-access-token!,indent=0
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-issue-access-token!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-issue-access-token!,indent=0]
 ----
 
 <1> All users are permitted to issue access tokens to applications that have

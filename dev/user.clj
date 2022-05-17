@@ -10,7 +10,7 @@
    [juxt.site.alpha.repl :refer :all]
    [integrant.core :as ig]
    [xtdb.api :as xt]
-   [juxt.demo :as demo]))
+   [juxt.book :as book]))
 
 (apply require clojure.main/repl-requires)
 

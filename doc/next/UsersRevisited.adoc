@@ -27,14 +27,14 @@ fulfils these criteria.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-action-put-user!,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-put-user!,indent=0]
 ----
 
 Here we grant the REPL user access to perform this Action.
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-user!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-put-user!,indent=0]
 ----
 
 <1> Check the format of the id.
@@ -69,14 +69,14 @@ permitting an Action that meets these requirements.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-action-put-user-identity!,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-put-user-identity!,indent=0]
 ----
 
 Here we grant the REPL user access to perform this Action.
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-user-identity!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-put-user-identity!,indent=0]
 ----
 ====
 
@@ -92,14 +92,14 @@ Copy the code in <<ex-create-action-put-identity>>, paste it into a REPL and eva
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-action-put-subject!,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-put-subject!,indent=0]
 ----
 
 Here we grant the REPL user access to perform this Action.
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-subject!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-put-subject!,indent=0]
 ----
 ====
 

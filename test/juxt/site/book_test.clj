@@ -1,12 +1,12 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.site.demo-test
+(ns juxt.site.book-test
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [juxt.site.alpha.repl :as repl]
    [clojure.test :refer [deftest is are testing use-fixtures] :as t]
-   [juxt.demo :as demo]
+   [juxt.book :as book]
    [juxt.test.util :refer [with-system-xt with-db submit-and-await! *xt-node* *db* *handler*] :as tutil]
    [xtdb.api :as xt]
    [juxt.site.alpha :as-alias site]
@@ -40,38 +40,38 @@
     {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}}}))
 
 (defn with-site-book-setup [f]
-  (demo/demo-put-user!)
-  (demo/demo-put-user-identity!)
-  (demo/demo-put-subject!)
-  (demo/demo-install-create-action!)
-  (demo/demo-install-do-action-fn!)
-  (demo/demo-permit-create-action!)
-  (demo/demo-create-grant-permission-action!)
-  (demo/demo-permit-grant-permission-action!)
-  (demo/demo-create-action-put-user!)
-  (demo/demo-create-action-put-user-identity!)
-  (demo/demo-create-action-put-subject!)
-  (demo/demo-grant-permission-to-invoke-action-put-subject!)
-  (demo/demo-create-action-put-application!)
-  (demo/demo-grant-permission-to-invoke-action-put-application!!)
-  (demo/demo-create-action-authorize-application!)
-  (demo/demo-grant-permission-to-invoke-action-authorize-application!)
-  (demo/demo-create-action-issue-access-token!)
-  (demo/demo-grant-permission-to-invoke-action-issue-access-token!)
-  (demo/demo-create-action-put-immutable-public-resource!)
-  (demo/demo-grant-permission-to-invoke-action-put-immutable-public-resource!)
-  (demo/demo-create-action-get-public-resource!)
-  (demo/demo-grant-permission-to-invoke-get-public-resource!)
-  (demo/demo-create-hello-world-resource!)
-  (demo/demo-create-action-put-immutable-private-resource!)
-  (demo/demo-grant-permission-to-put-immutable-private-resource!)
-  (demo/demo-create-action-get-private-resource!)
-  (demo/demo-grant-permission-to-get-private-resource!)
-  (demo/demo-create-immutable-private-resource!)
-  (demo/demo-invoke-put-application!)
-  (demo/demo-invoke-authorize-application!)
-  (demo/demo-create-test-subject!)
-  (demo/demo-invoke-issue-access-token!)
+  (book/book-put-user!)
+  (book/book-put-user-identity!)
+  (book/book-put-subject!)
+  (book/book-install-create-action!)
+  (book/book-install-do-action-fn!)
+  (book/book-permit-create-action!)
+  (book/book-create-grant-permission-action!)
+  (book/book-permit-grant-permission-action!)
+  (book/book-create-action-put-user!)
+  (book/book-create-action-put-user-identity!)
+  (book/book-create-action-put-subject!)
+  (book/book-grant-permission-to-invoke-action-put-subject!)
+  (book/book-create-action-put-application!)
+  (book/book-grant-permission-to-invoke-action-put-application!!)
+  (book/book-create-action-authorize-application!)
+  (book/book-grant-permission-to-invoke-action-authorize-application!)
+  (book/book-create-action-issue-access-token!)
+  (book/book-grant-permission-to-invoke-action-issue-access-token!)
+  (book/book-create-action-put-immutable-public-resource!)
+  (book/book-grant-permission-to-invoke-action-put-immutable-public-resource!)
+  (book/book-create-action-get-public-resource!)
+  (book/book-grant-permission-to-invoke-get-public-resource!)
+  (book/book-create-hello-world-resource!)
+  (book/book-create-action-put-immutable-private-resource!)
+  (book/book-grant-permission-to-put-immutable-private-resource!)
+  (book/book-create-action-get-private-resource!)
+  (book/book-grant-permission-to-get-private-resource!)
+  (book/book-create-immutable-private-resource!)
+  (book/book-invoke-put-application!)
+  (book/book-invoke-authorize-application!)
+  (book/book-create-test-subject!)
+  (book/book-invoke-issue-access-token!)
 
   ;; This tackles the '404' problem.
   (install-not-found)

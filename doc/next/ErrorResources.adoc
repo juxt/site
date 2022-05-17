@@ -7,22 +7,22 @@ First, create an error resource.
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-action-put-error-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-put-error-resource!,indent=0]
 ----
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-put-error-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-put-error-resource!,indent=0]
 ----
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=put-unauthorized-error-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=put-unauthorized-error-resource!,indent=0]
 ----
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=put-unauthorized-error-representation-for-html!,indent=0]
+include::../../test/juxt/book.clj[tag=put-unauthorized-error-representation-for-html!,indent=0]
 ----
 ====
 
@@ -52,7 +52,7 @@ Remember the `401 Unauthorized` response we got back in
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=put-unauthorized-error-representation-for-html-with-login-link!,indent=0]
+include::../../test/juxt/book.clj[tag=put-unauthorized-error-representation-for-html-with-login-link!,indent=0]
 ----
 ====
 

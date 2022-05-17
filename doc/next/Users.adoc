@@ -38,7 +38,7 @@ invoking our actions.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=install-user!,indent=0]
+include::../../test/juxt/book.clj[tag=install-user!,indent=0]
 ----
 
 <1> The user's name (arbitary data associated with this user).
@@ -104,7 +104,7 @@ s|Required
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=install-user-identity!,indent=0]
+include::../../test/juxt/book.clj[tag=install-user-identity!,indent=0]
 ----
 ====
 
@@ -182,7 +182,7 @@ the User Identity when a User logs in.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=install-subject!,indent=0]
+include::../../test/juxt/book.clj[tag=install-subject!,indent=0]
 ----
 ====
 

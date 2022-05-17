@@ -42,6 +42,6 @@ Add a password for Alice:
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=put-basic-auth-user-identity!,indent=0]
+include::../../test/juxt/book.clj[tag=put-basic-auth-user-identity!,indent=0]
 ----
 ====

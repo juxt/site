@@ -68,7 +68,7 @@ that works with the Action we created in <<example-create-action>>.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=permit-create-action!,indent=0]
+include::../../test/juxt/book.clj[tag=permit-create-action!,indent=0]
 ----
 
 <1> Permissions are individual resources, and must have unique URIs.
@@ -120,7 +120,7 @@ action.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-grant-permission-action!,indent=0]
+include::../../test/juxt/book.clj[tag=create-grant-permission-action!,indent=0]
 ----
 ====
 
@@ -145,7 +145,7 @@ This is shown in <<ex-permit-grant-permission-action>>.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=permit-grant-permission-action!,indent=0]
+include::../../test/juxt/book.clj[tag=permit-grant-permission-action!,indent=0]
 ----
 ====
 
