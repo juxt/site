@@ -1251,12 +1251,14 @@
    ;; 501
    wrap-method-not-implemented?
 
+   ;; Locate resource
+   wrap-locate-resource
+
    ;; Authenticate
    session/wrap-associate-session
    wrap-authenticate
 
-   ;; Locate resources
-   wrap-locate-resource
+   ;; Redirect if required
    wrap-redirect
 
    ;; 405
