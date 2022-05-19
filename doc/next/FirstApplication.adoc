@@ -52,7 +52,7 @@ NOTE: Developer note: TODO
 
 
 ----
-curl -i https://site.test/private.html -H "Authorization: Bearer test-access-token"
+curl -i https://site.test/protected.html -H "Authorization: Bearer test-access-token"
 ----
 
 == Development Notes

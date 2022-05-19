@@ -70,11 +70,11 @@
   )
 
 (defn setup-protected-resource! []
-  (book/book-create-action-put-immutable-private-resource!)
-  (book/book-grant-permission-to-put-immutable-private-resource!)
-  (book/book-create-action-get-private-resource!)
-  (book/book-grant-permission-to-get-private-resource!)
-  (book/book-create-immutable-private-resource!))
+  (book/book-create-action-put-immutable-protected-resource!)
+  (book/book-grant-permission-to-put-immutable-protected-resource!)
+  (book/book-create-action-get-protected-resource!)
+  (book/book-grant-permission-to-get-protected-resource!)
+  (book/book-create-immutable-protected-resource!))
 
 (defn setup-application! []
   (book/book-invoke-put-application!)
@@ -117,15 +117,15 @@
             {:ring.response/keys [status]} (*handler* invalid-req)]
         (is (= 404 status))))))
 
-(deftest private-resource-test
+(deftest protected-resource-test
   (preliminaries!)
   (setup-protected-resource!)
   (setup-application!)
 
-  (is (xt/entity (xt/db *xt-node*) "https://site.test/private.html"))
+  (is (xt/entity (xt/db *xt-node*) "https://site.test/protected.html"))
 
   (let [request {:ring.request/method :get
-                 :ring.request/path "/private.html"}]
+                 :ring.request/path "/protected.html"}]
 
     (testing "Cannot be accessed without a bearer token"
       (is (= 401 (:ring.response/status (*handler* request)))))

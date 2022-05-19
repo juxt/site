@@ -595,12 +595,12 @@
 
 ;; Protecting Resources
 
-(defn book-create-action-put-immutable-private-resource! []
-  ;; tag::create-action-put-immutable-private-resource![]
+(defn book-create-action-put-immutable-protected-resource! []
+  ;; tag::create-action-put-immutable-protected-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/put-immutable-private-resource"
+   {:xt/id "https://site.test/actions/put-immutable-protected-resource"
     :juxt.pass.alpha/scope "write:resource"
 
     :juxt.pass.alpha.malli/args-schema
@@ -613,8 +613,8 @@
      [:juxt.pass.alpha.process/update-in
       [0] 'merge
       {:juxt.http.alpha/methods
-       {:get {::pass/actions #{"https://site.test/actions/get-private-resource"}}
-        :head {::pass/actions #{"https://site.test/actions/get-private-resource"}}
+       {:get {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
+        :head {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
         :options {::pass/actions #{"https://site.test/actions/get-options"}}}
        :juxt.http.alpha.basic-auth/realm "Wonderland"}]
 
@@ -628,27 +628,27 @@
        [id :juxt.pass.alpha/user user]
        [permission :role role]
        [user :role role]]]})
-  ;; end::create-action-put-immutable-private-resource![]
+  ;; end::create-action-put-immutable-protected-resource![]
   )
 
-(defn book-grant-permission-to-put-immutable-private-resource! []
-  ;; tag::grant-permission-to-put-immutable-private-resource![]
+(defn book-grant-permission-to-put-immutable-protected-resource! []
+  ;; tag::grant-permission-to-put-immutable-protected-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-immutable-private-resource"
+   {:xt/id "https://site.test/permissions/administrators/put-immutable-protected-resource"
     :role "Administrator"
-    :juxt.pass.alpha/action "https://site.test/actions/put-immutable-private-resource"
+    :juxt.pass.alpha/action "https://site.test/actions/put-immutable-protected-resource"
     :juxt.pass.alpha/purpose nil})
-  ;; end::grant-permission-to-put-immutable-private-resource![]
+  ;; end::grant-permission-to-put-immutable-protected-resource![]
   )
 
-(defn book-create-action-get-private-resource! []
-  ;; tag::create-action-get-private-resource[]
+(defn book-create-action-get-protected-resource! []
+  ;; tag::create-action-get-protected-resource[]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/get-private-resource"
+   {:xt/id "https://site.test/actions/get-protected-resource"
     :juxt.pass.alpha/scope "read:resource"
 
     :juxt.pass.alpha/rules
@@ -658,33 +658,33 @@
        [id :juxt.pass.alpha/user user]
        [permission :juxt.pass.alpha/user user]
        [permission :juxt.site.alpha/uri resource]]]})
-  ;; end::create-action-get-private-resource[]
+  ;; end::create-action-get-protected-resource[]
   )
 
-(defn book-create-immutable-private-resource! []
-  ;; tag::create-immutable-private-resource![]
+(defn book-create-immutable-protected-resource! []
+  ;; tag::create-immutable-protected-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-immutable-private-resource"
-   {:xt/id "https://site.test/private.html"
+   "https://site.test/actions/put-immutable-protected-resource"
+   {:xt/id "https://site.test/protected.html"
     :juxt.http.alpha/content-type "text/html;charset=utf-8"
     :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"
     })
-  ;; end::create-immutable-private-resource![]
+  ;; end::create-immutable-protected-resource![]
   )
 
-(defn book-grant-permission-to-get-private-resource! []
-  ;; tag::grant-permission-to-get-private-resource![]
+(defn book-grant-permission-to-get-protected-resource! []
+  ;; tag::grant-permission-to-get-protected-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/alice/private-html"
-    :juxt.pass.alpha/action "https://site.test/actions/get-private-resource"
+   {:xt/id "https://site.test/permissions/alice/protected-html"
+    :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
     :juxt.pass.alpha/user "https://site.test/users/alice"
-    :juxt.site.alpha/uri "https://site.test/private.html"
+    :juxt.site.alpha/uri "https://site.test/protected.html"
     :juxt.pass.alpha/purpose nil
     })
-  ;; end::grant-permission-to-get-private-resource![]
+  ;; end::grant-permission-to-get-protected-resource![]
   )
 
 ;; First Application
@@ -858,11 +858,11 @@
   (book-create-action-get-public-resource!)
   (book-grant-permission-to-invoke-get-public-resource!)
   (book-create-hello-world-resource!)
-  (book-create-action-put-immutable-private-resource!)
-  (book-grant-permission-to-put-immutable-private-resource!)
-  (book-create-action-get-private-resource!)
-  (book-grant-permission-to-get-private-resource!)
-  (book-create-immutable-private-resource!)
+  (book-create-action-put-immutable-protected-resource!)
+  (book-grant-permission-to-put-immutable-protected-resource!)
+  (book-create-action-get-protected-resource!)
+  (book-grant-permission-to-get-protected-resource!)
+  (book-create-immutable-protected-resource!)
   (book-invoke-put-application!)
   (book-invoke-authorize-application!)
   (book-create-test-subject!)

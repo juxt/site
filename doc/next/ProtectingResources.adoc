@@ -1,23 +1,23 @@
 = Protecting Resources
 :toc: left
 
-[[publishing-private-resources]]
-== Creating a private resource
+[[publishing-protected-resources]]
+== Creating a protected resource
 
-Now let's publish an immutable private resource which can only be seen by an
+Now let's publish an immutable protected resource which can only be seen by an
 authenticated user.
 
-We'll need an action to publish a private resource.
+We'll need an action to publish a protected resource.
 
 
-.Creating and accessing a private resource
+.Creating and accessing a protected resource
 ====
 
 Again, let's complete the following steps:
 
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=create-action-put-immutable-private-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-put-immutable-protected-resource!,indent=0]
 ----
 
 [IMPORTANT]
@@ -29,7 +29,7 @@ We'll grant this permission to our REPL user.
 
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=grant-permission-to-put-immutable-private-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-put-immutable-protected-resource!,indent=0]
 ----
 
 [IMPORTANT]
@@ -37,14 +37,14 @@ include::../../test/juxt/book.clj[tag=grant-permission-to-put-immutable-private-
 Do it
 --
 
-Now we'll create the action that is used to get a private resource. The rules
+Now we'll create the action that is used to get a protected resource. The rules
 mandate that a permission has been granted on a specific resource and the
 subject is not nil.
 
 [source,clojure]
-.Creating the `get-private-resource` action
+.Creating the `get-protected-resource` action
 ----
-include::../../test/juxt/book.clj[tag=create-action-get-private-resource,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-get-protected-resource,indent=0]
 ----
 
 [IMPORTANT]
@@ -52,16 +52,16 @@ include::../../test/juxt/book.clj[tag=create-action-get-private-resource,indent=
 Do it
 --
 
-The `get-private-resource` action's rules state that a single 'global'
+The `get-protected-resource` action's rules state that a single 'global'
 permission (referencing the action) is sufficient for _any_ authenticated
 end-user (subject) to access the action.
 
 But we must rememeber to create that single global permission:
 
 [source,clojure]
-.Creating the global grant on `get-private-resource` to authenticated users
+.Creating the global grant on `get-protected-resource` to authenticated users
 ----
-include::../../test/juxt/book.clj[tag=grant-permission-to-get-private-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-get-protected-resource!,indent=0]
 ----
 
 [IMPORTANT]
@@ -69,11 +69,11 @@ include::../../test/juxt/book.clj[tag=grant-permission-to-get-private-resource!,
 Do it
 --
 
-Now to create a private resource.
+Now to create a protected resource.
 
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=create-immutable-private-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=create-immutable-protected-resource!,indent=0]
 ----
 
 [IMPORTANT]
@@ -81,10 +81,10 @@ include::../../test/juxt/book.clj[tag=create-immutable-private-resource!,indent=
 Do it
 --
 
-Let's try to access the private resource.
+Let's try to access the protected resource.
 
 ----
-curl -i https://site.test/private.html
+curl -i https://site.test/protected.html
 ----
 
 We should get a response with a 401 status. We're not authorized to access this

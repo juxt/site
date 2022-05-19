@@ -30,7 +30,7 @@ include::../../test/juxt/book.clj[tag=put-unauthorized-error-representation-for-
 
 == Next Steps
 
-We have a private resource but the 401 status response tells us we are not
+We have a protected resource but the 401 status response tells us we are not
 authorized to access it.
 
 To authorize the subject we'll need to first determine who is trying to access
@@ -48,7 +48,7 @@ return them to the original resource once they've been authenticated.
 [[installing-improved-401]]
 ====
 Remember the `401 Unauthorized` response we got back in
-<<publishing-private-resources>>? Now we can at least authenticate the end-user.
+<<publishing-protected-resources>>? Now we can at least authenticate the end-user.
 
 [source,clojure]
 ----
@@ -60,7 +60,7 @@ include::../../test/juxt/book.clj[tag=put-unauthorized-error-representation-for-
 .Testing the authentication
 [[testing-authentication]]
 ====
-If we now nagivate to +https://site.test/private.html+ we get the following:
+If we now nagivate to +https://site.test/protected.html+ we get the following:
 
 .Unauthorized
 image::Unauthorized.png[Unauthorized,width=50%]
@@ -70,5 +70,5 @@ installed for our `OpenID Provider`.
 
 If all goes as expected, the error should change to a 403. This means we've
 successfully _authenticated_, but still don't have the _permission_ to view the
-private resource. That's a topic for <<authorization>>.
+protected resource. That's a topic for <<authorization>>.
 ====
