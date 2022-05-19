@@ -288,36 +288,23 @@
 
   ;; TODO: This might be where we also add the 'on-behalf-of' info
 
-  (let [
-        ;; Are there any protection spaces for this URI?
-        protection-spaces (protection-spaces db uri)
+  (let [protection-spaces (protection-spaces db uri)
+        req (cond-> req protection-spaces (assoc ::pass/protection-spaces protection-spaces))
+        authorization-header (get-in req [:ring.request/headers "authorization"])
+        subject
+        (when authorization-header
+          (let [{::rfc7235/keys [auth-scheme token68]}
+                (reap/authorization authorization-header)]
 
-        ;; Associate the protection spaces onto the request
+            (case (.toLowerCase auth-scheme)
+              "basic" (lookup-subject-from-basic req db token68 (filter #(= (::pass/auth-scheme %) "Basic") protection-spaces))
+              "bearer" (lookup-subject-from-bearer req db token68 (filter #(= (::pass/auth-scheme %) "Bearer") protection-spaces))
+              (throw
+               (ex-info
+                "Auth scheme unsupported"
+                {::site/request-context (assoc req :ring.response/status 401)})))))]
 
-        now (::site/start-date req)
-        authorization-header
-        (get-in req [:ring.request/headers "authorization"])]
-
-    ;; Authorization header
-    (when authorization-header
-      (let [{::rfc7235/keys [auth-scheme token68]}
-            (reap/authorization authorization-header)]
-
-        (case (.toLowerCase auth-scheme)
-          "basic" (lookup-subject-from-basic req db token68 (filter #(= (::pass/auth-scheme %) "Basic") protection-spaces))
-          "bearer" (lookup-subject-from-bearer req db token68 (filter #(= (::pass/auth-scheme %) "Bearer") protection-spaces))
-
-          #_(when-let [session (lookup-session token68 now)]
-              (->
-               (select-keys session [::pass/user ::pass/username])
-               (assoc ::pass/auth-scheme "Bearer"
-                      ;;::pass/session-expiry (java.util.Date/from (::expiry-instant session))
-                      )))
-
-          (throw
-           (ex-info
-            "Auth scheme unsupported"
-            {::site/request-context (assoc req :ring.response/status 401)})))))))
+    (cond-> req subject (assoc ::pass/subject subject))))
 
 (defn login-template-model [req]
   {:query (str (:ring.request/query req))})

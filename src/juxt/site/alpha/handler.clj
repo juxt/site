@@ -463,20 +463,17 @@
 
 (defn wrap-authenticate [h]
   (fn [{:ring.request/keys [method] :as req}]
-    ;; @mal: TODO: I think we can authenticate OPTIONS now, authenticate doesn't
-    ;; prevent access, authorization does.
-    (let [sub (when-not (= method :options) (authn/authenticate req))]
-      (h (cond-> req sub (assoc ::pass/subject sub))))))
+    (h (authn/authenticate req))))
 
 #_(defn wrap-authorize-with-acls [h]
-  (fn [{::pass/keys [session] ::site/keys [resource] :as req}]
-    (when (::pass/authorization resource)
-      (log/trace "Already authorized")
-      )
-    (h (cond-> req
-         ;; Only authorize if not already authorized
-         (not (::pass/authorization resource))
-         authz/authorize-resource))))
+    (fn [{::pass/keys [session] ::site/keys [resource] :as req}]
+      (when (::pass/authorization resource)
+        (log/trace "Already authorized")
+        )
+      (h (cond-> req
+           ;; Only authorize if not already authorized
+           (not (::pass/authorization resource))
+           authz/authorize-resource))))
 
 #_(defn wrap-authorize-with-pdp
   ;; Do authorization as late as possible (in order to have as much data
