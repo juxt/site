@@ -615,8 +615,7 @@
       {:juxt.http.alpha/methods
        {:get {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
         :head {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
-        :options {::pass/actions #{"https://site.test/actions/get-options"}}}
-       :juxt.http.alpha.basic-auth/realm "Wonderland"}]
+        :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
 
      [:juxt.pass.alpha.malli/validate]
      [:xtdb.api/put]]
@@ -686,6 +685,22 @@
     })
   ;; end::grant-permission-to-get-protected-resource![]
   )
+
+;; Protection Spaces
+
+(defn book-put-protection-space! []
+  ;; TODO: This should be rewritten with an action
+  ;; TODO: Splice this into the book
+  (put! {:xt/id "https://site.test/protection-spaces/wonderland"
+         :juxt.site.alpha/type "https://meta.juxt.site/pass/protection-space"
+
+         :juxt.pass.alpha/canonical-root-uri "https://site.test"
+         :juxt.pass.alpha/realm "Wonderland" ; optional
+
+         :juxt.pass.alpha/auth-scheme "Basic"
+         :juxt.pass.alpha/authentication-scope "/protected.html" ; regex pattern
+
+         }))
 
 ;; First Application
 
@@ -831,8 +846,31 @@
      ;; end::put-unauthorized-error-representation-for-html-with-login-link![]
      ))))
 
+(defn install-not-found []
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/get-not-found"
+    :juxt.pass.alpha/scope "read:resource"
+    :juxt.pass.alpha/rules
+    [
+     ['(allowed? permission subject action resource)
+      ['permission :xt/id]]]})
+
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/get-not-found"
+    :juxt.pass.alpha/action "https://site.test/actions/get-not-found"
+    :juxt.pass.alpha/purpose nil})
+
+  (put!
+   {:xt/id "urn:site:resources:not-found"
+    ::http/methods
+    {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}}}))
+
 ;; Complete all tasks thus far directed by the book
-(defn init! []
+(defn preliminaries! []
   (book-put-user!)
   (book-put-user-identity!)
   (book-put-subject!)
@@ -842,7 +880,6 @@
   (book-create-grant-permission-action!)
   (book-permit-grant-permission-action!)
   (book-create-action-put-user!)
-  (book-grant-permission-to-invoke-action-put-user!)
   (book-create-action-put-user-identity!)
   (book-grant-permission-to-invoke-action-put-user-identity!)
   (book-create-action-put-subject!)
@@ -853,24 +890,35 @@
   (book-grant-permission-to-invoke-action-authorize-application!)
   (book-create-action-issue-access-token!)
   (book-grant-permission-to-invoke-action-issue-access-token!)
+  ;; This tackles the '404' problem.
+  (install-not-found))
+
+(defn setup-hello-world! []
   (book-create-action-put-immutable-public-resource!)
   (book-grant-permission-to-invoke-action-put-immutable-public-resource!)
   (book-create-action-get-public-resource!)
   (book-grant-permission-to-invoke-get-public-resource!)
   (book-create-hello-world-resource!)
+  )
+
+(defn setup-protected-resource! []
   (book-create-action-put-immutable-protected-resource!)
   (book-grant-permission-to-put-immutable-protected-resource!)
   (book-create-action-get-protected-resource!)
   (book-grant-permission-to-get-protected-resource!)
-  (book-create-immutable-protected-resource!)
+  (book-create-immutable-protected-resource!))
+
+(defn setup-application! []
   (book-invoke-put-application!)
   (book-invoke-authorize-application!)
   (book-create-test-subject!)
-  (book-invoke-issue-access-token!)
+  (book-invoke-issue-access-token!))
 
-  ;; Needs documenting
-  ;;(install-not-found)
-  )
+(defn init! []
+  (preliminaries!)
+  (setup-hello-world!)
+  (setup-protected-resource!)
+  (setup-application!))
 
 (defn book-put-basic-auth-user-identity! []
   ;; tag::put-basic-auth-user-identity![]

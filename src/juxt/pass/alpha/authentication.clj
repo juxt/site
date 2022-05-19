@@ -1,7 +1,5 @@
 ;; Copyright © 2021, JUXT LTD.
 
-;;(remove-ns 'juxt.pass.alpha.authentication)
-
 (ns juxt.pass.alpha.authentication
   (:require
    [jsonista.core :as json]
@@ -233,7 +231,24 @@
       (cookies-response)
       ((fn [req] (assoc-in req [:ring.response/headers "set-cookie"] (get-in req [:headers "Set-Cookie"]))))))
 
-(defn lookup-subject-from-bearer [db token68]
+(defn protection-spaces [db uri]
+  (for [{:keys [protection-space]}
+        (xt/q
+         db
+         '{:find [(pull ps [*])]
+           :keys [protection-space]
+           :where [[ps ::site/type "https://meta.juxt.site/pass/protection-space"]
+                   [ps ::pass/authentication-scope auth-scope]
+                   [ps ::pass/canonical-root-uri root]
+                   [(format "\\Q%s\\E%s" root auth-scope) regex]
+                   [(re-pattern regex) regex-pattern]
+                   [(re-matches regex-pattern uri)]
+                   ]
+           :in [uri]}
+         uri)]
+    protection-space))
+
+(defn lookup-subject-from-bearer [req db token68 protection-spaces]
   (:subject
    (first
     (xt/q db '{:find [(pull sub [*])]
@@ -244,9 +259,11 @@
                        [sub ::site/type "https://meta.juxt.site/pass/subject"]]
                :in [tok]} token68))))
 
-(defn lookup-subject-from-basic [db token68]
-  (try
-    (let [[_ username password]
+(defn lookup-subject-from-basic [req db token68 protection-spaces]
+
+  (throw (ex-info "BREAK" {::site/request-context (assoc req :protection-spaces protection-spaces)}))
+
+  #_(let [[_ username password]
           (re-matches
            #"([^:]*):([^:]*)"
            (String. (.decode (java.util.Base64/getDecoder) token68)))
@@ -259,19 +276,25 @@
         {::pass/user user
          ::pass/username username
          ::pass/auth-scheme "Basic"}))
-    (catch Exception e
-      (log/error e))))
+
+  )
 
 (defn authenticate
   "Authenticate a request. Return a pass subject, with information about user,
   roles and other credentials. The resource can be used to determine the
   particular Protection Space that it is part of, and the appropriate
   authentication scheme(s) for accessing the resource."
-  [{::site/keys [db] :as req}]
+  [{::site/keys [db uri] :as req}]
 
   ;; TODO: This might be where we also add the 'on-behalf-of' info
 
-  (let [now (::site/start-date req)
+  (let [
+        ;; Are there any protection spaces for this URI?
+        protection-spaces (protection-spaces db uri)
+
+        ;; Associate the protection spaces onto the request
+
+        now (::site/start-date req)
         authorization-header
         (get-in req [:ring.request/headers "authorization"])]
 
@@ -281,8 +304,8 @@
             (reap/authorization authorization-header)]
 
         (case (.toLowerCase auth-scheme)
-          "basic" (lookup-subject-from-basic db token68)
-          "bearer" (lookup-subject-from-bearer db token68)
+          "basic" (lookup-subject-from-basic req db token68 (filter #(= (::pass/auth-scheme %) "Basic") protection-spaces))
+          "bearer" (lookup-subject-from-bearer req db token68 (filter #(= (::pass/auth-scheme %) "Bearer") protection-spaces))
 
           #_(when-let [session (lookup-session token68 now)]
               (->

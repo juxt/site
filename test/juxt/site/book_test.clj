@@ -8,79 +8,15 @@
    [clojure.test :refer [deftest is are testing use-fixtures] :as t]
    [juxt.book :as book]
    [juxt.test.util :refer [with-system-xt with-db submit-and-await! *xt-node* *db* *handler*] :as tutil]
+   [juxt.site.alpha.repl :refer [put!]]
    [xtdb.api :as xt]
    [juxt.site.alpha :as-alias site]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.authorization :as authz]
+   [juxt.pass.alpha.authentication :as authn]
    [clojure.string :as str]
    [xtdb.api :as x]))
-
-(defn install-not-found []
-  (repl/do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/get-not-found"
-    :juxt.pass.alpha/scope "read:resource"
-    :juxt.pass.alpha/rules
-    [
-     ['(allowed? permission subject action resource)
-      ['permission :xt/id]]]})
-
-  (repl/do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/get-not-found"
-    :juxt.pass.alpha/action "https://site.test/actions/get-not-found"
-    :juxt.pass.alpha/purpose nil})
-
-  (repl/put!
-   {:xt/id "urn:site:resources:not-found"
-    ::http/methods
-    {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}}}))
-
-(defn preliminaries! []
-  (book/book-put-user!)
-  (book/book-put-user-identity!)
-  (book/book-put-subject!)
-  (book/book-install-create-action!)
-  (book/book-install-do-action-fn!)
-  (book/book-permit-create-action!)
-  (book/book-create-grant-permission-action!)
-  (book/book-permit-grant-permission-action!)
-  (book/book-create-action-put-user!)
-  (book/book-create-action-put-user-identity!)
-  (book/book-create-action-put-subject!)
-  (book/book-grant-permission-to-invoke-action-put-subject!)
-  (book/book-create-action-put-application!)
-  (book/book-grant-permission-to-invoke-action-put-application!!)
-  (book/book-create-action-authorize-application!)
-  (book/book-grant-permission-to-invoke-action-authorize-application!)
-  (book/book-create-action-issue-access-token!)
-  (book/book-grant-permission-to-invoke-action-issue-access-token!)
-  ;; This tackles the '404' problem.
-  (install-not-found))
-
-(defn setup-hello-world! []
-  (book/book-create-action-put-immutable-public-resource!)
-  (book/book-grant-permission-to-invoke-action-put-immutable-public-resource!)
-  (book/book-create-action-get-public-resource!)
-  (book/book-grant-permission-to-invoke-get-public-resource!)
-  (book/book-create-hello-world-resource!)
-  )
-
-(defn setup-protected-resource! []
-  (book/book-create-action-put-immutable-protected-resource!)
-  (book/book-grant-permission-to-put-immutable-protected-resource!)
-  (book/book-create-action-get-protected-resource!)
-  (book/book-grant-permission-to-get-protected-resource!)
-  (book/book-create-immutable-protected-resource!))
-
-(defn setup-application! []
-  (book/book-invoke-put-application!)
-  (book/book-invoke-authorize-application!)
-  (book/book-create-test-subject!)
-  (book/book-invoke-issue-access-token!))
 
 (defn with-handler [f]
   (binding [*handler*
@@ -93,8 +29,8 @@
 (use-fixtures :each with-system-xt with-handler)
 
 (deftest public-resource-test
-  (preliminaries!)
-  (setup-hello-world!)
+  (book/preliminaries!)
+  (book/setup-hello-world!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/hello")) ;; Assert the entity exists in the db
   (is (not (xt/entity (xt/db *xt-node*) "https://site.test/not-hello"))) ;; Assert that out 404 entity is not in the db
@@ -117,10 +53,38 @@
             {:ring.response/keys [status]} (*handler* invalid-req)]
         (is (= 404 status))))))
 
-(deftest protected-resource-test
-  (preliminaries!)
-  (setup-protected-resource!)
-  (setup-application!)
+(deftest protected-resource-with-http-basic-auth-test
+  (book/preliminaries!)
+  (book/setup-protected-resource!)
+
+  (is (xt/entity (xt/db *xt-node*) "https://site.test/protected.html"))
+
+  #_(let [request {:ring.request/method :get
+                 :ring.request/path "/protected.html"}]
+
+    (testing "Cannot be accessed without a bearer token"
+      (is (= 401 (:ring.response/status (*handler* request)))))
+
+    (testing "Can be accessed with a valid bearer token"
+      (is (= 200 (:ring.response/status
+                  (*handler*
+                   (assoc
+                    request
+                    :ring.request/headers
+                    {"authorization" "Bearer test-access-token"}))))))
+
+    (testing "Cannot be accessed with an invalid bearer token"
+      (is (= 401 (:ring.response/status
+                  (*handler*
+                   (assoc
+                    request
+                    :ring.request/headers
+                    {"authorization" "Bearer not-test-access-token"}))))))))
+
+(deftest protected-resource-with-http-bearer-auth-test
+  (book/preliminaries!)
+  (book/setup-protected-resource!)
+  (book/setup-application!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected.html"))
 
@@ -147,7 +111,7 @@
                     {"authorization" "Bearer not-test-access-token"}))))))))
 
 (deftest not-found-test
-  (preliminaries!)
+  (book/preliminaries!)
   (let [req {:ring.request/method :get
              :ring.request/path "/hello"}
         invalid-req (assoc req :ring.request/path "/not-hello")]
@@ -155,9 +119,9 @@
 
 
 (deftest user-directory-test
-  (preliminaries!)
-  (setup-protected-resource!)
-  (setup-application!)
+  (book/preliminaries!)
+  (book/setup-protected-resource!)
+  (book/setup-application!)
   (repl/do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/create-action"
@@ -210,6 +174,27 @@
              {"authorization" "Bearer test-access-token"}}]
     (is (= 411 (:ring.response/status (*handler* req))))))
 
-#_((t/join-fixtures [with-system-xt with-site-book-setup with-handler])
+#_((t/join-fixtures [with-system-xt with-handler])
  (fn []
-))
+   (book/preliminaries!)
+   (book/setup-protected-resource!)
+   (book/book-put-basic-auth-user-identity!)
+   (book/book-put-protection-space!)
+
+   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected.html"))
+
+   (is (= 1 (count (authn/protection-spaces (xt/db *xt-node*) "https://site.test/protected.html"))))
+
+   (let [request {:ring.request/method :get
+                  :ring.request/path "/protected.html"}]
+     (*handler*
+      (assoc
+       request
+       :ring.request/headers
+       {"authorization"
+        (format
+         "Basic %s"
+         (String.
+          (.encode
+           (java.util.Base64/getEncoder)
+           (.getBytes "alice:garden"))))})))))
