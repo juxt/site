@@ -306,10 +306,10 @@
 
     (cond-> req subject (assoc ::pass/subject subject))))
 
-(defn login-template-model [req]
+(defn ^:deprecated login-template-model [req]
   {:query (str (:ring.request/query req))})
 
-(defn unauthorized-template-model [req]
+(defn ^:deprecated unauthorized-template-model [req]
   {:redirect (str
               (:ring.request/path req)
               (when-let [query (:ring.request/query req)] (str "?" query)))})
