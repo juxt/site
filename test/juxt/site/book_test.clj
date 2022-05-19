@@ -39,7 +39,7 @@
     ::http/methods
     {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}}}))
 
-(defn with-site-book-setup [f]
+(defn preliminaries! []
   (book/book-put-user!)
   (book/book-put-user-identity!)
   (book/book-put-subject!)
@@ -58,25 +58,29 @@
   (book/book-grant-permission-to-invoke-action-authorize-application!)
   (book/book-create-action-issue-access-token!)
   (book/book-grant-permission-to-invoke-action-issue-access-token!)
+  ;; This tackles the '404' problem.
+  (install-not-found))
+
+(defn setup-hello-world! []
   (book/book-create-action-put-immutable-public-resource!)
   (book/book-grant-permission-to-invoke-action-put-immutable-public-resource!)
   (book/book-create-action-get-public-resource!)
   (book/book-grant-permission-to-invoke-get-public-resource!)
   (book/book-create-hello-world-resource!)
+  )
+
+(defn setup-protected-resource! []
   (book/book-create-action-put-immutable-private-resource!)
   (book/book-grant-permission-to-put-immutable-private-resource!)
   (book/book-create-action-get-private-resource!)
   (book/book-grant-permission-to-get-private-resource!)
-  (book/book-create-immutable-private-resource!)
+  (book/book-create-immutable-private-resource!))
+
+(defn setup-application! []
   (book/book-invoke-put-application!)
   (book/book-invoke-authorize-application!)
   (book/book-create-test-subject!)
-  (book/book-invoke-issue-access-token!)
-
-  ;; This tackles the '404' problem.
-  (install-not-found)
-
-  (f))
+  (book/book-invoke-issue-access-token!))
 
 (defn with-handler [f]
   (binding [*handler*
@@ -86,9 +90,12 @@
               ::site/uri-prefix "https://site.test"})]
     (f)))
 
-(use-fixtures :each with-system-xt with-site-book-setup with-handler)
+(use-fixtures :each with-system-xt with-handler)
 
 (deftest public-resource-test
+  (preliminaries!)
+  (setup-hello-world!)
+
   (is (xt/entity (xt/db *xt-node*) "https://site.test/hello")) ;; Assert the entity exists in the db
   (is (not (xt/entity (xt/db *xt-node*) "https://site.test/not-hello"))) ;; Assert that out 404 entity is not in the db
 
@@ -111,6 +118,10 @@
         (is (= 404 status))))))
 
 (deftest private-resource-test
+  (preliminaries!)
+  (setup-protected-resource!)
+  (setup-application!)
+
   (is (xt/entity (xt/db *xt-node*) "https://site.test/private.html"))
 
   (let [request {:ring.request/method :get
@@ -136,6 +147,7 @@
                     {"authorization" "Bearer not-test-access-token"}))))))))
 
 (deftest not-found-test
+  (preliminaries!)
   (let [req {:ring.request/method :get
              :ring.request/path "/hello"}
         invalid-req (assoc req :ring.request/path "/not-hello")]
@@ -143,6 +155,9 @@
 
 
 (deftest user-directory-test
+  (preliminaries!)
+  (setup-protected-resource!)
+  (setup-application!)
   (repl/do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/create-action"
