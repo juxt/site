@@ -62,6 +62,9 @@ include::Permissions.adoc[leveloffset=+1]
 [[ch-creating-users]]
 include::UsersRevisited.adoc[leveloffset=+1]
 
+[[ch-protection-spaces]]
+include::ProtectionSpaces.adoc[leveloffset=+1]
+
 [[ch-applications]]
 include::Applications.adoc[leveloffset=+1]
 

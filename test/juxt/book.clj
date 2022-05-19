@@ -3,6 +3,7 @@
 (ns juxt.book
   (:require
    [juxt.http.alpha :as-alias http]
+   [crypto.password.bcrypt :as password]
    [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]
    [clojure.walk :refer [postwalk]]
@@ -665,7 +666,7 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/put-immutable-protected-resource"
-   {:xt/id "https://site.test/protected.html"
+   {:xt/id "https://site.test/protected/document.html"
     :juxt.http.alpha/content-type "text/html;charset=utf-8"
     :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"
     })
@@ -680,7 +681,7 @@
    {:xt/id "https://site.test/permissions/alice/protected-html"
     :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
     :juxt.pass.alpha/user "https://site.test/users/alice"
-    :juxt.site.alpha/uri "https://site.test/protected.html"
+    :juxt.site.alpha/uri "https://site.test/protected/document.html"
     :juxt.pass.alpha/purpose nil
     })
   ;; end::grant-permission-to-get-protected-resource![]
@@ -688,7 +689,7 @@
 
 ;; Protection Spaces
 
-(defn book-put-protection-space! []
+(defn book-put-basic-protection-space! []
   ;; TODO: This should be rewritten with an action
   ;; TODO: Splice this into the book
   (put! {:xt/id "https://site.test/protection-spaces/wonderland"
@@ -698,8 +699,7 @@
          :juxt.pass.alpha/realm "Wonderland" ; optional
 
          :juxt.pass.alpha/auth-scheme "Basic"
-         :juxt.pass.alpha/authentication-scope "/protected.html" ; regex pattern
-
+         :juxt.pass.alpha/authentication-scope "/protected/.*" ; regex pattern
          }))
 
 ;; First Application
@@ -927,9 +927,13 @@
    "https://site.test/actions/put-user-identity"
    {:xt/id "https://site.test/user-identities/alice/basic"
     :juxt.pass.alpha/user "https://site.test/users/alice"
-    :juxt.pass.alpha.basic-auth/username "alice"
-    :juxt.pass.alpha.basic-auth/password "garden"
-    :juxt.pass.alpha.basic-auth/realm "Wonderland"
+    ;; Perhaps all user identities need this?
+    :juxt.pass.alpha/canonical-root-uri "https://site.test"
+    :juxt.pass.alpha/realm "Wonderland"
+    ;; Basic auth will only work if these are present
+    :juxt.pass.alpha/username "alice"
+    :juxt.pass.alpha/password-hash (password/encrypt "garden")
+
     })
   ;; end::put-basic-auth-user-identity![]
   )

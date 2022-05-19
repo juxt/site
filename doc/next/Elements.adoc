@@ -288,6 +288,21 @@ membership of a particular role.
 
 Permissions are described in <<ch-permissions>>.
 
+== Protection Spaces
+
+[NOTE]
+--
+In this section we introduce the concept of a Protection Space, as per RFC 7235.
+--
+
+[NOTE]
+--
+TODO: Create an action to create a protection space
+--
+
+Protection spaces are described in <<ch-protection-spaces>>.
+
+
 == Applications
 
 Actions are invoked when users make direct requests to an API. However, APIs are

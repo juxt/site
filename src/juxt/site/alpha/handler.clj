@@ -551,12 +551,28 @@
       (if (seq permissions)
         (h (assoc req ::pass/permissions permissions))
         (let [status (if subject 403 401)]
-          (throw
-           (ex-info
-            (case status
-              401 (format "No permission for actions: %s" (pr-str actions))
-              403 "No permission")
-            {::site/request-context (assoc req :ring.response/status status)})))))))
+          (case status
+            401
+            (let [protection-spaces (::pass/protection-spaces req)]
+              (throw
+               (ex-info
+                (format "No anonymous permission for actions: %s" (pr-str actions))
+                {::site/request-context
+                 (cond-> req
+                   status (assoc :ring.response/status status)
+                   protection-spaces
+                   (assoc
+                    :ring.response/headers
+                    {"www-authenticate"
+                     (authn/www-authenticate-header protection-spaces)}))})))
+            403
+            (throw
+             (ex-info
+              (format "No permission for actions: %s" (pr-str actions))
+              {::site/request-context
+               (assoc
+                req
+                :ring.response/status status)}))))))))
 
 (defn wrap-method-not-allowed? [h]
   (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]

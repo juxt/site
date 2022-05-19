@@ -57,7 +57,7 @@
   (book/preliminaries!)
   (book/setup-protected-resource!)
 
-  (is (xt/entity (xt/db *xt-node*) "https://site.test/protected.html"))
+  (is (xt/entity (xt/db *xt-node*) "https://site.test/protected/document.html"))
 
   #_(let [request {:ring.request/method :get
                  :ring.request/path "/protected.html"}]
@@ -86,10 +86,10 @@
   (book/setup-protected-resource!)
   (book/setup-application!)
 
-  (is (xt/entity (xt/db *xt-node*) "https://site.test/protected.html"))
+  (is (xt/entity (xt/db *xt-node*) "https://site.test/protected/document.html"))
 
   (let [request {:ring.request/method :get
-                 :ring.request/path "/protected.html"}]
+                 :ring.request/path "/protected/document.html"}]
 
     (testing "Cannot be accessed without a bearer token"
       (is (= 401 (:ring.response/status (*handler* request)))))
@@ -174,21 +174,34 @@
              {"authorization" "Bearer test-access-token"}}]
     (is (= 411 (:ring.response/status (*handler* req))))))
 
+;; TODO: Test for www-authenticate header
+
 #_((t/join-fixtures [with-system-xt with-handler])
  (fn []
    (book/preliminaries!)
-   (book/setup-protected-resource!)
    (book/book-put-basic-auth-user-identity!)
-   (book/book-put-protection-space!)
+   (book/book-put-basic-protection-space!)
+   (book/setup-protected-resource!)
 
-   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected.html"))
+   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected/document.html"))
 
-   (is (= 1 (count (authn/protection-spaces (xt/db *xt-node*) "https://site.test/protected.html"))))
+   (is (= 1 (count (authn/protection-spaces (xt/db *xt-node*) "https://site.test/protected/document.html"))))
+
+   #_(xt/entity (xt/db *xt-node*) "https://site.test/user-identities/alice/basic")
+   #_(xt/entity (xt/db *xt-node*) "https://site.test/permissions/alice/protected-html")
+
+   #_(xt/entity (xt/db *xt-node*) "https://site.test/actions/get-protected-resource")
+
+
+   #_(xt/q (xt/db *xt-node*)
+         '{:find [e]
+           :where [[e ::site/type "https://meta.juxt.site/pass/permission"]]})
 
    (let [request {:ring.request/method :get
-                  :ring.request/path "/protected.html"}]
+                  :ring.request/path "/protected/document.html"}]
      (*handler*
-      (assoc
+      request
+      #_(assoc
        request
        :ring.request/headers
        {"authorization"

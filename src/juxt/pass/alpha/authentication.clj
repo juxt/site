@@ -3,9 +3,11 @@
 (ns juxt.pass.alpha.authentication
   (:require
    [jsonista.core :as json]
+   [juxt.reap.alpha.encoders :refer [www-authenticate]]
    [clojure.tools.logging :as log]
    [crypto.password.bcrypt :as password]
    [xtdb.api :as x]
+   [juxt.pass.alpha.util :refer [new-subject-urn]]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.rfc7235 :as rfc7235]
    [juxt.http.alpha :as-alias http]
@@ -232,79 +234,126 @@
       ((fn [req] (assoc-in req [:ring.response/headers "set-cookie"] (get-in req [:headers "Set-Cookie"]))))))
 
 (defn protection-spaces [db uri]
-  (for [{:keys [protection-space]}
-        (xt/q
-         db
-         '{:find [(pull ps [*])]
-           :keys [protection-space]
-           :where [[ps ::site/type "https://meta.juxt.site/pass/protection-space"]
-                   [ps ::pass/authentication-scope auth-scope]
-                   [ps ::pass/canonical-root-uri root]
-                   [(format "\\Q%s\\E%s" root auth-scope) regex]
-                   [(re-pattern regex) regex-pattern]
-                   [(re-matches regex-pattern uri)]
-                   ]
-           :in [uri]}
-         uri)]
-    protection-space))
+  (seq
+   (for [{:keys [protection-space]}
+         (xt/q
+          db
+          '{:find [(pull ps [*])]
+            :keys [protection-space]
+            :where [[ps ::site/type "https://meta.juxt.site/pass/protection-space"]
+                    [ps ::pass/authentication-scope auth-scope]
+                    [ps ::pass/canonical-root-uri root]
+                    [(format "\\Q%s\\E%s" root auth-scope) regex]
+                    [(re-pattern regex) regex-pattern]
+                    [(re-matches regex-pattern uri)]
+                    ]
+            :in [uri]}
+          uri)]
+     protection-space)))
 
-(defn lookup-subject-from-bearer [req db token68 protection-spaces]
-  (:subject
-   (first
-    (xt/q db '{:find [(pull sub [*])]
-               :keys [subject]
-               :where [[at ::pass/token tok]
-                       [at ::site/type "https://meta.juxt.site/pass/access-token"]
-                       [at ::pass/subject sub]
-                       [sub ::site/type "https://meta.juxt.site/pass/subject"]]
-               :in [tok]} token68))))
+(defn authenticate-with-bearer-auth [req db token68 protection-spaces]
+  (let [subject
+        (:subject
+         (first
+          (xt/q db '{:find [(pull sub [*])]
+                     :keys [subject]
+                     :where [[at ::pass/token tok]
+                             [at ::site/type "https://meta.juxt.site/pass/access-token"]
+                             [at ::pass/subject sub]
+                             [sub ::site/type "https://meta.juxt.site/pass/subject"]]
+                     :in [tok]} token68)))]
+    (cond-> req subject (assoc ::pass/subject subject))))
 
-(defn lookup-subject-from-basic [req db token68 protection-spaces]
+;; TODO (idea): Tie bearer token to other security aspects such as remote IP so that
+;; the bearer token is more difficult to use if intercepted.
 
-  (throw (ex-info "BREAK" {::site/request-context (assoc req :protection-spaces protection-spaces)}))
+(defn find-or-create-basic-auth-subject [req user-identity protection-space]
+  (let [xt-node (::site/xt-node req)
+        subject {:xt/id (new-subject-urn)
+                 :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"
+                 :juxt.pass.alpha/user-identity (:xt/id user-identity)
+                 :juxt.pass.alpha/protection-space (:xt/id protection-space)}
+        tx (xt/submit-tx xt-node [[:xtdb.api/put subject]])]
+    (xt/await-tx xt-node tx)
+    ;; TODO: Find an existing subject we can re-use or we create a subject for
+    ;; every basic auth request. All attributes must match the above.
+    (cond-> req
+      subject (assoc ::pass/subject subject)
+      ;; We need to update the db because we have injected a subject and it will
+      ;; need to be in the database for authorization rules to work.
+      subject (assoc ::site/db (xt/db xt-node)))))
 
-  #_(let [[_ username password]
+(defn authenticate-with-basic-auth [req db token68 protection-spaces]
+  (when-let [{::pass/keys [canonical-root-uri realm] :as protection-space} (first protection-spaces)]
+    (let [[_ username password]
           (re-matches
            #"([^:]*):([^:]*)"
            (String. (.decode (java.util.Base64/getDecoder) token68)))
 
-          [user pwhash] (lookup-user db username)]
+          query (cond-> '{:find [(pull e [*])]
+                          :keys [identity]
+                          :where [[e ::site/type "https://meta.juxt.site/pass/user-identity"]
+                                  [e ::pass/canonical-root-uri canonical-root-uri]
+                                  [e ::pass/username username]]
+                          :in [username canonical-root-uri realm]}
+                  realm (update :where conj '[e ::pass/realm realm]))
 
-      (when (and password pwhash (password/check password pwhash))
-        ;; TODO: Now this needs to return the subject that is in the
-        ;; database
-        {::pass/user user
-         ::pass/username username
-         ::pass/auth-scheme "Basic"}))
+          candidates
+          (xt/q db query username canonical-root-uri realm)]
 
-  )
+      (when (> (count candidates) 1)
+        (log/warnf "Multiple candidates in basic auth found for username %s, using first found" username))
+
+      (when-let [user-identity (:identity (first candidates))]
+        (when-let [password-hash (::pass/password-hash user-identity)]
+          (when (password/check password password-hash)
+            (find-or-create-basic-auth-subject req user-identity protection-space)))))))
+
+(defn www-authenticate-header
+  "Create the WWW-Authenticate header value"
+  [protection-spaces]
+  (www-authenticate
+   (for [ps protection-spaces
+         :let [realm (::pass/realm ps)]]
+     {:juxt.reap.alpha.rfc7235/auth-scheme (::pass/auth-scheme ps)
+      :juxt.reap.alpha.rfc7235/auth-params
+      (cond-> []
+        realm (conj
+               {:juxt.reap.alpha.rfc7235/auth-param-name "realm"
+                :juxt.reap.alpha.rfc7235/auth-param-value realm}))})))
 
 (defn authenticate
-  "Authenticate a request. Return a pass subject, with information about user,
-  roles and other credentials. The resource can be used to determine the
-  particular Protection Space that it is part of, and the appropriate
-  authentication scheme(s) for accessing the resource."
+  "Authenticate a request. Return a modified request, with information about user,
+  roles and other credentials."
   [{::site/keys [db uri] :as req}]
 
   ;; TODO: This might be where we also add the 'on-behalf-of' info
 
   (let [protection-spaces (protection-spaces db uri)
         req (cond-> req protection-spaces (assoc ::pass/protection-spaces protection-spaces))
-        authorization-header (get-in req [:ring.request/headers "authorization"])
-        subject
-        (when authorization-header
-          (let [{::rfc7235/keys [auth-scheme token68]}
-                (reap/authorization authorization-header)]
+        authorization-header (get-in req [:ring.request/headers "authorization"])]
 
-            (case (.toLowerCase auth-scheme)
-              "basic" (lookup-subject-from-basic req db token68 (filter #(= (::pass/auth-scheme %) "Basic") protection-spaces))
-              "bearer" (lookup-subject-from-bearer req db token68 (filter #(= (::pass/auth-scheme %) "Bearer") protection-spaces))
-              (throw
-               (ex-info
-                "Auth scheme unsupported"
-                {::site/request-context (assoc req :ring.response/status 401)})))))]
+    (or
+     (when authorization-header
+       (let [{::rfc7235/keys [auth-scheme token68]}
+             (reap/authorization authorization-header)]
 
-    (cond-> req subject (assoc ::pass/subject subject))))
+         (or
+          (case (.toLowerCase auth-scheme)
+            "basic" (authenticate-with-basic-auth req db token68 (filter #(= (::pass/auth-scheme %) "Basic") protection-spaces))
+            "bearer" (authenticate-with-bearer-auth req db token68 (filter #(= (::pass/auth-scheme %) "Bearer") protection-spaces))
+            (throw
+             (ex-info
+              "Auth scheme unsupported"
+              {::site/request-context
+               (cond-> (assoc req :ring.response/status 401)
+                 protection-spaces
+                 (assoc
+                  :ring.response/headers
+                  {"www-authenticate"
+                   (www-authenticate-header protection-spaces)}))})))
+          req)))
+     req)))
 
 (defn ^:deprecated login-template-model [req]
   {:query (str (:ring.request/query req))})

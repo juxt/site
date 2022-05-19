@@ -56,7 +56,7 @@
               :in '[subject actions resource purpose]}
 
              subject actions resource purpose)]
-        (log/debugf "Returning %d permissions" (count permissions))
+        (log/debugf "Returning %s permissions" (pr-str permissions))
         permissions))))
 
 (defn allowed-resources

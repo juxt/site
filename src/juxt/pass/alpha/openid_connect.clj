@@ -11,7 +11,7 @@
    [xtdb.api :as xt]
    [java-http-clj.core :as hc]
    [juxt.site.alpha.return :refer [return]]
-   [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.pass.alpha.util :refer [make-nonce new-subject-urn]]
    [juxt.pass.alpha.session :as session]
    [ring.util.codec :as codec]
    [juxt.site.alpha.response :refer [redirect]]
@@ -198,9 +198,6 @@
           (log/infof "Storing JWKS in database: %s" uri)
           (xt/submit-tx xt-node [[:xtdb.api/put result]])
           (::pass/jwks result))))))
-
-(defn new-subject-urn []
-  (format "urn:site:subjects:%s" (random-uuid)))
 
 ;; See https://openid.net/specs/openid-connect-core-1_0.html
 (defn extract-standard-claims [claims]

@@ -1,6 +1,10 @@
 = Protecting Resources
 :toc: left
 
+== Creating a protection space
+
+NOTE: TODO
+
 [[publishing-protected-resources]]
 == Creating a protected resource
 
