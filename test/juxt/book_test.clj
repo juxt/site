@@ -77,9 +77,17 @@
         request-with-bad-creds
         (assoc request :ring.request/headers {"authorization" (encode-basic-authorization "alice" "gradne")})]
 
-    (is (= 401 (:ring.response/status (*handler* request))))
-    (is (= 401 (:ring.response/status (*handler* request-with-bad-creds))))
-    (is (= 200 (:ring.response/status (*handler* request-with-good-creds))))))
+    (let [response (*handler* request)]
+      (is (= 401 (:ring.response/status response)))
+      (is (= "Basic realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"]))))
+
+    (let [response (*handler* request-with-bad-creds)]
+      (is (= 401 (:ring.response/status response)))
+      (is (= "Basic realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"]))))
+
+    (let [response (*handler* request-with-good-creds)]
+      (is (= 200 (:ring.response/status response)))
+      (is (nil? (get-in response [:ring.response/headers "www-authenticate"]))))))
 
 (deftest protected-resource-with-http-bearer-auth-test
   (book/preliminaries!)
