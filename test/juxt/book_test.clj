@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.site.book-test
+(ns juxt.book-test
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
@@ -176,7 +176,7 @@
 
 ;; TODO: Test for www-authenticate header
 
-#_((t/join-fixtures [with-system-xt with-handler])
+((t/join-fixtures [with-system-xt with-handler])
  (fn []
    (book/preliminaries!)
    (book/book-put-basic-auth-user-identity!)
@@ -200,8 +200,7 @@
    (let [request {:ring.request/method :get
                   :ring.request/path "/protected/document.html"}]
      (*handler*
-      request
-      #_(assoc
+      (assoc
        request
        :ring.request/headers
        {"authorization"
