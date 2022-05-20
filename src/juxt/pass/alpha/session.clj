@@ -8,6 +8,7 @@
 (ns juxt.pass.alpha.session
   (:require
    [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.pass.alpha.authentication :as authz]
    [ring.middleware.cookies :refer [cookies-request cookies-response]]
    [clojure.tools.logging :as log]
    [crux.api :as xt]))
@@ -78,12 +79,14 @@
 
 (defn escalate-session
   "Update the session by applying f and return the result of rotating the session id."
-  [{::site/keys [db crux-node] ::pass/keys [session-token-id!] :as req} f]
+  [{::site/keys [db crux-node resource start-date]
+    ::pass/keys [session-token-id!] :as req} subject matched-identity]
   (let [session (lookup-session db session-token-id!)
         _ (assert session)
         new-session-token-id! (make-nonce 16)
-        new-session (-> (f session)
-                        (assoc :crux.db/id (:crux.db/id session)))
+        new-session (-> session
+                        (assoc :crux.db/id (:crux.db/id session)
+                               ::pass/subject subject))
 
         session-token {:crux.db/id (session-token-id->urn new-session-token-id!)
                        ::site/type "SessionToken"
@@ -103,9 +106,20 @@
 
         _ (xt/await-tx crux-node tx)]
 
+    (let [expires-in (get resource ::pass/expires-in (* 24 3600))
+          session {"access_token" new-session-token-id!
+                   "expires_in" expires-in
+                   "user" matched-identity}]
+
+      (authz/put-session!
+       new-session-token-id!
+       (assoc session ::pass/user matched-identity)
+       (.plusSeconds (.toInstant start-date) expires-in)))
+
     (if (xt/tx-committed? crux-node tx)
-      (-> req
-          (set-cookie new-session-token-id!))
+      (update-in req
+                 [:ring.response/headers "location"]
+                 #(str % "?code=" new-session-token-id!))
       (throw (ex-info "Session wasn't escalated" {})))))
 
 (defn wrap-associate-session [h]

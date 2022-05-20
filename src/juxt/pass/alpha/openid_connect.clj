@@ -348,7 +348,8 @@
 
         ;; Does the id-token match any identities in our database? If so, we create
         ;; a subject.
-        subject (when-let [matched-identity (match-identity db (:claims id-token))]
+        matched-identity (match-identity db (:claims id-token))
+        subject (when matched-identity
                   (create-subject! crux-node matched-identity id-token))]
 
     ;; Put the ID_TOKEN into the session, cycle the session id and redirect to
@@ -360,8 +361,7 @@
         (log/warnf "Successful login! %s" (pr-str (select-keys (:claims id-token) ["iss" "sub"])))
         (-> req
             (redirect 303 (get session ::pass/return-to "/login-succeeded"))
-            (session/escalate-session
-             #(assoc % ::pass/subject subject))))
+            (session/escalate-session subject matched-identity)))
 
       ;; Login unsuccessful.
       (do
