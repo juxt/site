@@ -53,33 +53,33 @@
             {:ring.response/keys [status]} (*handler* invalid-req)]
         (is (= 404 status))))))
 
+(defn encode-basic-authorization [user password]
+  (format "Basic %s" (String. (.encode (java.util.Base64/getEncoder) (.getBytes (format "%s:%s" user password))))))
+
+;; TODO: Test for www-authenticate header
+
 (deftest protected-resource-with-http-basic-auth-test
   (book/preliminaries!)
   (book/setup-protected-resource!)
+  (book/book-put-basic-auth-user-identity!)
+  (book/book-put-basic-protection-space!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected/document.html"))
 
-  #_(let [request {:ring.request/method :get
-                 :ring.request/path "/protected.html"}]
+  (is (= 1 (count (authn/protection-spaces (xt/db *xt-node*) "https://site.test/protected/document.html"))))
 
-    (testing "Cannot be accessed without a bearer token"
-      (is (= 401 (:ring.response/status (*handler* request)))))
+  (let [request {:ring.request/method :get
+                 :ring.request/path "/protected/document.html"}
 
-    (testing "Can be accessed with a valid bearer token"
-      (is (= 200 (:ring.response/status
-                  (*handler*
-                   (assoc
-                    request
-                    :ring.request/headers
-                    {"authorization" "Bearer test-access-token"}))))))
+        request-with-good-creds
+        (assoc request :ring.request/headers {"authorization" (encode-basic-authorization "alice" "garden")})
 
-    (testing "Cannot be accessed with an invalid bearer token"
-      (is (= 401 (:ring.response/status
-                  (*handler*
-                   (assoc
-                    request
-                    :ring.request/headers
-                    {"authorization" "Bearer not-test-access-token"}))))))))
+        request-with-bad-creds
+        (assoc request :ring.request/headers {"authorization" (encode-basic-authorization "alice" "gradne")})]
+
+    (is (= 401 (:ring.response/status (*handler* request))))
+    (is (= 401 (:ring.response/status (*handler* request-with-bad-creds))))
+    (is (= 200 (:ring.response/status (*handler* request-with-good-creds))))))
 
 (deftest protected-resource-with-http-bearer-auth-test
   (book/preliminaries!)
@@ -175,40 +175,3 @@
              :ring.request/headers
              {"authorization" "Bearer test-access-token"}}]
     (is (= 411 (:ring.response/status (*handler* req))))))
-
-;; TODO: Test for www-authenticate header
-
-#_((t/join-fixtures [with-system-xt with-handler])
- (fn []
-   (book/preliminaries!)
-   (book/book-put-basic-auth-user-identity!)
-   (book/book-put-basic-protection-space!)
-   (book/setup-protected-resource!)
-
-   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected/document.html"))
-
-   (is (= 1 (count (authn/protection-spaces (xt/db *xt-node*) "https://site.test/protected/document.html"))))
-
-   #_(xt/entity (xt/db *xt-node*) "https://site.test/user-identities/alice/basic")
-   #_(xt/entity (xt/db *xt-node*) "https://site.test/permissions/alice/protected-html")
-
-   #_(xt/entity (xt/db *xt-node*) "https://site.test/actions/get-protected-resource")
-
-
-   #_(xt/q (xt/db *xt-node*)
-         '{:find [e]
-           :where [[e ::site/type "https://meta.juxt.site/pass/permission"]]})
-
-   (let [request {:ring.request/method :get
-                  :ring.request/path "/protected/document.html"}]
-     (*handler*
-      (assoc
-       request
-       :ring.request/headers
-       {"authorization"
-        (format
-         "Basic %s"
-         (String.
-          (.encode
-           (java.util.Base64/getEncoder)
-           (.getBytes "alice:garden"))))})))))
