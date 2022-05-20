@@ -62,12 +62,6 @@ include::Permissions.adoc[leveloffset=+1]
 [[ch-creating-users]]
 include::UsersRevisited.adoc[leveloffset=+1]
 
-[[ch-protection-spaces]]
-include::ProtectionSpaces.adoc[leveloffset=+1]
-
-[[ch-applications]]
-include::Applications.adoc[leveloffset=+1]
-
 = Resources
 
 [[ch-resources]]
@@ -75,11 +69,29 @@ include::Resources.adoc[leveloffset=+1]
 
 include::Representations.adoc[leveloffset=+1]
 
+= Authentication
+
+Actions are integrated with authorization rules, providing a rich access control
+layer between users and data.
+
+Most authorization rules refer to the Subject of the request. To identify the
+Subject, we need to authenticate each request.
+
+This part contains all the information you need to authenticate users.
+
+[[ch-protection-spaces]]
+include::ProtectionSpaces.adoc[leveloffset=+1]
+
 include::ProtectingResources.adoc[leveloffset=+1]
 
 include::BasicAuthentication.adoc[leveloffset=+1]
 
+include::AuthenticationWithOpenID.adoc[leveloffset=+1]
+
 = Applications and APIs
+
+[[ch-applications]]
+include::Applications.adoc[leveloffset=+1]
 
 [[ch-first-application]]
 include::FirstApplication.adoc[leveloffset=+1]
@@ -89,11 +101,6 @@ include::OpenAPI.adoc[leveloffset=+1]
 
 [[ch-graphql]]
 include::GraphQL.adoc[leveloffset=+1]
-
-= OpenID
-
-[[ch-authentication-with-openid]]
-include::AuthenticationWithOpenID.adoc[leveloffset=+1]
 
 = Going further
 

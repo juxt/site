@@ -284,6 +284,100 @@
   ;; end::grant-permission-to-invoke-action-put-subject![]
   )
 
+;; Hello World!
+
+(defn book-create-action-put-immutable-public-resource! []
+  ;; tag::create-action-put-immutable-public-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-immutable-public-resource"
+    :juxt.pass.alpha/scope "write:resource" ; <1>
+
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/.*"]]]]
+
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in
+      [0] 'merge
+      {::http/methods                 ; <2>
+       {:get {::pass/actions #{"https://site.test/actions/get-public-resource"}}
+        :head {::pass/actions #{"https://site.test/actions/get-public-resource"}}
+        :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
+
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource) ; <3>
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [user :role role]
+       [permission :role role]]]})
+  ;; end::create-action-put-immutable-public-resource![]
+  )
+
+(defn book-grant-permission-to-invoke-action-put-immutable-public-resource! []
+  ;; tag::grant-permission-to-invoke-action-put-immutable-public-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/administrators/put-immutable-public-resource"
+    :role "Administrator"
+    :juxt.pass.alpha/action "https://site.test/actions/put-immutable-public-resource"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-invoke-action-put-immutable-public-resource![]
+  )
+
+(defn book-create-action-get-public-resource! []
+  ;; tag::create-action-get-public-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/get-public-resource"
+    :juxt.pass.alpha/scope "read:resource" ; <1>
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [permission :xt/id "https://site.test/permissions/public-resources-to-all"] ; <2>
+       ]]})
+  ;; end::create-action-get-public-resource![]
+  )
+
+(defn book-grant-permission-to-invoke-get-public-resource! []
+  ;; tag::grant-permission-to-invoke-get-public-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/public-resources-to-all"
+    :juxt.pass.alpha/action "https://site.test/actions/get-public-resource"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-invoke-get-public-resource![]
+  )
+
+(defn book-create-hello-world-resource! []
+  ;; tag::create-hello-world-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-immutable-public-resource"
+   {:xt/id "https://site.test/hello"
+    :juxt.http.alpha/content-type "text/plain"
+    :juxt.http.alpha/content "Hello World!\r\n"})
+  ;; end::create-hello-world-resource![]
+  )
+
+;; Protection Spaces
+
+
+
+
+
+
 ;; Applications
 
 (defn book-create-action-put-application! []
@@ -406,99 +500,15 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/mal/issue-access-token"
+   {:xt/id "https://site.test/permissions/users/issue-access-token"
     :role "User" ; <1>
     :juxt.pass.alpha/action "https://site.test/actions/issue-access-token"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-issue-access-token![]
   )
 
-;; Resources
 
-(defn book-create-action-put-immutable-public-resource! []
-  ;; tag::create-action-put-immutable-public-resource![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/put-immutable-public-resource"
-    :juxt.pass.alpha/scope "write:resource" ; <1>
 
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/.*"]]]]
-
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in
-      [0] 'merge
-      {::http/methods                 ; <2>
-       {:get {::pass/actions #{"https://site.test/actions/get-public-resource"}}
-        :head {::pass/actions #{"https://site.test/actions/get-public-resource"}}
-        :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
-
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
-
-    :juxt.pass.alpha/rules
-    '[
-      [(allowed? permission subject action resource) ; <3>
-       [subject :juxt.pass.alpha/user-identity id]
-       [id :juxt.pass.alpha/user user]
-       [user :role role]
-       [permission :role role]]]})
-  ;; end::create-action-put-immutable-public-resource![]
-  )
-
-(defn book-grant-permission-to-invoke-action-put-immutable-public-resource! []
-  ;; tag::grant-permission-to-invoke-action-put-immutable-public-resource![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-immutable-public-resource"
-    :role "Administrator"
-    :juxt.pass.alpha/action "https://site.test/actions/put-immutable-public-resource"
-    :juxt.pass.alpha/purpose nil})
-  ;; end::grant-permission-to-invoke-action-put-immutable-public-resource![]
-  )
-
-(defn book-create-action-get-public-resource! []
-  ;; tag::create-action-get-public-resource![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/get-public-resource"
-    :juxt.pass.alpha/scope "read:resource" ; <1>
-
-    :juxt.pass.alpha/rules
-    '[
-      [(allowed? permission subject action resource)
-       [permission :xt/id "https://site.test/permissions/public-resources-to-all"] ; <2>
-       ]]})
-  ;; end::create-action-get-public-resource![]
-  )
-
-(defn book-grant-permission-to-invoke-get-public-resource! []
-  ;; tag::grant-permission-to-invoke-get-public-resource![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/public-resources-to-all"
-    :juxt.pass.alpha/action "https://site.test/actions/get-public-resource"
-    :juxt.pass.alpha/purpose nil})
-  ;; end::grant-permission-to-invoke-get-public-resource![]
-  )
-
-(defn book-create-hello-world-resource! []
-  ;; tag::create-hello-world-resource![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-immutable-public-resource"
-   {:xt/id "https://site.test/hello"
-    :juxt.http.alpha/content-type "text/plain"
-    :juxt.http.alpha/content "Hello World!\r\n"})
-  ;; end::create-hello-world-resource![]
-  )
 
 (defn book-create-hello-world-html-representation! []
   (eval
@@ -880,16 +890,11 @@
   (book-create-grant-permission-action!)
   (book-permit-grant-permission-action!)
   (book-create-action-put-user!)
+  (book-grant-permission-to-invoke-action-put-user!)
   (book-create-action-put-user-identity!)
   (book-grant-permission-to-invoke-action-put-user-identity!)
   (book-create-action-put-subject!)
   (book-grant-permission-to-invoke-action-put-subject!)
-  (book-create-action-put-application!)
-  (book-grant-permission-to-invoke-action-put-application!!)
-  (book-create-action-authorize-application!)
-  (book-grant-permission-to-invoke-action-authorize-application!)
-  (book-create-action-issue-access-token!)
-  (book-grant-permission-to-invoke-action-issue-access-token!)
   ;; This tackles the '404' problem.
   (install-not-found))
 
@@ -901,6 +906,10 @@
   (book-create-hello-world-resource!)
   )
 
+(defn protection-spaces-preliminaries! []
+
+  )
+
 (defn setup-protected-resource! []
   (book-create-action-put-immutable-protected-resource!)
   (book-grant-permission-to-put-immutable-protected-resource!)
@@ -908,16 +917,26 @@
   (book-grant-permission-to-get-protected-resource!)
   (book-create-immutable-protected-resource!))
 
+(defn applications-preliminaries! []
+  (book-create-action-put-application!)
+  (book-grant-permission-to-invoke-action-put-application!!)
+  (book-create-action-authorize-application!)
+  (book-grant-permission-to-invoke-action-authorize-application!)
+  (book-create-action-issue-access-token!)
+  (book-grant-permission-to-invoke-action-issue-access-token!))
+
 (defn setup-application! []
   (book-invoke-put-application!)
   (book-invoke-authorize-application!)
   (book-create-test-subject!)
   (book-invoke-issue-access-token!))
 
-(defn init! []
+(defn init-all! []
   (preliminaries!)
   (setup-hello-world!)
+  (protection-spaces-preliminaries!)
   (setup-protected-resource!)
+  (applications-preliminaries!)
   (setup-application!))
 
 (defn book-put-basic-auth-user-identity! []

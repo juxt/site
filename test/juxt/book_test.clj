@@ -84,6 +84,7 @@
 (deftest protected-resource-with-http-bearer-auth-test
   (book/preliminaries!)
   (book/setup-protected-resource!)
+  (book/applications-preliminaries!)
   (book/setup-application!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected/document.html"))
@@ -121,6 +122,7 @@
 (deftest user-directory-test
   (book/preliminaries!)
   (book/setup-protected-resource!)
+  (book/applications-preliminaries!)
   (book/setup-application!)
   (repl/do-action
    "https://site.test/subjects/repl-default"
@@ -176,7 +178,7 @@
 
 ;; TODO: Test for www-authenticate header
 
-((t/join-fixtures [with-system-xt with-handler])
+#_((t/join-fixtures [with-system-xt with-handler])
  (fn []
    (book/preliminaries!)
    (book/book-put-basic-auth-user-identity!)
