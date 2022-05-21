@@ -8,7 +8,8 @@ details and practical examples in subsequent chapters.
 
 == Documents
 
-Data in Site is stored as documents.
+(((XTDB)))
+Data in Site is stored as documents in the https://xtdb.com[XTDB] database.
 
 A document is a set of named values, as shown in <<ex-cat-document>>.
 

@@ -14,9 +14,9 @@ document can be put into the database to represent a permission when it is
 granted, and (just as easily) deleted from the database when the authorization
 is revoked.
 
-TIP: Permissions are straight-forward to grant and revoke, as they are represented as
-XT documents, so granting and revoking a permission can be done with XTDB's
-respective `:xtdb.api/put` and `:xtdb.api/delete` operations.
+TIP: Permissions are straight-forward to grant and revoke, as they are
+represented as XTDB documents, so granting and revoking a permission can be done
+with XTDB's respective `:xtdb.api/put` and `:xtdb.api/delete` operations.
 
 An Action's Rules specify how Permissions determine the outcome of authorization
 decisions.

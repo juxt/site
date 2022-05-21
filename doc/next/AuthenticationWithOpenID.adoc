@@ -43,7 +43,7 @@ participant browser
 box Site
 participant "/.../login" as login
 participant "/.../callback" as callback
-database XT
+database XTDB
 end box
 
 box "OpenID Provider"
@@ -52,8 +52,8 @@ participant "/token" as token
 End box
 
 browser -> login: GET
-login <- XT: Look up config of\nOpenID Provider
-login -> XT: Create temporary session\ncookie, with state value
+login <- XTDB: Look up config of\nOpenID Provider
+login -> XTDB: Create temporary session\ncookie, with state value
 login -> browser: Set session cookie,\nredirect to /authorize
 note over login: We are asking Alice to authorize Site's access to her details
 browser -> auth: GET /authorize
@@ -62,12 +62,12 @@ user -> browser: Yes please!
 browser -> auth: Yes
 auth -> browser: Redirect to Site with this code
 browser -> callback: Here is the code and state
-callback <- XT: Check state\nvalue matches
+callback <- XTDB: Check state\nvalue matches
 callback -> token: POST code
 token -> callback: ID_TOKEN containing\nAlice's details
-callback -> XT: Find matching identity
-XT -> callback: Matching identity
-callback -> XT: Add identity to session
+callback -> XTDB: Find matching identity
+XTDB -> callback: Matching identity
+callback -> XTDB: Add identity to session
 callback -> browser: Upgrade session cookie
 ....
 

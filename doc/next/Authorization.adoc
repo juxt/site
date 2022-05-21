@@ -71,10 +71,16 @@ First, we'll need to create an action which will create our person entity.
     [permission ::pass/subject subject]]]}
 )
 ----
+
 <1> You can choose any id here but it's a good idea to keep to a convention
+
 <2> Actions are grouped into OAuth2 scopes
+
 <3> Arguments must conform to this schema
-<4> The processing pipeline which transforms arguments into XT transaction operations
+
+<4> The processing pipeline which transforms arguments into XTDB transaction
+operations
+
 <5> An action declares the rules as to who is authorized to invoke it
 ====
 

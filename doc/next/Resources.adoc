@@ -1,28 +1,29 @@
 = Resources
 :toc: left
 
+(((resource,definition)))
 Resources in Site are web resources, as per
 https://httpwg.org/specs/rfc7231.html#resources[RFC 7231].
 
-Resourse are identified by a URI. When resources are stored in XT, the
+Resources are identified by a URI. When resources are stored in XTDB, the
 resource's URI is the `:xt/id` attribute.
 
-A web resource is a series of states across time, just like an XT entity.
+A web resource is a series of states across time, just like an XTDB entity.
 
 In this section we'll create a basic plain-text public resource containing the
 classic greeting.
 
-== Anatomy of a Site resource
+== Document structure of a Site resource
 
-In Site, every XT document represents a web resource. This means that the terms
+In Site, every XTDB document represents a resource. This means that the terms
 resource and document are somewhat synonymous in Site documentation.
 
-In the same way every web resource has a Uniform Resource Identitier (URI),
-every document in the XTDB database has an XT (`:xt/id`) identifier.
+In the same way every resource has a Uniform Resource Identitier (URI), every
+document in the XTDB database has an XTDB (`:xt/id`) identifier.
 
-In this way, exposing data to the web is trivial. There is convoluted logic or
-mappings, it's a simply one-to-one correspondence. All Site does is provide the
-protocol layer to handle HTTP requests.
+In this way, exposing data to the web is trivial. There is no convoluted logic
+or mappings, it's a simple one-to-one correspondence. All Site does is provide
+the protocol layer to handle HTTP requests.
 
 Site uses the request URI to lookup the corresponding XT document, and uses
 certain known attributes of the document to determine the web resource's
@@ -38,15 +39,15 @@ reserved by Site. These always start with `juxt` and there are a handful of
 namespaces which are used, such as `juxt.http`, `juxt.site` and
 `juxt.pass`.
 
-It's important to understand that these XT documents are _your_ documents, with
+It's important to understand that these XTDB documents are _your_ documents, with
 attributes you choose from _your_ domain. The documents are merely augmented
 with additional non-conflicting attributes recognised by Site.
 --
 
-.HTTP protocol mappings to XT document attributes
+.HTTP protocol mappings to XTDB document attributes
 [[http-protocol-mappings]]
 |===
-|Web|XT
+|Web|XTDB
 
 |URI|`:xt/id`
 |Methods|`:juxt.http.alpha/methods`
@@ -65,7 +66,7 @@ with additional non-conflicting attributes recognised by Site.
 |OPTIONS|`:juxt.http.alpha/options`
 |===
 
-XT is to Site what a file-system is to a static web-server, such as Apache.
+XTDB is to Site what a file-system is to a static web-server, such as Apache.
 
 Apache encodes web metadata in the filename. For example, the filename
 `foo.en.html.gz` encodes the language (English), media-type (HTML) and encoding
