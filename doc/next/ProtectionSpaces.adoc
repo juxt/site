@@ -2,4 +2,47 @@
 :toc: left
 :experimental:
 
-TODO
+[quote,RFC 7235]
+--
+The protection space determines the domain over which credentials can be automatically applied.
+--
+
+In HTTP, a protection space governs a set of resources for which requests are
+authenticated.
+
+In Site, if a request arrives with a URI targetting a resource that is in a
+protection space, the request is authenticated according to the configuration
+details held in the document defining the protection space.
+
+If the Action on the resource fails to be authorized, and the request does not
+supply valid credentials, then the request is met with a `401 Unauthorized`
+response, along with a `WWW-Authenticate` header giving details of how to
+authenticate.
+
+If the request does contain valid credentials, yet the Action on the resource is
+still not authorized, then a `403 Forbidden` response is returned.
+
+[CAUTION]
+--
+
+Being in a protection space does not imply that a resource cannot still be
+publically accessible without credentials. It just means that any credentials in
+the request may be used when deciding if the Action corresponding to the
+request's method can be authorized. This is why a 401 response status is
+described as `Unauthorized` rather than `Unauthenticated`.
+
+Don't rely on a protection space providing protection for your resource. You
+still need to write rules for how your Actions will be authorized.
+--
+
+[quote,RFC 7235]
+--
+A protection space is defined by the canonical root URI of the server being
+accessed, in combination with the realm value if present.
+--
+
+Usually, a protection space is defined across a 'canonical root URI'.
+
+== Creating a protection space
+
+NOTE: TODO
