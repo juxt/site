@@ -44,7 +44,7 @@ subject is not nil.
 [source,clojure]
 .Creating the `get-protected-resource` action
 ----
-include::../../test/juxt/book.clj[tag=create-action-get-protected-resource,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-get-protected-resource!,indent=0]
 ----
 
 [IMPORTANT]

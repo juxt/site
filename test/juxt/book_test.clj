@@ -56,8 +56,6 @@
 (defn encode-basic-authorization [user password]
   (format "Basic %s" (String. (.encode (java.util.Base64/getEncoder) (.getBytes (format "%s:%s" user password))))))
 
-;; TODO: Test for www-authenticate header
-
 (deftest protected-resource-with-http-basic-auth-test
   (book/preliminaries!)
   (book/setup-protected-resource!)

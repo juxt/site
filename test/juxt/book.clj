@@ -371,12 +371,259 @@
   ;; end::create-hello-world-resource![]
   )
 
+
+;; Representations
+
+(defn book-create-hello-world-html-representation! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     ;; tag::create-hello-world-html-representation![]
+     (do-action
+      "https://site.test/subjects/repl-default"
+      "https://site.test/actions/put-immutable-public-resource"
+      {:xt/id "https://site.test/hello.html" ; <1>
+       :juxt.http.alpha/content-type "text/html;charset=utf-8" ; <2>
+       :juxt.http.alpha/content "<h1>Hello World!</h1>\r\n" ; <3>
+       :juxt.site.alpha/variant-of "https://site.test/hello" ; <4>
+       })
+     ;; end::create-hello-world-html-representation![]
+     ))))
+
+
+;; Templating
+
+(defn book-create-put-template-action! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     ;; tag::create-put-template-action![]
+     (do-action
+      "https://site.test/subjects/repl-default"
+      "https://site.test/actions/create-action"
+      {:xt/id "https://site.test/actions/put-template"
+       :juxt.pass.alpha/scope "write:resource"
+
+       :juxt.pass.alpha.malli/args-schema
+       [:tuple
+        [:map
+         [:xt/id [:re "https://site.test/templates/.*"]]]]
+
+       :juxt.pass.alpha/process
+       [
+        [:juxt.pass.alpha.process/update-in
+         [0] 'merge
+         {::http/methods {}}]
+        [:juxt.pass.alpha.malli/validate]
+        [:xtdb.api/put]]
+
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? permission subject action resource)
+          [permission :juxt.pass.alpha/user-identity i]
+          [subject :juxt.pass.alpha/user-identity i]]]})
+     ;; end::create-put-template-action![]
+     ))))
+
+(defn book-grant-permission-to-invoke-action-put-template! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     ;; tag::grant-permission-to-invoke-action-put-template![]
+     (do-action
+      "https://site.test/subjects/repl-default"
+      "https://site.test/actions/grant-permission"
+      {:xt/id "https://site.test/permissions/alice/put-template"
+       :juxt.pass.alpha/user "https://site.test/users/alice"
+       :juxt.pass.alpha/action #{"https://site.test/actions/put-template"}
+       :juxt.pass.alpha/purpose nil})
+     ;; end::grant-permission-to-invoke-action-put-template![]
+     ))))
+
+(defn book-create-hello-world-html-template! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     ;; tag::create-hello-world-html-template![]
+     (do-action
+      "https://site.test/subjects/repl-default"
+      "https://site.test/actions/put-template"
+      {:xt/id "https://site.test/templates/hello.html"
+       :juxt.http.alpha/content-type "text/html;charset=utf-8"
+       :juxt.http.alpha/content "<h1>Hello {audience}!</h1>\r\n"})
+     ;; end::create-hello-world-html-template![]
+     ))))
+
+(defn book-create-hello-world-with-html-template! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     ;; tag::create-hello-world-with-html-template![]
+     (do-action
+      "https://site.test/subjects/repl-default"
+      "https://site.test/actions/put-immutable-public-resource"
+      {:xt/id "https://site.test/hello-with-template.html"
+       :juxt.site.alpha/template "https://site.test/templates/hello.html"
+       })
+     ;; end::create-hello-world-with-html-template![]
+     ))))
+
 ;; Protection Spaces
 
+(defn book-create-action-put-protection-space! []
+  ;; tag::create-action-put-protection-space![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-protection-space"
+    :juxt.pass.alpha/scope "write:admin"
 
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/applications/(.+)"]]
+      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/protection-space"]]
+      [:juxt.pass.alpha/canonical-root-uri [:re "https?://[^/]*"]]
+      [:juxt.pass.alpha/realm {:optional true} [:string {:min 1}]]
+      [:juxt.pass.alpha/auth-scheme [:enum "Basic" "Bearer"]]
+      [:juxt.pass.alpha/authentication-scope [:string {:min 1}]]]]
 
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0]
+      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/protection-space"}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
 
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]
+       [permission :juxt.site.alpha/uri resource]]]})
+  ;; end::create-action-put-protection-space![]
+  )
 
+(defn book-grant-permission-to-put-protection-space! []
+  ;; tag::grant-permission-to-put-protection-space![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/administrators/put-protection-space"
+    :role "Administrator"
+    :juxt.pass.alpha/action "https://site.test/actions/put-protection-space"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-put-protection-space![]
+  )
+
+;; Basic Auth
+
+(defn book-put-basic-protection-space! []
+  (do-action
+   )
+  (put! {:xt/id "https://site.test/protection-spaces/wonderland"
+         :juxt.site.alpha/type "https://meta.juxt.site/pass/protection-space"
+
+         :juxt.pass.alpha/canonical-root-uri "https://site.test"
+         :juxt.pass.alpha/realm "Wonderland" ; optional
+
+         :juxt.pass.alpha/auth-scheme "Basic"
+         :juxt.pass.alpha/authentication-scope "/protected/.*" ; regex pattern
+         }))
+
+;; Protecting Resources
+
+(defn book-create-action-put-immutable-protected-resource! []
+  ;; tag::create-action-put-immutable-protected-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-immutable-protected-resource"
+    :juxt.pass.alpha/scope "write:resource"
+
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/.*"]]]]
+
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in
+      [0] 'merge
+      {:juxt.http.alpha/methods
+       {:get {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
+        :head {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
+        :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
+
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :role role]
+       [user :role role]]]})
+  ;; end::create-action-put-immutable-protected-resource![]
+  )
+
+(defn book-grant-permission-to-put-immutable-protected-resource! []
+  ;; tag::grant-permission-to-put-immutable-protected-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/administrators/put-immutable-protected-resource"
+    :role "Administrator"
+    :juxt.pass.alpha/action "https://site.test/actions/put-immutable-protected-resource"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-put-immutable-protected-resource![]
+  )
+
+(defn book-create-action-get-protected-resource! []
+  ;; tag::create-action-get-protected-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/get-protected-resource"
+    :juxt.pass.alpha/scope "read:resource"
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]
+       [permission :juxt.site.alpha/uri resource]]]})
+  ;; end::create-action-get-protected-resource![]
+  )
+
+(defn book-create-immutable-protected-resource! []
+  ;; tag::create-immutable-protected-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-immutable-protected-resource"
+   {:xt/id "https://site.test/protected/document.html"
+    :juxt.http.alpha/content-type "text/html;charset=utf-8"
+    :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"
+    })
+  ;; end::create-immutable-protected-resource![]
+  )
+
+(defn book-grant-permission-to-get-protected-resource! []
+  ;; tag::grant-permission-to-get-protected-resource![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/alice/protected-html"
+    :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
+    :juxt.pass.alpha/user "https://site.test/users/alice"
+    :juxt.site.alpha/uri "https://site.test/protected/document.html"
+    :juxt.pass.alpha/purpose nil
+    })
+  ;; end::grant-permission-to-get-protected-resource![]
+  )
 
 ;; Applications
 
@@ -506,211 +753,6 @@
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-issue-access-token![]
   )
-
-
-
-
-(defn book-create-hello-world-html-representation! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-hello-world-html-representation![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/put-immutable-public-resource"
-      {:xt/id "https://site.test/hello.html" ; <1>
-       :juxt.http.alpha/content-type "text/html;charset=utf-8" ; <2>
-       :juxt.http.alpha/content "<h1>Hello World!</h1>\r\n" ; <3>
-       :juxt.site.alpha/variant-of "https://site.test/hello" ; <4>
-       })
-     ;; end::create-hello-world-html-representation![]
-     ))))
-
-
-;; Templating
-
-(defn book-create-put-template-action! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-put-template-action![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/put-template"
-       :juxt.pass.alpha/scope "write:resource"
-
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/templates/.*"]]]]
-
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in
-         [0] 'merge
-         {::http/methods {}}]
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]]
-
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? permission subject action resource)
-          [permission :juxt.pass.alpha/user-identity i]
-          [subject :juxt.pass.alpha/user-identity i]]]})
-     ;; end::create-put-template-action![]
-     ))))
-
-(defn book-grant-permission-to-invoke-action-put-template! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-invoke-action-put-template![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/grant-permission"
-      {:xt/id "https://site.test/permissions/alice/put-template"
-       :juxt.pass.alpha/user "https://site.test/users/alice"
-       :juxt.pass.alpha/action #{"https://site.test/actions/put-template"}
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-invoke-action-put-template![]
-     ))))
-
-(defn book-create-hello-world-html-template! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-hello-world-html-template![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/put-template"
-      {:xt/id "https://site.test/templates/hello.html"
-       :juxt.http.alpha/content-type "text/html;charset=utf-8"
-       :juxt.http.alpha/content "<h1>Hello {audience}!</h1>\r\n"})
-     ;; end::create-hello-world-html-template![]
-     ))))
-
-(defn book-create-hello-world-with-html-template! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-hello-world-with-html-template![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/put-immutable-public-resource"
-      {:xt/id "https://site.test/hello-with-template.html"
-       :juxt.site.alpha/template "https://site.test/templates/hello.html"
-       })
-     ;; end::create-hello-world-with-html-template![]
-     ))))
-
-;; Protecting Resources
-
-(defn book-create-action-put-immutable-protected-resource! []
-  ;; tag::create-action-put-immutable-protected-resource![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/put-immutable-protected-resource"
-    :juxt.pass.alpha/scope "write:resource"
-
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/.*"]]]]
-
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in
-      [0] 'merge
-      {:juxt.http.alpha/methods
-       {:get {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
-        :head {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
-        :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
-
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
-
-    :juxt.pass.alpha/rules
-    '[
-      [(allowed? permission subject action resource)
-       [subject :juxt.pass.alpha/user-identity id]
-       [id :juxt.pass.alpha/user user]
-       [permission :role role]
-       [user :role role]]]})
-  ;; end::create-action-put-immutable-protected-resource![]
-  )
-
-(defn book-grant-permission-to-put-immutable-protected-resource! []
-  ;; tag::grant-permission-to-put-immutable-protected-resource![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-immutable-protected-resource"
-    :role "Administrator"
-    :juxt.pass.alpha/action "https://site.test/actions/put-immutable-protected-resource"
-    :juxt.pass.alpha/purpose nil})
-  ;; end::grant-permission-to-put-immutable-protected-resource![]
-  )
-
-(defn book-create-action-get-protected-resource! []
-  ;; tag::create-action-get-protected-resource[]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/get-protected-resource"
-    :juxt.pass.alpha/scope "read:resource"
-
-    :juxt.pass.alpha/rules
-    '[
-      [(allowed? permission subject action resource)
-       [subject :juxt.pass.alpha/user-identity id]
-       [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]
-       [permission :juxt.site.alpha/uri resource]]]})
-  ;; end::create-action-get-protected-resource[]
-  )
-
-(defn book-create-immutable-protected-resource! []
-  ;; tag::create-immutable-protected-resource![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-immutable-protected-resource"
-   {:xt/id "https://site.test/protected/document.html"
-    :juxt.http.alpha/content-type "text/html;charset=utf-8"
-    :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"
-    })
-  ;; end::create-immutable-protected-resource![]
-  )
-
-(defn book-grant-permission-to-get-protected-resource! []
-  ;; tag::grant-permission-to-get-protected-resource![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/alice/protected-html"
-    :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
-    :juxt.pass.alpha/user "https://site.test/users/alice"
-    :juxt.site.alpha/uri "https://site.test/protected/document.html"
-    :juxt.pass.alpha/purpose nil
-    })
-  ;; end::grant-permission-to-get-protected-resource![]
-  )
-
-;; Protection Spaces
-
-(defn book-put-basic-protection-space! []
-  ;; TODO: This should be rewritten with an action
-  ;; TODO: Splice this into the book
-  (put! {:xt/id "https://site.test/protection-spaces/wonderland"
-         :juxt.site.alpha/type "https://meta.juxt.site/pass/protection-space"
-
-         :juxt.pass.alpha/canonical-root-uri "https://site.test"
-         :juxt.pass.alpha/realm "Wonderland" ; optional
-
-         :juxt.pass.alpha/auth-scheme "Basic"
-         :juxt.pass.alpha/authentication-scope "/protected/.*" ; regex pattern
-         }))
 
 ;; First Application
 

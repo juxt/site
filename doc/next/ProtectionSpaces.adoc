@@ -7,10 +7,11 @@
 The protection space determines the domain over which credentials can be automatically applied.
 --
 
+(((protection space,definition)))
 In HTTP, a protection space governs a set of resources for which requests are
 authenticated.
 
-In Site, if a request arrives with a URI targetting a resource that is in a
+In Site, if a request arrives with a URI targeting a resource that is in a
 protection space, the request is authenticated according to the configuration
 details held in the document defining the protection space.
 
@@ -22,17 +23,21 @@ authenticate.
 If the request does contain valid credentials, yet the Action on the resource is
 still not authorized, then a `403 Forbidden` response is returned.
 
+Being in a protection space does not imply that a resource cannot still be
+publically accessible without credentials. It only means that any credentials in
+the request might be used when deciding if the Action corresponding to the
+request's method can be authorized.
+
+_This is why a 401 response status is labelled `Unauthorized` rather than
+`Unauthenticated`._
+
+It's possible that a resource might have a representation for unauthenticated
+users, perhaps with protected information removed.
+
 [CAUTION]
 --
-
-Being in a protection space does not imply that a resource cannot still be
-publically accessible without credentials. It just means that any credentials in
-the request may be used when deciding if the Action corresponding to the
-request's method can be authorized. This is why a 401 response status is
-described as `Unauthorized` rather than `Unauthenticated`.
-
-Don't rely on a protection space providing protection for your resource. You
-still need to write rules for how your Actions will be authorized.
+Do not rely on a protection space providing protection for your resource. You
+still need to write rules for how your Actions will be authorized!
 --
 
 [quote,RFC 7235]
@@ -41,8 +46,41 @@ A protection space is defined by the canonical root URI of the server being
 accessed, in combination with the realm value if present.
 --
 
-Usually, a protection space is defined across a 'canonical root URI'.
+Usually, a protection space is defined across a whole site. In most cases, only
+one protection space will be created. But in some cases, you might want to
+create a separate protection space for each root URI
+(e.g. `+https://example.com+`, `+https://example.org+`) you are hosting. In rare
+cases you may even want to partition a root URI into multiple protection spaces,
+and that's possible too, using a different realm value for each partition.
 
-== Creating a protection space
+== Creating protection spaces
 
-NOTE: TODO
+(((protection space,creating)))
+An Action is required to create a protection space. If one is not already set up
+we can create it one, as shown in <<ex-create-action-put-protection-space>>.
+
+[[ex-create-action-put-protection-space]]
+.Creating the Action to establish a Protection Space
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=create-action-put-protection-space!,indent=0]
+----
+
+[IMPORTANT]
+--
+Do it
+--
+
+We'll grant this permission to our REPL user.
+
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=grant-permission-to-put-protection-space!,indent=0]
+----
+
+[IMPORTANT]
+--
+Do it
+--
+====
