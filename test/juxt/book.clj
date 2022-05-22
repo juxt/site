@@ -521,16 +521,16 @@
 
 (defn book-put-basic-protection-space! []
   (do-action
-   )
-  (put! {:xt/id "https://site.test/protection-spaces/wonderland"
-         :juxt.site.alpha/type "https://meta.juxt.site/pass/protection-space"
+   "https://site.test/subjects/repl-default"
+   "https://site.test/permissions/administrators/put-protection-space"
+   {:xt/id "https://site.test/protection-spaces/wonderland"
 
-         :juxt.pass.alpha/canonical-root-uri "https://site.test"
-         :juxt.pass.alpha/realm "Wonderland" ; optional
+    :juxt.pass.alpha/canonical-root-uri "https://site.test"
+    :juxt.pass.alpha/realm "Wonderland" ; optional
 
-         :juxt.pass.alpha/auth-scheme "Basic"
-         :juxt.pass.alpha/authentication-scope "/protected/.*" ; regex pattern
-         }))
+    :juxt.pass.alpha/auth-scheme "Basic"
+    :juxt.pass.alpha/authentication-scope "/protected/.*" ; regex pattern
+    }))
 
 ;; Protecting Resources
 

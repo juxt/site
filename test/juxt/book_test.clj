@@ -60,6 +60,8 @@
   (book/preliminaries!)
   (book/setup-protected-resource!)
   (book/book-put-basic-auth-user-identity!)
+  (book/book-create-action-put-protection-space!)
+  (book/book-grant-permission-to-put-protection-space!)
   (book/book-put-basic-protection-space!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected/document.html"))
