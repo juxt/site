@@ -481,7 +481,7 @@
     :juxt.pass.alpha.malli/args-schema
     [:tuple
      [:map
-      [:xt/id [:re "https://site.test/applications/(.+)"]]
+      [:xt/id [:re "https://site.test/protection-spaces/(.+)"]]
       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/protection-space"]]
       [:juxt.pass.alpha/canonical-root-uri [:re "https?://[^/]*"]]
       [:juxt.pass.alpha/realm {:optional true} [:string {:min 1}]]
@@ -500,8 +500,8 @@
       [(allowed? permission subject action resource)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]
-       [permission :juxt.site.alpha/uri resource]]]})
+       [permission :role role]
+       [user :role role]]]})
   ;; end::create-action-put-protection-space![]
   )
 
@@ -522,7 +522,7 @@
 (defn book-put-basic-protection-space! []
   (do-action
    "https://site.test/subjects/repl-default"
-   "https://site.test/permissions/administrators/put-protection-space"
+   "https://site.test/actions/put-protection-space"
    {:xt/id "https://site.test/protection-spaces/wonderland"
 
     :juxt.pass.alpha/canonical-root-uri "https://site.test"
@@ -711,6 +711,8 @@
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-authorize-application![]
   )
+
+;;(defn book-create-resource)
 
 (defn book-create-action-issue-access-token! []
   ;; tag::create-action-issue-access-token![]
@@ -949,7 +951,8 @@
   )
 
 (defn protection-spaces-preliminaries! []
-
+  (book-create-action-put-protection-space!)
+  (book-grant-permission-to-put-protection-space!)
   )
 
 (defn setup-protected-resource! []
@@ -964,6 +967,7 @@
   (book-grant-permission-to-invoke-action-put-application!!)
   (book-create-action-authorize-application!)
   (book-grant-permission-to-invoke-action-authorize-application!)
+
   (book-create-action-issue-access-token!)
   (book-grant-permission-to-invoke-action-issue-access-token!))
 

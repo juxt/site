@@ -117,7 +117,10 @@
                    (assoc
                     request
                     :ring.request/headers
-                    {"authorization" "Bearer not-test-access-token"}))))))))
+                    {"authorization" "Bearer not-test-access-token"})))))
+      ;; Test WWW-Authenticate header and realm
+
+      )))
 
 (deftest not-found-test
   (book/preliminaries!)
