@@ -143,8 +143,11 @@
      xt-node
      (into
       {:xt/id (str base-uri "/_site/graphql/requests/operations.graphql")
-       ::http/methods {:get {} :head {} :post {} :options {}}
-       ::http/acceptable-on-post {"accept" "application/x-www-form-urlencoded"}
+       ::site/methods
+       {:get {}
+        :head {}
+        :post {::site/acceptable {"accept" "application/x-www-form-urlencoded"}}
+        :options {}}
        ::site/graphql-schema schema-id
        ::site/post-fn 'juxt.site.alpha.graphql/stored-document-post-handler}
       (graphql/stored-document-resource-map

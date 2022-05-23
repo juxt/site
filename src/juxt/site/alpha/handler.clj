@@ -107,10 +107,7 @@
       ;; and POST
 
       (when-let [acceptable
-                 (get resource
-                      (case method
-                        :put ::http/acceptable-on-put
-                        :post ::http/acceptable-on-post))]
+                 (get-in resource [::site/methods method ::site/acceptable])]
 
         (let [prefs (headers->decoded-preferences acceptable)
               request-rep (rate-representation prefs decoded-representation)]
