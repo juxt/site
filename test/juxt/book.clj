@@ -625,6 +625,19 @@
   ;; end::grant-permission-to-get-protected-resource![]
   )
 
+;; Authorization Server
+
+(defn book-install-authorization-server! []
+  ;; tag::install-authorization-server![]
+  (put! {:xt/id "https://auth.site.test/oauth/authorize"
+         :juxt.http.alpha/methods
+         ;; TODO: Is now the time to allow get-fn?
+         {:get {}}})
+  ;; end::install-authorization-server![]
+)
+
+;; TODO: Put Authorization Server in a protection space
+
 ;; Applications
 
 (defn book-create-action-put-application! []
