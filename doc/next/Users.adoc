@@ -6,7 +6,7 @@ Users are individuals with access to Site.
 
 == User documents
 
-(((user, document structure)))
+(((User, document structure)))
 A User is a database document, with the `juxt.site.alpha/type` attribute value
 set to "+https://meta.juxt.site/pass/user+", as detailed in
 <<user-doc-structure>>.
@@ -59,16 +59,16 @@ Actions.
 
 == User Identities
 
-(((user identity, definition)))
-An Identity contains information that can uniquely identify a User, such as the
+(((User Identity, description)))
+A User Identity contains information that can uniquely identify a User, such as the
 user's login credentials, company-wide username, email address, Twitter handle
 or a reference to an external identity issued by another authority.
 
-(((user identity, document structure)))
+(((User Identity, document structure)))
 An Identity always references a *User*, with the `juxt.pass.alpha/user`
 attribute, as detailed in <<identity-doc-structure>>.
 
-.Document structure of an Identity
+.Document structure of a User Identity
 [[identity-doc-structure]]
 [%header,cols="2l,3d,1"]
 |===
@@ -79,7 +79,7 @@ attribute, as detailed in <<identity-doc-structure>>.
 s|Required
 
 |:juxt.site.alpha/type
-l|"https://meta.juxt.site/pass/identity"
+l|"https://meta.juxt.site/pass/user-identity"
 s|Required
 
 |:juxt.pass.alpha/user
@@ -117,13 +117,13 @@ include::../../test/juxt/book.clj[tag=install-user-identity!,indent=0]
 
 == Subjects
 
-(((subject, definition)))
+(((Subject, description)))
 In Site, a *Subject* is a database document automatically created when the user
 authenticates and represents a *user login*. This document has the
 `juxt.site.alpha/type` attribute value set to
 "+https://meta.juxt.site/pass/subject+".
 
-(((subject, relationship to user identity)))
+(((Subject, relationship to user identity)))
 A Subject always references an *Identity*, with the `juxt.pass.alpha/identity`
 attribute.
 
@@ -135,7 +135,7 @@ include information such as:
 * The number and type of authentication factors which were used
 * Whether the user's claimed email address has been verified
 
-(((user identity, document structure)))
+(((Subject, document structure)))
 <<subject-doc-structure>> lists some recognised attributes of a Subject.
 
 .Document structure of a Subject
