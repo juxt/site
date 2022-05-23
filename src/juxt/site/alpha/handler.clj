@@ -236,8 +236,6 @@
 
     (into req {:ring.response/status (if existing 204 201)})))
 
-;; TODO: When this works, repeat for PUT
-
 (defn POST [{::site/keys [resource request-id] :as req}]
   (let [rep (->
              (receive-representation req)
