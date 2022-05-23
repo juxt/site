@@ -168,19 +168,25 @@
         {::site/template-dialect (::site/template-dialect template)
          ::site/request-context (assoc req :ring.response/status 500)})))))
 
-(defn ^:deprecated add-payload [{::site/keys [selected-representation db] :as req}]
-  (let [{::http/keys [body content] ::site/keys [get-fn body-fn]} selected-representation
-        template (some->> selected-representation ::site/template (xt/entity db))]
+(defn add-payload [{::site/keys [selected-representation db]
+                    :ring.request/keys [method]
+                    :as req}]
+  ;; Should not be called if method is HEAD
+  (assert (not= method :head))
+
+  (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
+        template (some->> selected-representation ::site/template (xt/entity db))
+        custom-handler (get-in req [::site/methods method ::site/handler])]
     (cond
-      get-fn
-      (if-let [f (cond-> get-fn (symbol? get-fn) requiring-resolve)]
+      custom-handler
+      (if-let [f (cond-> custom-handler (symbol? custom-handler) requiring-resolve)]
         (do
-          (log/debugf "Calling get-fn: %s %s" get-fn (type get-fn))
+          (log/debugf "Calling custom-handler: %s %s" custom-handler (type custom-handler))
           (f req))
         (throw
          (ex-info
-          (format "get-fn cannot be resolved: %s" body-fn)
-          {:get-fn get-fn
+          (format "custom-handler cannot be resolved: %s" body-fn)
+          {:custom-handler custom-handler
            ::site/request-context (assoc req :ring.response/status 500)})))
 
       body-fn

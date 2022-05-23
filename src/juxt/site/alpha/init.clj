@@ -598,18 +598,15 @@
           (put-immutable-public-resource
            {:xt/id login
             :juxt.http.alpha/content-type "text/plain"
-            :juxt.site.alpha/get-fn 'juxt.pass.alpha.openid-connect/login
+            :juxt.site.alpha/methods {:get {:handler 'juxt.pass.alpha.openid-connect/login}}
             :juxt.pass.alpha/oauth-client client})
 
           callback
           (put-immutable-public-resource
            {:xt/id callback
             :juxt.http.alpha/content-type "text/plain"
-            :juxt.site.alpha/get-fn 'juxt.pass.alpha.openid-connect/callback
+            :juxt.site.alpha/methods {:get {:handler 'juxt.pass.alpha.openid-connect/callback}}
             :juxt.pass.alpha/oauth-client client})
           ]
       {:login-uri (get-in login [::pass/puts 0])
-       :callback-uri (get-in callback [::pass/puts 0])})
-
-
-    ))
+       :callback-uri (get-in callback [::pass/puts 0])})))
