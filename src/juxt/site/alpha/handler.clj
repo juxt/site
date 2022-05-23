@@ -390,7 +390,7 @@
             [[:xtdb.api/put
               {:xt/id uri
                ::dave/resource-type :collection
-               ::http/methods {:get {} :head {} :options {} :propfind {}}
+               ::site/methods {:get {} :head {} :options {} :propfind {}}
                ::http/content-type "text/html;charset=utf-8"
                ::http/content "<h1>Index</h1>\r\n"
                ::http/options {"DAV" "1"}}]])]
@@ -535,7 +535,7 @@
         :ring.request/keys [method]
         :as req}]
 
-    (let [actions (get-in resource [::http/methods method ::pass/actions])
+    (let [actions (get-in resource [::site/methods method ::pass/actions])
           permissions
           (authz/check-permissions
            db
@@ -574,12 +574,12 @@
 
 (defn wrap-method-not-allowed? [h]
   (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
-    (when-not (map? (::http/methods resource))
-      (throw (ex-info "Resource :juxt.http.alpha/methods must be a map"
+    (when-not (map? (::site/methods resource))
+      (throw (ex-info "Resource :juxt.site.alpha/methods must be a map"
                       {:resource resource
                        ::site/request-context req})))
     (if resource
-      (let [allowed-methods (set (keys (::http/methods resource)))]
+      (let [allowed-methods (set (keys (::site/methods resource)))]
         (when-not (contains? allowed-methods method)
           (throw
            (ex-info

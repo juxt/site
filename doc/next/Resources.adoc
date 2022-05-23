@@ -50,7 +50,7 @@ with additional non-conflicting attributes recognised by Site.
 |Web|XTDB
 
 |URI|`:xt/id`
-|Methods|`:juxt.http.alpha/methods`
+|Methods|`:juxt.site.alpha/methods`
 |Representations|`:juxt.site.alpha/variant-of`
 |Body|`:juxt.http.alpha/body`, `:juxt.http.alpha/content`
 |Content Type|`:juxt.http.alpha/content-type`
@@ -84,7 +84,7 @@ Site attributes.
 === Methods
 
 (((web methods)))
-The `:juxt.http.alpha/methods` attribute value is a map of entries, one for each
+The `:juxt.site.alpha/methods` attribute value is a map of entries, one for each
 web method.
 
 The value of each entry is another map, which contains configuration data for
@@ -107,14 +107,14 @@ be used when seeking permission.
 In effect, this allows the resource to indicate which rules are to be used in
 determining whether a user can access the resource.
 
-<<ex-http-methods>> shows an example of a `:juxt.http.alpha/methods` entry.
+<<ex-http-methods>> shows an example of a `:juxt.site.alpha/methods` entry.
 
 [[ex-http-methods]]
-.A `:juxt.http.alpha/methods` entry
+.A `:juxt.site.alpha/methods` entry
 ====
 [source,clojure]
 ----
-{:juxt.http.alpha/methods
+{:juxt.site.alpha/methods
   {:get
     {:juxt.pass.alpha/actions
       #{"https://site.test/actions/get-shopping-list"}}

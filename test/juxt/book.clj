@@ -160,7 +160,7 @@
     [
      [:juxt.pass.alpha.process/update-in [0]
       'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/user" ; <3>
-              :juxt.http.alpha/methods ; <4>
+              :juxt.site.alpha/methods ; <4>
               {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user"}}
                :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user"}}
                :options {}}}]
@@ -210,7 +210,7 @@
      [:juxt.pass.alpha.process/update-in
       [0] 'merge
       {:juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"
-       :juxt.http.alpha/methods
+       :juxt.site.alpha/methods
        {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
         :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
         :options {}}}]
@@ -303,7 +303,7 @@
     [
      [:juxt.pass.alpha.process/update-in
       [0] 'merge
-      {::http/methods                 ; <2>
+      {:juxt.site.alpha/methods ; <2>
        {:get {::pass/actions #{"https://site.test/actions/get-public-resource"}}
         :head {::pass/actions #{"https://site.test/actions/get-public-resource"}}
         :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
@@ -413,7 +413,7 @@
        [
         [:juxt.pass.alpha.process/update-in
          [0] 'merge
-         {::http/methods {}}]
+         {:juxt.site.alpha/methods {}}]
         [:juxt.pass.alpha.malli/validate]
         [:xtdb.api/put]]
 
@@ -551,7 +551,7 @@
     [
      [:juxt.pass.alpha.process/update-in
       [0] 'merge
-      {:juxt.http.alpha/methods
+      {:juxt.site.alpha/methods
        {:get {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
         :head {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
         :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
@@ -630,7 +630,7 @@
 (defn book-install-authorization-server! []
   ;; tag::install-authorization-server![]
   (put! {:xt/id "https://auth.site.test/oauth/authorize"
-         :juxt.http.alpha/methods
+         :juxt.site.alpha/methods
          ;; TODO: Is now the time to allow get-fn?
          {:get {}}})
   ;; end::install-authorization-server![]
@@ -933,7 +933,7 @@
 
   (put!
    {:xt/id "urn:site:resources:not-found"
-    ::http/methods
+    :juxt.site.alpha/methods
     {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}}}))
 
 ;; Complete all tasks thus far directed by the book

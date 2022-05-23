@@ -164,7 +164,7 @@
       ;; unify on the subject's user and the resource's owner.
       :owner (format "https://site.test/users/%s" user)
       ::site/uri-template true
-      ::http/methods
+      ::site/methods
       {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}
        :put {::pass/actions #{"https://site.test/actions/put-user-owned-content"}}}}))
 
