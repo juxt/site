@@ -632,7 +632,7 @@
   (put! {:xt/id "https://auth.site.test/oauth/authorize"
          :juxt.site.alpha/methods
          ;; TODO: Is now the time to allow get-fn?
-         {:get {}}})
+         {:get {:juxt.site.alpha/handler 'juxt.pass.alpha.authorization-server/authorize}}})
   ;; end::install-authorization-server![]
 )
 
