@@ -168,7 +168,7 @@
         {::site/template-dialect (::site/template-dialect template)
          ::site/request-context (assoc req :ring.response/status 500)})))))
 
-(defn add-payload [{::site/keys [selected-representation db] :as req}]
+(defn ^:deprecated add-payload [{::site/keys [selected-representation db] :as req}]
   (let [{::http/keys [body content] ::site/keys [get-fn body-fn]} selected-representation
         template (some->> selected-representation ::site/template (xt/entity db))]
     (cond
