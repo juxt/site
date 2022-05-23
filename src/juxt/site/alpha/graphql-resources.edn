@@ -5,8 +5,8 @@
  :juxt.site.alpha/methods
  {:get {}
   :head {}
-  :post {:juxt.site.alpha/acceptable "application/json"}
-  :put {:juxt.site.alpha/acceptable "application/graphql"}
+  :post {:juxt.site.alpha/acceptable {"accept" "application/json"}}
+  :put {:juxt.site.alpha/acceptable {"accept" "application/graphql"}}
   :options {}}
 
  :juxt.site.alpha/access-control-allow-origins
