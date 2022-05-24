@@ -77,10 +77,17 @@ layer between users and data.
 Most authorization rules refer to the Subject of the request. To identify the
 Subject, we need to authenticate each request.
 
-This part contains all the information you need to authenticate users.
+Site supports two options for authenticating users:
 
-[[ch-protection-spaces]]
-include::ProtectionSpaces.adoc[leveloffset=+1]
+* HTTP Authentication, as described in https://www.rfc-editor.org/rfc/rfc7235[RFC 7235], which we describe in <<ch-http-authentication>>.
+
+* Cookie-based authentication, which we describe in <<ch-cookie-authentication>>.
+
+[[ch-http-authentication]]
+include::HttpAuthentication.adoc[leveloffset=+1]
+
+[[ch-cookie-authentication]]
+include::CookieAuthentication.adoc[leveloffset=+1]
 
 include::ProtectingResources.adoc[leveloffset=+1]
 

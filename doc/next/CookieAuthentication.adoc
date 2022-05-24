@@ -1,0 +1,10 @@
+= Cookie Authentication
+:toc: left
+:experimental:
+
+== Introduction
+
+Most websites authenticate with cookies.
+
+Mention JWT and Sessions - mention that Site chooses Sessions identifiers over
+JWTs (for now). JWTs may be supported in the future.
