@@ -21,9 +21,13 @@ Since the relationship between the authorization server and resource server in
 OAuth2 is undefined, Site is able to fulfill the role of an authorization server
 as well as a resource server.
 
-== Configuring the Authorization Server
+[quote,draft-ietf-oauth-v2-1-05,https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05#section-1.3.3]
+____
+The authorization server
+may be the same server as the resource server…
+____
 
-TODO: Do a put of an authorization server with a get-fn
+== Configuring the Authorization Server
 
 NOTE: TODO: If this is written as an action, much of it can be defaulted leaving
 the user to decide the URI and other optional details, perhaps such as which
@@ -34,4 +38,5 @@ types of authorization grant to support.
 include::../../test/juxt/book.clj[tag=install-authorization-server!,indent=0]
 ----
 
-NOTE: TODO
+NOTE: TODO: Add a protection space so that we can authenticate the user. We may
+as well use the OpenID one that we configured in <<ch-openid>>.

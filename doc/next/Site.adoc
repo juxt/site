@@ -86,34 +86,24 @@ include::ProtectingResources.adoc[leveloffset=+1]
 
 include::BasicAuthentication.adoc[leveloffset=+1]
 
+[[ch-openid]]
 include::AuthenticationWithOpenID.adoc[leveloffset=+1]
 
 = Applications and APIs
 
-[NOTE]
---
-In OAuth, Applications are created and authorized by an authorization
-server. The actions described in this chapter could be part of another Site
-instance which carries out the duties of an OAuth Authorization Server.
 
-[quote,https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05#section-1.3.3]
-____
-The authorization server
-may be the same server as the resource server…
-____
-
---
+First, in <<ch-applications>>, we introduce Applications and create the required
+Actions.
 
 We start by configuring our Authorization Server in <<ch-authorization-server>>.
 
-Then, in <<ch-applications>>, we create Applications registered against the Authorization Server that it
-can authorize.
-
-[[ch-authorization-server]]
-include::AuthorizationServer.adoc[leveloffset=+1]
+Then, in <<ch-first-application>>, we create an example Application.
 
 [[ch-applications]]
 include::Applications.adoc[leveloffset=+1]
+
+[[ch-authorization-server]]
+include::AuthorizationServer.adoc[leveloffset=+1]
 
 [[ch-first-application]]
 include::FirstApplication.adoc[leveloffset=+1]
