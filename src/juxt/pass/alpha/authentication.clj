@@ -100,7 +100,7 @@
         (update :ring.response/headers assoc "Cache-Control" "no-store"))))
 
 ;; Deprecated until reinstated with subjects from the database
-(defn lookup-user
+#_(defn lookup-user
   "Return a vector of user, pwhash"
   [db username]
   (when-not (re-matches #"[\p{Alnum}-_]+" username)
