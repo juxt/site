@@ -625,19 +625,6 @@
   ;; end::grant-permission-to-get-protected-resource![]
   )
 
-;; Authorization Server
-
-(defn book-install-authorization-server! []
-  ;; tag::install-authorization-server![]
-  (put! {:xt/id "https://auth.site.test/oauth/authorize"
-         :juxt.site.alpha/methods
-         ;; TODO: Is now the time to allow get-fn?
-         {:get {:juxt.site.alpha/handler 'juxt.pass.alpha.authorization-server/authorize}}})
-  ;; end::install-authorization-server![]
-)
-
-;; TODO: Put Authorization Server in a protection space
-
 ;; Applications
 
 (defn book-create-action-put-application! []
@@ -768,6 +755,32 @@
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-issue-access-token![]
   )
+
+;; Authorization Server
+
+(defn book-install-authorization-server! []
+  ;; tag::install-authorization-server![]
+  (put!
+   {:xt/id "https://auth.site.test/oauth/authorize"
+    :juxt.site.alpha/methods
+    {:get
+     {:juxt.site.alpha/handler 'juxt.pass.alpha.authorization-server/authorize
+      :juxt.pass.alpha/actions #{"https://site.test/actions/authorize-application"}
+
+      ;; Should we create a 'session space' which functions like a protection
+      ;; space?  Like a protection space, it will extract the ::pass/subject
+      ;; from the session and place into the request - see
+      ;; juxt.pass.alpha.session/wrap-associate-session
+
+      :juxt.pass.alpha/session-cookie "id"
+      ;; This will be called with query parameter return-to set to ::site/uri
+      ;; (effective URI) of request
+      :juxt.pass.alpha/redirect-when-no-session-cookie "https://site.test/_site/openid/auth0/login"
+      }}})
+  ;; end::install-authorization-server![]
+  )
+
+;; TODO: Put Authorization Server in a protection space
 
 ;; First Application
 
@@ -934,7 +947,7 @@
   (put!
    {:xt/id "urn:site:resources:not-found"
     :juxt.site.alpha/methods
-    {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}}}))
+    {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-not-found"}}}}))
 
 ;; Complete all tasks thus far directed by the book
 (defn preliminaries! []
