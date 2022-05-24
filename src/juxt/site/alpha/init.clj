@@ -11,7 +11,6 @@
    [juxt.apex.alpha :as-alias apex]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.authentication :as authn]
    [juxt.pass.alpha.malli :as-alias pass.malli]
    [juxt.pass.alpha.process :as-alias pass.process]
    [juxt.pass.alpha.util :refer [make-nonce]]

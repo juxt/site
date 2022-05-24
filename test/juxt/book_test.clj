@@ -14,7 +14,7 @@
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.authorization :as authz]
-   [juxt.pass.alpha.authentication :as authn]
+   [juxt.pass.alpha.http-authentication :as authn]
    [clojure.string :as str]
    [xtdb.api :as x]))
 

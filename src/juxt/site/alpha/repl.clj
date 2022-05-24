@@ -11,7 +11,6 @@
    [clojure.java.shell :as sh]
    [io.aviso.ansi :as ansi]
    [juxt.pass.alpha.application :as application]
-   [juxt.pass.alpha.authentication :as authn]
    [juxt.pass.alpha.authorization :as authz]
    [juxt.site.alpha.graphql :as graphql]
    [juxt.grab.alpha.schema :as graphql.schema]

@@ -12,7 +12,7 @@
    [juxt.dave.alpha :as dave]
    [juxt.dave.alpha.methods :as dave.methods]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
-   [juxt.pass.alpha.authentication :as authn]
+   [juxt.pass.alpha.http-authentication :as authn]
    [juxt.pass.alpha.authorization :as authz]
    [juxt.pass.alpha.session :as session]
    [juxt.pick.alpha.core :refer [rate-representation]]

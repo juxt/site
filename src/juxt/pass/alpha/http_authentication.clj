@@ -1,6 +1,6 @@
 ;; Copyright © 2021, JUXT LTD.
 
-(ns juxt.pass.alpha.authentication
+(ns juxt.pass.alpha.http-authentication
   (:require
    [jsonista.core :as json]
    [juxt.reap.alpha.encoders :refer [www-authenticate]]
