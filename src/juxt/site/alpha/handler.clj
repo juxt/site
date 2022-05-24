@@ -12,7 +12,7 @@
    [juxt.dave.alpha :as dave]
    [juxt.dave.alpha.methods :as dave.methods]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
-   [juxt.pass.alpha.http-authentication :as authn]
+   [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.pass.alpha.authorization :as authz]
    [juxt.pass.alpha.session :as session]
    [juxt.pick.alpha.core :refer [rate-representation]]
@@ -456,9 +456,9 @@
             ::site/selected-representation
             (conneg/negotiate-representation req cur-reps)))))))
 
-(defn wrap-authenticate [h]
-  (fn [{:ring.request/keys [method] :as req}]
-    (h (authn/authenticate req))))
+(defn wrap-http-authenticate [h]
+  (fn [req]
+    (h (http-authn/authenticate req))))
 
 #_(defn wrap-authorize-with-acls [h]
     (fn [{::pass/keys [session] ::site/keys [resource] :as req}]
@@ -1261,7 +1261,7 @@
 
    ;; Authenticate
    session/wrap-associate-session
-   wrap-authenticate
+   wrap-http-authenticate
 
    ;; Locate resources
    wrap-locate-resource
