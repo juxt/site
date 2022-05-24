@@ -545,29 +545,40 @@
 
       (if (seq permissions)
         (h (assoc req ::pass/permissions permissions))
-        (let [status (if subject 403 401)]
-          (case status
-            401
-            (let [protection-spaces (::pass/protection-spaces req)]
-              (throw
-               (ex-info
-                (format "No anonymous permission for actions: %s" (pr-str actions))
-                {::site/request-context
-                 (cond-> req
-                   status (assoc :ring.response/status status)
-                   protection-spaces
-                   (assoc
-                    :ring.response/headers
-                    {"www-authenticate"
-                     (authn/www-authenticate-header protection-spaces)}))})))
-            403
+
+        (if-let [protection-spaces (::pass/protection-spaces req)]
+          ;; We are in a protection space, so this is HTTP Authentication
+          (if subject
             (throw
              (ex-info
               (format "No permission for actions: %s" (pr-str actions))
               {::site/request-context
+               (assoc req :ring.response/status 403)}))
+
+            ;; Else no subject: 401 + WWW-Authenticate header
+            (throw
+             (ex-info
+              (format "No anonymous permission for actions (try authenticating!): %s" (pr-str actions))
+              {::site/request-context
                (assoc
                 req
-                :ring.response/status status)}))))))))
+                :ring.response/status 401
+                :ring.response/headers
+                {"www-authenticate"
+                 (http-authn/www-authenticate-header protection-spaces)})})))
+
+          ;; We are outside a protection space, there is nothing we can do
+          ;; except return a 403 status.  We MUST NOT return a 401 UNLESS we can
+          ;; set a WWW-Authenticate header (which we can't, as there is no
+          ;; protection space). 403 is the only option afforded by RFC 7231: "If
+          ;; authentication credentials were provided in the request ... the
+          ;; client MAY repeat the request with new or different credentials. "
+          ;; -- Section 6.5.3, RFC 7231
+          (throw
+           (ex-info
+            (format "No anonymous permission for actions (try authenticating!): %s" (pr-str actions))
+            {::site/request-context
+             (assoc req :ring.response/status 403)})))))))
 
 (defn wrap-method-not-allowed? [h]
   (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
