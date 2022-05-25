@@ -468,133 +468,6 @@
      ;; end::create-hello-world-with-html-template![]
      ))))
 
-;; Protection Spaces
-
-(defn book-create-action-put-protection-space! []
-  ;; tag::create-action-put-protection-space![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/put-protection-space"
-    :juxt.pass.alpha/scope "write:admin"
-
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/protection-spaces/(.+)"]]
-      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/protection-space"]]
-      [:juxt.pass.alpha/canonical-root-uri [:re "https?://[^/]*"]]
-      [:juxt.pass.alpha/realm {:optional true} [:string {:min 1}]]
-      [:juxt.pass.alpha/auth-scheme [:enum "Basic" "Bearer"]]
-      [:juxt.pass.alpha/authentication-scope [:string {:min 1}]]]]
-
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0]
-      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/protection-space"}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
-
-    :juxt.pass.alpha/rules
-    '[
-      [(allowed? permission subject action resource)
-       [subject :juxt.pass.alpha/user-identity id]
-       [id :juxt.pass.alpha/user user]
-       [permission :role role]
-       [user :role role]]]})
-  ;; end::create-action-put-protection-space![]
-  )
-
-(defn book-grant-permission-to-put-protection-space! []
-  ;; tag::grant-permission-to-put-protection-space![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-protection-space"
-    :role "Administrator"
-    :juxt.pass.alpha/action "https://site.test/actions/put-protection-space"
-    :juxt.pass.alpha/purpose nil})
-  ;; end::grant-permission-to-put-protection-space![]
-  )
-
-;; Cookie Scopes
-
-(defn book-create-action-put-cookie-scope! []
-  ;; tag::create-action-put-cookie-scope![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/put-cookie-scope"
-    :juxt.pass.alpha/scope "write:admin"
-
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/cookie-scopes/(.+)"]]
-      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/cookie-scope"]]
-      [:juxt.pass.alpha/cookie-domain [:re "https?://[^/]*"]]
-      [:juxt.pass.alpha/cookie-path [:re "/.*"]]
-      [:juxt.pass.alpha/login-uri [:re "https?://[^/]*"]]]]
-
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0]
-      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/cookie-scope"}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
-
-    :juxt.pass.alpha/rules
-    '[
-      [(allowed? permission subject action resource)
-       [subject :juxt.pass.alpha/user-identity id]
-       [id :juxt.pass.alpha/user user]
-       [permission :role role]
-       [user :role role]]]})
-  ;; end::create-action-put-cookie-scope![]
-  )
-
-(defn book-grant-permission-to-put-cookie-scope! []
-  ;; tag::grant-permission-to-put-cookie-scope![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-cookie-scope"
-    :role "Administrator"
-    :juxt.pass.alpha/action "https://site.test/actions/put-cookie-scope"
-    :juxt.pass.alpha/purpose nil})
-  ;; end::grant-permission-to-put-cookie-scope![]
-  )
-
-;; Basic Auth
-
-(defn book-put-basic-protection-space! []
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-protection-space"
-   {:xt/id "https://site.test/protection-spaces/basic/wonderland"
-
-    :juxt.pass.alpha/canonical-root-uri "https://site.test"
-    :juxt.pass.alpha/realm "Wonderland" ; optional
-
-    :juxt.pass.alpha/auth-scheme "Basic"
-    :juxt.pass.alpha/authentication-scope "/protected/.*" ; regex pattern
-    }))
-
-;; Bearer Auth
-
-(defn book-put-bearer-protection-space! []
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-protection-space"
-   {:xt/id "https://site.test/protection-spaces/bearer/wonderland"
-
-    :juxt.pass.alpha/canonical-root-uri "https://site.test"
-    :juxt.pass.alpha/realm "Wonderland" ; optional
-
-    :juxt.pass.alpha/auth-scheme "Bearer"
-    :juxt.pass.alpha/authentication-scope "/protected/.*" ; regex pattern
-    }))
-
 ;; Protecting Resources
 
 (defn book-create-action-put-immutable-protected-resource! []
@@ -662,31 +535,184 @@
   ;; end::create-action-get-protected-resource![]
   )
 
-(defn book-create-immutable-protected-resource! []
-  ;; tag::create-immutable-protected-resource![]
+;; Protection Spaces
+
+(defn book-create-action-put-protection-space! []
+  ;; tag::create-action-put-protection-space![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-protection-space"
+    :juxt.pass.alpha/scope "write:admin"
+
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/protection-spaces/(.+)"]]
+      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/protection-space"]]
+      [:juxt.pass.alpha/canonical-root-uri [:re "https?://[^/]*"]]
+      [:juxt.pass.alpha/realm {:optional true} [:string {:min 1}]]
+      [:juxt.pass.alpha/auth-scheme [:enum "Basic" "Bearer"]]
+      [:juxt.pass.alpha/authentication-scope [:string {:min 1}]]]]
+
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0]
+      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/protection-space"}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :role role]
+       [user :role role]]]})
+  ;; end::create-action-put-protection-space![]
+  )
+
+(defn book-grant-permission-to-put-protection-space! []
+  ;; tag::grant-permission-to-put-protection-space![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/administrators/put-protection-space"
+    :role "Administrator"
+    :juxt.pass.alpha/action "https://site.test/actions/put-protection-space"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-put-protection-space![]
+  )
+
+(defn book-put-basic-protection-space! []
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-protection-space"
+   {:xt/id "https://site.test/protection-spaces/basic/wonderland"
+
+    :juxt.pass.alpha/canonical-root-uri "https://site.test"
+    :juxt.pass.alpha/realm "Wonderland" ; optional
+
+    :juxt.pass.alpha/auth-scheme "Basic"
+    :juxt.pass.alpha/authentication-scope "/protected/.*" ; regex pattern
+    }))
+
+;; HTTP Basic Auth
+
+(defn book-create-resource-protected-by-basic-auth! []
+  ;; tag::create-resource-protected-by-basic-auth![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/put-immutable-protected-resource"
-   {:xt/id "https://site.test/protected/document.html"
+   {:xt/id "https://site.test/protected-by-basic-auth/document.html"
     :juxt.http.alpha/content-type "text/html;charset=utf-8"
     :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"
     })
-  ;; end::create-immutable-protected-resource![]
+  ;; end::create-resource-protected-by-basic-auth![]
   )
 
-(defn book-grant-permission-to-get-protected-resource! []
-  ;; tag::grant-permission-to-get-protected-resource![]
+(defn book-grant-permission-to-resource-protected-by-basic-auth! []
+  ;; tag::grant-permission-to-resource-protected-by-basic-auth![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/alice/protected-html"
     :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
     :juxt.pass.alpha/user "https://site.test/users/alice"
-    :juxt.site.alpha/uri "https://site.test/protected/document.html"
+    :juxt.site.alpha/uri "https://site.test/protected-by-basic-auth/document.html"
     :juxt.pass.alpha/purpose nil
     })
-  ;; end::grant-permission-to-get-protected-resource![]
+  ;; end::grant-permission-to-resource-protected-by-basic-auth![]
   )
+
+;; Cookie Scopes Preliminaries
+
+(defn book-create-action-put-cookie-scope! []
+  ;; tag::create-action-put-cookie-scope![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-cookie-scope"
+    :juxt.pass.alpha/scope "write:admin"
+
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/cookie-scopes/(.+)"]]
+      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/cookie-scope"]]
+      [:juxt.pass.alpha/cookie-domain [:re "https?://[^/]*"]]
+      [:juxt.pass.alpha/cookie-path [:re "/.*"]]
+      [:juxt.pass.alpha/login-uri [:re "https?://[^/]*"]]]]
+
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0]
+      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/cookie-scope"}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :role role]
+       [user :role role]]]})
+  ;; end::create-action-put-cookie-scope![]
+  )
+
+(defn book-grant-permission-to-put-cookie-scope! []
+  ;; tag::grant-permission-to-put-cookie-scope![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/administrators/put-cookie-scope"
+    :role "Administrator"
+    :juxt.pass.alpha/action "https://site.test/actions/put-cookie-scope"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-put-cookie-scope![]
+  )
+
+;; Cookie Scope Example
+
+(defn book-create-resource-protected-by-cookie! []
+  ;; tag::create-resource-protected-by-cookie![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-immutable-protected-resource"
+   {:xt/id "https://site.test/protected-by-cookie/document.html"
+    :juxt.http.alpha/content-type "text/html;charset=utf-8"
+    :juxt.http.alpha/content "<p>This is a protected message that is only visible when sending the correct cookie header.</p>"
+    })
+  ;; end::create-resource-protected-by-cookie![]
+  )
+
+(defn book-grant-permission-to-resource-protected-by-cookie! []
+  ;; tag::grant-permission-to-resource-protected-by-cookie![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/alice/protected-html"
+    :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
+    :juxt.pass.alpha/user "https://site.test/users/alice"
+    :juxt.site.alpha/uri "https://site.test/protected-by-cookie/document.html"
+    :juxt.pass.alpha/purpose nil
+    })
+  ;; end::grant-permission-to-resource-protected-by-cookie![]
+  )
+
+(defn book-create-cookie-scope! []
+  ;; tag::create-cookie-scope![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-cookie-scope"
+   {:xt/id "https://site.test/cookie-scopes/example"
+    :juxt.pass.alpha/cookie-name "id"
+    :juxt.pass.alpha/cookie-domain "https://site.test"
+    :juxt.pass.alpha/cookie-path "/protected-by-cookie/"
+    :juxt.pass.alpha/login-uri "https://site.test/login"})
+    ;; end::create-cookie-scope![]
+)
 
 ;; Applications
 
@@ -1039,17 +1065,18 @@
   (book-create-hello-world-resource!)
   )
 
-(defn protection-spaces-preliminaries! []
-  (book-create-action-put-protection-space!)
-  (book-grant-permission-to-put-protection-space!)
-  )
-
-(defn setup-protected-resource! []
+(defn protected-resource-preliminaries! []
   (book-create-action-put-immutable-protected-resource!)
   (book-grant-permission-to-put-immutable-protected-resource!)
-  (book-create-action-get-protected-resource!)
-  (book-grant-permission-to-get-protected-resource!)
-  (book-create-immutable-protected-resource!))
+  (book-create-action-get-protected-resource!))
+
+(defn protection-spaces-preliminaries! []
+  (book-create-action-put-protection-space!)
+  (book-grant-permission-to-put-protection-space!))
+
+(defn cookies-scopes-preliminaries! []
+  (book-create-action-put-cookie-scope!)
+  (book-grant-permission-to-put-cookie-scope!))
 
 (defn applications-preliminaries! []
   (book-create-action-put-application!)
@@ -1069,7 +1096,7 @@
   (preliminaries!)
   (setup-hello-world!)
   (protection-spaces-preliminaries!)
-  (setup-protected-resource!)
+  (protected-resource-preliminaries!)
   (applications-preliminaries!)
   (setup-application!))
 

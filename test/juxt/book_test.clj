@@ -196,24 +196,18 @@
   (book/preliminaries!)
   (book/setup-protected-resource!)
 
-  (book/book-create-action-put-cookie-scope!)
-  (book/book-grant-permission-to-put-cookie-scope!)
+  (book/cookies-scopes-preliminaries!)
 
-  (repl/do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-cookie-scope"
-   {:xt/id "https://site.test/cookie-scopes/test"
-    :juxt.pass.alpha/cookie-name "id"
-    :juxt.pass.alpha/cookie-domain "https://site.test"
-    :juxt.pass.alpha/cookie-path "/protected/"
-    :juxt.pass.alpha/login-uri "https://site.test/login"
-    })
+  (book/book-create-resource-protected-by-cookie!)
+  (book/book-grant-permission-to-resource-protected-by-cookie!)
+  (book/book-create-cookie-scope!)
 
-  (some :juxt.pass.alpha/login-uri
-        (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected/document.html"))
+  (let [uri (some :juxt.pass.alpha/login-uri
+                  (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie/document.html"))]
+    (is (string? uri)))
 
   (let [request {:ring.request/method :get
-                 :ring.request/path "/protected/document.html"}]
+                 :ring.request/path "/protected-by-cookie//document.html"}]
     (testing "Redirect"
       (let [response (*handler* request)]
         (is (= 302 (:ring.response/status response)))
@@ -235,13 +229,12 @@
        :juxt.pass.alpha/cookie-name "id"
        :juxt.pass.alpha/cookie-domain "https://site.test"
        :juxt.pass.alpha/cookie-path "/protected/"
-       :juxt.pass.alpha/login-uri "https://site.test/login"
-       })
+       :juxt.pass.alpha/login-uri "https://site.test/login"})
 
      (some :juxt.pass.alpha/login-uri
            (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected/document.html"))
 
-     (let [request {:ring.request/method :get
+     #_(let [request {:ring.request/method :get
                     :ring.request/path "/protected/document.html"}]
 
        (*handler* request)))))
