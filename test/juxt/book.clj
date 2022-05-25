@@ -488,7 +488,7 @@
      [:juxt.pass.alpha.process/update-in
       [0] 'merge
       {:juxt.site.alpha/methods
-       {:get {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
+       {:get {::pass/actions #{"https://site.test/actions/get-protected-resource"}} ; <1>
         :head {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
         :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
 
@@ -497,7 +497,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject action resource)
+      [(allowed? permission subject action resource) ; <2>
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [permission :role role]
@@ -530,8 +530,9 @@
       [(allowed? permission subject action resource)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]
-       [permission :juxt.site.alpha/uri resource]]]})
+       [permission :juxt.pass.alpha/user user] ; <1>
+       [permission :juxt.site.alpha/uri resource] ; <2>
+       ]]})
   ;; end::create-action-get-protected-resource![]
   )
 

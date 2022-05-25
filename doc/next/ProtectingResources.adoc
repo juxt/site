@@ -1,74 +1,99 @@
 = Protecting Resources
 :toc: left
 
+== Introduction
+
+For many record-keeping systems, it's necessary to protect resources from access
+and modification from unauthorized users.
+
+In this chapter we will create an Action for creating protected resources. These
+preliminaries will be useful later on as we explore different approaches to
+authentication.
+
 [[publishing-protected-resources]]
-== Creating a protected resource
+== Create the Action to create a protected resource
 
-Now let's publish an immutable protected resource which can only be seen by an
-authenticated user.
+We'll need an Action to create a protected resource. This is demonstrated in
+<<creating-an-action-to-create-a-protected-resource>>.
 
-We'll need an action to publish a protected resource.
-
-
-.Creating and accessing a protected resource
+[[creating-an-action-to-create-a-protected-resource]]
+.Creating an Action to create a protected resource
 ====
-
-Again, let's complete the following steps:
-
 [source,clojure]
 ----
 include::../../test/juxt/book.clj[tag=create-action-put-immutable-protected-resource!,indent=0]
 ----
 
+<1> Users making a GET request to this resource will require a permission to
+perform the Action `+https://site.test/actions/get-protected-resource+`. This
+Action doesn't yet exist (we'll create it in
+<<creating-action-get-protected-resource>>).
+
+<2> We'll repeat our usual RBAC policy for this Action: we make this Action
+accessible if a Permission exists that permits Users in a particular role to
+perform this Action.
+
+====
+
 [IMPORTANT]
 --
-Do it
+Copy the code in <<creating-an-action-to-create-a-protected-resource>> into a
+REPL, edit as required and evaluate.
 --
 
-We'll grant this permission to our REPL user.
+As per our Action's rules, we'll need to grant a Permission so that our REPL user can perform it. This Permission is created in
+<<permit-admins-to-create-a-protected-resource>>.
 
+[[permit-admins-to-create-a-protected-resource]]
+.Permitting administrators to create protected resources
+====
 [source,clojure]
 ----
 include::../../test/juxt/book.clj[tag=grant-permission-to-put-immutable-protected-resource!,indent=0]
 ----
+====
 
 [IMPORTANT]
 --
-Do it
+Copy the code in <<permit-admins-to-create-a-protected-resource>> into a REPL,
+edit as required and evaluate.
 --
 
-Now we'll create the action that is used to get a protected resource. The rules
-mandate that a permission has been granted on a specific resource and the
-subject is not nil.
+In <<creating-an-action-to-create-a-protected-resource>>, we restricted access
+to the resource to those Users who are authorized to perform the
+`+https://site.test/actions/get-protected-resource+`
+Action. <<creating-action-get-protected-resource>> demonstrates the creation
+this Action.
 
+[[creating-action-get-protected-resource]]
+.Creating the `get-protected-resource` Action
+====
 [source,clojure]
-.Creating the `get-protected-resource` action
 ----
 include::../../test/juxt/book.clj[tag=create-action-get-protected-resource!,indent=0]
 ----
 
-[IMPORTANT]
---
-Do it
---
+<1> The Permission must directly reference the User.
 
-The `get-protected-resource` action's rules state that a single 'global'
-permission (referencing the action) is sufficient for _any_ authenticated
-end-user (subject) to access the action.
+<2> The Permission must _also_ directly reference the Resource that is being
+protected. There are no roles used in this example, Permissions must exist for
+every combination of User and Resource. Note, this may not be practical for many
+systems, but works for these authentication examples.
 
-But we must rememeber to create that single global permission:
-
-[source,clojure]
-.Creating the global grant on `get-protected-resource` to authenticated users
-----
-include::../../test/juxt/book.clj[tag=grant-permission-to-get-protected-resource!,indent=0]
-----
+====
 
 [IMPORTANT]
 --
-Do it
+
+Copy the code in <<creating-action-get-protected-resource>> into a REPL, edit as
+required and evaluate.
+
 --
 
+
+
+
+////
 Now to create a protected resource.
 
 [source,clojure]
@@ -103,3 +128,5 @@ permissions-policy: interest-cohort=()
 Unauthorized
 ----
 ====
+
+////

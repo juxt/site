@@ -1,4 +1,4 @@
-= Authentication with OpenID
+= OpenID Authentication
 :toc: left
 :experimental:
 

@@ -71,30 +71,40 @@ include::Representations.adoc[leveloffset=+1]
 
 = Authentication
 
+(((access control)))
 Actions are integrated with authorization rules, providing a rich access control
 layer between users and data.
 
+(((Subject)))
 Most authorization rules refer to the Subject of the request. To identify the
 Subject, we need to authenticate each request.
 
-Site supports two options for authenticating users:
+Site supports two broad categories of user authentication:
 
-* HTTP Authentication, as described in https://www.rfc-editor.org/rfc/rfc7235[RFC 7235], which we describe in <<ch-http-authentication>>.
+. (((authentication,HTTP))) HTTP Authentication, which introduces the concept of
+  _protection spaces_, specified in https://www.rfc-editor.org/rfc/rfc7235[RFC
+  7235], is described in <<ch-http-authentication>>. An example of HTTP
+  Authentication is the 'Basic' authentication scheme, which is covered in
+  <<ch-basic-authentication>>.
 
-* Cookie-based authentication, which we describe in <<ch-cookie-authentication>>.
+. (((authentication,cookie-based))) Cookie-based authentication, which we
+  describe in <<ch-cookie-authentication>>, opens up numerous additional options
+  for authentication. One such option is OpenID Connect, which is covered in
+  <<ch-openid>> with a working example.
+
+include::ProtectingResources.adoc[leveloffset=+1]
 
 [[ch-http-authentication]]
 include::HttpAuthentication.adoc[leveloffset=+1]
 
+[[ch-basic-authentication]]
+include::BasicAuthentication.adoc[leveloffset=+1]
+
 [[ch-cookie-authentication]]
 include::CookieAuthentication.adoc[leveloffset=+1]
 
-include::ProtectingResources.adoc[leveloffset=+1]
-
-include::BasicAuthentication.adoc[leveloffset=+1]
-
 [[ch-openid]]
-include::AuthenticationWithOpenID.adoc[leveloffset=+1]
+include::OpenIdAuthentication.adoc[leveloffset=+1]
 
 = Applications and APIs
 

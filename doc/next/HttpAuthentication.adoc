@@ -38,8 +38,8 @@ request's method can be authorized.
 _This is why a 401 response status is labelled `Unauthorized` rather than
 `Unauthenticated`._
 
-It's possible that a resource might have a representation for unauthenticated
-users, perhaps with protected information removed.
+It's possible that a resource might generate a successful response for
+unauthenticated users, showing only publically accessible information.
 
 [CAUTION]
 --
