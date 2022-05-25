@@ -29,6 +29,13 @@
 
 (use-fixtures :each with-system-xt with-handler)
 
+(deftest not-found-test
+  (book/preliminaries!)
+  (let [req {:ring.request/method :get
+             :ring.request/path "/hello"}
+        invalid-req (assoc req :ring.request/path "/not-hello")]
+    (is (= 404 (:ring.response/status (*handler* invalid-req))))))
+
 (deftest public-resource-test
   (book/preliminaries!)
   (book/setup-hello-world!)
@@ -153,13 +160,6 @@
       (let [response (*handler* request)]
         (is (= 302 (:ring.response/status response)))
         (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"])))))))
-
-(deftest not-found-test
-  (book/preliminaries!)
-  (let [req {:ring.request/method :get
-             :ring.request/path "/hello"}
-        invalid-req (assoc req :ring.request/path "/not-hello")]
-    (is (= 404 (:ring.response/status (*handler* invalid-req))))))
 
 (deftest user-directory-test
   (book/preliminaries!)
