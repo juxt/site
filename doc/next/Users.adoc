@@ -160,7 +160,7 @@ s|Required
 <<user-model>> shows an example of how a Subject may relate to an Identity, and
 how an Identity, in turn, may relate to a User.
 
-.A possible relationship between a Users Subject and Identity
+.A possible relationship between a User, Subject and Identity
 [[user-model]]
 ====
 [plantuml,user-model,svg]
