@@ -584,19 +584,6 @@
   ;; end::grant-permission-to-put-protection-space![]
   )
 
-(defn book-put-basic-protection-space! []
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-protection-space"
-   {:xt/id "https://site.test/protection-spaces/basic/wonderland"
-
-    :juxt.pass.alpha/canonical-root-uri "https://site.test"
-    :juxt.pass.alpha/realm "Wonderland" ; optional
-
-    :juxt.pass.alpha/auth-scheme "Basic"
-    :juxt.pass.alpha/authentication-scope "/protected/.*" ; regex pattern
-    }))
-
 ;; HTTP Basic Auth
 
 (defn book-create-resource-protected-by-basic-auth! []
@@ -624,6 +611,19 @@
     })
   ;; end::grant-permission-to-resource-protected-by-basic-auth![]
   )
+
+(defn book-put-basic-protection-space! []
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-protection-space"
+   {:xt/id "https://site.test/protection-spaces/basic/wonderland"
+
+    :juxt.pass.alpha/canonical-root-uri "https://site.test"
+    :juxt.pass.alpha/realm "Wonderland" ; optional
+
+    :juxt.pass.alpha/auth-scheme "Basic"
+    :juxt.pass.alpha/authentication-scope "/protected-by-basic-auth/.*" ; regex pattern
+    }))
 
 ;; Cookie Scopes Preliminaries
 

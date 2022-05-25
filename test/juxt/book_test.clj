@@ -59,18 +59,20 @@
 
 (deftest protected-resource-with-http-basic-auth-test
   (book/preliminaries!)
-  (book/setup-protected-resource!)
+  (book/protected-resource-preliminaries!)
   (book/book-put-basic-auth-user-identity!)
-  (book/book-create-action-put-protection-space!)
-  (book/book-grant-permission-to-put-protection-space!)
+  (book/protection-spaces-preliminaries!)
+
+  (book/book-create-resource-protected-by-basic-auth!)
+  (book/book-grant-permission-to-resource-protected-by-basic-auth!)
   (book/book-put-basic-protection-space!)
 
-  (is (xt/entity (xt/db *xt-node*) "https://site.test/protected/document.html"))
+  (is (xt/entity (xt/db *xt-node*) "https://site.test/protected-by-basic-auth/document.html"))
 
-  (is (= 1 (count (authn/protection-spaces (xt/db *xt-node*) "https://site.test/protected/document.html"))))
+  (is (= 1 (count (authn/protection-spaces (xt/db *xt-node*) "https://site.test/protected-by-basic-auth/document.html"))))
 
   (let [request {:ring.request/method :get
-                 :ring.request/path "/protected/document.html"}
+                 :ring.request/path "/protected-by-basic-auth/document.html"}
 
         request-with-good-creds
         (assoc request :ring.request/headers {"authorization" (encode-basic-authorization "alice" "garden")})
@@ -90,13 +92,15 @@
       (is (= 200 (:ring.response/status response)))
       (is (nil? (get-in response [:ring.response/headers "www-authenticate"]))))))
 
-(deftest protected-resource-with-http-bearer-auth-test
+#_(deftest protected-resource-with-http-bearer-auth-test
   (book/preliminaries!)
-  (book/setup-protected-resource!)
+  (book/protected-resource-preliminaries!)
   (book/applications-preliminaries!)
   (book/setup-application!)
+
   (book/book-create-action-put-protection-space!)
   (book/book-grant-permission-to-put-protection-space!)
+
   (book/book-put-bearer-protection-space!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected/document.html"))
@@ -137,7 +141,7 @@
 
 (deftest user-directory-test
   (book/preliminaries!)
-  (book/setup-protected-resource!)
+  (book/protected-resource-preliminaries!)
   (book/applications-preliminaries!)
   (book/setup-application!)
   (repl/do-action
@@ -194,7 +198,7 @@
 
 (deftest cookie-scope-test
   (book/preliminaries!)
-  (book/setup-protected-resource!)
+  (book/protected-resource-preliminaries!)
 
   (book/cookies-scopes-preliminaries!)
 
