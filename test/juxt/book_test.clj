@@ -123,8 +123,8 @@
                     request
                     :ring.request/headers
                     {"authorization" "Bearer not-test-access-token"})))))
-      ;; Test WWW-Authenticate header and realm
 
+      ;; TODO: Test WWW-Authenticate header and realm
       )))
 
 (deftest not-found-test
@@ -133,7 +133,6 @@
              :ring.request/path "/hello"}
         invalid-req (assoc req :ring.request/path "/not-hello")]
     (is (= 404 (:ring.response/status (*handler* invalid-req))))))
-
 
 (deftest user-directory-test
   (book/preliminaries!)
@@ -191,3 +190,26 @@
              :ring.request/headers
              {"authorization" "Bearer test-access-token"}}]
     (is (= 411 (:ring.response/status (*handler* req))))))
+
+#_((t/join-fixtures [with-system-xt with-handler])
+ (fn []
+   (book/preliminaries!)
+   (book/setup-protected-resource!)
+
+   (book/book-create-action-put-cookie-scope!)
+   (book/book-grant-permission-to-put-cookie-scope!)
+
+   (repl/do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-cookie-scope"
+   {:xt/id "https://site.test/cookie-scopes/test"
+    :juxt.pass.alpha/cookie-name "id"
+    :juxt.pass.alpha/cookie-domain "https://site.test"
+    :juxt.pass.alpha/cookie-path "/protected/"
+    :juxt.pass.alpha/login-uri "https://site.test/login"
+    })
+
+   (let [request {:ring.request/method :get
+                  :ring.request/path "/protected/document.html"}]
+
+     (:ring.response/status (*handler* request)))))

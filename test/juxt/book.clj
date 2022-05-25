@@ -517,6 +517,54 @@
   ;; end::grant-permission-to-put-protection-space![]
   )
 
+;; Cookie Scopes
+
+(defn book-create-action-put-cookie-scope! []
+  ;; tag::create-action-put-cookie-scope![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/put-cookie-scope"
+    :juxt.pass.alpha/scope "write:admin"
+
+    :juxt.pass.alpha.malli/args-schema
+    [:tuple
+     [:map
+      [:xt/id [:re "https://site.test/cookie-scopes/(.+)"]]
+      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/cookie-scope"]]
+      [:juxt.pass.alpha/cookie-domain [:re "https?://[^/]*"]]
+      [:juxt.pass.alpha/cookie-path [:re "/.*"]]
+      [:juxt.pass.alpha/login-uri [:re "https?://[^/]*"]]]]
+
+    :juxt.pass.alpha/process
+    [
+     [:juxt.pass.alpha.process/update-in [0]
+      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/cookie-scope"}]
+     [:juxt.pass.alpha.malli/validate]
+     [:xtdb.api/put]]
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :role role]
+       [user :role role]]]})
+  ;; end::create-action-put-cookie-scope![]
+  )
+
+(defn book-grant-permission-to-put-cookie-scope! []
+  ;; tag::grant-permission-to-put-cookie-scope![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/administrators/put-cookie-scope"
+    :role "Administrator"
+    :juxt.pass.alpha/action "https://site.test/actions/put-cookie-scope"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::grant-permission-to-put-cookie-scope![]
+  )
+
 ;; Basic Auth
 
 (defn book-put-basic-protection-space! []

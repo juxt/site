@@ -4,7 +4,13 @@
 
 == Introduction
 
-Most websites authenticate with cookies.
+The use of cookies provide an alternative approach to user authentication.
 
-Mention JWT and Sessions - mention that Site chooses Sessions identifiers over
-JWTs (for now). JWTs may be supported in the future.
+== Cookie Scopes
+
+Site introduces the concept of a _cookie scopes_ which are conceptually similar to protection spaces, described in <<protection-spaces>>.
+
+== Creating a Cookie Scope
+
+NOTE: TODO: Mention JWT and Sessions - mention that Site chooses Sessions
+identifiers over JWTs (for now). JWTs may be supported in the future.

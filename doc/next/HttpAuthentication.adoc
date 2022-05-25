@@ -6,6 +6,7 @@
 
 NOTE: TODO
 
+[[protection-spaces]]
 == Protection Spaces
 
 [quote,RFC 7235]
@@ -59,7 +60,7 @@ create a separate protection space for each root URI
 cases you may even want to partition a root URI into multiple protection spaces,
 and that's possible too, using a different realm value for each partition.
 
-=== Creating protection spaces
+== Creating a Protection Space
 
 (((protection space,creating)))
 An Action is required to create a protection space. If one is not already set up
