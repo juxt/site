@@ -9,6 +9,7 @@
    [malli.core :as m]
    [malli.error :a me]
    [juxt.pass.alpha :as-alias pass]
+   [juxt.pass.alpha.cookie-scope :as cookie-scope]
    [juxt.pass.alpha.malli :as-alias pass.malli]
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]))
@@ -361,7 +362,7 @@
 
 (defn wrap-authorize-with-actions [h]
   (fn [{::pass/keys [subject]
-        ::site/keys [db resource]
+        ::site/keys [db resource uri]
         :ring.request/keys [method]
         :as req}]
 
@@ -415,8 +416,17 @@
             ;; respond with a redirect to a page that will establish (immediately
             ;; or eventually), the cookie.
 
-            (throw
-             (ex-info
-              (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))
-              {::site/request-context
-               (assoc req :ring.response/status 403)}))))))))
+            (if-let [login-uri (some->> (cookie-scope/cookie-scopes db uri) (some :juxt.pass.alpha/login-uri))]
+              ;; If we are in a cookie-scope that contains a login-uri, let's redirect to that
+              (throw
+               (ex-info
+                (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))
+                {::site/request-context
+                 (-> req
+                     (assoc :ring.response/status 302)
+                     (assoc-in [:ring.response/headers "location"] login-uri))}))
+              (throw
+               (ex-info
+                (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))
+                {::site/request-context
+                 (assoc req :ring.response/status 403)})))))))))

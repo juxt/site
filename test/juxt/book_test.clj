@@ -10,6 +10,7 @@
    [juxt.test.util :refer [with-system-xt with-db submit-and-await! *xt-node* *db* *handler*] :as tutil]
    [juxt.site.alpha.repl :refer [put!]]
    [xtdb.api :as xt]
+   [juxt.pass.alpha.cookie-scope :as cookie-scope]
    [juxt.site.alpha :as-alias site]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
@@ -191,15 +192,14 @@
              {"authorization" "Bearer test-access-token"}}]
     (is (= 411 (:ring.response/status (*handler* req))))))
 
-#_((t/join-fixtures [with-system-xt with-handler])
- (fn []
-   (book/preliminaries!)
-   (book/setup-protected-resource!)
+(deftest cookie-scope-test
+  (book/preliminaries!)
+  (book/setup-protected-resource!)
 
-   (book/book-create-action-put-cookie-scope!)
-   (book/book-grant-permission-to-put-cookie-scope!)
+  (book/book-create-action-put-cookie-scope!)
+  (book/book-grant-permission-to-put-cookie-scope!)
 
-   (repl/do-action
+  (repl/do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/put-cookie-scope"
    {:xt/id "https://site.test/cookie-scopes/test"
@@ -209,7 +209,39 @@
     :juxt.pass.alpha/login-uri "https://site.test/login"
     })
 
-   (let [request {:ring.request/method :get
-                  :ring.request/path "/protected/document.html"}]
+  (some :juxt.pass.alpha/login-uri
+        (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected/document.html"))
 
-     (:ring.response/status (*handler* request)))))
+  (let [request {:ring.request/method :get
+                 :ring.request/path "/protected/document.html"}]
+    (testing "Redirect"
+      (let [response (*handler* request)]
+        (is (= 302 (:ring.response/status response)))
+        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"])))))))
+
+(comment
+  ((t/join-fixtures [with-system-xt with-handler])
+   (fn []
+     (book/preliminaries!)
+     (book/setup-protected-resource!)
+
+     (book/book-create-action-put-cookie-scope!)
+     (book/book-grant-permission-to-put-cookie-scope!)
+
+     (repl/do-action
+      "https://site.test/subjects/repl-default"
+      "https://site.test/actions/put-cookie-scope"
+      {:xt/id "https://site.test/cookie-scopes/test"
+       :juxt.pass.alpha/cookie-name "id"
+       :juxt.pass.alpha/cookie-domain "https://site.test"
+       :juxt.pass.alpha/cookie-path "/protected/"
+       :juxt.pass.alpha/login-uri "https://site.test/login"
+       })
+
+     (some :juxt.pass.alpha/login-uri
+           (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected/document.html"))
+
+     (let [request {:ring.request/method :get
+                    :ring.request/path "/protected/document.html"}]
+
+       (*handler* request)))))
