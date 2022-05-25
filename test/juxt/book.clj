@@ -523,12 +523,27 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/put-protection-space"
-   {:xt/id "https://site.test/protection-spaces/wonderland"
+   {:xt/id "https://site.test/protection-spaces/basic/wonderland"
 
     :juxt.pass.alpha/canonical-root-uri "https://site.test"
     :juxt.pass.alpha/realm "Wonderland" ; optional
 
     :juxt.pass.alpha/auth-scheme "Basic"
+    :juxt.pass.alpha/authentication-scope "/protected/.*" ; regex pattern
+    }))
+
+;; Bearer Auth
+
+(defn book-put-bearer-protection-space! []
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-protection-space"
+   {:xt/id "https://site.test/protection-spaces/bearer/wonderland"
+
+    :juxt.pass.alpha/canonical-root-uri "https://site.test"
+    :juxt.pass.alpha/realm "Wonderland" ; optional
+
+    :juxt.pass.alpha/auth-scheme "Bearer"
     :juxt.pass.alpha/authentication-scope "/protected/.*" ; regex pattern
     }))
 
@@ -993,7 +1008,6 @@
   (book-grant-permission-to-invoke-action-put-application!!)
   (book-create-action-authorize-application!)
   (book-grant-permission-to-invoke-action-authorize-application!)
-
   (book-create-action-issue-access-token!)
   (book-grant-permission-to-invoke-action-issue-access-token!))
 

@@ -94,6 +94,9 @@
   (book/setup-protected-resource!)
   (book/applications-preliminaries!)
   (book/setup-application!)
+  (book/book-create-action-put-protection-space!)
+  (book/book-grant-permission-to-put-protection-space!)
+  (book/book-put-bearer-protection-space!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected/document.html"))
 
@@ -102,6 +105,8 @@
 
     (testing "Cannot be accessed without a bearer token"
       (is (= 401 (:ring.response/status (*handler* request)))))
+
+    ;; Check WWW-Authenticate header
 
     (testing "Can be accessed with a valid bearer token"
       (is (= 200 (:ring.response/status
