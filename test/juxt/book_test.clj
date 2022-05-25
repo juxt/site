@@ -100,6 +100,27 @@
       (is (= 200 (:ring.response/status response)))
       (is (nil? (get-in response [:ring.response/headers "www-authenticate"]))))))
 
+(deftest cookie-scope-test
+  (book/preliminaries!)
+  (book/protected-resource-preliminaries!)
+
+  (book/cookies-scopes-preliminaries!)
+
+  (book/book-create-resource-protected-by-cookie!)
+  (book/book-grant-permission-to-resource-protected-by-cookie!)
+  (book/book-create-cookie-scope!)
+
+  (let [uri (some :juxt.pass.alpha/login-uri
+                  (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie/document.html"))]
+    (is (string? uri)))
+
+  (let [request {:ring.request/method :get
+                 :ring.request/path "/protected-by-cookie//document.html"}]
+    (testing "Redirect"
+      (let [response (*handler* request)]
+        (is (= 302 (:ring.response/status response)))
+        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"])))))))
+
 (deftest protected-resource-with-http-bearer-auth-test
   (book/preliminaries!)
   (book/protected-resource-preliminaries!)
@@ -139,27 +160,6 @@
                        {"authorization" "Bearer not-test-access-token"}))]
         (is (= 401 (:ring.response/status response)))
         (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"])))))))
-
-(deftest cookie-scope-test
-  (book/preliminaries!)
-  (book/protected-resource-preliminaries!)
-
-  (book/cookies-scopes-preliminaries!)
-
-  (book/book-create-resource-protected-by-cookie!)
-  (book/book-grant-permission-to-resource-protected-by-cookie!)
-  (book/book-create-cookie-scope!)
-
-  (let [uri (some :juxt.pass.alpha/login-uri
-                  (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie/document.html"))]
-    (is (string? uri)))
-
-  (let [request {:ring.request/method :get
-                 :ring.request/path "/protected-by-cookie//document.html"}]
-    (testing "Redirect"
-      (let [response (*handler* request)]
-        (is (= 302 (:ring.response/status response)))
-        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"])))))))
 
 (deftest user-directory-test
   (book/preliminaries!)

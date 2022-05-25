@@ -625,6 +625,24 @@
     :juxt.pass.alpha/authentication-scope "/protected-by-basic-auth/.*" ; regex pattern
     }))
 
+(defn book-put-basic-auth-user-identity! []
+  ;; tag::put-basic-auth-user-identity![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-user-identity"
+   {:xt/id "https://site.test/user-identities/alice/basic"
+    :juxt.pass.alpha/user "https://site.test/users/alice"
+    ;; Perhaps all user identities need this?
+    :juxt.pass.alpha/canonical-root-uri "https://site.test"
+    :juxt.pass.alpha/realm "Wonderland"
+    ;; Basic auth will only work if these are present
+    :juxt.pass.alpha/username "alice"
+    :juxt.pass.alpha/password-hash (password/encrypt "garden")
+
+    })
+  ;; end::put-basic-auth-user-identity![]
+  )
+
 ;; HTTP Bearer Auth
 
 (defn book-create-resource-protected-by-bearer-auth! []
@@ -1136,25 +1154,25 @@
 (defn init-all! []
   (preliminaries!)
   (setup-hello-world!)
-  (protection-spaces-preliminaries!)
+
   (protected-resource-preliminaries!)
+
+  (protection-spaces-preliminaries!)
+
+  (book-create-resource-protected-by-basic-auth!)
+  (book-grant-permission-to-resource-protected-by-basic-auth!)
+  (book-put-basic-protection-space!)
+  (book-put-basic-auth-user-identity!)
+
+  (cookies-scopes-preliminaries!)
+
+  (book-create-resource-protected-by-cookie!)
+  (book-grant-permission-to-resource-protected-by-cookie!)
+  (book-create-cookie-scope!)
+
   (applications-preliminaries!)
-  (setup-application!))
+  (setup-application!)
 
-(defn book-put-basic-auth-user-identity! []
-  ;; tag::put-basic-auth-user-identity![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-user-identity"
-   {:xt/id "https://site.test/user-identities/alice/basic"
-    :juxt.pass.alpha/user "https://site.test/users/alice"
-    ;; Perhaps all user identities need this?
-    :juxt.pass.alpha/canonical-root-uri "https://site.test"
-    :juxt.pass.alpha/realm "Wonderland"
-    ;; Basic auth will only work if these are present
-    :juxt.pass.alpha/username "alice"
-    :juxt.pass.alpha/password-hash (password/encrypt "garden")
-
-    })
-  ;; end::put-basic-auth-user-identity![]
-  )
+  (book-create-resource-protected-by-bearer-auth!)
+  (book-grant-permission-to-resource-protected-by-bearer-auth!)
+  (book-put-bearer-protection-space!))
