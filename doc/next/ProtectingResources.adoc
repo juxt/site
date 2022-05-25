@@ -90,6 +90,8 @@ required and evaluate.
 
 --
 
+Now we have created the Actions necessary to protect resources from unauthorized
+Users, we can illustrate different approaches to User authentication.
 
 
 

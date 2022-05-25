@@ -4,7 +4,14 @@
 
 == Introduction
 
-NOTE: TODO
+HTTP Authentication is specified in https://www.rfc-editor.org/rfc/rfc7235[RFC
+7235] and provides the overall authentication framework for a number of
+authentication 'schemes'.
+
+Besides the 'Basic' HTTP Authentication Scheme (supported more for the sake of
+completeness and discussed in <<ch-basic-authentication>>), the 'Bearer'
+Authentication Scheme is important for securing APIs using OAuth2, covered in
+<<ch-applications>> and beyond.
 
 [[protection-spaces]]
 == Protection Spaces
@@ -14,32 +21,31 @@ NOTE: TODO
 The protection space determines the domain over which credentials can be automatically applied.
 --
 
-(((protection space,definition)))
-In HTTP, a protection space governs a set of resources for which requests are
+(((protection space,definition))) In the HTTP Authentication framework, a
+_protection space_ governs a set of resources for which requests are
 authenticated.
 
-In Site, if a request arrives with a URI targeting a resource that is in a
-protection space, the request is authenticated according to the configuration
-details held in the document defining the protection space.
+If a request is made for a resource in a protection space, the User making the
+request is authenticated prior to any authorization decisions being made. The
+details depend on the configuration of the protection space.
+
+In Site, protection spaces are defined in individual Documents in the database.
 
 If the Action on the resource fails to be authorized, and the request does not
 supply valid credentials, then the request is met with a `401 Unauthorized`
 response, along with a `WWW-Authenticate` header giving details of how to
-authenticate.
+authenticate according to the protection spaces that the resource belongs to.
 
-If the request does contain valid credentials, yet the Action on the resource is
-still not authorized, then a `403 Forbidden` response is returned.
+If the request contains valid credentials, yet the Action on the resource is
+still not authorized, a `403 Forbidden` response is returned.
 
 Being in a protection space does not imply that a resource cannot still be
-publically accessible without credentials. It only means that any credentials in
+publically accessible without credentials. It just means that any credentials in
 the request might be used when deciding if the Action corresponding to the
-request's method can be authorized.
-
-_This is why a 401 response status is labelled `Unauthorized` rather than
-`Unauthenticated`._
-
-It's possible that a resource might generate a successful response for
-unauthenticated users, showing only publically accessible information.
+request's method can be authorized. _This is why a 401 response status is
+labelled `Unauthorized` rather than `Unauthenticated`_. It's possible that a
+resource might generate a successful response for unauthenticated users, showing
+only publically accessible information.
 
 [CAUTION]
 --
@@ -53,18 +59,17 @@ A protection space is defined by the canonical root URI of the server being
 accessed, in combination with the realm value if present.
 --
 
-Usually, a protection space is defined across a whole site. In most cases, only
-one protection space will be created. But in some cases, you might want to
-create a separate protection space for each root URI
-(e.g. `+https://example.com+`, `+https://example.org+`) you are hosting. In rare
-cases you may even want to partition a root URI into multiple protection spaces,
-and that's possible too, using a different realm value for each partition.
+Usually, a protection space is defined to span a whole domain
+(`+https://example.org+`) or root URI (`+https://foo.example.org+`,
+`+https://bar.example.org+`). In rare cases you may even want to partition a
+root URI into multiple protection spaces. That's possible too, using a different
+_realm_ value for each partition.
 
 == Creating a Protection Space
 
-(((protection space,creating)))
-An Action is required to create a protection space. If one is not already set up
-we can create it one, as shown in <<ex-create-action-put-protection-space>>.
+(((protection space,creating))) Since a protection space is represented as a
+Document, an Action is required to create one. If one is not already set up we
+can create it one, as shown in <<ex-create-action-put-protection-space>>.
 
 [[ex-create-action-put-protection-space]]
 .Creating the Action to establish a Protection Space
@@ -73,21 +78,33 @@ we can create it one, as shown in <<ex-create-action-put-protection-space>>.
 ----
 include::../../test/juxt/book.clj[tag=create-action-put-protection-space!,indent=0]
 ----
+====
+
 
 [IMPORTANT]
 --
-Do it
+
+Copy the code in <<ex-create-action-put-protection-space>> into a REPL, edit as
+necessary and evaluate.
+
 --
 
-We'll grant this permission to our REPL user.
+Finally, we'll grant this permission to our REPL user, as demonstrated in
+<<ex-create-action-put-protection-space>>.
 
+[[ex-permit-action-put-protection-space]]
+.Permit the Action to create a protection space
+====
 [source,clojure]
 ----
 include::../../test/juxt/book.clj[tag=grant-permission-to-put-protection-space!,indent=0]
 ----
+====
 
 [IMPORTANT]
 --
-Do it
+
+Copy the code in <<ex-permit-action-put-protection-space>> into a REPL, edit as
+necessary and evaluate.
+
 --
-====
