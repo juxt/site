@@ -603,7 +603,7 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/alice/protected-html"
+   {:xt/id "https://site.test/permissions/alice/protected-by-basic-auth/document.html"
     :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
     :juxt.pass.alpha/user "https://site.test/users/alice"
     :juxt.site.alpha/uri "https://site.test/protected-by-basic-auth/document.html"
@@ -623,6 +623,47 @@
 
     :juxt.pass.alpha/auth-scheme "Basic"
     :juxt.pass.alpha/authentication-scope "/protected-by-basic-auth/.*" ; regex pattern
+    }))
+
+;; HTTP Bearer Auth
+
+(defn book-create-resource-protected-by-bearer-auth! []
+  ;; tag::create-resource-protected-by-bearer-auth![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-immutable-protected-resource"
+   {:xt/id "https://site.test/protected-by-bearer-auth/document.html"
+    :juxt.http.alpha/content-type "text/html;charset=utf-8"
+    :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"
+    })
+  ;; end::create-resource-protected-by-bearer-auth![]
+  )
+
+(defn book-grant-permission-to-resource-protected-by-bearer-auth! []
+  ;; tag::grant-permission-to-resource-protected-by-bearer-auth![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/alice/protected-by-bearer-auth/document.html"
+    :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
+    :juxt.pass.alpha/user "https://site.test/users/alice"
+    :juxt.site.alpha/uri "https://site.test/protected-by-bearer-auth/document.html"
+    :juxt.pass.alpha/purpose nil
+    })
+  ;; end::grant-permission-to-resource-protected-by-bearer-auth![]
+  )
+
+(defn book-put-bearer-protection-space! []
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-protection-space"
+   {:xt/id "https://site.test/protection-spaces/bearer/wonderland"
+
+    :juxt.pass.alpha/canonical-root-uri "https://site.test"
+    :juxt.pass.alpha/realm "Wonderland" ; optional
+
+    :juxt.pass.alpha/auth-scheme "Bearer"
+    :juxt.pass.alpha/authentication-scope "/protected-by-bearer-auth/.*" ; regex pattern
     }))
 
 ;; Cookie Scopes Preliminaries

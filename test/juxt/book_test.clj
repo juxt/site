@@ -60,12 +60,13 @@
 (deftest protected-resource-with-http-basic-auth-test
   (book/preliminaries!)
   (book/protected-resource-preliminaries!)
-  (book/book-put-basic-auth-user-identity!)
   (book/protection-spaces-preliminaries!)
 
   (book/book-create-resource-protected-by-basic-auth!)
   (book/book-grant-permission-to-resource-protected-by-basic-auth!)
   (book/book-put-basic-protection-space!)
+
+  (book/book-put-basic-auth-user-identity!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected-by-basic-auth/document.html"))
 
@@ -92,45 +93,66 @@
       (is (= 200 (:ring.response/status response)))
       (is (nil? (get-in response [:ring.response/headers "www-authenticate"]))))))
 
-#_(deftest protected-resource-with-http-bearer-auth-test
+(deftest protected-resource-with-http-bearer-auth-test
   (book/preliminaries!)
   (book/protected-resource-preliminaries!)
+  (book/protection-spaces-preliminaries!)
+
   (book/applications-preliminaries!)
   (book/setup-application!)
 
-  (book/book-create-action-put-protection-space!)
-  (book/book-grant-permission-to-put-protection-space!)
-
+  (book/book-create-resource-protected-by-bearer-auth!)
+  (book/book-grant-permission-to-resource-protected-by-bearer-auth!)
   (book/book-put-bearer-protection-space!)
 
-  (is (xt/entity (xt/db *xt-node*) "https://site.test/protected/document.html"))
+  (is (xt/entity (xt/db *xt-node*) "https://site.test/protected-by-bearer-auth/document.html"))
 
   (let [request {:ring.request/method :get
-                 :ring.request/path "/protected/document.html"}]
+                 :ring.request/path "/protected-by-bearer-auth/document.html"}]
 
     (testing "Cannot be accessed without a bearer token"
-      (is (= 401 (:ring.response/status (*handler* request)))))
-
-    ;; Check WWW-Authenticate header
+      (let [response (*handler* request)]
+        (is (= 401 (:ring.response/status response)))
+        (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"])))))
 
     (testing "Can be accessed with a valid bearer token"
-      (is (= 200 (:ring.response/status
-                  (*handler*
-                   (assoc
-                    request
-                    :ring.request/headers
-                    {"authorization" "Bearer test-access-token"}))))))
+      (let [response (*handler*
+                      (assoc
+                       request
+                       :ring.request/headers
+                       {"authorization" "Bearer test-access-token"}))]
+        (is (= 200 (:ring.response/status response)))
+        (is (nil? (get-in response [:ring.response/headers "www-authenticate"])))))
 
     (testing "Cannot be accessed with an invalid bearer token"
-      (is (= 401 (:ring.response/status
-                  (*handler*
-                   (assoc
-                    request
-                    :ring.request/headers
-                    {"authorization" "Bearer not-test-access-token"})))))
+      (let [response (*handler*
+                      (assoc
+                       request
+                       :ring.request/headers
+                       {"authorization" "Bearer not-test-access-token"}))]
+        (is (= 401 (:ring.response/status response)))
+        (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"])))))))
 
-      ;; TODO: Test WWW-Authenticate header and realm
-      )))
+(deftest cookie-scope-test
+  (book/preliminaries!)
+  (book/protected-resource-preliminaries!)
+
+  (book/cookies-scopes-preliminaries!)
+
+  (book/book-create-resource-protected-by-cookie!)
+  (book/book-grant-permission-to-resource-protected-by-cookie!)
+  (book/book-create-cookie-scope!)
+
+  (let [uri (some :juxt.pass.alpha/login-uri
+                  (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie/document.html"))]
+    (is (string? uri)))
+
+  (let [request {:ring.request/method :get
+                 :ring.request/path "/protected-by-cookie//document.html"}]
+    (testing "Redirect"
+      (let [response (*handler* request)]
+        (is (= 302 (:ring.response/status response)))
+        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"])))))))
 
 (deftest not-found-test
   (book/preliminaries!)
@@ -196,49 +218,7 @@
              {"authorization" "Bearer test-access-token"}}]
     (is (= 411 (:ring.response/status (*handler* req))))))
 
-(deftest cookie-scope-test
-  (book/preliminaries!)
-  (book/protected-resource-preliminaries!)
-
-  (book/cookies-scopes-preliminaries!)
-
-  (book/book-create-resource-protected-by-cookie!)
-  (book/book-grant-permission-to-resource-protected-by-cookie!)
-  (book/book-create-cookie-scope!)
-
-  (let [uri (some :juxt.pass.alpha/login-uri
-                  (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie/document.html"))]
-    (is (string? uri)))
-
-  (let [request {:ring.request/method :get
-                 :ring.request/path "/protected-by-cookie//document.html"}]
-    (testing "Redirect"
-      (let [response (*handler* request)]
-        (is (= 302 (:ring.response/status response)))
-        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"])))))))
-
 (comment
   ((t/join-fixtures [with-system-xt with-handler])
    (fn []
-     (book/preliminaries!)
-     (book/setup-protected-resource!)
-
-     (book/book-create-action-put-cookie-scope!)
-     (book/book-grant-permission-to-put-cookie-scope!)
-
-     (repl/do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/put-cookie-scope"
-      {:xt/id "https://site.test/cookie-scopes/test"
-       :juxt.pass.alpha/cookie-name "id"
-       :juxt.pass.alpha/cookie-domain "https://site.test"
-       :juxt.pass.alpha/cookie-path "/protected/"
-       :juxt.pass.alpha/login-uri "https://site.test/login"})
-
-     (some :juxt.pass.alpha/login-uri
-           (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected/document.html"))
-
-     #_(let [request {:ring.request/method :get
-                    :ring.request/path "/protected/document.html"}]
-
-       (*handler* request)))))
+     )))
