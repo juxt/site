@@ -2,7 +2,7 @@
 Malcolm Sparks <mal@juxt.pro>
 :doctype: book
 :toc: left
-:toclevels: 2
+:toclevels: 1
 :sectnums:
 :sectnumlevels: 4
 :xrefstyle: short
