@@ -5,6 +5,7 @@
  :tests [{:id :test
           :test-paths ["test"]
           :ns-patterns ["juxt.book-test"
+                        "juxt.authorization-integration-test"
                         "juxt.pass.authorization-test"
                         ]}]
 
