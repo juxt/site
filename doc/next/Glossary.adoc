@@ -18,6 +18,9 @@ Entity:: A Record with its own identity (as the `:xt/id` attribute).
 Permission:: A Document capturing the act of granting or revoking access,
 typically to a Subject accessing a Resource.
 
+(((Protection Space, definition)))
+Protection Space:: A set of the resources, usually in the same domain identified by URIs with a given prefix, that will authenticate the User making the request and use that in any authorization decisions.
+
 (((Record, definition)))
 Record:: The set of all versions of a given Document.
 

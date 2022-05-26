@@ -706,3 +706,6 @@
 
 (defn as-hex-str [bytes]
   (util/as-hex-str bytes))
+
+(defn encrypt-password [password]
+  (password/encrypt password))

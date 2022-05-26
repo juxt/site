@@ -9,7 +9,7 @@
    [clojure.walk :refer [postwalk]]
    [clojure.string :as str]
    [malli.core :as m]
-   [juxt.site.alpha.repl :refer [base-uri put! install-do-action-fn! do-action make-application-doc make-application-authorization-doc make-access-token-doc]]
+   [juxt.site.alpha.repl :refer [base-uri put! install-do-action-fn! do-action make-application-doc make-application-authorization-doc make-access-token-doc encrypt-password]]
    [juxt.site.alpha.util :refer [as-hex-str random-bytes]]))
 
 (defn substitute-actual-base-uri [form]
@@ -614,6 +614,7 @@
   )
 
 (defn book-put-basic-protection-space! []
+  ;; tag::put-basic-protection-space![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/put-protection-space"
@@ -624,7 +625,9 @@
 
     :juxt.pass.alpha/auth-scheme "Basic"
     :juxt.pass.alpha/authentication-scope "/protected-by-basic-auth/.*" ; regex pattern
-    }))
+    })
+  ;; end::put-basic-protection-space![]
+)
 
 (defn book-put-basic-auth-user-identity! []
   ;; tag::put-basic-auth-user-identity![]
@@ -638,9 +641,7 @@
     :juxt.pass.alpha/realm "Wonderland"
     ;; Basic auth will only work if these are present
     :juxt.pass.alpha/username "alice"
-    :juxt.pass.alpha/password-hash (password/encrypt "garden")
-
-    })
+    :juxt.pass.alpha/password-hash (encrypt-password "garden")})
   ;; end::put-basic-auth-user-identity![]
   )
 
