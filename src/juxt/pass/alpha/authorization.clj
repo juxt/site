@@ -9,7 +9,9 @@
    [malli.core :as m]
    [malli.error :a me]
    [juxt.pass.alpha :as-alias pass]
+   [juxt.pass.alpha.cookie-scope :as cookie-scope]
    [juxt.pass.alpha.malli :as-alias pass.malli]
+   [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]))
 
 (defn actions->rules
@@ -56,7 +58,7 @@
               :in '[subject actions resource purpose]}
 
              subject actions resource purpose)]
-        (log/debugf "Returning %d permissions" (count permissions))
+        (log/debugf "Returning %s permissions" (pr-str permissions))
         permissions))))
 
 (defn allowed-resources
@@ -357,3 +359,74 @@
       (if (::site/error result)
         (throw (ex-info "Failed to do action" (merge {:action action} pass-ctx (dissoc result ::site/type))))
         result))))
+
+(defn wrap-authorize-with-actions [h]
+  (fn [{::pass/keys [subject]
+        ::site/keys [db resource uri]
+        :ring.request/keys [method]
+        :as req}]
+
+    (let [actions (get-in resource [::site/methods method ::pass/actions])
+          permissions
+          (check-permissions
+           db
+           actions
+           (cond-> {:subject (:xt/id subject)}
+             ;; When the resource is in the database, we can add it to the
+             ;; permission checking in case there's a specific permission for
+             ;; this resource.
+             (:xt/id resource) (assoc :resource (:xt/id resource))))]
+
+      (if (seq permissions)
+        (h (assoc req ::pass/permissions permissions))
+
+        (if subject
+          (throw
+           (ex-info
+            (format "No permission for actions: %s" (pr-str actions))
+            {::site/request-context
+             (assoc req :ring.response/status 403)}))
+
+          ;; No subject?
+          (if-let [protection-spaces (::pass/protection-spaces req)]
+            ;; We are in a protection space, so this is HTTP Authentication (401
+            ;; + WWW-Authenticate header)
+            (throw
+             (ex-info
+              (format "No anonymous permission for actions (try authenticating!): %s" (pr-str actions))
+              {::site/request-context
+               (assoc
+                req
+                :ring.response/status 401
+                :ring.response/headers
+                {"www-authenticate"
+                 (http-authn/www-authenticate-header protection-spaces)})}))
+
+            ;; We are outside a protection space, there is nothing we can do
+            ;; except return a 403 status.
+
+            ;; We MUST NOT return a 401 UNLESS we can
+            ;; set a WWW-Authenticate header (which we can't, as there is no
+            ;; protection space). 403 is the only option afforded by RFC 7231: "If
+            ;; authentication credentials were provided in the request ... the
+            ;; client MAY repeat the request with new or different credentials. "
+            ;; -- Section 6.5.3, RFC 7231
+
+            ;; TODO: But are we inside a cookie-scope ? If so, we can
+            ;; respond with a redirect to a page that will establish (immediately
+            ;; or eventually), the cookie.
+
+            (if-let [login-uri (some->> (cookie-scope/cookie-scopes db uri) (some :juxt.pass.alpha/login-uri))]
+              ;; If we are in a cookie-scope that contains a login-uri, let's redirect to that
+              (throw
+               (ex-info
+                (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))
+                {::site/request-context
+                 (-> req
+                     (assoc :ring.response/status 302)
+                     (assoc-in [:ring.response/headers "location"] login-uri))}))
+              (throw
+               (ex-info
+                (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))
+                {::site/request-context
+                 (assoc req :ring.response/status 403)})))))))))

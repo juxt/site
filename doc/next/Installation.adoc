@@ -40,12 +40,12 @@ own hostname in a domain you control, amend these instructions accordingly.
 To access Site locally for bootstrapping we need to ensure requests to
 `site.test` are directed to the local service.
 
-Edit /etc/hosts to direct requests for `site.test` to 127.0.0.1.
+Edit /etc/hosts to direct requests for `site.test` and `auth.site.test` to 127.0.0.1.
 
 ----
 # Static table lookup for hostnames.
 # See hosts(5) for details.
-127.0.0.1	localhost site.test
+127.0.0.1	localhost site.test auth.site.test
 ----
 
 === mkcert
@@ -80,8 +80,9 @@ Create a new cert for the local development server, and move these into your
 nginx config directory.
 
 ----
-mkcert site.test
-sudo mv site.test-key.pem site.test.pem /etc/nginx
+mkcert site.test auth.site.test
+sudo mv site.test+1.pem /etc/nginx/site.test.pem
+sudo mv site.test+1-key.pem /etc/nginx/site.test-key.pem
 ----
 
 === Configure nginx

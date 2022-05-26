@@ -2,12 +2,12 @@
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-put-template-action!,indent=0]
+include::../../test/juxt/book.clj[tag=create-put-template-action!,indent=0]
 ----
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-template!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-put-template!,indent=0]
 ----
 
 .Creating a template
@@ -15,7 +15,7 @@ include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-temp
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-hello-world-html-template!,indent=0]
+include::../../test/juxt/book.clj[tag=create-hello-world-html-template!,indent=0]
 ----
 
 
@@ -26,7 +26,7 @@ include::../../test/juxt/demo.clj[tag=create-hello-world-html-template!,indent=0
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-hello-world-with-html-template!,indent=0]
+include::../../test/juxt/book.clj[tag=create-hello-world-with-html-template!,indent=0]
 ----
 
 ====

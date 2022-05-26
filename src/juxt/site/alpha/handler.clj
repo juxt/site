@@ -12,7 +12,7 @@
    [juxt.dave.alpha :as dave]
    [juxt.dave.alpha.methods :as dave.methods]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
-   [juxt.pass.alpha.authentication :as authn]
+   [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.pass.alpha.authorization :as authz]
    [juxt.pass.alpha.session :as session]
    [juxt.pick.alpha.core :refer [rate-representation]]
@@ -107,10 +107,7 @@
       ;; and POST
 
       (when-let [acceptable
-                 (get resource
-                      (case method
-                        :put ::http/acceptable-on-put
-                        :post ::http/acceptable-on-post))]
+                 (get-in resource [::site/methods method ::site/acceptable])]
 
         (let [prefs (headers->decoded-preferences acceptable)
               request-rep (rate-representation prefs decoded-representation)]
@@ -235,8 +232,6 @@
          (xt/await-tx xt-node))
 
     (into req {:ring.response/status (if existing 204 201)})))
-
-;; TODO: When this works, repeat for PUT
 
 (defn POST [{::site/keys [resource request-id] :as req}]
   (let [rep (->
@@ -392,7 +387,7 @@
             [[:xtdb.api/put
               {:xt/id uri
                ::dave/resource-type :collection
-               ::http/methods {:get {} :head {} :options {} :propfind {}}
+               ::site/methods {:get {} :head {} :options {} :propfind {}}
                ::http/content-type "text/html;charset=utf-8"
                ::http/content "<h1>Index</h1>\r\n"
                ::http/options {"DAV" "1"}}]])]
@@ -461,22 +456,19 @@
             ::site/selected-representation
             (conneg/negotiate-representation req cur-reps)))))))
 
-(defn wrap-authenticate [h]
-  (fn [{:ring.request/keys [method] :as req}]
-    ;; @mal: TODO: I think we can authenticate OPTIONS now, authenticate doesn't
-    ;; prevent access, authorization does.
-    (let [sub (when-not (= method :options) (authn/authenticate req))]
-      (h (cond-> req sub (assoc ::pass/subject sub))))))
+(defn wrap-http-authenticate [h]
+  (fn [req]
+    (h (http-authn/authenticate req))))
 
 #_(defn wrap-authorize-with-acls [h]
-  (fn [{::pass/keys [session] ::site/keys [resource] :as req}]
-    (when (::pass/authorization resource)
-      (log/trace "Already authorized")
-      )
-    (h (cond-> req
-         ;; Only authorize if not already authorized
-         (not (::pass/authorization resource))
-         authz/authorize-resource))))
+    (fn [{::pass/keys [session] ::site/keys [resource] :as req}]
+      (when (::pass/authorization resource)
+        (log/trace "Already authorized")
+        )
+      (h (cond-> req
+           ;; Only authorize if not already authorized
+           (not (::pass/authorization resource))
+           authz/authorize-resource))))
 
 #_(defn wrap-authorize-with-pdp
   ;; Do authorization as late as possible (in order to have as much data
@@ -534,43 +526,14 @@
               {::site/request-context (assoc req :ring.response/status status)}))))
         (h req)))))
 
-(defn wrap-authorize-with-actions [h]
-  (fn [{::pass/keys [subject]
-        ::site/keys [db resource]
-        :ring.request/keys [method]
-        :as req}]
-
-    (log/infof "AUTHORIZE: subject is %s" subject)
-
-    (let [actions (get-in resource [::http/methods method ::pass/actions])
-          permissions
-          (authz/check-permissions
-           db
-           actions
-           (cond-> {:subject (:xt/id subject)}
-             ;; When the resource is in the database, we can add it to the
-             ;; permission checking in case there's a specific permission for
-             ;; this resource.
-             (:xt/id resource) (assoc :resource (:xt/id resource))))]
-
-      (if (seq permissions)
-        (h (assoc req ::pass/permissions permissions))
-        (let [status (if subject 403 401)]
-          (throw
-           (ex-info
-            (case status
-              401 (format "No permission for actions: %s" (pr-str actions))
-              403 "No permission")
-            {::site/request-context (assoc req :ring.response/status status)})))))))
-
 (defn wrap-method-not-allowed? [h]
   (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
-    (when-not (map? (::http/methods resource))
-      (throw (ex-info "Resource :juxt.http.alpha/methods must be a map"
+    (when-not (map? (::site/methods resource))
+      (throw (ex-info "Resource :juxt.site.alpha/methods must be a map"
                       {:resource resource
                        ::site/request-context req})))
     (if resource
-      (let [allowed-methods (set (keys (::http/methods resource)))]
+      (let [allowed-methods (set (keys (::site/methods resource)))]
         (when-not (contains? allowed-methods method)
           (throw
            (ex-info
@@ -1254,8 +1217,12 @@
    wrap-method-not-implemented?
 
    ;; Authenticate
+
+   ;; Rewrite to work against a cookie-domain, which may use JWTs or sessions.
+   ;; wrap-process-cookies
    session/wrap-associate-session
-   wrap-authenticate
+
+   wrap-http-authenticate
 
    ;; Locate resources
    wrap-locate-resource
@@ -1265,7 +1232,7 @@
    wrap-method-not-allowed?
 
    ;; We authorize the resource, prior to finding representations.
-   wrap-authorize-with-actions
+   authz/wrap-authorize-with-actions
 
    ;; Find representations and possibly do content negotiation
    wrap-find-current-representations

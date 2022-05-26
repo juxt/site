@@ -4,11 +4,10 @@
   (:require
    [clojure.string :as str]
    [juxt.pick.alpha.ring :refer [pick]]
-   [xtdb.api :as xt]))
-
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'pick (create-ns 'juxt.pick.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
+   [xtdb.api :as xt]
+   [juxt.http.alpha :as-alias http]
+   [juxt.pick.alpha :as-alias pick]
+   [juxt.site.alpha :as-alias site]))
 
 (defn pick-representation [req representations]
   (when representations
@@ -54,7 +53,7 @@
       (not-empty vary) (assoc ::http/vary (str/join ", " vary)))))
 
 
-(defn find-variants [{::site/keys [resource uri db] :as req}]
+(defn find-variants [{::site/keys [resource uri db]}]
 
   (let [variants (xt/q db '{:find [(pull v [*])]
                            :where [[v ::site/variant-of uri]]
@@ -78,7 +77,7 @@
      representation)
     representation))
 
-(defn current-representations [{::site/keys [resource uri db] :as req}]
+(defn current-representations [{::site/keys [resource db] :as req}]
   (->> (or
         ;; This is not common to find statically in the db, but this option
         ;; allows 'dynamic' resources to declare multiple representations.

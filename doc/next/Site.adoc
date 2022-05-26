@@ -2,7 +2,7 @@
 Malcolm Sparks <mal@juxt.pro>
 :doctype: book
 :toc: left
-:toclevels: 2
+:toclevels: 1
 :sectnums:
 :sectnumlevels: 4
 :xrefstyle: short
@@ -62,9 +62,6 @@ include::Permissions.adoc[leveloffset=+1]
 [[ch-creating-users]]
 include::UsersRevisited.adoc[leveloffset=+1]
 
-[[ch-applications]]
-include::Applications.adoc[leveloffset=+1]
-
 = Resources
 
 [[ch-resources]]
@@ -72,11 +69,58 @@ include::Resources.adoc[leveloffset=+1]
 
 include::Representations.adoc[leveloffset=+1]
 
+= Authentication
+
+(((access control)))
+Actions are integrated with authorization rules, providing a rich access control
+layer between users and data.
+
+(((Subject)))
+Most authorization rules refer to the Subject of the request. To identify the
+Subject, we need to authenticate each request.
+
+Site supports two broad categories of user authentication:
+
+. (((authentication,HTTP))) HTTP Authentication, which introduces the concept of
+  _protection spaces_, specified in https://www.rfc-editor.org/rfc/rfc7235[RFC
+  7235], is described in <<ch-http-authentication>>. An example of HTTP
+  Authentication is the 'Basic' authentication scheme, which is covered in
+  <<ch-basic-authentication>>.
+
+. (((authentication,cookie-based))) Cookie-based authentication, which we
+  describe in <<ch-cookie-authentication>>, opens up numerous additional options
+  for authentication. One such option is OpenID Connect, which is covered in
+  <<ch-openid>> with a working example.
+
 include::ProtectingResources.adoc[leveloffset=+1]
 
+[[ch-http-authentication]]
+include::HttpAuthentication.adoc[leveloffset=+1]
+
+[[ch-basic-authentication]]
 include::BasicAuthentication.adoc[leveloffset=+1]
 
+[[ch-cookie-authentication]]
+include::CookieAuthentication.adoc[leveloffset=+1]
+
+[[ch-openid]]
+include::OpenIdAuthentication.adoc[leveloffset=+1]
+
 = Applications and APIs
+
+
+First, in <<ch-applications>>, we introduce Applications and create the required
+Actions.
+
+We start by configuring our Authorization Server in <<ch-authorization-server>>.
+
+Then, in <<ch-first-application>>, we create an example Application.
+
+[[ch-applications]]
+include::Applications.adoc[leveloffset=+1]
+
+[[ch-authorization-server]]
+include::AuthorizationServer.adoc[leveloffset=+1]
 
 [[ch-first-application]]
 include::FirstApplication.adoc[leveloffset=+1]
@@ -86,11 +130,6 @@ include::OpenAPI.adoc[leveloffset=+1]
 
 [[ch-graphql]]
 include::GraphQL.adoc[leveloffset=+1]
-
-= OpenID
-
-[[ch-authentication-with-openid]]
-include::AuthenticationWithOpenID.adoc[leveloffset=+1]
 
 = Going further
 

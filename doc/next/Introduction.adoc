@@ -98,8 +98,9 @@ authorization server
    authenticating the resource owner and obtaining authorization.
 ____
 
-In a wider architecture, Site can play the role of a Resource Server and is able
-to interact with other components that play the other OAuth roles.
+In a wider architecture, Site can play the roles of a Resource Server
+and,optionally, an Authorization Server. It is able to fully interact with other
+components that play the other OAuth roles in a standards compliant manner.
 
 == This book
 
@@ -136,8 +137,8 @@ meaning. This allows us to use common nouns with less risk of confusion.
 
 Many of the examples in this document use Clojure keywords.
 
-Keywords can have namespaces. For example, the keyword `:a.b/c` is a keyword
-with the namespace is `a.b`.
+Keywords can have namespaces. For example, the keyword `:foo.bar/zip` is a keyword
+with the namespace is `foo.bar`.
 
 As a convention in this document, keyword namespaces are only used for
 _reserved_ keywords that have some meaning to Site. The majority of other

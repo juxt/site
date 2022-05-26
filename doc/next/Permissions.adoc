@@ -14,9 +14,9 @@ document can be put into the database to represent a permission when it is
 granted, and (just as easily) deleted from the database when the authorization
 is revoked.
 
-TIP: Permissions are straight-forward to grant and revoke, as they are represented as
-XT documents, so granting and revoking a permission can be done with XTDB's
-respective `:xtdb.api/put` and `:xtdb.api/delete` operations.
+TIP: Permissions are straight-forward to grant and revoke, as they are
+represented as XTDB documents, so granting and revoking a permission can be done
+with XTDB's respective `:xtdb.api/put` and `:xtdb.api/delete` operations.
 
 An Action's Rules specify how Permissions determine the outcome of authorization
 decisions.
@@ -68,7 +68,7 @@ that works with the Action we created in <<example-create-action>>.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=permit-create-action!,indent=0]
+include::../../test/juxt/book.clj[tag=permit-create-action!,indent=0]
 ----
 
 <1> Permissions are individual resources, and must have unique URIs.
@@ -120,7 +120,7 @@ action.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-grant-permission-action!,indent=0]
+include::../../test/juxt/book.clj[tag=create-grant-permission-action!,indent=0]
 ----
 ====
 
@@ -145,7 +145,7 @@ This is shown in <<ex-permit-grant-permission-action>>.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=permit-grant-permission-action!,indent=0]
+include::../../test/juxt/book.clj[tag=permit-grant-permission-action!,indent=0]
 ----
 ====
 

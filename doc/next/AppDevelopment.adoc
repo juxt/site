@@ -17,7 +17,7 @@ participant "/authorize" as auth
 participant "/token" as token
 end box
 
-database XT
+database XTDB
 app -> browser : create link containing client_id
 browser -> auth: user clicks on 'authorize' link
 User -> browser

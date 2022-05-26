@@ -15,7 +15,7 @@ access.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=invoke-put-application!,indent=0]
+include::../../test/juxt/book.clj[tag=invoke-put-application!,indent=0]
 ----
 ====
 
@@ -24,7 +24,7 @@ include::../../test/juxt/demo.clj[tag=invoke-put-application!,indent=0]
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=invoke-authorize-application!,indent=0]
+include::../../test/juxt/book.clj[tag=invoke-authorize-application!,indent=0]
 ----
 ====
 
@@ -33,7 +33,7 @@ include::../../test/juxt/demo.clj[tag=invoke-authorize-application!,indent=0]
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-test-subject!,indent=0]
+include::../../test/juxt/book.clj[tag=create-test-subject!,indent=0]
 ----
 ====
 
@@ -42,7 +42,7 @@ include::../../test/juxt/demo.clj[tag=create-test-subject!,indent=0]
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=invoke-issue-access-token!,indent=0]
+include::../../test/juxt/book.clj[tag=invoke-issue-access-token!,indent=0]
 ----
 ====
 
@@ -52,7 +52,7 @@ NOTE: Developer note: TODO
 
 
 ----
-curl -i https://site.test/private.html -H "Authorization: Bearer test-access-token"
+curl -i https://site.test/protected.html -H "Authorization: Bearer test-access-token"
 ----
 
 == Development Notes

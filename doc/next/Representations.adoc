@@ -57,7 +57,7 @@ response body in HTML.
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-hello-world-html-representation!,indent=0]
+include::../../test/juxt/book.clj[tag=create-hello-world-html-representation!,indent=0]
 ----
 <1> The variant is itself a resoure, with its own URI.
 <2> The content-type, and potentially other attributes making up the *representation metadata*, is included in the document

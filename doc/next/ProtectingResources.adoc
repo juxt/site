@@ -1,23 +1,106 @@
 = Protecting Resources
 :toc: left
 
-[[publishing-private-resources]]
-== Creating a private resource
+== Introduction
 
-Now let's publish an immutable private resource which can only be seen by an
-authenticated user.
+For many record-keeping systems, it's necessary to protect resources from access
+and modification from unauthorized users.
 
-We'll need an action to publish a private resource.
+In this chapter we will create an Action for creating protected resources. These
+preliminaries will be useful later on as we explore different approaches to
+authentication.
 
+[[publishing-protected-resources]]
+== Create the Action to create a protected resource
 
-.Creating and accessing a private resource
+We'll need an Action to create a protected resource. This is demonstrated in
+<<creating-an-action-to-create-a-protected-resource>>.
+
+[[creating-an-action-to-create-a-protected-resource]]
+.Creating an Action to create a protected resource
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=create-action-put-immutable-protected-resource!,indent=0]
+----
+
+<1> Users making a GET request to this resource will require a permission to
+perform the Action `+https://site.test/actions/get-protected-resource+`. This
+Action doesn't yet exist (but we'll create it in
+<<creating-action-get-protected-resource>>).
+
+<2> We'll repeat our usual RBAC policy for this Action: we make this Action
+accessible if a Permission exists that permits Users in a particular role to
+perform this Action.
+
 ====
 
-Again, let's complete the following steps:
+[IMPORTANT]
+--
+Copy the code in <<creating-an-action-to-create-a-protected-resource>> into a
+REPL, edit as required and evaluate.
+--
+
+As per our Action's rules, we'll need to grant a Permission so that our REPL user can perform it. This Permission is created in
+<<permit-admins-to-create-a-protected-resource>>.
+
+[[permit-admins-to-create-a-protected-resource]]
+.Permitting administrators to create protected resources
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=grant-permission-to-put-immutable-protected-resource!,indent=0]
+----
+====
+
+[IMPORTANT]
+--
+Copy the code in <<permit-admins-to-create-a-protected-resource>> into a REPL,
+edit as required and evaluate.
+--
+
+In <<creating-an-action-to-create-a-protected-resource>>, we restricted access
+to the resource to those Users who are authorized to perform the
+`+https://site.test/actions/get-protected-resource+`
+Action. <<creating-action-get-protected-resource>> demonstrates the creation
+this Action.
+
+[[creating-action-get-protected-resource]]
+.Creating the `get-protected-resource` Action
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=create-action-get-protected-resource!,indent=0]
+----
+
+<1> The Permission must directly reference the User.
+
+<2> The Permission must _also_ directly reference the Resource that is being
+protected. There are no roles used in this example, Permissions must exist for
+every combination of User and Resource. Note, this may not be practical for many
+systems, but works for these authentication examples.
+
+====
+
+[IMPORTANT]
+--
+
+Copy the code in <<creating-action-get-protected-resource>> into a REPL, edit as
+required and evaluate.
+
+--
+
+Now we have created the Actions necessary to protect resources from unauthorized
+Users, we can illustrate different approaches to User authentication.
+
+
+
+////
+Now to create a protected resource.
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-action-put-immutable-private-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=create-immutable-protected-resource!,indent=0]
 ----
 
 [IMPORTANT]
@@ -25,66 +108,10 @@ include::../../test/juxt/demo.clj[tag=create-action-put-immutable-private-resour
 Do it
 --
 
-We'll grant this permission to our REPL user.
-
-[source,clojure]
-----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-put-immutable-private-resource!,indent=0]
-----
-
-[IMPORTANT]
---
-Do it
---
-
-Now we'll create the action that is used to get a private resource. The rules
-mandate that a permission has been granted on a specific resource and the
-subject is not nil.
-
-[source,clojure]
-.Creating the `get-private-resource` action
-----
-include::../../test/juxt/demo.clj[tag=create-action-get-private-resource,indent=0]
-----
-
-[IMPORTANT]
---
-Do it
---
-
-The `get-private-resource` action's rules state that a single 'global'
-permission (referencing the action) is sufficient for _any_ authenticated
-end-user (subject) to access the action.
-
-But we must rememeber to create that single global permission:
-
-[source,clojure]
-.Creating the global grant on `get-private-resource` to authenticated users
-----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-get-private-resource!,indent=0]
-----
-
-[IMPORTANT]
---
-Do it
---
-
-Now to create a private resource.
-
-[source,clojure]
-----
-include::../../test/juxt/demo.clj[tag=create-immutable-private-resource!,indent=0]
-----
-
-[IMPORTANT]
---
-Do it
---
-
-Let's try to access the private resource.
+Let's try to access the protected resource.
 
 ----
-curl -i https://site.test/private.html
+curl -i https://site.test/protected.html
 ----
 
 We should get a response with a 401 status. We're not authorized to access this
@@ -103,3 +130,5 @@ permissions-policy: interest-cohort=()
 Unauthorized
 ----
 ====
+
+////

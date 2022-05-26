@@ -13,3 +13,6 @@
   and similar. For the size parameter, try 12."
   [size]
   (as-hex-str (random-bytes size)))
+
+(defn new-subject-urn []
+  (format "urn:site:subjects:%s" (random-uuid)))

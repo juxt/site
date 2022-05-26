@@ -1,28 +1,29 @@
 = Resources
 :toc: left
 
+(((resource,definition)))
 Resources in Site are web resources, as per
 https://httpwg.org/specs/rfc7231.html#resources[RFC 7231].
 
-Resourse are identified by a URI. When resources are stored in XT, the
+Resources are identified by a URI. When resources are stored in XTDB, the
 resource's URI is the `:xt/id` attribute.
 
-A web resource is a series of states across time, just like an XT entity.
+A web resource is a series of states across time, just like an XTDB entity.
 
 In this section we'll create a basic plain-text public resource containing the
 classic greeting.
 
-== Anatomy of a Site resource
+== Document structure of a Site resource
 
-In Site, every XT document represents a web resource. This means that the terms
+In Site, every XTDB document represents a resource. This means that the terms
 resource and document are somewhat synonymous in Site documentation.
 
-In the same way every web resource has a Uniform Resource Identitier (URI),
-every document in the XTDB database has an XT (`:xt/id`) identifier.
+In the same way every resource has a Uniform Resource Identitier (URI), every
+document in the XTDB database has an XTDB (`:xt/id`) identifier.
 
-In this way, exposing data to the web is trivial. There is convoluted logic or
-mappings, it's a simply one-to-one correspondence. All Site does is provide the
-protocol layer to handle HTTP requests.
+In this way, exposing data to the web is trivial. There is no convoluted logic
+or mappings, it's a simple one-to-one correspondence. All Site does is provide
+the protocol layer to handle HTTP requests.
 
 Site uses the request URI to lookup the corresponding XT document, and uses
 certain known attributes of the document to determine the web resource's
@@ -38,18 +39,18 @@ reserved by Site. These always start with `juxt` and there are a handful of
 namespaces which are used, such as `juxt.http`, `juxt.site` and
 `juxt.pass`.
 
-It's important to understand that these XT documents are _your_ documents, with
+It's important to understand that these XTDB documents are _your_ documents, with
 attributes you choose from _your_ domain. The documents are merely augmented
 with additional non-conflicting attributes recognised by Site.
 --
 
-.HTTP protocol mappings to XT document attributes
+.HTTP protocol mappings to XTDB document attributes
 [[http-protocol-mappings]]
 |===
-|Web|XT
+|Web|XTDB
 
 |URI|`:xt/id`
-|Methods|`:juxt.http.alpha/methods`
+|Methods|`:juxt.site.alpha/methods`
 |Representations|`:juxt.site.alpha/variant-of`
 |Body|`:juxt.http.alpha/body`, `:juxt.http.alpha/content`
 |Content Type|`:juxt.http.alpha/content-type`
@@ -65,7 +66,7 @@ with additional non-conflicting attributes recognised by Site.
 |OPTIONS|`:juxt.http.alpha/options`
 |===
 
-XT is to Site what a file-system is to a static web-server, such as Apache.
+XTDB is to Site what a file-system is to a static web-server, such as Apache.
 
 Apache encodes web metadata in the filename. For example, the filename
 `foo.en.html.gz` encodes the language (English), media-type (HTML) and encoding
@@ -83,7 +84,7 @@ Site attributes.
 === Methods
 
 (((web methods)))
-The `:juxt.http.alpha/methods` attribute value is a map of entries, one for each
+The `:juxt.site.alpha/methods` attribute value is a map of entries, one for each
 web method.
 
 The value of each entry is another map, which contains configuration data for
@@ -106,14 +107,14 @@ be used when seeking permission.
 In effect, this allows the resource to indicate which rules are to be used in
 determining whether a user can access the resource.
 
-<<ex-http-methods>> shows an example of a `:juxt.http.alpha/methods` entry.
+<<ex-http-methods>> shows an example of a `:juxt.site.alpha/methods` entry.
 
 [[ex-http-methods]]
-.A `:juxt.http.alpha/methods` entry
+.A `:juxt.site.alpha/methods` entry
 ====
 [source,clojure]
 ----
-{:juxt.http.alpha/methods
+{:juxt.site.alpha/methods
   {:get
     {:juxt.pass.alpha/actions
       #{"https://site.test/actions/get-shopping-list"}}
@@ -144,7 +145,7 @@ Let's start with the first action, shown in <<ex-get-public-resource>>.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-action-get-public-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-get-public-resource!,indent=0]
 ----
 <1> We use a more appropriate scope that better reflects this action.
 <2> This is a very weak rule that matches a particular permission.
@@ -164,7 +165,7 @@ Note in <<ex-get-public-resource>> the Rules referenced the existence of a Permi
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-get-public-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-get-public-resource!,indent=0]
 ----
 
 ====
@@ -190,7 +191,7 @@ REPL.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-action-put-immutable-public-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-put-immutable-public-resource!,indent=0]
 ----
 <1> We'll put this action in the `write:resource` scope
 <2> We add (or override) the HTTP methods allowed on this resource. Each entry is a mapping from an allowed method to a set of actions. This restricts the search for permissions to a set of actions. The fact that we don't specify any methods such as PUT, POST or DELETE that will change the resource is the reason we've named this action as creating an immutable public resource.
@@ -212,7 +213,7 @@ In this example, we allow anyone with the role of `Administrator` to perform the
 
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=grant-permission-to-invoke-action-put-immutable-public-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-put-immutable-public-resource!,indent=0]
 ----
 ====
 
@@ -235,7 +236,7 @@ resource that will print `Hello World!` on a web page.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/demo.clj[tag=create-hello-world-resource!,indent=0]
+include::../../test/juxt/book.clj[tag=create-hello-world-resource!,indent=0]
 ----
 ====
 

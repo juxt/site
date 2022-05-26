@@ -11,7 +11,6 @@
    [juxt.apex.alpha :as-alias apex]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.authentication :as authn]
    [juxt.pass.alpha.malli :as-alias pass.malli]
    [juxt.pass.alpha.process :as-alias pass.process]
    [juxt.pass.alpha.util :refer [make-nonce]]
@@ -143,8 +142,11 @@
      xt-node
      (into
       {:xt/id (str base-uri "/_site/graphql/requests/operations.graphql")
-       ::http/methods {:get {} :head {} :post {} :options {}}
-       ::http/acceptable-on-post {"accept" "application/x-www-form-urlencoded"}
+       ::site/methods
+       {:get {}
+        :head {}
+        :post {::site/acceptable {"accept" "application/x-www-form-urlencoded"}}
+        :options {}}
        ::site/graphql-schema schema-id
        ::site/post-fn 'juxt.site.alpha.graphql/stored-document-post-handler}
       (graphql/stored-document-resource-map
@@ -595,18 +597,15 @@
           (put-immutable-public-resource
            {:xt/id login
             :juxt.http.alpha/content-type "text/plain"
-            :juxt.site.alpha/get-fn 'juxt.pass.alpha.openid-connect/login
+            :juxt.site.alpha/methods {:get {:handler 'juxt.pass.alpha.openid-connect/login}}
             :juxt.pass.alpha/oauth-client client})
 
           callback
           (put-immutable-public-resource
            {:xt/id callback
             :juxt.http.alpha/content-type "text/plain"
-            :juxt.site.alpha/get-fn 'juxt.pass.alpha.openid-connect/callback
+            :juxt.site.alpha/methods {:get {:handler 'juxt.pass.alpha.openid-connect/callback}}
             :juxt.pass.alpha/oauth-client client})
           ]
       {:login-uri (get-in login [::pass/puts 0])
-       :callback-uri (get-in callback [::pass/puts 0])})
-
-
-    ))
+       :callback-uri (get-in callback [::pass/puts 0])})))
