@@ -3,11 +3,13 @@ schema {
 }
 
 type Query {
-  accounts: [Account]
+  accounts: [Account] @site(action: "https://site.test/actions/list-accounts")
+  transactions: [Transaction] @site(action: "https://site.test/actions/list-transactions")
 }
 
 type Account {
-  transactions: [Transaction]
+  name: String
+  transactions: [Transaction] @site(action: "https://site.test/actions/list-transactions")
 }
 
 type Transaction {
