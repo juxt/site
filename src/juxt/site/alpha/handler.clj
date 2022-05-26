@@ -953,7 +953,8 @@
                         ::site/status-message (status-message (:ring.response/status error-resource)))
 
         response (try
-                   (response/add-payload error-resource)
+                   (cond-> error-resource
+                       (not= method :head) response/add-payload)
                    (catch Exception e
                      (respond-internal-error req e)))]
 

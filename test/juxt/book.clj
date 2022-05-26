@@ -1097,7 +1097,8 @@
   (put!
    {:xt/id "urn:site:resources:not-found"
     :juxt.site.alpha/methods
-    {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-not-found"}}}}))
+    {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-not-found"}}
+     :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-not-found"}}}}))
 
 ;; Complete all tasks thus far directed by the book
 (defn preliminaries! []
