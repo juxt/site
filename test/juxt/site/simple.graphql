@@ -14,4 +14,5 @@ type Account {
 
 type Transaction {
   amount: String
+  account: Account
 }

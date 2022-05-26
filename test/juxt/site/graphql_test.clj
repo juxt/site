@@ -14,7 +14,7 @@
    [juxt.grab.alpha.document :as document]
    [juxt.grab.alpha.parser :as parser]
    [juxt.site.alpha :as-alias site]
-   [juxt.site.alpha.graphql-compiler :refer [compile-graphql-as-xt compile-root exec-graphql-as-xt]]
+   [juxt.site.alpha.graphql-compiler :refer [compile-graphql-as-xt compile-root]]
    [juxt.pass.alpha :as-alias pass]
    [juxt.http.alpha :as-alias http]
    [juxt.grab.alpha.graphql :as-alias g]
@@ -73,29 +73,29 @@
 
 (use-fixtures :each with-system-xt with-setup with-handler)
 
-(defn post-handler [req]
-  (let [subject-doc (::pass/subject req)
-        subject (:xt/id subject-doc)
-        db (::site/db req)
-        schema (schema/compile-schema (parser/parse (slurp (io/resource "juxt/site/simple.graphql"))))
+;; (defn post-handler [req]
+;;   (let [subject-doc (::pass/subject req)
+;;         subject (:xt/id subject-doc)
+;;         db (::site/db req)
+;;         schema (schema/compile-schema (parser/parse (slurp (io/resource "juxt/site/simple.graphql"))))
 
-        body (some-> req ::site/received-representation ::http/body (String.))
+;;         body (some-> req ::site/received-representation ::http/body (String.))
 
-        _ (log/infof "body is %s" body)
+;;         _ (log/infof "body is %s" body)
 
-        {query "query"
-         operation-name "operationName"
-         variables "variables"} (some-> body json/read-value)
+;;         {query "query"
+;;          operation-name "operationName"
+;;          variables "variables"} (some-> body json/read-value)
 
-        _ (log/infof "query is %s" query)
-        ]
+;;         _ (log/infof "query is %s" query)
+;;         ]
 
-    (-> req
-        (assoc
-         :ring.response/status 200
-         :ring.response/body
-         (json/write-value-as-string (exec-graphql-as-xt query schema (::pass/subject subject) db)))
-        (update :ring.response/headers assoc "content-type" "application/json"))))
+;;     (-> req
+;;         (assoc
+;;          :ring.response/status 200
+;;          :ring.response/body
+;;          (json/write-value-as-string (compile-graphql-as-xt query schema (::pass/subject subject) db)))
+;;         (update :ring.response/headers assoc "content-type" "application/json"))))
 
 
 ((t/join-fixtures [with-system-xt with-setup with-handler])
@@ -187,7 +187,7 @@
                ::pass/purpose nil
                ::pass/user :bob})
 
-   (repl/put! {:xt/id "https://site.test/permissions/bob/list-transactions"
+   (repl/put! {:xt/id "https://site.test/permissions/carol/list-transactions"
                ::site/type "https://meta.juxt.site/pass/permission"
                ::pass/action "https://site.test/actions/list-transactions"
                ::pass/purpose nil
@@ -323,15 +323,13 @@
          join (first (:joins datalog-map))
          join-action
          #{(:action join)}]
+     
      (xt/q (xt/db *xt-node*)
            (:query join)
            "https://site.test/subjects/alice"
            join-action
            (set (map #(-> % :resource :xt/id) resources-in-scope))
-           action)
-     ;; (map #(-> % :resource :xt/id) resources-in-scope)
-     datalog-map
-     ;; resources-in-scope
+           join-action)
      )
 
    #_(let [body (json/write-value-as-bytes {"query" "query { accounts @site(action: \"https://site.test/actions/list-accounts\") { name } }"})
