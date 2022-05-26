@@ -646,3 +646,20 @@
           :ring.request/headers {"accept" "text/html"}})]
     (is (= 200 (:ring.response/status response)))
     (is (= "<h1>Hello!</h1>" (:ring.response/body response)))))
+
+(deftest authentication-header-with-extraneous-input-returns-401
+  (submit-and-await!
+   [[:crux.tx/put access-all-apis]
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/example.txt"
+      ::http/last-modified #inst "2020-03-01"
+      ::http/content-type "text/plain"
+      ::http/methods #{:get}}]])
+  (let [response
+        (*handler*
+         {:ring.request/method :get
+          :ring.request/path "/example.txt"
+          :ring.request/headers {"accept" "text/plain"
+                                 "authorization" "Bearer: abc  "}})]
+    (is (= 401 (:ring.response/status response)))
+    (is (= "Unauthorized\r\n" (:ring.response/body response)))))

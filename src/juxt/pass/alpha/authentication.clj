@@ -244,39 +244,43 @@
           (assoc ::pass/auth-scheme "Session"))))
 
      ;; Authorization header
-     (when-let [authorization-header
-                (get-in req [:ring.request/headers "authorization"])]
-       (let [{::rfc7235/keys [auth-scheme token68]}
-             (reap/authorization authorization-header)]
+     (try
+       (when-let [authorization-header
+                  (get-in req [:ring.request/headers "authorization"])]
+         (let [{::rfc7235/keys [auth-scheme token68]}
+               (reap/authorization authorization-header)]
 
-         (case (.toLowerCase auth-scheme)
-           "basic"
-           (try
-             (let [[_ username password]
-                   (re-matches
-                    #"([^:]*):([^:]*)"
-                    (String. (.decode (java.util.Base64/getDecoder) token68)))
+           (case (.toLowerCase auth-scheme)
+             "basic"
+             (try
+               (let [[_ username password]
+                     (re-matches
+                      #"([^:]*):([^:]*)"
+                      (String. (.decode (java.util.Base64/getDecoder) token68)))
 
-                   [user pwhash] (lookup-user db base-uri username)]
+                     [user pwhash] (lookup-user db base-uri username)]
 
-               (when (and password pwhash (password/check password pwhash))
-                 {::pass/user user
-                  ::pass/username username
-                  ::pass/auth-scheme "Basic"}))
-             (catch Exception e
-               (log/error e)))
+                 (when (and password pwhash (password/check password pwhash))
+                   {::pass/user user
+                    ::pass/username username
+                    ::pass/auth-scheme "Basic"}))
+               (catch Exception e
+                 (log/error e)))
 
-           "bearer"
-           (when-let [session (lookup-session token68 now)]
-             (->
-              (select-keys session [::pass/user ::pass/username])
-              (assoc ::pass/auth-scheme "Bearer"
-                     ;;::pass/session-expiry (java.util.Date/from (::expiry-instant session))
-                     )))
-
+             "bearer"
+             (when-let [session (lookup-session token68 now)]
+               (->
+                (select-keys session [::pass/user ::pass/username])
+                (assoc ::pass/auth-scheme "Bearer"
+                       ;;::pass/session-expiry (java.util.Date/from (::expiry-instant session))
+                       )))
            (throw
             (ex-info "Auth scheme unsupported"
-                     (into req {:ring.response/status 401})))))))))
+                     (into req {:ring.response/status 401}))))))
+       (catch clojure.lang.ExceptionInfo e
+         (throw (ex-info (str "Failed parsing Authorization header: " (.getMessage e))
+                         (into req {:ring.response/status 401})
+                         e)))))))
 
 (defn login-template-model [req]
   {:query (str (:ring.request/query req))})
