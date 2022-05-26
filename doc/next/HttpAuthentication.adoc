@@ -29,7 +29,7 @@ If a request is made for a resource in a protection space, the User making the
 request is authenticated prior to any authorization decisions being made. The
 details depend on the configuration of the protection space.
 
-In Site, protection spaces are defined in individual Documents in the database.
+In Site, a protection space is defined in a Document in the database.
 
 If the Action on the resource fails to be authorized, and the request does not
 supply valid credentials, then the request is met with a `401 Unauthorized`
@@ -52,6 +52,8 @@ only publically accessible information.
 Do not rely on a protection space providing protection for your resource. You
 still need to write rules for how your Actions will be authorized!
 --
+
+== Realm values
 
 [quote,RFC 7235]
 --

@@ -26,7 +26,7 @@ include::../../test/juxt/book.clj[tag=create-action-put-immutable-protected-reso
 
 <1> Users making a GET request to this resource will require a permission to
 perform the Action `+https://site.test/actions/get-protected-resource+`. This
-Action doesn't yet exist (we'll create it in
+Action doesn't yet exist (but we'll create it in
 <<creating-action-get-protected-resource>>).
 
 <2> We'll repeat our usual RBAC policy for this Action: we make this Action
