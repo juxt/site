@@ -15,6 +15,7 @@
    [jsonista.core :as json]
 
    [juxt.pass.alpha.session :as session]
+   [juxt.pass.alpha.authentication :refer [put-session!]]
    [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.site.alpha.response :refer [redirect]]
    [juxt.site.alpha.return :refer [return]]
@@ -34,7 +35,7 @@
 
 (defn login
   "Redirect to an authorization endpoint"
-  [{::site/keys [resource crux-node db]
+  [{::site/keys [db crux-node resource start-date]
     :ring.request/keys [query]
     :as req}]
 
@@ -43,6 +44,7 @@
 
         query-params (some-> req :ring.request/query (codec/form-decode "US-ASCII"))
         return-to (get query-params "return-to")
+        fail-to (get query-params "fail-to")
 
         _ (when-not oauth-client-id
             (return req 500 "No oauth client id found" {}))
@@ -61,16 +63,19 @@
         nonce (make-nonce 12)
 
         ;; Create a pre-auth session
-        session-token-id!
-        (session/create-session
-         crux-node
-         (cond-> {::pass/state state ::pass/nonce nonce}
-           return-to (assoc ::pass/return-to return-to)))
+        session-token-id! (make-nonce 16)
+        expires-in (get resource ::pass/expires-in (* 24 3600))
+        _ (put-session!
+           session-token-id!
+           (cond-> {::pass/state state ::pass/nonce nonce}
+             return-to (assoc ::pass/return-to return-to)
+             fail-to (assoc ::pass/fail-to fail-to))
+           (.plusSeconds (.toInstant start-date) expires-in))
 
         query-string
         (codec/form-encode
          {"response_type" "code"
-          "scope" "openid name picture profile email" ; TODO: configure in the XT entity
+          "scope" "openid"
           "client_id" oauth-client-id
           "redirect_uri" redirect-uri
           "state" state
@@ -81,9 +86,6 @@
     (-> req
         (redirect 303 location)
         (session/set-cookie session-token-id!))))
-
-(defn login-with-github [req]
-  (login req))
 
 (defn find-key [kid jwks]
   (when kid
@@ -197,45 +199,6 @@
           (crux/submit-tx crux-node [[:crux.tx/put result]])
           (::pass/jwks result))))))
 
-(defn new-subject-urn []
-  (format "urn:site:subjects:%s" (java.util.UUID/randomUUID)))
-
-;; See https://openid.net/specs/openid-connect-core-1_0.html
-(defn extract-standard-claims [claims]
-  (let [standard-claims ["iss" "sub" "aud" "exp" "iat" "auth_time" "nonce" "acr" "amr" "azp"
-                         "name" "given_name" "family_name" "middle_name" "nickname" "preferred_username"
-                         "profile" "picture" "website" "email" "email_verified" "gender" "birthdate"
-                         "zoneinfo" "locale" "phone_number" "phone_number_verified" "address" "updated_at"]]
-    (->>
-     (for [c standard-claims
-           :let [v (get claims c)]
-           :when v]
-       [(keyword "juxt.pass.jwt" (str/replace c "_" "-")) v])
-     (into {}))))
-
-(defn create-subject! [crux-node matched-identity id-token]
-  (let [subject (new-subject-urn)]
-    (crux/submit-tx
-     crux-node
-     [[:crux.tx/put
-       (into
-        {:crux.db/id subject
-         ::site/type "Subject"
-         ::pass/id-token-claims (:claims id-token)
-         ::pass/user matched-identity}
-        ;; We need to index some of the common known claims in order to
-        ;; use them in our Datalog rules.
-        (extract-standard-claims (get id-token :claims)))]])
-    subject))
-
-#_(xt/q db '{:find [i]
-             :where [[i ::site/type "Identity"]
-                     [i :juxt.pass.jwt/iss iss]
-                     [i :juxt.pass.jwt/sub sub]]
-             :in [iss sub]}
-        (get id-token-claims "iss")
-        (get id-token-claims "sub"))
-
 (defn match-identity [db id-token-claims]
   (let [identities
         (map first
@@ -305,8 +268,6 @@
         _ (when-not oauth-client-secret
             (return req 500 "The required OAuth client secret was not found" {}))
 
-        ;; TODO: Check state - need to think about sessions?
-
         jwks-uri (get openid-configuration "jwks_uri")
         _ (when-not jwks-uri
             (return req 500 "No JWKS URI in configuration" {}))
@@ -346,24 +307,21 @@
             ;; This is possibly an attack, we should log an alert
             (return req 500 "Nonce received does not match expected" {}))
 
-        ;; Does the id-token match any identities in our database? If so, we create
-        ;; a subject.
-        matched-identity (match-identity db (:claims id-token))
-        subject (when matched-identity
-                  (create-subject! crux-node matched-identity id-token))]
+        ;; Does the id-token match any identities in our database?
+        matched-identity (match-identity db (:claims id-token))]
 
     ;; Put the ID_TOKEN into the session, cycle the session id and redirect to
     ;; the redirect URI stored in the original session.
 
-    (if subject
+    (if matched-identity
 
       (do
         (log/warnf "Successful login! %s" (pr-str (select-keys (:claims id-token) ["iss" "sub"])))
         (-> req
             (redirect 303 (get session ::pass/return-to "/login-succeeded"))
-            (session/escalate-session subject matched-identity)))
+            (session/escalate-session matched-identity)))
 
       ;; Login unsuccessful.
       (do
         (log/warnf "Unsuccessful login, no known identity match for claims %s" (pr-str (select-keys (:claims id-token) ["iss" "sub"])))
-        (redirect req 303 "/login-failed")))))
+        (redirect req 303 (get session ::pass/fail-to "/login-failed"))))))

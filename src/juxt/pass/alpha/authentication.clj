@@ -30,6 +30,10 @@
          assoc k (assoc session
                         ::expiry-instant expiry-instant)))
 
+(defn remove-session! [k]
+  (swap! sessions-by-access-token
+         dissoc k))
+
 (defn expire-sessions! [date-now]
   (swap! sessions-by-access-token
          (fn [sessions]
@@ -49,7 +53,7 @@
 
   ;; Check grant_type of posted-representation
   (assert (.startsWith (::http/content-type received-representation)
-             "application/x-www-form-urlencoded"))
+                       "application/x-www-form-urlencoded"))
 
   (when-not subject
     (throw
@@ -275,9 +279,8 @@
            (when-let [session (lookup-session token68 now)]
              (->
               (select-keys session [::pass/user ::pass/username])
-              (assoc ::pass/auth-scheme "Bearer"
-                     ;;::pass/session-expiry (java.util.Date/from (::expiry-instant session))
-                     )))
+              (assoc ::pass/auth-scheme "Bearer")))
+
            (throw
             (ex-info "Auth scheme unsupported"
                      (into req {:ring.response/status 401})))))))))
@@ -287,5 +290,5 @@
 
 (defn unauthorized-template-model [req]
   {:redirect (str
-               (:ring.request/path req)
-               (when-let [query (:ring.request/query req)] (str "?" query)))})
+              (:ring.request/path req)
+              (when-let [query (:ring.request/query req)] (str "?" query)))})
