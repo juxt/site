@@ -367,7 +367,7 @@
         :as req}]
 
     (let [actions (get-in resource [::site/methods method ::pass/actions])
-          permissions
+          permitted-actions
           (check-permissions
            db
            actions
@@ -377,8 +377,8 @@
              ;; this resource.
              (:xt/id resource) (assoc :resource (:xt/id resource))))]
 
-      (if (seq permissions)
-        (h (assoc req ::pass/permissions permissions))
+      (if (seq permitted-actions)
+        (h (assoc req ::pass/permitted-actions permitted-actions))
 
         (if subject
           (throw
