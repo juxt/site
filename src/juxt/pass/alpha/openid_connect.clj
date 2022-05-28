@@ -350,8 +350,11 @@
 
         ;; Does the id-token match any identities in our database? If so, we create
         ;; a subject.
-        subject (when-let [matched-identity (match-identity db (:claims id-token))]
-                  (create-subject! xt-node matched-identity id-token))]
+        subject
+        ;; TODO: Do as transaction function - can we write this in terms of an
+        ;; action?
+        (when-let [matched-identity (match-identity db (:claims id-token))]
+          (create-subject! xt-node matched-identity id-token))]
 
     ;; Put the ID_TOKEN into the session, cycle the session id and redirect to
     ;; the redirect URI stored in the original session.
