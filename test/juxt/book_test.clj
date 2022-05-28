@@ -115,7 +115,7 @@
     (is (string? uri)))
 
   (let [request {:ring.request/method :get
-                 :ring.request/path "/protected-by-cookie//document.html"}]
+                 :ring.request/path "/protected-by-cookie/document.html"}]
     (testing "Redirect"
       (let [response (*handler* request)]
         (is (= 302 (:ring.response/status response)))
