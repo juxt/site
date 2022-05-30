@@ -37,6 +37,14 @@
    :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"
    :juxt.pass.alpha/identity (str site-prefix "/identities/" user-id)})
 
+(defn make-bearer-protection-space [realm]
+  {:xt/id (str "https://site.test/protection-spaces/bearer/" realm)
+   :juxt.site.alpha/type "https://meta.juxt.site/pass/protection-space"
+    :juxt.pass.alpha/canonical-root-uri site-prefix
+    :juxt.pass.alpha/realm realm
+    :juxt.pass.alpha/auth-scheme "Bearer"
+    :juxt.pass.alpha/authentication-scope "/.*"})
+
 (defn make-permission
   [action-id]
   {:xt/id (str site-prefix "/permissions/" action-id)
@@ -71,13 +79,13 @@
   []
   (repl/put!
    {:xt/id "urn:site:resources:not-found"
-    ::http/methods
+    ::site/methods
     {:get {:juxt.pass.alpha/actions #{(str site-prefix "/actions/get-not-found")}}}}))
 
 (defn make-resource
   [path]
   {:xt/id (str site-prefix path)
-   ::http/methods {:get {:juxt.pass.alpha/actions #{(str site-prefix "/actions/get-public-resource")}}}
+   ::site/methods {:get {:juxt.pass.alpha/actions #{(str site-prefix "/actions/get-public-resource")}}}
    :juxt.pass.alpha/rules
    [['(allowed? permission subject action resource)
      ['permission :xt/id]]]})
@@ -119,6 +127,9 @@
                                                              [ident :juxt.pass.alpha/user user]]]}))
   (repl/put! (merge (make-permission "get-public-resource") {:juxt.pass.alpha/user (str site-prefix "/users/unauthorized-user")}))
   (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
+
+  (repl/put! (make-bearer-protection-space "test"))
+
   (testing "401 Unauthorized - When a resource requires authentication credentials that are not available 401 status is returned"
     (let [resp (*handler* {:ring.request/method :get
                            :ring.request/path "/hello"})]
@@ -181,6 +192,8 @@
   (repl/put! (make-user "bob"))
   (repl/put! (make-identity "bob"))
   (repl/put! (make-subject "bob" "bob-subj"))
+
+  (repl/put! (make-bearer-protection-space "test"))
 
   (testing "Access to a resource which requires authorization is denied when no bearer token provided"
     (let [resp (*handler* {:ring.request/method :get
