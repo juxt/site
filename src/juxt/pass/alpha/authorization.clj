@@ -12,7 +12,8 @@
    [juxt.pass.alpha.cookie-scope :as cookie-scope]
    [juxt.pass.alpha.malli :as-alias pass.malli]
    [juxt.pass.alpha.http-authentication :as http-authn]
-   [juxt.site.alpha :as-alias site]))
+   [juxt.site.alpha :as-alias site]
+   [juxt.pass.alpha.process :as process]))
 
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
@@ -155,7 +156,7 @@
         results
         (xt/q
          db
-         {:find '[resource (pull action [::xt/id ::pass/pull]) purpose permission]
+         {:find '[resource (pull action [:xt/id ::pass/pull]) purpose permission]
           :keys '[resource action purpose permission]
           :where
           (cond-> '[
@@ -206,57 +207,6 @@
              (group-by :xt/id))]
     (map #(update % join-key (comp first idx)) coll)))
 
-(defn resolve-with-ctx [form ctx]
-  (postwalk
-   (fn [x]
-     (if (and (vector? x) (= (first x) ::pass/resolve))
-       (ctx (second x))
-       x))
-   form))
-
-(defmulti apply-processor (fn [processor action acc] (first processor)))
-
-(defmethod apply-processor :default [[kw] action acc]
-  (throw (ex-info (format "No processor for %s" kw) {:kw kw :action action})))
-
-(defmethod apply-processor :juxt.pass.alpha.process/update-in [[kw ks f-sym & update-in-args] action acc]
-  (assert (vector? (:args acc)))
-  (let [f (case f-sym 'merge merge nil)]
-    (when-not f
-      (throw (ex-info "Unsupported update-in function" {:f f-sym})))
-    (apply update acc :args update-in ks f (resolve-with-ctx update-in-args (:ctx acc)))))
-
-(defmethod apply-processor ::xt/put [[kw ks] action acc]
-  (update acc :args (fn [args] (mapv (fn [arg] [::xt/put arg]) args))))
-
-(defmethod apply-processor ::pass.malli/validate [_ {::pass.malli/keys [args-schema]} acc]
-  (let [resolved-args-schema (resolve-with-ctx args-schema (:ctx acc))]
-    (when-not (m/validate resolved-args-schema (:args acc))
-      (throw
-       (ex-info
-        "Failed validation check"
-        ;; Not sure why Malli throws this error here: No implementation of
-        ;; method: :-form of protocol: #'malli.core/Schema found for class: clojure.lang.PersistentVector
-        ;;
-        ;; Workaround is to pr-str and read-string
-        (read-string (pr-str (m/explain resolved-args-schema (:args acc))))))))
-  acc)
-
-(defmethod apply-processor :gen-hex-string [[_ k size] action acc]
-  (update acc :ctx assoc k (as-hex-str (random-bytes size))))
-
-(defmethod apply-processor :add-prefix [[_ k prefix] action acc]
-  (update acc :ctx update k (fn [old] (str prefix old))))
-
-(defn process-args [pass-ctx action args]
-  (:args
-   (reduce
-    (fn [acc processor]
-      (apply-processor processor action acc))
-    {:args args
-     :ctx pass-ctx}
-    (::pass/process action))))
-
 (defn do-action*
   [xt-ctx
    {resource ::pass/resource
@@ -294,14 +244,14 @@
              :resource resource
              :purpose purpose})))
 
-        (let [processed-args (process-args pass-ctx action-doc args)]
+        (let [processed-args (process/process-args pass-ctx action-doc args)]
           (doseq [arg processed-args]
             (when-not (and (vector? arg) (keyword? (first arg)))
               (throw (ex-info "Every arg must be processed to return a tx op" {:action action :arg arg}))))
 
           (conj
            processed-args
-           [::xt/put
+           [:xtdb.api/put
             (into
              {:xt/id (format "urn:site:action-log:%s" (::xt/tx-id tx))
               ::site/type "ActionLogEntry"
