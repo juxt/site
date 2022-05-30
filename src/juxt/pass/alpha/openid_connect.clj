@@ -79,7 +79,8 @@
           "client_id" oauth-client-id
           "redirect_uri" redirect-uri
           "state" state
-          "nonce" nonce})
+          "nonce" nonce
+          "prompt" "login"})
 
         location (format "%s?%s" authorization-endpoint query-string)]
 
