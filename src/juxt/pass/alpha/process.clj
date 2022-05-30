@@ -31,7 +31,7 @@
     (apply update acc :args update-in ks f (resolve-with-ctx update-in-args (:ctx acc)))))
 
 (defmethod apply-processor :xtdb.api/put [[kw ks] acc]
-  (update acc :args (fn [args] (mapv (fn [arg] [::xt/put arg]) args))))
+  (assoc acc :ops (mapv (fn [arg] [::xt/put arg]) (:args acc))))
 
 (defmethod apply-processor ::pass.malli/validate [_ acc]
   (let [{::pass.malli/keys [args-schema]} (:action acc)
@@ -54,11 +54,10 @@
   (update acc :ctx update k (fn [old] (str prefix old))))
 
 (defn process-args [pass-ctx action args]
-  (:args
-   (reduce
-    (fn [acc processor]
-      (apply-processor processor acc))
-    {:args args
-     :ctx pass-ctx
-     :action action}
-    (::pass/process action))))
+  (reduce
+   (fn [acc processor]
+     (apply-processor processor acc))
+   {:args args
+    :ctx pass-ctx
+    :action action}
+   (::pass/process action)))

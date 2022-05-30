@@ -244,13 +244,13 @@
              :resource resource
              :purpose purpose})))
 
-        (let [processed-args (process/process-args pass-ctx action-doc args)]
-          (doseq [arg processed-args]
-            (when-not (and (vector? arg) (keyword? (first arg)))
-              (throw (ex-info "Every arg must be processed to return a tx op" {:action action :arg arg}))))
+        (let [ops (:ops (process/process-args pass-ctx action-doc args))]
+          (doseq [op ops]
+            (when-not (and (vector? op) (keyword? (first op)))
+              (throw (ex-info "Invalid op" {:action action :op op}))))
 
           (conj
-           processed-args
+           ops
            [:xtdb.api/put
             (into
              {:xt/id (format "urn:site:action-log:%s" (::xt/tx-id tx))
@@ -262,12 +262,12 @@
                            (keep
                             (fn [[tx-op {id :xt/id}]]
                               (when (= tx-op ::xt/put) id))
-                            processed-args))
+                            ops))
               ::pass/deletes (vec
                               (keep
                                (fn [[tx-op {id :xt/id}]]
                                  (when (= tx-op ::xt/delete) id))
-                               processed-args))}
+                               ops))}
              tx)])))
 
       (catch Exception e
