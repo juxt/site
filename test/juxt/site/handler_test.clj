@@ -5,6 +5,7 @@
    [clojure.test :refer [deftest is are testing] :as t]
    [clojure.tools.logging :as log]
    [crux.api :as x]
+   [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
    [juxt.mail.alpha.mail :as mailer]
@@ -647,19 +648,50 @@
     (is (= 200 (:ring.response/status response)))
     (is (= "<h1>Hello!</h1>" (:ring.response/body response)))))
 
-(deftest authentication-header-with-extraneous-input-returns-401
+
+(deftest authentication-test
   (submit-and-await!
    [[:crux.tx/put access-all-apis]
     [:crux.tx/put
      {:crux.db/id "https://example.org/example.txt"
       ::http/last-modified #inst "2020-03-01"
       ::http/content-type "text/plain"
-      ::http/methods #{:get}}]])
-  (let [response
-        (*handler*
-         {:ring.request/method :get
-          :ring.request/path "/example.txt"
-          :ring.request/headers {"accept" "text/plain"
-                                 "authorization" "Bearer: abc  "}})]
-    (is (= 401 (:ring.response/status response)))
-    (is (= "Unauthorized\r\n" (:ring.response/body response)))))
+      ::http/methods #{:get}}]
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/_site/users/abc"
+      ::site/type "User"}]
+    [:crux.tx/put
+     {:crux.db/id "https://example.org/_site/users/abc/password"
+      ::site/type "Password"
+      ::pass/user "https://example.org/_site/users/abc"
+      ::pass/password-hash (password/encrypt "123")}]])
+
+  (testing "Correct credentials"
+    (let [response
+          (*handler*
+           {:ring.request/method :get
+            :ring.request/path "/example.txt"
+            :ring.request/headers {"accept" "text/plain"
+                                   "authorization" "Basic YWJjOjEyMw=="}})]
+      (is (= 403 (:ring.response/status response)))
+      (is (= "Forbidden\r\n" (:ring.response/body response)))) )
+
+  (testing "Unsupported authorization scheme"
+    (let [response
+          (*handler*
+           {:ring.request/method :get
+            :ring.request/path "/example.txt"
+            :ring.request/headers {"accept" "text/plain"
+                                   "authorization" "Foo abc"}})]
+      (is (= 401 (:ring.response/status response)))
+      (is (= "Unauthorized\r\n" (:ring.response/body response)))))
+
+  (testing "Extraneous header input"
+    (let [response
+          (*handler*
+           {:ring.request/method :get
+            :ring.request/path "/example.txt"
+            :ring.request/headers {"accept" "text/plain"
+                                   "authorization" "Bearer abc "}})]
+      (is (= 401 (:ring.response/status response)))
+      (is (= "Unauthorized\r\n" (:ring.response/body response))))))
