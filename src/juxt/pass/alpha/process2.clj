@@ -14,12 +14,17 @@
 
 ;; ctx must contain :db
 (defmethod processing-step ::validate [m [_ schema] ctx]
-  (if-not (m/validate schema m)
-    (throw
-     (ex-info
-      "Failed validation check"
-      (m/explain schema m)))
-    m))
+  (let [schema (m/schema schema)]
+    (if-not (m/validate schema m)
+      ;; Not sure why Malli throws this error here: No implementation of
+      ;; method: :-form of protocol: #'malli.core/Schema found for class: clojure.lang.PersistentVector
+      ;;
+      ;; Workaround is to pr-str and read-string
+      (throw
+       (ex-info
+        "Failed validation check"
+        (m/explain schema m)))
+      m)))
 
 (defmethod processing-step ::nest [m [_ k] ctx]
   {k m})
@@ -31,8 +36,8 @@
   (apply dissoc m ks))
 
 (defmethod processing-step ::match-identity-on-password
-  [m [_ k {:keys [username-in-identity-key username-location
-                  password-in-identity-key password-location]}]
+  [m [_ k {:keys [username-in-identity-key path-to-username
+                  password-hash-in-identity-key path-to-password]}]
    ctx]
   (assert (:db ctx))
   (let [identity
@@ -43,17 +48,21 @@
                {:find '[e]
                 :where [
                         ['e username-in-identity-key 'username]
-                        ['e password-in-identity-key 'password-hash]
+                        ['e password-hash-in-identity-key 'password-hash]
                         ['(crypto.password.bcrypt/check password password-hash)]]
                 :in '[username password]}
-               (get-in m username-location)
-               (get-in m password-location))))]
-    (cond-> m
-      identity (assoc k identity))))
+               (get-in m path-to-username)
+               (get-in m path-to-password))))]
+    (if identity
+      (assoc m k identity)
+      (throw (ex-info "Login failed" {:username (get-in m path-to-username)})))))
 
 (defmethod processing-step ::db-single-put
   [m _ _]
   [[:xtdb.api/put m]])
+
+(defmethod processing-step ::abort [m _ _]
+  (throw (ex-info "Abort" {:value m})))
 
 (defn process [steps seed ctx]
   (reduce (fn [acc step] (processing-step acc step ctx)) seed (filter some? steps)))

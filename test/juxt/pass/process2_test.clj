@@ -2,11 +2,12 @@
 
 (ns juxt.pass.process2-test
   (:require
-   [clojure.test :refer [deftest is use-fixtures] :as t]
+   [clojure.test :refer [deftest is use-fixtures testing] :as t]
    [crypto.password.bcrypt :as password]
    [juxt.pass.alpha.process2 :as proc]
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node*]]
+   [malli.core :as m]
    [malli.util :as mu]
    [xtdb.api :as xt]))
 
@@ -32,7 +33,7 @@
 
   (repl/put! {:xt/id "alice-identity"
               :username "alice"
-              :password (password/encrypt "garden")})
+              :password-hash (password/encrypt "garden")})
 
   (let [cold-program
         [
@@ -50,9 +51,9 @@
          [::proc/match-identity-on-password
           :juxt.pass.alpha/identity
           {:username-in-identity-key :username
-           :username-location [:input "username"]
-           :password-in-identity-key :password
-           :password-location [:input "password"]}]
+           :path-to-username [:input "username"]
+           :password-hash-in-identity-key :password-hash
+           :path-to-password [:input "password"]}]
 
          [::proc/merge
           {:juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}]
@@ -65,26 +66,36 @@
 
          ^{:doc "Final validation before going into the database"}
          [::proc/validate
-          (mu/closed-schema
-           [:map
-            [:xt/id [:re "(.+)"]]
-            [:juxt.pass.alpha/identity :string]
-            [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/subject"]]])]
+          [:map
+           [:xt/id [:re "(.+)"]]
+           [:juxt.pass.alpha/identity :string]
+           [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/subject"]]]]
 
-         [::proc/db-single-put]]
+         [::proc/db-single-put]]]
 
-        result
+    (testing "Correct password creates subject"
+      (is
+       (=
+        [[:xtdb.api/put
+          {:juxt.pass.alpha/identity "alice-identity",
+           :juxt.site.alpha/type "https://meta.juxt.site/pass/subject",
+           :xt/id "https://juxt.site/subjects/alice438348348"}]]
         (proc/process
          (concat cold-program hot-program)
          {"username" "alice"
           "password" "garden"}
-         {:db (xt/db *xt-node*)})]
+         {:db (xt/db *xt-node*)}))))
 
-    (is (= [[:xtdb.api/put
-             {:juxt.pass.alpha/identity "alice-identity",
-              :juxt.site.alpha/type "https://meta.juxt.site/pass/subject",
-              :xt/id "https://juxt.site/subjects/alice438348348"}]] result))))
-
+    (testing "Incorrect password throws exception"
+      (is
+       (thrown-with-msg?
+        clojure.lang.ExceptionInfo
+        #"\QLogin failed\E"
+        (proc/process
+         (concat cold-program hot-program)
+         {"username" "alice"
+          "password" "wrong-password"}
+         {:db (xt/db *xt-node*)}))))))
 
 (comment
   ((t/join-fixtures [with-system-xt])
