@@ -247,7 +247,12 @@
      (when-let [authorization-header
                 (get-in req [:ring.request/headers "authorization"])]
        (let [{::rfc7235/keys [auth-scheme token68]}
-             (reap/authorization authorization-header)]
+             (try
+               (reap/authorization authorization-header)
+               (catch clojure.lang.ExceptionInfo e
+                 (throw (ex-info (str "Failed parsing Authorization header: " (.getMessage e))
+                                 (into req {:ring.response/status 401})
+                                 e))))]
 
          (case (.toLowerCase auth-scheme)
            "basic"
@@ -273,7 +278,6 @@
               (assoc ::pass/auth-scheme "Bearer"
                      ;;::pass/session-expiry (java.util.Date/from (::expiry-instant session))
                      )))
-
            (throw
             (ex-info "Auth scheme unsupported"
                      (into req {:ring.response/status 401})))))))))
