@@ -13,7 +13,8 @@
    [juxt.pass.alpha.malli :as-alias pass.malli]
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
-   [juxt.pass.alpha.process :as process]))
+   [juxt.pass.alpha.process :as process]
+   [juxt.pass.alpha.process2 :as proc2]))
 
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
@@ -214,7 +215,7 @@
     subject ::pass/subject
     action ::pass/action
     :as pass-ctx}
-    args]
+   args]
   (assert (vector? args))
   (let [db (xt/db xt-ctx)
         tx (xt/indexing-tx xt-ctx)]
@@ -244,7 +245,15 @@
              :resource resource
              :purpose purpose})))
 
-        (let [ops (:ops (process/process-args pass-ctx action-doc args))]
+        (let [ops
+              (cond
+                (::pass/process action-doc)
+                (:ops (process/process-args pass-ctx action-doc args))
+                (::pass/process2 action-doc)
+                (proc2/process (::pass/process2 action-doc) (first args) (assoc pass-ctx :db db))
+                :else
+                (throw (ex-info "All actions must have some processing steps"
+                                {:action action-doc})))]
           (doseq [op ops]
             (when-not (and (vector? op) (keyword? (first op)))
               (throw (ex-info "Invalid op" {:action action :op op}))))
