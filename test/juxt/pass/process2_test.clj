@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.process-test
+(ns juxt.pass.process2-test
   (:require
    [clojure.test :refer [deftest is use-fixtures] :as t]
    [crypto.password.bcrypt :as password]
