@@ -23,7 +23,7 @@
       (throw
        (ex-info
         "Failed validation check"
-        (m/explain schema m)))
+        (read-string (pr-str (m/explain schema m)))))
       m)))
 
 (defmethod processing-step ::nest [m [_ k] ctx]
