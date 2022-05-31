@@ -233,47 +233,83 @@
 
     (into req {:ring.response/status (if existing 204 201)})))
 
-(defn POST [{::site/keys [resource request-id] :as req}]
-  (let [rep (->
-             (receive-representation req)
-             (assoc ::site/request request-id))
-        req (assoc req ::site/received-representation rep)
-        post-fn (::site/post-fn resource)
-        post
-        (cond
-          (fn? post-fn) post-fn
+(defn POST [{::site/keys [xt-node resource]
+             ::pass/keys [subject]
+             :ring.request/keys [method]
+             :as req}]
+  (let [rep (receive-representation req)
 
-          (symbol? post-fn)
-          (try
-            (or
-             (requiring-resolve post-fn)
-             (throw
-              (ex-info
-               (format "Requiring resolve of %s returned nil" post-fn)
-               {:post-fn post-fn
-                ::site/request-context (assoc req :ring.response/status 500)})))
-            (catch Exception e
-              (throw
-               (ex-info
-                (format "post-fn '%s' is not resolvable" post-fn)
-                {::post-fn post-fn
-                 ::site/request-context (assoc req :ring.response/status 500)}
-                e))))
+        content-type (get-in req [:ring.request/headers "content-type"] "application/octet-stream")
 
-          (nil? post-fn)
-          (throw
-           (ex-info
-            "Resource allows POST but doesn't have a post-fn function"
-            {::site/request-context (assoc req :ring.response/status 500)}))
+        body-as-value
+        (case content-type
+          "application/x-www-form-urlencoded"
+          (ring.util.codec/form-decode (String. (::http/body rep)))
+          )
 
-          :else
-          (throw
-           (ex-info
-            (format "post-fn is neither a function or a symbol, but type '%s'" (type post-fn))
-            {::site/request-context (assoc req :ring.response/status 500)})))]
+        ;; TODO: Should we fail if more than one permitted action available?
+        permitted-action (:action (first (::pass/permitted-actions req)))
 
-    (assert post)
-    (post req)))
+        pass-ctx {:subject (:xt/id subject)
+                  :resource (:xt/id resource)}
+
+        action-log
+        (try
+          (authz/do-action xt-node pass-ctx (:xt/id permitted-action) body-as-value)
+          (catch Exception e
+            (throw
+             (ex-info
+              (format "Failed to perform action: %s" (:xt/id permitted-action))
+              {::site/request-context (assoc req :ring.response/status 500)
+               :permitted-action permitted-action
+               :rep rep
+               :cause e
+               :body-as-value body-as-value}
+              e))))
+
+        #_post-fn #_(::site/post-fn resource)
+        #_post
+        #_(cond
+            (fn? post-fn) post-fn
+
+            (symbol? post-fn)
+            (try
+              (or
+               (requiring-resolve post-fn)
+               (throw
+                (ex-info
+                 (format "Requiring resolve of %s returned nil" post-fn)
+                 {:post-fn post-fn
+                  ::site/request-context (assoc req :ring.response/status 500)})))
+              (catch Exception e
+                (throw
+                 (ex-info
+                  (format "post-fn '%s' is not resolvable" post-fn)
+                  {::post-fn post-fn
+                   ::site/request-context (assoc req :ring.response/status 500)}
+                  e))))
+
+            (nil? post-fn)
+            (throw
+             (ex-info
+              "Resource allows POST but doesn't have a post-fn function"
+              {::site/request-context (assoc req :ring.response/status 500)}))
+
+            :else
+            (throw
+             (ex-info
+              (format "post-fn is neither a function or a symbol, but type '%s'" (type post-fn))
+              {::site/request-context (assoc req :ring.response/status 500)})))]
+
+    ;;(assert post)
+
+    ;; TODO: Depending on the context, it might be applicable to reveal the URI
+    ;; of any newly created resource with a 201 and Location header. This
+    ;; determination perhaps ought to be configured into the Action doing the
+    ;; creation.
+    (assoc req :ring.response/status 200)
+    ;;(post req)
+    ))
 
 (defn PUT [{::site/keys [resource] :as req}]
   (let [rep (receive-representation req) _ (assert rep)
