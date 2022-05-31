@@ -14,9 +14,11 @@
    [juxt.site.alpha :as-alias site]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
+   [juxt.pass.alpha.process2 :as proc]
    [juxt.pass.alpha.authorization :as authz]
    [juxt.pass.alpha.http-authentication :as authn]
    [clojure.string :as str]
+   [malli.util :as mu]
    [xtdb.api :as x]))
 
 (defn with-handler [f]
@@ -119,7 +121,11 @@
     (testing "Redirect"
       (let [response (*handler* request)]
         (is (= 302 (:ring.response/status response)))
-        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"])))))))
+        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"]))))))
+
+
+  ;; POST to a login resource which we create a session - this is done in session
+  )
 
 (deftest protected-resource-with-http-bearer-auth-test
   (book/preliminaries!)
@@ -221,4 +227,124 @@
 (comment
   ((t/join-fixtures [with-system-xt with-handler])
    (fn []
+     (book/preliminaries!)
+     (book/protected-resource-preliminaries!)
+
+     (book/cookies-scopes-preliminaries!)
+
+     (book/book-create-resource-protected-by-cookie!)
+     (book/book-grant-permission-to-resource-protected-by-cookie!)
+     (book/book-create-cookie-scope!)
+
+     (book/book-put-basic-auth-user-identity!)
+
+     (let [uri (some :juxt.pass.alpha/login-uri
+                     (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie/document.html"))]
+       (is (string? uri)))
+
+     (let [request {:ring.request/method :get
+                    :ring.request/path "/protected-by-cookie/document.html"}]
+
+       (testing "Redirect"
+         (let [response (*handler* request)]
+           (is (= 302 (:ring.response/status response)))
+           (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"]))))))
+
+     ;; Create login action
+     (repl/do-action
+      "https://site.test/subjects/repl-default"
+      "https://site.test/actions/create-action"
+      {:xt/id "https://site.test/actions/login"
+
+       #_:juxt.pass.alpha.malli/args-schema
+       #_[:tuple
+          [:map
+           ["username" [:string]]
+           ["password" [:string]]]]
+
+       ;; TODO: Replace with 'cold' and 'hot' steps - cold steps run before
+       ;; head-of-line, hot steps run AT head-of-line
+       :juxt.pass.alpha/process2
+       [
+        [::proc/validate
+         [:map
+          ["username" [:string {:min 1}]]
+          ["password" [:string {:min 1}]]]]
+
+        [::proc/nest :input]
+
+        [::proc/match-identity-on-password
+         :juxt.pass.alpha/identity
+         {:username-in-identity-key :juxt.pass.alpha/username
+          :path-to-username [:input "username"]
+          :password-hash-in-identity-key :juxt.pass.alpha/password-hash
+          :path-to-password [:input "password"]}]
+
+        [::proc/merge
+         {:juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}]
+
+        ^{:doc "Add an id"}
+        [::proc/merge {:xt/id "https://juxt.site/subjects/alice438348348"}]
+
+        ^{:doc "Strip input"}
+        [::proc/dissoc :input]
+
+        [::proc/validate
+         [:map {:closed true}
+          [:xt/id [:string {:min 1}]]
+          [:juxt.pass.alpha/identity :string]
+          [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/subject"]]]]
+
+        [::proc/db-single-put]
+
+        ]
+
+       #_:juxt.pass.alpha/process
+       #_[
+          [:juxt.pass.alpha.malli/validate]
+
+          ;; Look up a matching identity - do a password check
+          [:juxt.pass.alpha.process/find-entity
+           {:juxt.pass.alpha/type "https://meta.juxt.site/pass/user-identity"
+            :juxt.pass.alpha/username [:get-in ["username"]]}]
+
+          [:juxt.pass.alpha.process/check-password "password" :juxt.pass.alpha/password-hash]
+
+          [:juxt.pass.alpha.process/wrap-in
+           {:xt/id (format "urn:site:subjects:%s" (random-uuid))
+            ::site/type "Subject"
+            ::pass/identity '%}]
+
+          [:xtdb.api/put]]
+
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? permission subject action resource)
+          [permission :xt/id]]]})
+
+     (repl/do-action
+      "https://site.test/subjects/repl-default"
+      "https://site.test/actions/grant-permission"
+      {:xt/id "https://site.test/permissions/login"
+       :juxt.pass.alpha/action "https://site.test/actions/login"
+       :juxt.pass.alpha/purpose nil})
+
+     ;; Create a new resource /login resource
+     ;; TODO: Put in an action
+     (put! {:xt/id "https://site.test/login"
+            ::site/methods
+            {:post {::site/acceptable {"accept" "application/x-www-form-urlencoded"}
+                    ::pass/actions #{"https://site.test/actions/login"}}}})
+
+     (let [body (.getBytes (ring.util.codec/form-encode {"username" "alice" "password" "garden"}))
+           request {:ring.request/method :post
+                    :ring.request/path "/login"
+                    :ring.request/headers
+                    {"content-length" (str (count body))
+                     "content-type" "application/x-www-form-urlencoded"}
+                    :ring.request/body (io/input-stream body)
+                    }]
+       (*handler* request))
+
+
      )))
