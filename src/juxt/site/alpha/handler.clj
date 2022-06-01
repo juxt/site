@@ -2,17 +2,19 @@
 
 (ns juxt.site.alpha.handler
   (:require
+   [cheshire.core :as json]
    [clojure.instant :refer [read-instant-date]]
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [crux.api :as x]
+   [crux.api :as crux]
    [crypto.password.bcrypt :as password]
    [juxt.apex.alpha.openapi :as openapi]
    [juxt.dave.alpha :as dave]
    [juxt.dave.alpha.methods :as dave.methods]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha.authentication :as authn]
+   [juxt.pass.alpha.session :as session]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.pick.alpha.core :refer [rate-representation]]
    [juxt.pick.alpha.ring :refer [pick decode-maybe]]
@@ -26,13 +28,13 @@
    [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.debug :as debug]
    [juxt.site.alpha.locator :as locator]
-   [juxt.site.alpha.util :as util]
-   [juxt.site.alpha.templating :as templating]
-   juxt.site.alpha.selmer
-   [juxt.site.alpha.triggers :as triggers]
    [juxt.site.alpha.rules :as rules]
-   [cheshire.core :as json])
-  (:import (java.net URI)))
+   juxt.site.alpha.selmer
+   [juxt.site.alpha.templating :as templating]
+   [juxt.site.alpha.triggers :as triggers]
+   [juxt.site.alpha.util :as util])
+  (:import
+   (java.net URI)))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -68,14 +70,13 @@
                 current-representations {::pick/vary? true}))]
 
     #_(when (contains? #{:get :head} (:ring.request/method request))
-      (when-not selected-representation
-        (throw
-         (ex-info
-          "Not Acceptable"
+        (when-not selected-representation
+          (throw
+           (ex-info
+            "Not Acceptable"
           ;; TODO: Must add list of available representations
           ;; TODO: Add to req with into
-          {:ring.response/status 406
-           }))))
+            {:ring.response/status 406}))))
 
     (log/debug "result of negotiate-representation" (dissoc selected-representation ::http/body ::http/content))
 
@@ -277,10 +278,10 @@
 
               ;; TODO: "unless it can be determined that the state-changing
               ;; request has already succeeded (see Section 3.1)"
-              (throw
-               (ex-info
-                "No strong matches between if-match and current representations"
-                (into req {:ring.response/status 412})))))))))
+            (throw
+             (ex-info
+              "No strong matches between if-match and current representations"
+              (into req {:ring.response/status 412})))))))))
 
 ;; TODO: See Section 4.1, RFC 7232:
 ;;
@@ -393,16 +394,16 @@
   "PUT a new representation of the target resource. All other representations are
   replaced."
   [{::site/keys [uri db received-representation start-date crux-node base-uri] :as req}]
-  (let [existing? (x/entity db uri)
+  (let [existing? (crux/entity db uri)
         classification (get-in req [:ring.request/headers "site-classification"])
         new-rep (merge
                  (cond->
-                     {:crux.db/id uri
-                      ::site/type "StaticRepresentation"
-                      ::http/methods #{:get :head :options :put :patch}
-                      ::http/etag (etag received-representation)
-                      ::http/last-modified start-date}
-                     classification (assoc ::pass/classification classification))
+                  {:crux.db/id uri
+                   ::site/type "StaticRepresentation"
+                   ::http/methods #{:get :head :options :put :patch}
+                   ::http/etag (etag received-representation)
+                   ::http/last-modified start-date}
+                   classification (assoc ::pass/classification classification))
                  received-representation)]
 
     ;; Currently we cannot tell whether a submitted tx has been successful,
@@ -411,10 +412,10 @@
     ;; tx fns.
     (evaluate-preconditions! req)
 
-    (->> (x/submit-tx
+    (->> (crux/submit-tx
           crux-node
           [[:crux.tx/put new-rep]])
-         (x/await-tx crux-node))
+         (crux/await-tx crux-node))
 
     (into req {:ring.response/status (if existing? 204 201)})))
 
@@ -446,7 +447,7 @@
    (openapi/locate-resource db uri req)
 
    ;; Is it in Crux?
-   (when-let [r (x/entity db uri)]
+   (when-let [r (crux/entity db uri)]
      (cond-> (assoc r ::site/resource-provider ::db)
        (= (get r ::site/type) "StaticRepresentation")
        (assoc ::site/put-fn put-static-resource
@@ -457,12 +458,12 @@
 
    ;; Is it a redirect?
    (when-let [[r loc] (first
-                       (x/q db '{:find [r loc]
-                                 :where [[r ::site/resource uri]
-                                         [r ::site/location loc]
-                                         [r ::site/type "Redirect"]]
-                                 :in [uri]}
-                            uri))]
+                       (crux/q db '{:find [r loc]
+                                    :where [[r ::site/resource uri]
+                                            [r ::site/location loc]
+                                            [r ::site/type "Redirect"]]
+                                    :in [uri]}
+                               uri))]
      {::site/uri uri
       ::http/methods #{:get :head :options}
       ::site/resource-provider r
@@ -498,7 +499,7 @@
   representation metadata. This function takes a representation and merges in
   its template's metadata, if necessary."
   [db representation]
-  (if-let [template (some->> representation ::site/template (x/entity db))]
+  (if-let [template (some->> representation ::site/template (crux/entity db))]
     (merge
      (select-keys template [::http/content-type ::http/content-encoding ::http/content-language])
      representation)
@@ -506,15 +507,14 @@
 
 (defn find-variants [{::site/keys [resource uri db] :as req}]
 
-  (let [variants (x/q db '{:find [r]
-                           :where [[v ::site/type "Variant"]
-                                   [v ::site/resource uri]
-                                   [v ::site/variant r]]
-                           :in [uri]
-                           } uri)]
+  (let [variants (crux/q db '{:find [r]
+                              :where [[v ::site/type "Variant"]
+                                      [v ::site/resource uri]
+                                      [v ::site/variant r]]
+                              :in [uri]} uri)]
     (when (pos? (count variants))
       (cond-> (for [[v] variants
-                    :let [rep (x/entity db v)]
+                    :let [rep (crux/entity db v)]
                     :when rep]
                 (assoc rep ::http/content-location v))
         (or (::http/content-type resource) (::site/template resource))
@@ -540,20 +540,35 @@
        (mapv #(merge-template-maybe db %))))
 
 (defn add-payload [{::site/keys [selected-representation db] :as req}]
-  (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
-        template (some->> selected-representation ::site/template (x/entity db))
-        body (cond
-               body-fn
-               (let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
-                 (log/debugf "Calling body-fn: %s" body-fn)
-                 (f req))
+  (let [{::http/keys [body content] ::site/keys [get-fn body-fn]} selected-representation
+        template (some->> selected-representation ::site/template (crux/entity db))]
+    (cond
+      get-fn
+      (if-let [f (cond-> get-fn (symbol? get-fn) requiring-resolve)]
+        (do
+          (log/debugf "Calling get-fn: %s %s" get-fn (type get-fn))
+          (f req))
+        (throw
+         (ex-info
+          (format "get-fn cannot be resolved: %s" body-fn)
+          {:get-fn get-fn
+           ::site/request-context (assoc req :ring.response/status 500)})))
 
-               template (templating/render-template req template)
+      body-fn
+      (if-let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
+        (do
+          (log/debugf "Calling body-fn: %s %s" body-fn (type body-fn))
+          (assoc req :ring.response/body (f req)))
+        (throw
+         (ex-info
+          (format "body-fn cannot be resolved: %s" body-fn)
+          {:body-fn body-fn
+           ::site/request-context (assoc req :ring.response/status 500)})))
 
-               content content
-               body body)]
-
-    (cond-> req body (assoc :ring.response/body body))))
+      template (assoc req :ring.response/body (templating/render-template req template))
+      content (assoc req :ring.response/body content)
+      body (assoc req :ring.response/body body)
+      :else req)))
 
 (defn GET [{::site/keys [resource] :as req}]
   (evaluate-preconditions! req)
@@ -569,12 +584,12 @@
                      :as req}]
   (let [location
         (str uri (hash (select-keys request-instance [::site/resource ::site/variant])))
-        existing (x/entity db location)]
+        existing (crux/entity db location)]
 
-    (->> (x/submit-tx
+    (->> (crux/submit-tx
           crux-node
           [[:crux.tx/put (merge {:crux.db/id location} request-instance)]])
-         (x/await-tx crux-node))
+         (crux/await-tx crux-node))
 
     (into req {:ring.response/status (if existing 204 201)
                :ring.response/headers {"location" location}})))
@@ -583,15 +598,15 @@
                       :as req}]
   (let [resource-state (openapi/received-body->resource-state req)
         {::site/keys [resource]} resource-state
-        existing (x/entity db resource)]
-    (->> (x/submit-tx
+        existing (crux/entity db resource)]
+    (->> (crux/submit-tx
           crux-node
           [[:crux.tx/put
             (merge
              {:crux.db/id resource}
              ;; ::site/resource = :crux.db/id, no need to duplicate
              (dissoc resource-state ::site/resource))]])
-         (x/await-tx crux-node))
+         (crux/await-tx crux-node))
 
     (into req {:ring.response/status (if existing 204 201)})))
 
@@ -643,7 +658,7 @@
                       {:ring.response/status 500}))))))
 
 (defn DELETE [{::site/keys [crux-node uri] :as req}]
-  (x/await-tx crux-node (x/submit-tx crux-node [[:crux.tx/delete uri]]))
+  (crux/await-tx crux-node (crux/submit-tx crux-node [[:crux.tx/delete uri]]))
   (into req {:ring.response/status 204}))
 
 (defn OPTIONS [{::site/keys [resource allowed-methods] :as req}]
@@ -692,7 +707,7 @@
   (dave.methods/propfind req))
 
 (defn MKCOL [{::site/keys [crux-node uri]}]
-  (let [tx (x/submit-tx
+  (let [tx (crux/submit-tx
             crux-node
             [[:crux.tx/put
               {:crux.db/id uri
@@ -701,7 +716,7 @@
                ::http/content-type "text/html;charset=utf-8"
                ::http/content "<h1>Index</h1>\r\n"
                ::http/options {"DAV" "1"}}]])]
-    (x/await-tx crux-node tx))
+    (crux/await-tx crux-node tx))
   {:ring.response/status 201
    :ring.response/headers {}})
 
@@ -844,12 +859,12 @@
   ;; - this should really be in a 'finally' block.
   (fn [{::site/keys [crux-node base-uri] ::pass/keys [subject] :as req}]
 
-    (let [db (x/db crux-node) ; latest post-method db
+    (let [db (crux/db crux-node) ; latest post-method db
           result (h req)
 
           triggers
-          (->> (x/q db '{:find [rule]
-                         :where [[rule ::site/type "Trigger"]]})
+          (->> (crux/q db '{:find [rule]
+                            :where [[rule ::site/type "Trigger"]]})
                (map first)
                (filter #(str/starts-with? % base-uri)))
 
@@ -869,7 +884,7 @@
 
       (try
         ;; TODO: Can we use the new refreshed db here to save another call to x/db?
-        (let [actions (rules/eval-triggers (x/db crux-node) triggers request-context)]
+        (let [actions (rules/eval-triggers (crux/db crux-node) triggers request-context)]
           (log/tracef "Triggered actions are %s" (pr-str actions))
           (doseq [action actions]
             (log/tracef "Running action: %s" (get-in action [:trigger ::site/action]))
@@ -968,24 +983,26 @@
                    ::site/duration-millis (- (.getTime end-date)
                                              (.getTime start-date)))]
     (cond->
-        (update req
-                :ring.response/headers
-                assoc "date" (format-http-date start-date))
+     (update req
+             :ring.response/headers
+             assoc "date" (format-http-date start-date))
 
-        request-id
-        (update :ring.response/headers
-                assoc "site-request-id"
-                (cond-> request-id
+      request-id
+      (update
+
+       :ring.response/headers
+       assoc "site-request-id"
+       (cond-> request-id
                   ;; Not sure I like this shortening, it's inconvenient to have
                   ;; to prepend the base-uri each time
-                  #_(.startsWith request-id base-uri)
-                  #_(subs (count base-uri))))
+         #_(.startsWith request-id base-uri)
+         #_(subs (count base-uri))))
 
-        selected-representation
-        (update :ring.response/headers
-                representation-headers selected-representation body)
+      selected-representation
+      (update :ring.response/headers
+              representation-headers selected-representation body)
 
-        (= method :head) (dissoc :ring.response/body))))
+      (= method :head) (dissoc :ring.response/body))))
 
 (defn wrap-initialize-response [h]
   (fn [req]
@@ -1051,22 +1068,22 @@
   variables to determine the resource to use."
   [{::site/keys [db]} status]
   (ffirst
-   (x/q db '{:find [(pull er [*])]
-             :where [[er ::site/type "ErrorResource"]
-                     [er :ring.response/status status]]
-             :in [status]} status)))
+   (crux/q db '{:find [(pull er [*])]
+                :where [[er ::site/type "ErrorResource"]
+                        [er :ring.response/status status]]
+                :in [status]} status)))
 
 (defn errors-with-causes
   "Return a collection of errors with their messages and causes"
   [e]
   (let [cause (.getCause e)]
     (cond->
-        {:message (.getMessage e)
-         :stack (.getStackTrace e)}
-        (and
-         (instance? clojure.lang.ExceptionInfo e)
-         (nil? (::site/start-date (ex-data e)))) (assoc :ex-data (ex-data e))
-        cause (assoc :cause (errors-with-causes cause)))))
+     {:message (.getMessage e)
+      :stack (.getStackTrace e)}
+      (and
+       (instance? clojure.lang.ExceptionInfo e)
+       (nil? (::site/start-date (ex-data e)))) (assoc :ex-data (ex-data e))
+      cause (assoc :cause (errors-with-causes cause)))))
 
 (defn wrap-error-handling
   "Return a handler that constructs proper Ring responses, logs and error
@@ -1158,12 +1175,9 @@
              ::site/selected-representation
              {::http/content-type "text/plain;charset=utf-8"
               ::http/content-length (count default-body)
-              :ring.response/body default-body}
-             }))))
+              :ring.response/body default-body}}))))
       (finally
         (org.slf4j.MDC/clear)))))
-
-
 
 ;; See https://portswigger.net/web-security/host-header and similar TODO: Have a
 ;; 'whitelist' in the config to check against - but this would require a reboot,
@@ -1213,7 +1227,7 @@
   (assert crux-node)
   (assert base-uri)
   (fn [{:ring.request/keys [scheme] :as req}]
-    (let [db (x/db crux-node)
+    (let [db (crux/db crux-node)
           req-id (new-request-id base-uri)
           scheme+authority
           (or uri-prefix
@@ -1319,8 +1333,7 @@
   or Sieppari (https://github.com/metosin/sieppari) could be used. This is
   currently a synchronous chain but async could be supported in the future."
   [opts]
-  [
-   ;; Switch Ring requests/responses to Ring 2 namespaced keywords
+  [;; Switch Ring requests/responses to Ring 2 namespaced keywords
    wrap-ring-1-adapter
 
    ;; Optional, helpful for AWS ALB
@@ -1354,6 +1367,7 @@
    wrap-negotiate-representation
 
    ;; Authentication, authorization
+   session/wrap-associate-session
    wrap-authenticate
    wrap-authorize
 
@@ -1367,10 +1381,7 @@
    wrap-initialize-response
 
    ;; Methods (GET, PUT, POST, etc.)
-   wrap-invoke-method
-
-   ])
-
+   wrap-invoke-method])
 
 (defn make-handler [opts]
   ((apply comp (make-pipeline opts)) identity))

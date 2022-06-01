@@ -3,7 +3,9 @@
 (ns juxt.site.alpha.util
   (:require
    [clojure.string :as str]
-   [taoensso.nippy.utils :refer [freezable?]]))
+   [taoensso.nippy.utils :refer [freezable?]])
+  (:import
+   [org.apache.commons.codec.binary Hex]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 
@@ -65,3 +67,12 @@
      (cond-> form
        (not (freezable? form))
        ((fn [_] ::site/unfreezable))))))
+
+(defn as-hex-str
+  [bytes]
+  (. Hex (encodeHexString bytes)))
+
+(defn random-bytes [size]
+  (let [result (byte-array size)]
+    (.nextBytes (java.security.SecureRandom/getInstanceStrong) result)
+    result))
