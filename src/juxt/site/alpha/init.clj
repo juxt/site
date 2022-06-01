@@ -6,7 +6,6 @@
    [crux.api :as x]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
-   [juxt.pass.alpha.authorization :as authz]
    [juxt.reap.alpha.combinators :as p]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.site.alpha.util :as util])
@@ -240,9 +239,6 @@
             (p/pattern-parser #"(?<scheme>https?)://" {:group {:juxt.reap.alpha.rfc7230/scheme "scheme"}})
             host-parser))))
 
-(defn do-action [crux-node subject action & args]
-  (apply authz/do-action crux-node {::pass/subject subject} action args))
-
 (defn openid-provider-configuration-url
   "Returns the URL of the OpenID Provider Configuration Information."
   [issuer-id]
@@ -254,32 +250,25 @@
   ;; This uses a reluctant regex qualifier.
   (str (second (re-matches #"(.*?)/?" issuer-id)) "/.well-known/openid-configuration"))
 
-(comment
-  (openid-provider-configuration-url "dev-14bkigf7.us.auth0.com"))
-
 (defn install-openid-provider! [crux-node issuer-id]
   (let [;; https://openid.net/specs/openid-connect-discovery-1_0.html#rfc.section.4
         ;; tells us we rely on the configuration information being available at
         ;; the path <issuer-id>/.well-known/openid-configuration.
         config-uri (openid-provider-configuration-url issuer-id)
-        _ (printf "Loading OpenID configuration from %s\n" config-uri)
+        _ (log/info "Loading OpenID configuration from" config-uri)
         config (json/read-value (slurp config-uri))]
-    (printf "Issuer added: %s\n" (get config "issuer"))
+    (log/info "Issuer added:" (get config "issuer"))
     (put!
      crux-node
      {:crux.db/id issuer-id
       :juxt.pass.alpha/openid-configuration config})))
 
-(comment
-  (require 'sc.api)
-  (sc.api/defsc 85))
-
 (defn install-openid-resources!
-  [crux-node {::site/keys [base-uri] :as config}
-   & {:keys [name issuer-id client-id client-secret]}]
-
+  [crux-node {::site/keys [base-uri]
+              {:keys [name issuer-id client-id client-secret]} :openid
+              :as config}]
   (assert name)
-  #_(install-put-immutable-public-resource-action! crux-node config)
+
   (let [client (format "%s/_site/openid/%s/client" base-uri name)
         login (format "%s/_site/openid/%s/login" base-uri name)
         callback (format "%s/_site/openid/%s/callback" base-uri name)]

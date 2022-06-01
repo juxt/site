@@ -17,7 +17,7 @@
    [juxt.pass.alpha.session :as session]
    [juxt.pass.alpha.pdp :as pdp]
    [juxt.pick.alpha.core :refer [rate-representation]]
-   [juxt.pick.alpha.ring :refer [decode-maybe pick]]
+   [juxt.pick.alpha.ring :refer [pick decode-maybe]]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
