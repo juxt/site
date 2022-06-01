@@ -3,7 +3,6 @@
 (ns juxt.pass.alpha.util
   (:require [juxt.site.alpha.util :refer [as-hex-str random-bytes]])
   (:import
-   (java.util HexFormat)
    (java.security SecureRandom)))
 
 (defn make-nonce

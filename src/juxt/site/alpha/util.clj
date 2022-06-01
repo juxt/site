@@ -3,7 +3,9 @@
 (ns juxt.site.alpha.util
   (:require
    [clojure.string :as str]
-   [taoensso.nippy.utils :refer [freezable?]]))
+   [taoensso.nippy.utils :refer [freezable?]])
+  (:import
+   [org.apache.commons.codec.binary Hex]))
 
 (alias 'site (create-ns 'juxt.site.alpha))
 
@@ -67,12 +69,8 @@
        ((fn [_] ::site/unfreezable))))))
 
 (defn as-hex-str
-  "This uses java.util.HexFormat which requires Java 17 and above. If required,
-  this can be re-coded, see
-  https://stackoverflow.com/questions/9655181/how-to-convert-a-byte-array-to-a-hex-string-in-java
-  and similar. For the size parameter, try 12."
   [bytes]
-  (.formatHex (java.util.HexFormat/of) bytes))
+  (. Hex (encodeHexString bytes)))
 
 (defn random-bytes [size]
   (let [result (byte-array size)]
