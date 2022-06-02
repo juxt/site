@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.alpha.process2
+(ns juxt.pass.alpha.procedure
   (:require
    [clojure.walk :refer [postwalk]]
    [juxt.site.alpha.util :refer [random-bytes as-hex-str]]

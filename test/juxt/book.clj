@@ -770,7 +770,7 @@
    {:xt/id "https://site.test/cookie-scopes/example"
     :juxt.pass.alpha/cookie-name "id"
     :juxt.pass.alpha/cookie-domain "https://site.test"
-    :juxt.pass.alpha/cookie-path "/protected-by-cookie/"
+    :juxt.pass.alpha/cookie-path "/protected-by-cookie-scope/"
     :juxt.pass.alpha/login-uri "https://site.test/login.html"})
     ;; end::create-cookie-scope![]
 )
@@ -1169,8 +1169,8 @@
 
   (cookies-scopes-preliminaries!)
 
-  (book-create-resource-protected-by-cookie!)
-  (book-grant-permission-to-resource-protected-by-cookie!)
+  (book-create-resource-protected-by-cookie-scope!)
+  (book-grant-permission-to-resource-protected-by-cookie-scope!)
   (book-create-cookie-scope!)
 
   (applications-preliminaries!)

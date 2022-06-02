@@ -7,7 +7,7 @@
           :ns-patterns ["juxt.book-test"
                         "juxt.authorization-integration-test"
                         "juxt.pass.authorization-test"
-                        "juxt.pass.process2-test"
+                        "juxt.pass.procedure-test"
                         ]}]
 
  :reporter kaocha.report/documentation}

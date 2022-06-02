@@ -14,7 +14,7 @@
    [juxt.site.alpha :as-alias site]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.process2 :as proc]
+   [juxt.pass.alpha.procedure :as proc]
    [juxt.pass.alpha.authorization :as authz]
    [juxt.pass.alpha.http-authentication :as authn]
    [clojure.string :as str]
@@ -108,20 +108,20 @@
 
   (book/cookies-scopes-preliminaries!)
 
-  (book/book-create-resource-protected-by-cookie!)
-  (book/book-grant-permission-to-resource-protected-by-cookie!)
+  (book/book-create-resource-protected-by-cookie-scope!)
+  (book/book-grant-permission-to-resource-protected-by-cookie-scope!)
   (book/book-create-cookie-scope!)
 
   (let [uri (some :juxt.pass.alpha/login-uri
-                  (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie/document.html"))]
+                  (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie-scope/document.html"))]
     (is (string? uri)))
 
   (let [request {:ring.request/method :get
-                 :ring.request/path "/protected-by-cookie/document.html"}]
+                 :ring.request/path "/protected-by-cookie-scope/document.html"}]
     (testing "Redirect"
       (let [response (*handler* request)]
         (is (= 302 (:ring.response/status response)))
-        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"]))))))
+        (is (= "https://site.test/login.html" (get-in response [:ring.response/headers "location"]))))))
 
 
   ;; POST to a login resource which we create a session - this is done in session
@@ -278,7 +278,7 @@
 
        ;; TODO: Replace with 'cold' and 'hot' steps - cold steps run before
        ;; head-of-line, hot steps run /at/ head-of-line
-       :juxt.pass.alpha/process2
+       :juxt.pass.alpha/procedure
        [
         [::proc/validate
          [:map

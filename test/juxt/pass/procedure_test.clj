@@ -1,14 +1,12 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.process2-test
+(ns juxt.pass.procedure-test
   (:require
    [clojure.test :refer [deftest is use-fixtures testing] :as t]
    [crypto.password.bcrypt :as password]
-   [juxt.pass.alpha.process2 :as proc]
+   [juxt.pass.alpha.procedure :as proc]
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node*]]
-   [malli.core :as m]
-   [malli.util :as mu]
    [xtdb.api :as xt]))
 
 (use-fixtures :each with-system-xt)
@@ -48,7 +46,7 @@
         hot-program
         [
          ;; Find an entry
-         [::proc/match-identity-on-password
+         [::proc/find-matching-identity-on-password
           :juxt.pass.alpha/identity
           {:username-in-identity-key :username
            :path-to-username [:input "username"]

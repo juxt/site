@@ -1,5 +1,7 @@
 ;; Copyright © 2022, JUXT LTD.
 
+;; Deprecated: obsoleted by procedure.clj
+
 (ns juxt.pass.alpha.process
   (:require
    [clojure.walk :refer [postwalk]]
