@@ -44,39 +44,49 @@ actor Alice as user
 participant browser
 
 participant "/…/document.html" as document
-participant "/login.html" as login
+participant "/login.html" as loginform
 participant "/login" as loginhandler
 participant Pass as pass
 participant "login action" as loginaction
 database XTDB
 
+user -> browser: Click href\nto document
 browser -> document: GET
 document -> pass: Check permission
 document <- pass: Denied
 document -> pass: Lookup cookie scopes
 document <- pass: Cookie Scope
-browser <- document: 302
-browser -> login: GET
-browser <- login: HTML form
-user -> browser: Enter credentials, submit
+browser <- document: 302 Found
+browser -> loginform: GET
+loginform -> pass: Create session
+pass -> XTDB: Create session entity
+browser <- loginform: 200 OK, with Set-Cookie,\nwith HTML form in body
+user -> browser: Enter credentials,\nsubmit
 browser -> loginhandler: POST
 loginhandler -> pass: Check permission\nto perform action
 loginhandler <- pass: Approved
-loginhandler -> loginaction: Submit transaction function
+loginhandler -> pass: Do action
+pass -> loginaction: Submit\ntransaction\nfunction
 loginaction -> XTDB: Find identity\nwith credentials
 loginaction <- XTDB: Matched identity
-loginaction -> XTDB: Create subject for identity
-browser <- loginhandler: 302 with Set-Cookie
+loginaction -> XTDB: Create subject
+pass <- loginaction: Check for subject
+pass -> XTDB: Update session with subject
+loginhandler <- pass: Escalate session\nwith new subject
+browser <- loginhandler: 302 Found with Set-Cookie
 browser -> document: GET
 document -> pass: Check permission
 document <- pass: Approved
-browser <- document: 200
+browser <- document: 200 OK
+user <- browser: document
 ....
 
 In <<cookie-scope-flow>>, the following steps are illustrated:
 
+. Alice enters a URI (or clicks on a link) to browse a document.
+
 . The browser sends a GET request to the protected document:
-`+https://site.test/protected-by-cookie/document.html+`
+`+https://site.test/protected-by-cookie/document.html+`.
 
 . The operation is associated with the Action
 `+https://site.test/actions/get-protected-resource+` and a check is made for a
@@ -91,7 +101,7 @@ permission to perform this Action.
 . A `302 Found` response is send containing a `Location` header of the URI of
 the login form.
 
-. The browser redirects to URI contained in the `Location` header of the
+. The browser redirects to the URI contained in the `Location` header of the
 previous response.
 
 . The URI locates a resource which returns the HTML of a login form, with an

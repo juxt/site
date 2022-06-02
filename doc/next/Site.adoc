@@ -71,26 +71,30 @@ include::Representations.adoc[leveloffset=+1]
 
 = Authentication
 
+(((authentication, definition)))
+Authentication is the process by which a user is identified.
+
 (((access control)))
-Actions are integrated with authorization rules, providing a rich access control
+In Site, Actions are integrated with authorization rules, providing a rich access control
 layer between users and data.
 
 (((Subject)))
 Most authorization rules refer to the Subject of the request. To identify the
 Subject, we need to authenticate each request.
 
-Site supports two broad categories of user authentication:
+Site supports two types of user authentication:
 
-. (((authentication,HTTP))) HTTP Authentication, which introduces the concept of
-  _protection spaces_, specified in https://www.rfc-editor.org/rfc/rfc7235[RFC
-  7235], is described in <<ch-http-authentication>>. An example of HTTP
-  Authentication is the 'Basic' authentication scheme, which is covered in
-  <<ch-basic-authentication>>.
+(((authentication,HTTP))) *HTTP Authentication*, which introduces the concept of
+_protection spaces_, specified in https://www.rfc-editor.org/rfc/rfc7235[RFC
+7235], is described in <<ch-http-authentication>>. An example of HTTP
+Authentication is the 'Basic' authentication scheme, which is covered in
+<<ch-basic-authentication>>.
 
-. (((authentication,cookie-based))) Cookie-based authentication, which we
-  describe in <<ch-cookie-authentication>>, opens up numerous additional options
-  for authentication. One such option is OpenID Connect, which is covered in
-  <<ch-openid>> with a working example.
+(((authentication,cookie-based))) *Cookie-based Authentication*, which we
+describe in <<ch-cookie-authentication>>, opens up numerous additional options
+for authentication. One such option is authenticating via an HTML form, which is
+covered in <<ch-form-based-authentication>>. Another is with the OpenID Connect
+protocol, which is covered in <<ch-openid>> with a worked example.
 
 include::ProtectingResources.adoc[leveloffset=+1]
 
