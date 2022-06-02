@@ -54,12 +54,9 @@ autonumber
 
 actor Alice as user
 participant browser
-
-box Site
 participant "/protected-by-basic-auth/document.html" as document
 participant Pass as pass
 database XTDB
-end box
 
 browser -> document: GET
 document <- XTDB: Lookup protection spaces\n(one is found for 'Basic' auth)

@@ -1,0 +1,109 @@
+= Form-Based Authentication
+:toc: left
+:experimental:
+
+== Introduction
+
+In this chapter we'll create a login form that will allow a user access to a
+protected resource.
+
+We'll need to create the following resources:
+
+. A document at `+https://site.test/protected-by-cookie-scope/document.html+`
+which requires the User can perform the Action
+`+https://site.test/actions/get-protected-resource+`. We'll called this the
+_protected document_. This is explained in <<create-resource-protected-by-cookie-scope>>.
+
+. A Permission to allow Alice to access this protected document. This is added
+in <<grant-permission-to-resource-protected-by-cookie-scope>>.
+
+. A Cookie Scope that redirects unauthenticated requests when necessary. This is done in
+<<create-cookie-scope>>.
+
+. A login form that will be shown to the User, allowing them to authenticate.
+
+. A resource that can receive the POST request that occurs when a User submits the login form.
+
+. An Action that can be used when the POST request is received. This Action will
+attempt to find a User Identity that matches some received credentials. If one
+if found, the Action will create a Subject in the database.
+
+. A User Identity for Alice, including a username/password pair, that Alice can use
+to authenticate using the form. This is added in <<cookie-scope-add-user-identity>>.
+
+<<cookie-scope-flow>> shows the interaction between the components.
+
+.How Cookie Authentication works in Site
+[[cookie-scope-flow]]
+[plantuml,cookie-scope-flow,svg]
+....
+skinparam monochrome true
+autonumber
+
+actor Alice as user
+participant browser
+
+participant "/…/document.html" as document
+participant "/login.html" as login
+participant "/login" as loginhandler
+participant Pass as pass
+participant "login action" as loginaction
+database XTDB
+
+browser -> document: GET
+document -> pass: Check permission
+document <- pass: Denied
+document -> pass: Lookup cookie scopes
+document <- pass: Cookie Scope
+browser <- document: 302
+browser -> login: GET
+browser <- login: HTML form
+user -> browser: Enter credentials, submit
+browser -> loginhandler: POST
+loginhandler -> pass: Check permission\nto perform action
+loginhandler <- pass: Approved
+loginhandler -> loginaction: Submit transaction function
+loginaction -> XTDB: Find identity\nwith credentials
+loginaction <- XTDB: Matched identity
+loginaction -> XTDB: Create subject for identity
+browser <- loginhandler: 302 with Set-Cookie
+browser -> document: GET
+document -> pass: Check permission
+document <- pass: Approved
+browser <- document: 200
+....
+
+In <<cookie-scope-flow>>, the following steps are illustrated:
+
+. The browser sends a GET request to the protected document:
+`+https://site.test/protected-by-cookie/document.html+`
+
+. The operation is associated with the Action
+`+https://site.test/actions/get-protected-resource+` and a check is made for a
+permission to perform this Action.
+
+. No permission is matched, the request is denied.
+
+. In denying the request, a Cookie Scope is looked up.
+
+. One is found and returned, associated with the URI of a login form.
+
+. A `302 Found` response is send containing a `Location` header of the URI of
+the login form.
+
+. The browser redirects to URI contained in the `Location` header of the
+previous response.
+
+. The URI locates a resource which returns the HTML of a login form, with an
+`action` attribute containing the URI of a resource that will handle the
+credentials.
+
+. Alice enters her credentials and clicks btn:[Submit].
+
+. The browser makes a POST request to the resource identified by the form's
+`action` attribute, with a body that contains the credentials.
+
+. The operation is associated with the Action
+`+https://site.test/actions/login+` and a check is made for a permission to
+perform this Action. Since the login form is intended as a public resource, a
+permission is found and the request proceeds.

@@ -736,30 +736,30 @@
 
 ;; Cookie Scope Example
 
-(defn book-create-resource-protected-by-cookie! []
-  ;; tag::create-resource-protected-by-cookie![]
+(defn book-create-resource-protected-by-cookie-scope! []
+  ;; tag::create-resource-protected-by-cookie-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/put-immutable-protected-resource"
-   {:xt/id "https://site.test/protected-by-cookie/document.html"
+   {:xt/id "https://site.test/protected-by-cookie-scope/document.html"
     :juxt.http.alpha/content-type "text/html;charset=utf-8"
     :juxt.http.alpha/content "<p>This is a protected message that is only visible when sending the correct cookie header.</p>"
     })
-  ;; end::create-resource-protected-by-cookie![]
+  ;; end::create-resource-protected-by-cookie-scope![]
   )
 
-(defn book-grant-permission-to-resource-protected-by-cookie! []
-  ;; tag::grant-permission-to-resource-protected-by-cookie![]
+(defn book-grant-permission-to-resource-protected-by-cookie-scope! []
+  ;; tag::grant-permission-to-resource-protected-by-cookie-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/alice/protected-html"
+   {:xt/id "https://site.test/permissions/alice/protected-by-cookie-scope/document.html"
     :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
     :juxt.pass.alpha/user "https://site.test/users/alice"
-    :juxt.site.alpha/uri "https://site.test/protected-by-cookie/document.html"
+    :juxt.site.alpha/uri "https://site.test/protected-by-cookie-scope/document.html"
     :juxt.pass.alpha/purpose nil
     })
-  ;; end::grant-permission-to-resource-protected-by-cookie![]
+  ;; end::grant-permission-to-resource-protected-by-cookie-scope![]
   )
 
 (defn book-create-cookie-scope! []

@@ -273,6 +273,7 @@
 
         [::proc/nest :input]
 
+        ;; TODO: Rename to 'find identity with password'
         [::proc/match-identity-on-password
          :juxt.pass.alpha/identity
          {:username-in-identity-key :juxt.pass.alpha/username

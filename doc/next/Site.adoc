@@ -103,6 +103,9 @@ include::BasicAuthentication.adoc[leveloffset=+1]
 [[ch-cookie-authentication]]
 include::CookieAuthentication.adoc[leveloffset=+1]
 
+[[ch-form-based-authentication]]
+include::FormBasedAuthentication.adoc[leveloffset=+1]
+
 [[ch-openid]]
 include::OpenIdAuthentication.adoc[leveloffset=+1]
 

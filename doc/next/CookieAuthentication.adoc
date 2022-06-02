@@ -8,9 +8,55 @@ The use of cookies provide an alternative approach to user authentication.
 
 == Cookie Scopes
 
-Site introduces the concept of a _cookie scopes_ which are conceptually similar to protection spaces, described in <<protection-spaces>>.
+Site introduces the concept of a _Cookie Scopes_ which are conceptually similar
+to protection spaces, described in <<protection-spaces>>.
 
-== Creating a Cookie Scope
+A Cookie Scope covers a set of resources. If a request to a resource within this
+set is made without a session containing valid credentials, and the request
+cannot be authorized, then the request is redirected to another location. This
+other location is a resource which will presumably establish a session
+containing valid credentials before redirecting back to the original resource
+for another try. Note, there is no guarentee that the new request will be
+authorized, since the user identified by the credentials may not be permitted to
+access the resource.
 
-NOTE: TODO: Mention JWT and Sessions - mention that Site chooses Sessions
-identifiers over JWTs (for now). JWTs may be supported in the future.
+[CAUTION]
+--
+
+Cookie Scopes are not standard nor specified by an RFC, but are Site-specific to
+support common authentication mechanisms used on the Web.
+
+--
+
+== Preparing the creation of Cookie Scopes
+
+To create a Cookie Scope, we first need to establish an Action that will allow
+us to do so. As always, the Action specifies which attributes are required and
+their values. <<ex-create-action-put-cookie-scope>> demonstrates the creation of
+such an Action.
+
+[[ex-create-action-put-cookie-scope]]
+.Creating the Action to establish a Cookie Scope
+====
+We first create the Action.
+
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=create-action-put-cookie-scope!,indent=0]
+----
+
+We must also ensure our REPL user has permission to call this Action.
+
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=grant-permission-to-put-cookie-scope!,indent=0]
+----
+====
+
+[IMPORTANT]
+--
+
+Copy the code in <<ex-create-action-put-cookie-scope>> into a REPL, edit as
+necessary and evaluate.
+
+--

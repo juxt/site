@@ -80,24 +80,9 @@ can create it one, as shown in <<ex-create-action-put-protection-space>>.
 ----
 include::../../test/juxt/book.clj[tag=create-action-put-protection-space!,indent=0]
 ----
-====
 
+We'll grant this permission to our REPL user:
 
-[IMPORTANT]
---
-
-Copy the code in <<ex-create-action-put-protection-space>> into a REPL, edit as
-necessary and evaluate.
-
---
-
-Finally, we'll grant this permission to our REPL user, as demonstrated in
-<<ex-create-action-put-protection-space>>.
-
-[[ex-permit-action-put-protection-space]]
-.Permit the Action to create a protection space
-====
-[source,clojure]
 ----
 include::../../test/juxt/book.clj[tag=grant-permission-to-put-protection-space!,indent=0]
 ----
@@ -106,7 +91,7 @@ include::../../test/juxt/book.clj[tag=grant-permission-to-put-protection-space!,
 [IMPORTANT]
 --
 
-Copy the code in <<ex-permit-action-put-protection-space>> into a REPL, edit as
+Copy the code in <<ex-create-action-put-protection-space>> into a REPL, edit as
 necessary and evaluate.
 
 --

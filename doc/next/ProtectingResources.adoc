@@ -33,20 +33,8 @@ Action doesn't yet exist (but we'll create it in
 accessible if a Permission exists that permits Users in a particular role to
 perform this Action.
 
-====
+As per our Action's rules, we'll need to grant a Permission so that our REPL user can perform it:
 
-[IMPORTANT]
---
-Copy the code in <<creating-an-action-to-create-a-protected-resource>> into a
-REPL, edit as required and evaluate.
---
-
-As per our Action's rules, we'll need to grant a Permission so that our REPL user can perform it. This Permission is created in
-<<permit-admins-to-create-a-protected-resource>>.
-
-[[permit-admins-to-create-a-protected-resource]]
-.Permitting administrators to create protected resources
-====
 [source,clojure]
 ----
 include::../../test/juxt/book.clj[tag=grant-permission-to-put-immutable-protected-resource!,indent=0]
@@ -55,8 +43,10 @@ include::../../test/juxt/book.clj[tag=grant-permission-to-put-immutable-protecte
 
 [IMPORTANT]
 --
-Copy the code in <<permit-admins-to-create-a-protected-resource>> into a REPL,
-edit as required and evaluate.
+
+Copy the code snippets in <<creating-an-action-to-create-a-protected-resource>>
+into a REPL, edit as required and evaluate.
+
 --
 
 In <<creating-an-action-to-create-a-protected-resource>>, we restricted access
