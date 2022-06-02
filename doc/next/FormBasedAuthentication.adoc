@@ -47,7 +47,7 @@ participant "/…/document.html" as document
 participant "/login.html" as loginform
 participant "/login" as loginhandler
 participant Pass as pass
-participant "login action" as loginaction
+participant "login procedure" as loginproc
 database XTDB
 
 user -> browser: Click href\nto document
@@ -58,21 +58,20 @@ document -> pass: Lookup cookie scopes
 document <- pass: Cookie Scope
 browser <- document: 302 Found
 browser -> loginform: GET
-loginform -> pass: Create session
-pass -> XTDB: Create session entity
-browser <- loginform: 200 OK, with Set-Cookie,\nwith HTML form in body
+' loginform -> pass: Create session
+' pass -> XTDB: Create session entity
+browser <- loginform: 200 OK\nwith HTML form in body
 user -> browser: Enter credentials,\nsubmit
 browser -> loginhandler: POST
 loginhandler -> pass: Check permission\nto perform action
 loginhandler <- pass: Approved
-loginhandler -> pass: Do action
-pass -> loginaction: Submit\ntransaction\nfunction
-loginaction -> XTDB: Find identity\nwith credentials
-loginaction <- XTDB: Matched identity
-loginaction -> XTDB: Create subject
-pass <- loginaction: Check for subject
-pass -> XTDB: Update session with subject
-loginhandler <- pass: Escalate session\nwith new subject
+loginhandler -> pass: Perform login action
+pass -> loginproc: Submit\ntransaction\nfunction
+loginproc -> XTDB: Find identity\nwith credentials
+loginproc <- XTDB: Matched identity
+loginproc -> XTDB: Create subject, session
+pass <- loginproc: Check for session id
+loginhandler <- pass: Set-cookie for session
 browser <- loginhandler: 302 Found with Set-Cookie
 browser -> document: GET
 document -> pass: Check permission
@@ -102,18 +101,51 @@ permission to perform this Action.
 the login form.
 
 . The browser redirects to the URI contained in the `Location` header of the
-previous response.
+previous response (in this case, `/login.html`).
 
 . The URI locates a resource which returns the HTML of a login form, with an
 `action` attribute containing the URI of a resource that will handle the
-credentials.
+credentials (in this case, `/login`).
 
 . Alice enters her credentials and clicks btn:[Submit].
 
 . The browser makes a POST request to the resource identified by the form's
 `action` attribute, with a body that contains the credentials.
 
-. The operation is associated with the Action
-`+https://site.test/actions/login+` and a check is made for a permission to
-perform this Action. Since the login form is intended as a public resource, a
-permission is found and the request proceeds.
+. The Action associated with the POST method on this resource is looked up
+(`+https://site.test/actions/login+`). The system searches for a permission to
+perform this Action.
+
+. Since the login form is intended as a public resource, a permission is found
+to exist and the request is allowed to proceed.
+
+. The `+https://site.test/actions/login+` Action is performed.
+
+. All actions are run as transaction functions in XTDB in order to guarantee
+database consistency and preserve a deterministic log of serialized
+transactions. The `+https://site.test/actions/login+` Action contains a
+procedural 'program' which is run inside the transaction function.
+
+. One of the first steps of the procedure is to find a User Identity that
+matches the credentials received in the request body.
+
+. A matching User Identity exists for Alice which is returned, otherwise the
+procedure throws an error and the transaction aborts.
+
+. (create subject, session)
+
+. (check for session id)
+
+. (set-cookie corresponding to session)
+
+. (302 found)
+
+. (get original resource)
+
+. (check permission)
+
+. (approved)
+
+. (200 OK)
+
+. (document)

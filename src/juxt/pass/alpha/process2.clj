@@ -35,7 +35,7 @@
 (defmethod processing-step ::dissoc [m [_ & ks] ctx]
   (apply dissoc m ks))
 
-(defmethod processing-step ::match-identity-on-password
+(defmethod processing-step ::find-matching-identity-on-password
   [m [_ k {:keys [username-in-identity-key path-to-username
                   password-hash-in-identity-key path-to-password]}]
    ctx]

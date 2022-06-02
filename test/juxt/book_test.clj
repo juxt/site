@@ -242,13 +242,33 @@
                      (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie/document.html"))]
        (is (string? uri)))
 
+     ;; There is no cookie at present, so no session, so we're expecting a
+     ;; redirect to a login form.
      (let [request {:ring.request/method :get
                     :ring.request/path "/protected-by-cookie/document.html"}]
 
        (testing "Redirect"
          (let [response (*handler* request)]
            (is (= 302 (:ring.response/status response)))
-           (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"]))))))
+           (is (= "https://site.test/login.html" (get-in response [:ring.response/headers "location"]))))))
+
+     ;; Create a new resource /login resource
+     ;; TODO: Put in an action
+     (put! {:xt/id "https://site.test/login"
+            ::site/methods
+            {:post {::site/acceptable
+                    {"accept" "application/x-www-form-urlencoded"}
+                    ::pass/actions
+                    #{ ;; We must create this action
+                      "https://site.test/actions/login"}}}})
+
+     ;; Grant permission for anyone to access the login handler
+     (repl/do-action
+      "https://site.test/subjects/repl-default"
+      "https://site.test/actions/grant-permission"
+      {:xt/id "https://site.test/permissions/login"
+       :juxt.pass.alpha/action "https://site.test/actions/login"
+       :juxt.pass.alpha/purpose nil})
 
      ;; Create login action
      (repl/do-action
@@ -256,14 +276,8 @@
       "https://site.test/actions/create-action"
       {:xt/id "https://site.test/actions/login"
 
-       #_:juxt.pass.alpha.malli/args-schema
-       #_[:tuple
-          [:map
-           ["username" [:string]]
-           ["password" [:string]]]]
-
        ;; TODO: Replace with 'cold' and 'hot' steps - cold steps run before
-       ;; head-of-line, hot steps run AT head-of-line
+       ;; head-of-line, hot steps run /at/ head-of-line
        :juxt.pass.alpha/process2
        [
         [::proc/validate
@@ -273,8 +287,7 @@
 
         [::proc/nest :input]
 
-        ;; TODO: Rename to 'find identity with password'
-        [::proc/match-identity-on-password
+        [::proc/find-matching-identity-on-password
          :juxt.pass.alpha/identity
          {:username-in-identity-key :juxt.pass.alpha/username
           :path-to-username [:input "username"]
@@ -300,52 +313,27 @@
 
         ]
 
-       #_:juxt.pass.alpha/process
-       #_[
-          [:juxt.pass.alpha.malli/validate]
-
-          ;; Look up a matching identity - do a password check
-          [:juxt.pass.alpha.process/find-entity
-           {:juxt.pass.alpha/type "https://meta.juxt.site/pass/user-identity"
-            :juxt.pass.alpha/username [:get-in ["username"]]}]
-
-          [:juxt.pass.alpha.process/check-password "password" :juxt.pass.alpha/password-hash]
-
-          [:juxt.pass.alpha.process/wrap-in
-           {:xt/id (format "urn:site:subjects:%s" (random-uuid))
-            ::site/type "Subject"
-            ::pass/identity '%}]
-
-          [:xtdb.api/put]]
-
        :juxt.pass.alpha/rules
        '[
          [(allowed? permission subject action resource)
           [permission :xt/id]]]})
 
-     (repl/do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/grant-permission"
-      {:xt/id "https://site.test/permissions/login"
-       :juxt.pass.alpha/action "https://site.test/actions/login"
-       :juxt.pass.alpha/purpose nil})
 
-     ;; Create a new resource /login resource
-     ;; TODO: Put in an action
-     (put! {:xt/id "https://site.test/login"
-            ::site/methods
-            {:post {::site/acceptable {"accept" "application/x-www-form-urlencoded"}
-                    ::pass/actions #{"https://site.test/actions/login"}}}})
-
+     ;; POST to the /login handler, which call the login action.
+     ;; After this there should be a set-cookie escalation
      (let [body (.getBytes (ring.util.codec/form-encode {"username" "alice" "password" "garden"}))
-           request {:ring.request/method :post
-                    :ring.request/path "/login"
-                    :ring.request/headers
-                    {"content-length" (str (count body))
-                     "content-type" "application/x-www-form-urlencoded"}
-                    :ring.request/body (io/input-stream body)
-                    }]
-       (*handler* request))
+             request {:ring.request/method :post
+                      :ring.request/path "/login"
+                      :ring.request/headers
+                      {"content-length" (str (count body))
+                       "content-type" "application/x-www-form-urlencoded"}
+                      :ring.request/body (io/input-stream body)
+                      }]
+       (*handler* request)
+       ;; TODO: Check for a correct set-cookie header
+       )
+
+     ;; TODO: Check the database for evidence a session has been created
 
 
      )))

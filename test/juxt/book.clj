@@ -771,7 +771,7 @@
     :juxt.pass.alpha/cookie-name "id"
     :juxt.pass.alpha/cookie-domain "https://site.test"
     :juxt.pass.alpha/cookie-path "/protected-by-cookie/"
-    :juxt.pass.alpha/login-uri "https://site.test/login"})
+    :juxt.pass.alpha/login-uri "https://site.test/login.html"})
     ;; end::create-cookie-scope![]
 )
 
