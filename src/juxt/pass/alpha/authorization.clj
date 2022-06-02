@@ -393,6 +393,6 @@
                      (assoc-in [:ring.response/headers "location"] login-uri))}))
               (throw
                (ex-info
-                (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))
+                (format "No anonymous permission for actions: %s" (pr-str actions))
                 {::site/request-context
                  (assoc req :ring.response/status 403)})))))))))
