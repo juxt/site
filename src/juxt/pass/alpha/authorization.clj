@@ -319,6 +319,13 @@
         (throw (ex-info "Failed to do action" (merge {:action action} pass-ctx (dissoc result ::site/type))))
         result))))
 
+;; TODO: Since it is possible that a permission is in the queue which might
+;; grant or revoke an action, it is necessary to run this check 'head-of-line'
+;; and submit a transaction function. This will avoid any non-determinism caused
+;; by a race-condition and retain proper serialization of transactions.
+;;
+;; For a fuller discussion on determinism and its benefits, see
+;; https://www.cs.umd.edu/~abadi/papers/abadi-cacm2018.pdf
 (defn wrap-authorize-with-actions [h]
   (fn [{::pass/keys [subject]
         ::site/keys [db resource uri]
