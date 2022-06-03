@@ -280,7 +280,8 @@ type Mutation {
         (is (= {:xt/id "https://example.org/persons/mal"
                 :juxt.site/type "Person"
                 :name "Malcolm Sparks"}
-               (xt/entity db "https://example.org/persons/mal"))))
+               (-> (xt/entity db "https://example.org/persons/mal")
+                   (select-keys [:xt/id :juxt.site/type :name])))))
 
       (let [body (json/read-value (:ring.response/body response))]
         (is (= {"data"
@@ -289,9 +290,7 @@ type Mutation {
                   "name" "Malcolm Sparks"}}}
                body))
         ;;body
-        ))
-
-    ))
+        ))))
 
 #_((t/join-fixtures [with-xt with-handler])
    mutation
