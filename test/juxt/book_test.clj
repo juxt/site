@@ -2,24 +2,18 @@
 
 (ns juxt.book-test
   (:require
-   [clojure.edn :as edn]
    [clojure.java.io :as io]
    [juxt.site.alpha.repl :as repl]
-   [clojure.test :refer [deftest is are testing use-fixtures] :as t]
+   [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [juxt.book :as book]
-   [juxt.test.util :refer [with-system-xt with-db submit-and-await! *xt-node* *db* *handler*] :as tutil]
-   [juxt.site.alpha.repl :refer [put!]]
+   [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
    [xtdb.api :as xt]
    [juxt.pass.alpha.cookie-scope :as cookie-scope]
    [juxt.site.alpha :as-alias site]
-   [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.procedure :as proc]
-   [juxt.pass.alpha.authorization :as authz]
    [juxt.pass.alpha.http-authentication :as authn]
-   [clojure.string :as str]
-   [malli.util :as mu]
-   [xtdb.api :as x]))
+   [ring.util.codec :as codec]))
 
 (defn with-handler [f]
   (binding [*handler*
@@ -232,8 +226,8 @@
 
      (book/cookies-scopes-preliminaries!)
 
-     (book/book-create-resource-protected-by-cookie!)
-     (book/book-grant-permission-to-resource-protected-by-cookie!)
+     (book/book-create-resource-protected-by-cookie-scope!)
+     (book/book-grant-permission-to-resource-protected-by-cookie-scope!)
      (book/book-create-cookie-scope!)
 
      (book/book-put-basic-auth-user-identity!)
@@ -254,7 +248,7 @@
 
      ;; Create a new resource /login resource
      ;; TODO: Put in an action
-     (put! {:xt/id "https://site.test/login"
+     (repl/put! {:xt/id "https://site.test/login"
             ::site/methods
             {:post {::site/acceptable
                     {"accept" "application/x-www-form-urlencoded"}
@@ -321,14 +315,14 @@
 
      ;; POST to the /login handler, which call the login action.
      ;; After this there should be a set-cookie escalation
-     (let [body (.getBytes (ring.util.codec/form-encode {"username" "alice" "password" "garden"}))
-             request {:ring.request/method :post
-                      :ring.request/path "/login"
-                      :ring.request/headers
-                      {"content-length" (str (count body))
-                       "content-type" "application/x-www-form-urlencoded"}
-                      :ring.request/body (io/input-stream body)
-                      }]
+     (let [body (.getBytes (codec/form-encode {"username" "alice" "password" "garden"}))
+           request {:ring.request/method :post
+                    :ring.request/path "/login"
+                    :ring.request/headers
+                    {"content-length" (str (count body))
+                     "content-type" "application/x-www-form-urlencoded"}
+                    :ring.request/body (io/input-stream body)
+                    }]
        (*handler* request)
        ;; TODO: Check for a correct set-cookie header
        )
