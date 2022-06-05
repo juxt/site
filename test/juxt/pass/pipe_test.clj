@@ -1,10 +1,10 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.procedure-test
+(ns juxt.pass.pipe-test
   (:require
    [clojure.test :refer [deftest is use-fixtures testing] :as t]
    [crypto.password.bcrypt :as password]
-   [juxt.pass.alpha.procedure :as proc]
+   [juxt.pass.alpha.pipe :as pipe]
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node*]]
    [xtdb.api :as xt]))
@@ -36,40 +36,40 @@
   (let [cold-program
         [
          ;; Initial validation on user provided data
-         [::proc/validate
+         [::pipe/validate
           [:map
            ["username" [:string {:min 1}]]
            ["password" [:string {:min 1}]]]]
 
-         [::proc/nest :input]]
+         [::pipe/nest :input]]
 
         hot-program
         [
          ;; Find an entry
-         [::proc/find-matching-identity-on-password
+         [::pipe/find-matching-identity-on-password
           :juxt.pass.alpha/identity
           {:username-in-identity-key :username
            :path-to-username [:input "username"]
            :password-hash-in-identity-key :password-hash
            :path-to-password [:input "password"]}]
 
-         [::proc/merge
+         [::pipe/merge
           {:juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}]
 
          ^{:doc "Add an id"}
-         [::proc/merge {:xt/id "https://juxt.site/subjects/alice438348348"}]
+         [::pipe/merge {:xt/id "https://juxt.site/subjects/alice438348348"}]
 
          ^{:doc "Strip input"}
-         [::proc/dissoc :input]
+         [::pipe/dissoc :input]
 
          ^{:doc "Final validation before going into the database"}
-         [::proc/validate
+         [::pipe/validate
           [:map
            [:xt/id [:re "(.+)"]]
            [:juxt.pass.alpha/identity :string]
            [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/subject"]]]]
 
-         [::proc/db-single-put]]]
+         [::pipe/db-single-put]]]
 
     (testing "Correct password creates subject"
       (is
@@ -78,7 +78,7 @@
           {:juxt.pass.alpha/identity "alice-identity",
            :juxt.site.alpha/type "https://meta.juxt.site/pass/subject",
            :xt/id "https://juxt.site/subjects/alice438348348"}]]
-        (proc/process
+        (pipe/pipe
          (concat cold-program hot-program)
          {"username" "alice"
           "password" "garden"}
@@ -89,7 +89,7 @@
        (thrown-with-msg?
         clojure.lang.ExceptionInfo
         #"\QLogin failed\E"
-        (proc/process
+        (pipe/pipe
          (concat cold-program hot-program)
          {"username" "alice"
           "password" "wrong-password"}

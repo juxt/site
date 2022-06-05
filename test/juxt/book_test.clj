@@ -11,7 +11,7 @@
    [juxt.pass.alpha.cookie-scope :as cookie-scope]
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.procedure :as proc]
+   [juxt.pass.alpha.pipe :as pipe]
    [juxt.pass.alpha.http-authentication :as authn]
    [ring.util.codec :as codec]))
 
@@ -272,38 +272,38 @@
 
        ;; TODO: Replace with 'cold' and 'hot' steps - cold steps run before
        ;; head-of-line, hot steps run /at/ head-of-line
-       :juxt.pass.alpha/procedure
+       :juxt.pass.alpha/pipe
        [
-        [::proc/validate
+        [::pipe/validate
          [:map
           ["username" [:string {:min 1}]]
           ["password" [:string {:min 1}]]]]
 
-        [::proc/nest :input]
+        [::pipe/nest :input]
 
-        [::proc/find-matching-identity-on-password
+        [::pipe/find-matching-identity-on-password
          :juxt.pass.alpha/identity
          {:username-in-identity-key :juxt.pass.alpha/username
           :path-to-username [:input "username"]
           :password-hash-in-identity-key :juxt.pass.alpha/password-hash
           :path-to-password [:input "password"]}]
 
-        [::proc/merge
+        [::pipe/merge
          {:juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}]
 
         ^{:doc "Add an id"}
-        [::proc/merge {:xt/id "https://juxt.site/subjects/alice438348348"}]
+        [::pipe/merge {:xt/id "https://juxt.site/subjects/alice438348348"}]
 
         ^{:doc "Strip input"}
-        [::proc/dissoc :input]
+        [::pipe/dissoc :input]
 
-        [::proc/validate
+        [::pipe/validate
          [:map {:closed true}
           [:xt/id [:string {:min 1}]]
           [:juxt.pass.alpha/identity :string]
           [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/subject"]]]]
 
-        [::proc/db-single-put]
+        [::pipe/db-single-put]
 
         ]
 
@@ -322,9 +322,15 @@
                     {"content-length" (str (count body))
                      "content-type" "application/x-www-form-urlencoded"}
                     :ring.request/body (io/input-stream body)
-                    }]
-       (*handler* request)
+                    }
+           response (*handler* request)]
+
        ;; TODO: Check for a correct set-cookie header
+       (is (= 200 (:ring.response/status response)))
+
+       (get-in response [:ring.response/headers])
+
+
        )
 
      ;; TODO: Check the database for evidence a session has been created

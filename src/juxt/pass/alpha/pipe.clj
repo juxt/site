@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.alpha.procedure
+(ns juxt.pass.alpha.pipe
   (:require
    [clojure.walk :refer [postwalk]]
    [juxt.site.alpha.util :refer [random-bytes as-hex-str]]
@@ -10,10 +10,10 @@
    [malli.error :a me]
    [xtdb.api :as xt]))
 
-(defmulti processing-step (fn [_ [k] ctx] k))
+(defmulti word (fn [_ [k] ctx] k))
 
 ;; ctx must contain :db
-(defmethod processing-step ::validate [m [_ schema] ctx]
+(defmethod word ::validate [m [_ schema] ctx]
   (let [schema (m/schema schema)]
     (if-not (m/validate schema m)
       ;; Not sure why Malli throws this error here: No implementation of
@@ -26,16 +26,16 @@
         (read-string (pr-str (m/explain schema m)))))
       m)))
 
-(defmethod processing-step ::nest [m [_ k] ctx]
+(defmethod word ::nest [m [_ k] ctx]
   {k m})
 
-(defmethod processing-step ::merge [m [_ m2] ctx]
+(defmethod word ::merge [m [_ m2] ctx]
   (merge m m2))
 
-(defmethod processing-step ::dissoc [m [_ & ks] ctx]
+(defmethod word ::dissoc [m [_ & ks] ctx]
   (apply dissoc m ks))
 
-(defmethod processing-step ::find-matching-identity-on-password
+(defmethod word ::find-matching-identity-on-password
   [m [_ k {:keys [username-in-identity-key path-to-username
                   password-hash-in-identity-key path-to-password]}]
    ctx]
@@ -57,12 +57,12 @@
       (assoc m k identity)
       (throw (ex-info "Login failed" {:username (get-in m path-to-username)})))))
 
-(defmethod processing-step ::db-single-put
+(defmethod word ::db-single-put
   [m _ _]
   [[:xtdb.api/put m]])
 
-(defmethod processing-step ::abort [m _ _]
+(defmethod word ::abort [m _ _]
   (throw (ex-info "Abort" {:value m})))
 
-(defn process [steps seed ctx]
-  (reduce (fn [acc step] (processing-step acc step ctx)) seed (filter some? steps)))
+(defn pipe [steps seed ctx]
+  (reduce (fn [acc step] (word acc step ctx)) seed (filter some? steps)))

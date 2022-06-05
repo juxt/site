@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-;; Deprecated: obsoleted by procedure.clj
+;; Deprecated: obsoleted by pipe.clj
 
 (ns juxt.pass.alpha.process
   (:require

@@ -14,7 +14,7 @@
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha.process :as process]
-   [juxt.pass.alpha.procedure :as proc]))
+   [juxt.pass.alpha.pipe :as pipe]))
 
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
@@ -250,7 +250,7 @@
                 (::pass/process action-doc)
                 (:ops (process/process-args pass-ctx action-doc args))
                 (::pass/procedure action-doc)
-                (proc/process (::pass/procedure action-doc) (first args) (assoc pass-ctx :db db))
+                (pipe/pipe (::pass/procedure action-doc) (first args) (assoc pass-ctx :db db))
                 :else
                 (throw (ex-info "All actions must have some processing steps"
                                 {:action action-doc})))]
