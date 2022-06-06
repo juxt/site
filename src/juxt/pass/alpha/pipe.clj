@@ -71,8 +71,8 @@
 
 (declare pipe)
 
-(defmethod word ::dip [[x & stack] [[_ subqueue] & queue] env]
-  (let [stack (pipe stack subqueue env)]
+(defmethod word ::dip [[x & stack] [[_ quotation] & queue] env]
+  (let [stack (pipe stack quotation env)]
     [(cons x stack) queue env]))
 
 (defmethod word ::find-matching-identity-on-password-query
