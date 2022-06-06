@@ -249,8 +249,8 @@
               (cond
                 (::pass/process action-doc)
                 (:ops (process/process-args pass-ctx action-doc args))
-                (::pass/procedure action-doc)
-                (pipe/pipe (::pass/procedure action-doc) (first args) (assoc pass-ctx :db db))
+                #_(::pass/procedure action-doc)
+                #_(pipe/pipe (::pass/procedure action-doc) (first args) (assoc pass-ctx :db db))
                 :else
                 (throw (ex-info "All actions must have some processing steps"
                                 {:action action-doc})))]

@@ -29,9 +29,10 @@
 
 (deftest match-password-test
 
-  (repl/put! {:xt/id "alice-identity"
-              :username "alice"
-              :password-hash (password/encrypt "garden")})
+  (repl/put!
+   {:xt/id "alice-identity"
+    :username "alice"
+    :password-hash (password/encrypt "garden")})
 
   (let [cold-program
         [
@@ -57,7 +58,7 @@
           {:juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}]
 
          ^{:doc "Add an id"}
-         [::pipe/merge {:xt/id "https://juxt.site/subjects/alice438348348"}]
+         [::pipe/merge {:xt/id "https://site.test/subjects/alice438348348"}]
 
          ^{:doc "Strip input"}
          [::pipe/dissoc :input]
@@ -79,9 +80,9 @@
            :juxt.site.alpha/type "https://meta.juxt.site/pass/subject",
            :xt/id "https://juxt.site/subjects/alice438348348"}]]
         (pipe/pipe
+         (list {"username" "alice"
+                "password" "garden"})
          (concat cold-program hot-program)
-         {"username" "alice"
-          "password" "garden"}
          {:db (xt/db *xt-node*)}))))
 
     (testing "Incorrect password throws exception"
@@ -90,12 +91,59 @@
         clojure.lang.ExceptionInfo
         #"\QLogin failed\E"
         (pipe/pipe
+         (list {"username" "alice"
+                "password" "wrong-password"})
          (concat cold-program hot-program)
-         {"username" "alice"
-          "password" "wrong-password"}
          {:db (xt/db *xt-node*)}))))))
 
 (comment
   ((t/join-fixtures [with-system-xt])
    (fn []
+     (repl/put!
+      {:xt/id "alice-identity"
+       :username "alice"
+       :password-hash (password/encrypt "garden")})
+
+     (pipe/pipe
+      (list {"username" "alice"
+             "password" "garden"})
+      '[
+        [::pipe/validate
+         [:map
+          ["username" [:string {:min 1}]]
+          ["password" [:string {:min 1}]]]]
+
+        [::pipe/dup]
+
+        [::pipe/push "username"]
+        [::pipe/?of]
+
+        [::pipe/dip
+         ;; TODO: Perhaps need a deftype for a Quotation
+         [[::pipe/push "password"]
+          [::pipe/?of]]]
+
+        [::pipe/find-matching-identity-on-password-query
+         {:username-in-identity-key :username
+          :password-hash-in-identity-key :password-hash}]
+
+        [::pipe/xtdb-query]
+        [::pipe/first]
+        [::pipe/first]
+        [::pipe/nest :juxt.pass.alpha/identity]
+
+        [::pipe/push :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"]
+        [::pipe/set-at]
+
+        [::pipe/push :xt/id]
+        [::pipe/push 10]
+        [::pipe/random-bytes]
+        [::pipe/as-hex-string]
+        [::pipe/push "https://site.test/subjects/alice/"]
+        [::pipe/str]
+        [::pipe/set-at]
+
+        ]
+
+      {:db (xt/db *xt-node*)})
      )))
