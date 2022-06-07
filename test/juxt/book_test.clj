@@ -13,7 +13,8 @@
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.pipe :as pipe]
    [juxt.pass.alpha.http-authentication :as authn]
-   [ring.util.codec :as codec]))
+   [ring.util.codec :as codec]
+   [juxt.pass.pipe-test :refer [LOGIN]]))
 
 (defn with-handler [f]
   (binding [*handler*
@@ -272,46 +273,12 @@
 
        ;; TODO: Replace with 'cold' and 'hot' steps - cold steps run before
        ;; head-of-line, hot steps run /at/ head-of-line
-       :juxt.pass.alpha/pipe
-       [
-        [::pipe/validate
-         [:map
-          ["username" [:string {:min 1}]]
-          ["password" [:string {:min 1}]]]]
-
-        [::pipe/nest :input]
-
-        [::pipe/find-matching-identity-on-password
-         :juxt.pass.alpha/identity
-         {:username-in-identity-key :juxt.pass.alpha/username
-          :path-to-username [:input "username"]
-          :password-hash-in-identity-key :juxt.pass.alpha/password-hash
-          :path-to-password [:input "password"]}]
-
-        [::pipe/merge
-         {:juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}]
-
-        ^{:doc "Add an id"}
-        [::pipe/merge {:xt/id "https://juxt.site/subjects/alice438348348"}]
-
-        ^{:doc "Strip input"}
-        [::pipe/dissoc :input]
-
-        [::pipe/validate
-         [:map {:closed true}
-          [:xt/id [:string {:min 1}]]
-          [:juxt.pass.alpha/identity :string]
-          [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/subject"]]]]
-
-        [::pipe/db-single-put]
-
-        ]
+       :juxt.pass.alpha/pipe LOGIN
 
        :juxt.pass.alpha/rules
        '[
          [(allowed? permission subject action resource)
           [permission :xt/id]]]})
-
 
      ;; POST to the /login handler, which call the login action.
      ;; After this there should be a set-cookie escalation
@@ -329,9 +296,13 @@
        (is (= 200 (:ring.response/status response)))
 
        (get-in response [:ring.response/headers])
+       response)
 
 
-       )
+     #_(repl/ls)
+
+
+
 
      ;; TODO: Check the database for evidence a session has been created
 
