@@ -1,0 +1,20 @@
+= Pipe
+:toc: left
+:experimental:
+
+== Introduction
+
+Actions are performed in transaction functions. A transaction function must
+return one or more transaction operations that will be submitted to the database
+atomically.
+
+Often, actions are required to validate input and construct documents that must
+be put into the database.
+
+Pipe is a language that is used in transaction functions which is designed for
+the purpose of producing transaction operations.
+
+Pipe is a stack-based
+https://www.concatenative.org/wiki/view/Front%20Page[concatenative] language,
+drawing heavily from https://factorcode.org/[Factor] and
+https://www.nsl.com/k/xy/xy.htm[XY].
