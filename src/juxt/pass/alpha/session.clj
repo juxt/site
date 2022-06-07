@@ -20,7 +20,9 @@
 ;; "The session ID or token binds the user authentication credentials (in the
 ;; form of a user session) to the user HTTP traffic and the appropriate access
 ;; controls enforced by the web application." [OWASP-SM]
-(defn create-session
+
+;; This is deprecated and will be replaced with a txfn.
+(defn ^:deprecated create-session
   "Create sesssion identifier."
   [xt-node init-state]
   ;; "The session ID content (or value) must be meaningless to prevent

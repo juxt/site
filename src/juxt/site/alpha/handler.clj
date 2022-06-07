@@ -1255,9 +1255,9 @@
 
    ;; Authenticate
 
-   ;; Rewrite to work against a cookie-domain, which may use JWTs or sessions.
+   ;; Rewrite to work against a cookie-scope, which may use JWTs or sessions.
    ;; wrap-process-cookies
-   session/wrap-associate-session
+   #_session/wrap-associate-session
 
    wrap-http-authenticate
 

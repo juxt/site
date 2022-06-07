@@ -7,6 +7,8 @@
    [juxt.pass.alpha.pipe :as pipe]
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node*]]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.site.alpha :as-alias site]
    [xtdb.api :as xt]))
 
 (use-fixtures :each with-system-xt)
@@ -34,7 +36,7 @@
     :username "alice"
     :password-hash (password/encrypt "garden")})
 
-  (let [cold-program
+  (let [program
         [
          ;; Initial validation on user provided data
          [::pipe/validate
@@ -42,11 +44,6 @@
            ["username" [:string {:min 1}]]
            ["password" [:string {:min 1}]]]]
 
-         [::pipe/nest :input]]
-
-        hot-program
-        [
-         ;; Find an entry
          [::pipe/find-matching-identity-on-password
           :juxt.pass.alpha/identity
           {:username-in-identity-key :username
@@ -72,7 +69,7 @@
 
          [::pipe/db-single-put]]]
 
-    (testing "Correct password creates subject"
+    (testing "Correct password creates subject and session"
       (is
        (=
         [[:xtdb.api/put
@@ -82,7 +79,7 @@
         (pipe/pipe
          (list {"username" "alice"
                 "password" "garden"})
-         (concat cold-program hot-program)
+         program
          {:db (xt/db *xt-node*)}))))
 
     (testing "Incorrect password throws exception"
@@ -93,57 +90,82 @@
         (pipe/pipe
          (list {"username" "alice"
                 "password" "wrong-password"})
-         (concat cold-program hot-program)
+         program
          {:db (xt/db *xt-node*)}))))))
 
 (comment
   ((t/join-fixtures [with-system-xt])
-   (fn []
-     (repl/put!
-      {:xt/id "alice-identity"
-       :username "alice"
-       :password-hash (password/encrypt "garden")})
+   (time
+    (fn []
+      (repl/put!
+       {:xt/id "https://site.test/user-identities/alice"
+        :username "alice"
+        :password-hash (password/encrypt "garden")})
 
-     (pipe/pipe
-      (list {"username" "alice"
-             "password" "garden"})
-      '[
-        [::pipe/validate
-         [:map
-          ["username" [:string {:min 1}]]
-          ["password" [:string {:min 1}]]]]
+      (pipe/pipe
+       (list {"username" "alice"
+              "password" "garden"})
+       '[
+         [::pipe/validate
+          [:map
+           ["username" [:string {:min 1}]]
+           ["password" [:string {:min 1}]]]]
 
-        [::pipe/dup]
+         ::pipe/dup
 
-        [::pipe/push "username"]
-        [::pipe/?of]
+         [::pipe/push "username"]
+         ;; TODO: Doesn't Factor return two values here, including a boolean?
+         ::pipe/of
 
-        [::pipe/dip
-         ;; TODO: Perhaps need a deftype for a Quotation
-         [[::pipe/push "password"]
-          [::pipe/?of]]]
+         ::pipe/swap
+         [::pipe/push "password"]
+         ::pipe/of
+         ::pipe/swap
 
-        [::pipe/find-matching-identity-on-password-query
-         {:username-in-identity-key :username
-          :password-hash-in-identity-key :password-hash}]
+         ;; We now have a stack with: <user> <password>
 
-        [::pipe/xtdb-query]
-        [::pipe/first]
-        [::pipe/first]
-        [::pipe/nest :juxt.pass.alpha/identity]
+         [::pipe/find-matching-identity-on-password-query
+          {:username-in-identity-key :username
+           :password-hash-in-identity-key :password-hash}]
 
-        [::pipe/push :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"]
-        [::pipe/set-at]
+         ::pipe/xtdb-query ::pipe/first ::pipe/first
 
-        [::pipe/push :xt/id]
-        [::pipe/push 10]
-        [::pipe/random-bytes]
-        [::pipe/as-hex-string]
-        [::pipe/push "https://site.test/subjects/alice/"]
-        [::pipe/str]
-        [::pipe/set-at]
+         [::pipe/push ::pass/user-identity]
+         ::pipe/swap ::pipe/associate
 
-        ]
+         [::pipe/push ::site/type "https://meta.juxt.site/pass/subject"]
+         ::pipe/set-at
 
-      {:db (xt/db *xt-node*)})
-     )))
+         ;; Make subject
+         [::pipe/push :xt/id]
+         [::pipe/push 10] ::pipe/random-bytes ::pipe/as-hex-string
+         [::pipe/push "https://site.test/subjects/alice/"] ::pipe/str
+         ::pipe/set-at
+
+         ;; Create the session, linked to the subject
+         ::pipe/dup [::pipe/push :xt/id] ::pipe/of
+         [::pipe/push ::pass/subject] ::pipe/swap ::pipe/associate
+         ;; Add id
+         [::pipe/push :xt/id]
+         [::pipe/push 16] ::pipe/make-nonce
+         [::pipe/push "https://site.test/sessions/"] ::pipe/str
+         ::pipe/set-at
+         ;; Add type
+         [::pipe/push ::site/type "https://meta.juxt.site/pass/session"]
+         ::pipe/set-at
+
+         ;; Create the session token, linked to the session
+         ::pipe/dup [::pipe/push :xt/id] ::pipe/of
+         [::pipe/push ::pass/session] ::pipe/swap ::pipe/associate
+         ;; Add id
+         [::pipe/push :xt/id]
+         [::pipe/push 16] ::pipe/make-nonce
+         [::pipe/push "https://site.test/session-tokens/"] ::pipe/str
+         ::pipe/set-at
+         ;; Add type
+         [::pipe/push ::site/type "https://meta.juxt.site/pass/session-token"]
+         ::pipe/set-at
+         ]
+
+       {:db (xt/db *xt-node*)})
+      ))))
