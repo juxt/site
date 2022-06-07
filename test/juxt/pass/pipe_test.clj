@@ -32,65 +32,96 @@
 (deftest match-password-test
 
   (repl/put!
-   {:xt/id "alice-identity"
+   {:xt/id "https://site.test/user-identities/alice"
     :username "alice"
     :password-hash (password/encrypt "garden")})
 
-  (let [program
-        [
-         ;; Initial validation on user provided data
-         [::pipe/validate
-          [:map
-           ["username" [:string {:min 1}]]
-           ["password" [:string {:min 1}]]]]
+  (let [quotation
+        '[
+          [:validate
+           [:map
+            ["username" [:string {:min 1}]]
+            ["password" [:string {:min 1}]]]]
 
-         [::pipe/find-matching-identity-on-password
-          :juxt.pass.alpha/identity
-          {:username-in-identity-key :username
-           :path-to-username [:input "username"]
-           :password-hash-in-identity-key :password-hash
-           :path-to-password [:input "password"]}]
+          :dup
 
-         [::pipe/merge
-          {:juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}]
+          [:push "username"]
+          ;; TODO: Doesn't Factor return two values here, including a boolean?
+          :of
 
-         ^{:doc "Add an id"}
-         [::pipe/merge {:xt/id "https://site.test/subjects/alice438348348"}]
+          :swap
+          [:push "password"]
+          :of
+          :swap
 
-         ^{:doc "Strip input"}
-         [::pipe/dissoc :input]
+          ;; We now have a stack with: <user> <password>
 
-         ^{:doc "Final validation before going into the database"}
-         [::pipe/validate
-          [:map
-           [:xt/id [:re "(.+)"]]
-           [:juxt.pass.alpha/identity :string]
-           [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/subject"]]]]
+          [:find-matching-identity-on-password-query
+           {:username-in-identity-key :username
+            :password-hash-in-identity-key :password-hash}]
 
-         [::pipe/db-single-put]]]
+          :xtdb-query :first :first
+
+          [:push ::pass/user-identity]
+          :swap :associate
+
+          [:push ::site/type "https://meta.juxt.site/pass/subject"]
+          :set-at
+
+          ;; Make subject
+          [:push :xt/id]
+          [:push 10] :random-bytes :as-hex-string
+          [:push "https://site.test/subjects/alice/"] :str
+          :set-at
+
+          ;; Create the session, linked to the subject
+          :dup [:push :xt/id] :of
+          [:push ::pass/subject] :swap :associate
+
+          ;; Now we're good to wrap up the subject in a tx-op
+          :swap :xtdb.api/put :swap
+
+          [:push :xt/id]
+          [:push 16] :make-nonce
+          [:push "https://site.test/sessions/"] :str
+          :set-at
+          [:push ::site/type "https://meta.juxt.site/pass/session"]
+          :set-at
+
+          :dup [:push :xt/id] :of
+          [:push ::pass/session] :swap :associate
+
+          :swap :xtdb.api/put :swap
+
+          [:push :xt/id]
+          [:push 16] :make-nonce
+          [:push "https://site.test/session-tokens/"] :str
+          :set-at
+          [:push ::site/type "https://meta.juxt.site/pass/session-token"]
+          :set-at
+
+          :xtdb.api/put
+          ]
+        ]
 
     (testing "Correct password creates subject and session"
-      (is
-       (=
-        [[:xtdb.api/put
-          {:juxt.pass.alpha/identity "alice-identity",
-           :juxt.site.alpha/type "https://meta.juxt.site/pass/subject",
-           :xt/id "https://juxt.site/subjects/alice438348348"}]]
-        (pipe/pipe
-         (list {"username" "alice"
-                "password" "garden"})
-         program
-         {:db (xt/db *xt-node*)}))))
+      (let [result (pipe/pipe
+                    (list {"username" "alice"
+                           "password" "garden"})
+                    quotation
+                    {:db (xt/db *xt-node*)})]
+        (is
+         (= 3 (count result)))))
 
     (testing "Incorrect password throws exception"
       (is
        (thrown-with-msg?
         clojure.lang.ExceptionInfo
-        #"\QLogin failed\E"
+        #"\QError, query didn't return any results\E"
         (pipe/pipe
          (list {"username" "alice"
                 "password" "wrong-password"})
-         program
+         quotation
          {:db (xt/db *xt-node*)}))))))
 
 (comment
@@ -106,65 +137,69 @@
        (list {"username" "alice"
               "password" "garden"})
        '[
-         [::pipe/validate
+         [:validate
           [:map
            ["username" [:string {:min 1}]]
            ["password" [:string {:min 1}]]]]
 
-         ::pipe/dup
+         :dup
 
-         [::pipe/push "username"]
+         [:push "username"]
          ;; TODO: Doesn't Factor return two values here, including a boolean?
-         ::pipe/of
+         :of
 
-         ::pipe/swap
-         [::pipe/push "password"]
-         ::pipe/of
-         ::pipe/swap
+         :swap
+         [:push "password"]
+         :of
+         :swap
 
          ;; We now have a stack with: <user> <password>
 
-         [::pipe/find-matching-identity-on-password-query
+         [:find-matching-identity-on-password-query
           {:username-in-identity-key :username
            :password-hash-in-identity-key :password-hash}]
 
-         ::pipe/xtdb-query ::pipe/first ::pipe/first
+         :xtdb-query :first :first
 
-         [::pipe/push ::pass/user-identity]
-         ::pipe/swap ::pipe/associate
+         [:push ::pass/user-identity]
+         :swap :associate
 
-         [::pipe/push ::site/type "https://meta.juxt.site/pass/subject"]
-         ::pipe/set-at
+         [:push ::site/type "https://meta.juxt.site/pass/subject"]
+         :set-at
 
          ;; Make subject
-         [::pipe/push :xt/id]
-         [::pipe/push 10] ::pipe/random-bytes ::pipe/as-hex-string
-         [::pipe/push "https://site.test/subjects/alice/"] ::pipe/str
-         ::pipe/set-at
+         [:push :xt/id]
+         [:push 10] :random-bytes :as-hex-string
+         [:push "https://site.test/subjects/alice/"] :str
+         :set-at
 
          ;; Create the session, linked to the subject
-         ::pipe/dup [::pipe/push :xt/id] ::pipe/of
-         [::pipe/push ::pass/subject] ::pipe/swap ::pipe/associate
-         ;; Add id
-         [::pipe/push :xt/id]
-         [::pipe/push 16] ::pipe/make-nonce
-         [::pipe/push "https://site.test/sessions/"] ::pipe/str
-         ::pipe/set-at
-         ;; Add type
-         [::pipe/push ::site/type "https://meta.juxt.site/pass/session"]
-         ::pipe/set-at
+         :dup [:push :xt/id] :of
+         [:push ::pass/subject] :swap :associate
 
-         ;; Create the session token, linked to the session
-         ::pipe/dup [::pipe/push :xt/id] ::pipe/of
-         [::pipe/push ::pass/session] ::pipe/swap ::pipe/associate
-         ;; Add id
-         [::pipe/push :xt/id]
-         [::pipe/push 16] ::pipe/make-nonce
-         [::pipe/push "https://site.test/session-tokens/"] ::pipe/str
-         ::pipe/set-at
-         ;; Add type
-         [::pipe/push ::site/type "https://meta.juxt.site/pass/session-token"]
-         ::pipe/set-at
+         ;; Now we're good to wrap up the subject in a tx-op
+         :swap :xtdb.api/put :swap
+
+         [:push :xt/id]
+         [:push 16] :make-nonce
+         [:push "https://site.test/sessions/"] :str
+         :set-at
+         [:push ::site/type "https://meta.juxt.site/pass/session"]
+         :set-at
+
+         :dup [:push :xt/id] :of
+         [:push ::pass/session] :swap :associate
+
+         :swap :xtdb.api/put :swap
+
+         [:push :xt/id]
+         [:push 16] :make-nonce
+         [:push "https://site.test/session-tokens/"] :str
+         :set-at
+         [:push ::site/type "https://meta.juxt.site/pass/session-token"]
+         :set-at
+
+         :xtdb.api/put
          ]
 
        {:db (xt/db *xt-node*)})
