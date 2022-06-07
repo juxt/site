@@ -11,10 +11,25 @@ atomically.
 Often, actions are required to validate input and construct documents that must
 be put into the database.
 
-Pipe is a language that is used in transaction functions which is designed for
-the purpose of producing transaction operations.
+Pipe is a bespoke language that is used in transaction functions which is
+specially designed for the purpose of producing transaction operations.
 
 Pipe is a stack-based
 https://www.concatenative.org/wiki/view/Front%20Page[concatenative] language,
 drawing heavily from https://factorcode.org/[Factor] and
 https://www.nsl.com/k/xy/xy.htm[XY].
+
+.Why a dedicated language?
+****
+The rationale for Pipe is that we need a DSL that is constrained and therefore
+easier to secure. Another issue with allowing a general purpose language such as
+Clojure or JavaScript is that we cannot know whether the program will terminate.
+
+The problem with only allowing extensions to be defmethods is that this implies
+that we need to allow users to add methods to the code-base, and track versions,
+etc.
+
+The benefit of an internal language is that its primitives can be established
+earlier on and compositions can be defined in terms of primitives. Compositions
+can be added to the database rather than the codebase.
+****
