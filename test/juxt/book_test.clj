@@ -299,7 +299,7 @@
        response)
 
 
-     (repl/ls-type "ActionLogEntry")
+     (repl/ls-type "https://meta.juxt.site/site/action-log-entry")
 
      (repl/e "urn:site:action-log:29")
 

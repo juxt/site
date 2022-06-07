@@ -53,7 +53,7 @@
     {:username-in-identity-key :username
      :password-hash-in-identity-key :password-hash}]
 
-   :xtdb-query :first :first
+   :pipe.xtdb/q :first :first
 
    [:push ::pass/user-identity]
    :swap :associate
@@ -133,7 +133,7 @@
 
       (pipe/pipe
        (list {"username" "alice"
-              "password" "gardenj"})
+              "password" "gardenh"})
        (list
         [:validate
          [:map
@@ -143,7 +143,6 @@
         :dup
 
         [:push "username"]
-        ;; TODO: Doesn't Factor return two values here, including a boolean?
         :of
 
         :swap
@@ -157,7 +156,7 @@
          {:username-in-identity-key :username
           :password-hash-in-identity-key :password-hash}]
 
-        :xtdb-query :first :first
+        :pipe.xtdb/q :first :first
 
         [:push ::pass/user-identity]
         :swap :associate

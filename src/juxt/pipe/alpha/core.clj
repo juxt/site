@@ -95,7 +95,7 @@
   (let [stack (pipe stack quotation env)]
     [(cons x stack) queue env]))
 
-(defmethod word :xtdb-query
+(defmethod word :pipe.xtdb/q
   [[q & stack] [_ & queue] env]
   (assert (map? q))
   (assert (:db env))
@@ -141,37 +141,6 @@
 (defmethod word :xtdb.api/put
   [[doc & stack] [_ & queue] env]
   [(cons [:xtdb.api/put doc] stack) queue env])
-
-#_(defmethod word :find-matching-identity-on-password
-    [[path-to-password path-to-username & stack]
-     [[_ {:keys [username-in-identity-key path-to-username
-                 password-hash-in-identity-key path-to-password]}]
-      & queue]
-     env]
-    (assert (:db env))
-    (let [identity
-          (first
-           (map first
-                (xt/q
-                 (:db env)
-                 {:find '[e]
-                  :where [
-                          ['e username-in-identity-key 'username]
-                          ['e password-hash-in-identity-key 'password-hash]
-                          ['(crypto.password.bcrypt/check password password-hash)]]
-                  :in '[username password]}
-                 (get-in m path-to-username)
-                 (get-in m path-to-password))))]
-      (if identity
-        [(cons identity stack) queue env]
-        (throw (ex-info "Login failed" {:username (get-in m path-to-username)})))))
-
-#_(defmethod word :db-single-put
-  [m _ _]
-  [[:xtdb.api/put m]])
-
-#_(defmethod word :abort [m _ _]
-  (throw (ex-info "Abort" {:value m})))
 
 (defn pipe [stack queue env]
   ;; Naiive implementation. A production implementation would put an upper limit
