@@ -8,6 +8,7 @@
                         "juxt.authorization-integration-test"
                         "juxt.pass.authorization-test"
                         "juxt.pass.procedure-test"
+                        "juxt.pipe.core-test"
                         ]}]
 
  :reporter kaocha.report/documentation}

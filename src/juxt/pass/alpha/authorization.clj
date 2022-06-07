@@ -14,7 +14,8 @@
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha.process :as process]
-   [juxt.pass.alpha.pipe :as pipe]))
+   [juxt.pipe.alpha.core :refer [pipe]]
+   [juxt.pipe.alpha :as-alias pipe]))
 
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
@@ -249,8 +250,8 @@
               (cond
                 (::pass/process action-doc)
                 (:ops (process/process-args pass-ctx action-doc args))
-                (::pass/pipe action-doc)
-                (pipe/pipe (list (first args)) (::pass/pipe action-doc) (assoc pass-ctx :db db))
+                (::pipe/quotation action-doc)
+                (pipe (list (first args)) (::pipe/quotation action-doc) (assoc pass-ctx :db db))
                 :else
                 (throw (ex-info "All actions must have some processing steps"
                                 {:action action-doc})))]
@@ -263,7 +264,7 @@
            [:xtdb.api/put
             (into
              {:xt/id (format "urn:site:action-log:%s" (::xt/tx-id tx))
-              ::site/type "ActionLogEntry"
+              ::site/type "https://meta.juxt.site/site/action-log-entry"
               ::pass/subject subject
               ::pass/action action
               ::pass/purpose purpose

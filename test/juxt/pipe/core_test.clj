@@ -1,10 +1,10 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.pipe-test
+(ns juxt.pipe.core-test
   (:require
    [clojure.test :refer [deftest is use-fixtures testing] :as t]
    [crypto.password.bcrypt :as password]
-   [juxt.pass.alpha.pipe :as pipe]
+   [juxt.pipe.alpha.core :as pipe]
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node*]]
    [juxt.pass.alpha :as-alias pass]

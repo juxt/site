@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.alpha.pipe
+(ns juxt.pipe.alpha.core
   ;; When promoting this ns, move the defmethods that require all these
   ;; dependencies:
   (:require

@@ -11,10 +11,10 @@
    [juxt.pass.alpha.cookie-scope :as cookie-scope]
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.pipe :as pipe]
    [juxt.pass.alpha.http-authentication :as authn]
    [ring.util.codec :as codec]
-   [juxt.pass.pipe-test :refer [LOGIN]]))
+   [juxt.pipe.core-test :refer [LOGIN]]
+   [juxt.pipe.alpha :as-alias pipe]))
 
 (defn with-handler [f]
   (binding [*handler*
@@ -273,7 +273,7 @@
 
        ;; TODO: Replace with 'cold' and 'hot' steps - cold steps run before
        ;; head-of-line, hot steps run /at/ head-of-line
-       :juxt.pass.alpha/pipe LOGIN
+       ::pipe/quotation LOGIN
 
        :juxt.pass.alpha/rules
        '[
@@ -299,12 +299,10 @@
        response)
 
 
-     #_(repl/ls)
+     (repl/ls-type "ActionLogEntry")
 
-
-
+     (repl/e "urn:site:action-log:29")
 
      ;; TODO: Check the database for evidence a session has been created
-
 
      )))
