@@ -284,7 +284,10 @@
         (log/errorf e "Error when doing action: %s %s" action (format "urn:site:action-log:%s" (::xt/tx-id tx)))
         [[::xt/put
           {:xt/id (format "urn:site:action-log:%s" (::xt/tx-id tx))
-           ::site/type "ActionLogEntry"
+           ::site/type "https://meta.juxt.site/site/action-log-entry"
+           ::pass/subject subject
+           ::pass/action action
+           ::pass/purpose purpose
            ::site/error {:message (.getMessage e)
                          :ex-data (ex-data e)}}]]))))
 
