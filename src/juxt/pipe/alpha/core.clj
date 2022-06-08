@@ -103,9 +103,7 @@
   (let [db (:db env)
         [in stack] (split-at (count (:in q)) stack)
         results (apply xt/q db q in)]
-    (if (seq results)
-      [(cons results stack) queue env]
-      (throw (ex-info "Error, query didn't return any results" {})))))
+    [(cons results stack) queue env]))
 
 (defmethod word :set-at
   [[v k m & stack] [_ & queue] env]
