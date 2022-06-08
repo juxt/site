@@ -96,7 +96,14 @@
   (let [stack (pipe stack quotation env)]
     [(cons x stack) queue env]))
 
-(defmethod word :pipe.xtdb/q
+(defmethod word :if [[cond & stack] [[_ t f] & queue] env]
+  [stack (concat (if cond t f) queue) env])
+
+;; "Alternative conditional form that preserves the cond value if it is true."
+(defmethod word :if* [[cond :as stack] [[_ t f] & queue] env]
+  [stack (concat (if cond t f) queue) env])
+
+(defmethod word :juxt.pipe.alpha.xtdb/q
   [[q & stack] [_ & queue] env]
   (assert (map? q))
   (assert (:db env))
@@ -140,6 +147,19 @@
 (defmethod word :xtdb.api/put
   [[doc & stack] [_ & queue] env]
   [(cons [:xtdb.api/put doc] stack) queue env])
+
+(defmethod word :ex-info
+  [[ex-data msg & stack] [_ & queue] env]
+  [(cons (ex-info msg ex-data) stack) queue env])
+
+(defmethod word :throw
+  [[err & stack] [_ & queue] env]
+  (throw err))
+
+(defn word* [stack [w & queue] env]
+  (if (or (keyword? w) (vector? w))
+    (word stack (cons w queue) env)
+    [(cons w stack) queue env]))
 
 (defn pipe [stack queue env]
   ;; Naiive implementation. A production implementation would put an upper limit
