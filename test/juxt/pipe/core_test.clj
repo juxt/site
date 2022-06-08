@@ -39,7 +39,6 @@
    :dup
 
    [:push "username"]
-   ;; TODO: Doesn't Factor return two values here, including a boolean?
    :of
 
    :swap
@@ -50,57 +49,64 @@
    ;; We now have a stack with: <user> <password>
 
    [:find-matching-identity-on-password-query
-    {:username-in-identity-key :username
-     :password-hash-in-identity-key :password-hash}]
+    {:username-in-identity-key ::pass/username
+     :password-hash-in-identity-key ::pass/password-hash}]
 
-   :pipe.xtdb/q :first :first
+   :juxt.pipe.alpha.xtdb/q :first :first
 
-   [:push ::pass/user-identity]
-   :swap :associate
+   ;; If nil then return 400
 
-   [:push ::site/type "https://meta.juxt.site/pass/subject"]
-   :set-at
+   [:if*
+    (list
+     [:push ::pass/user-identity]
+     :swap :associate
 
-   ;; Make subject
-   [:push :xt/id]
-   [:push 10] :random-bytes :as-hex-string
-   [:push "https://site.test/subjects/alice/"] :str
-   :set-at
+     [:push ::site/type "https://meta.juxt.site/pass/subject"]
+     :set-at
 
-   ;; Create the session, linked to the subject
-   :dup [:push :xt/id] :of
-   [:push ::pass/subject] :swap :associate
+     ;; Make subject
+     [:push :xt/id]
+     10 :random-bytes :as-hex-string
+     "https://site.test/subjects/alice/" :str
+     :set-at
 
-   ;; Now we're good to wrap up the subject in a tx-op
-   :swap :xtdb.api/put :swap
+     ;; Create the session, linked to the subject
+     :dup [:push :xt/id] :of
+     [:push ::pass/subject] :swap :associate
 
-   [:push :xt/id]
-   [:push 16] :make-nonce
-   [:push "https://site.test/sessions/"] :str
-   :set-at
-   [:push ::site/type "https://meta.juxt.site/pass/session"]
-   :set-at
+     ;; Now we're good to wrap up the subject in a tx-op
+     :swap :xtdb.api/put :swap
 
-   :dup [:push :xt/id] :of
-   [:push ::pass/session] :swap :associate
+     [:push :xt/id]
+     16 :make-nonce
+     "https://site.test/sessions/" :str
+     :set-at
+     [:push ::site/type "https://meta.juxt.site/pass/session"]
+     :set-at
 
-   :swap :xtdb.api/put :swap
+     :dup [:push :xt/id] :of
+     [:push ::pass/session] :swap :associate
 
-   [:push :xt/id]
-   [:push 16] :make-nonce
-   [:push "https://site.test/session-tokens/"] :str
-   :set-at
-   [:push ::site/type "https://meta.juxt.site/pass/session-token"]
-   :set-at
+     :swap :xtdb.api/put :swap
 
-   :xtdb.api/put))
+     [:push :xt/id]
+     16 :make-nonce "https://site.test/session-tokens/" :str
+     :set-at
+
+     [:push ::site/type "https://meta.juxt.site/pass/session-token"] :set-at
+
+     :xtdb.api/put)
+
+    (list
+     "Login failed" {:ring.response/status 400} :ex-info :throw
+     )]))
 
 (deftest match-password-test
 
   (repl/put!
    {:xt/id "https://site.test/user-identities/alice"
-    :username "alice"
-    :password-hash (password/encrypt "garden")})
+    ::pass/username "alice"
+    ::pass/password-hash (password/encrypt "garden")})
 
   (testing "Correct password creates subject and session"
     (let [result (pipe/pipe
@@ -111,11 +117,12 @@
       (is
        (= 3 (count result)))))
 
+  ;; TODO: Reinstate
   (testing "Incorrect password throws exception"
     (is
      (thrown-with-msg?
       clojure.lang.ExceptionInfo
-      #"\QError, query didn't return any results\E"
+      #"\QLogin failed\E"
       (pipe/pipe
        (list {"username" "alice"
               "password" "wrong-password"})
@@ -128,12 +135,12 @@
     (fn []
       (repl/put!
        {:xt/id "https://site.test/user-identities/alice"
-        :username "alice"
-        :password-hash (password/encrypt "garden")})
+        ::pass/username "alice"
+        ::pass/password-hash (password/encrypt "garden")})
 
       (pipe/pipe
        (list {"username" "alice"
-              "password" "gardenh"})
+              "password" "garden"})
        (list
         [:validate
          [:map
@@ -153,50 +160,59 @@
         ;; We now have a stack with: <user> <password>
 
         [:find-matching-identity-on-password-query
-         {:username-in-identity-key :username
-          :password-hash-in-identity-key :password-hash}]
+         {:username-in-identity-key ::pass/username
+          :password-hash-in-identity-key ::pass/password-hash}]
 
-        :pipe.xtdb/q :first :first
+        :juxt.pipe.alpha.xtdb/q :first :first
 
-        [:push ::pass/user-identity]
-        :swap :associate
+        ;; If nil then return 400
 
-        [:push ::site/type "https://meta.juxt.site/pass/subject"]
-        :set-at
+        [:if*
+         (list
 
-        ;; Make subject
-        [:push :xt/id]
-        [:push 10] :random-bytes :as-hex-string
-        [:push "https://site.test/subjects/alice/"] :str
-        :set-at
+          [:push ::pass/user-identity]
+          :swap :associate
 
-        ;; Create the session, linked to the subject
-        :dup [:push :xt/id] :of
-        [:push ::pass/subject] :swap :associate
+          [:push ::site/type "https://meta.juxt.site/pass/subject"]
+          :set-at
 
-        ;; Now we're good to wrap up the subject in a tx-op
-        :swap :xtdb.api/put :swap
+          ;; Make subject
+          [:push :xt/id]
+          10 :random-bytes :as-hex-string
+          "https://site.test/subjects/alice/" :str
+          :set-at
 
-        [:push :xt/id]
-        [:push 16] :make-nonce
-        [:push "https://site.test/sessions/"] :str
-        :set-at
-        [:push ::site/type "https://meta.juxt.site/pass/session"]
-        :set-at
+          ;; Create the session, linked to the subject
+          :dup [:push :xt/id] :of
+          [:push ::pass/subject] :swap :associate
 
-        :dup [:push :xt/id] :of
-        [:push ::pass/session] :swap :associate
+          ;; Now we're good to wrap up the subject in a tx-op
+          :swap :xtdb.api/put :swap
 
-        :swap :xtdb.api/put :swap
+          [:push :xt/id]
+          16 :make-nonce
+          "https://site.test/sessions/" :str
+          :set-at
+          [:push ::site/type "https://meta.juxt.site/pass/session"]
+          :set-at
 
-        [:push :xt/id]
-        [:push 16] :make-nonce
-        [:push "https://site.test/session-tokens/"] :str
-        :set-at
-        [:push ::site/type "https://meta.juxt.site/pass/session-token"]
-        :set-at
+          :dup [:push :xt/id] :of
+          [:push ::pass/session] :swap :associate
 
-        :xtdb.api/put)
+          :swap :xtdb.api/put :swap
 
-       {:db (xt/db *xt-node*)})
-      ))))
+          [:push :xt/id]
+          16 :make-nonce "https://site.test/session-tokens/" :str
+          :set-at
+
+          [:push ::site/type "https://meta.juxt.site/pass/session-token"] :set-at
+
+          :xtdb.api/put)
+
+         (list
+          "Login failed"
+          {:ring.response/status 400} ;; Respond with a 400 status
+          :ex-info :throw
+          )])
+
+       {:db (xt/db *xt-node*)})))))
