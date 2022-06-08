@@ -23,7 +23,8 @@
     (if (keyword? word) word (first word))))
 
 (defmethod word :break [stack queue env]
-  (throw (ex-info "BREAK" {:stack stack :queue queue :env env})))
+  ;; Don't include the environment, this error may be logged
+  (throw (ex-info "BREAK" {:stack stack :queue queue})))
 
 ;; no-op is identity
 (defmethod word :no-op [stack queue env]
