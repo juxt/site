@@ -311,8 +311,13 @@
           (xt/entity
            (xt/db xt-node)
            (format "urn:site:action-log:%s" tx-id))]
-      (if (::site/error result)
-        (throw (ex-info "Failed to do action" (merge {:action action} pass-ctx (dissoc result ::site/type))))
+      (if-let [error (::site/error result)]
+        (throw
+         (ex-info
+          (:message error)
+          (merge
+           (dissoc result ::site/type :xt/id ::site/error)
+           (:ex-data error))))
         result))))
 
 ;; TODO: Since it is possible that a permission is in the queue which might

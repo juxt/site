@@ -259,11 +259,12 @@
           (catch Exception e
             (throw
              (ex-info
-              (format "Failed to perform action: %s" (:xt/id permitted-action))
-              {::site/request-context (assoc req :ring.response/status 500)
+              (.getMessage e)
+              {::site/request-context
+               (merge (assoc req :ring.response/status 500)
+                      (ex-data e))
                :permitted-action permitted-action
                :received-representation rep
-               :cause e
                :body-as-value body-as-value}
               e))))
 
