@@ -29,9 +29,7 @@
 
 (defn check-permissions
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
-  [db actions {:keys [subject resource purpose] :as pass-ctx}]
-
-  (log/debugf "CHECK PERMS: %s" (pr-str (assoc pass-ctx :actions actions)))
+  [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose :as pass-ctx}]
 
   (let [rules (actions->rules db actions)]
     (when (seq rules)
@@ -132,14 +130,12 @@
 (defn pull-allowed-resource
   "Given a subject, a set of possible actions and a resource, pull the allowed
   attributes."
-  [db actions resource {::pass/keys [subject purpose]}]
+  [db actions resource {::pass/keys [subject purpose] :as pass-ctx}]
   (let [check-result
         (check-permissions
          db
          actions
-         {:subject subject
-          :purpose purpose
-          :resource resource})
+         (assoc pass-ctx ::site/resource resource))
 
         pull-expr (vec (mapcat
                         (fn [{:keys [action]}]
@@ -211,10 +207,10 @@
 
 (defn do-action*
   [xt-ctx
-   {resource ::pass/resource
-    purpose ::pass/purpose
-    subject ::pass/subject
+   {subject ::pass/subject
     action ::pass/action
+    resource ::site/resource
+    purpose ::pass/purpose
     :as pass-ctx}
    args]
   (assert (vector? args))
@@ -226,9 +222,7 @@
             (check-permissions
              db
              #{action}
-             {:subject subject
-              :resource resource
-              :purpose purpose})
+             pass-ctx)
 
             action-doc (xt/entity db action)
             _ (when-not action-doc
@@ -287,6 +281,7 @@
            ::site/type "https://meta.juxt.site/site/action-log-entry"
            ::pass/subject subject
            ::pass/action action
+           ::site/resource resource
            ::pass/purpose purpose
            ::site/error {:message (.getMessage e)
                          :ex-data (ex-data e)}}]]))))
@@ -341,11 +336,11 @@
           (check-permissions
            db
            actions
-           (cond-> {:subject (:xt/id subject)}
+           (cond-> {::pass/subject (:xt/id subject)}
              ;; When the resource is in the database, we can add it to the
              ;; permission checking in case there's a specific permission for
              ;; this resource.
-             (:xt/id resource) (assoc :resource (:xt/id resource))))]
+             (:xt/id resource) (assoc ::site/resource (:xt/id resource))))]
 
       (if (seq permitted-actions)
         (h (assoc req ::pass/permitted-actions permitted-actions))

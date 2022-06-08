@@ -200,8 +200,8 @@
               (authz/check-permissions
                db
                #{(:xt/id GET_RESOURCE_ACTION)}
-               {:subject (:xt/id subject)
-                :resource (:xt/id resource)})]
+               {::pass/subject (:xt/id subject)
+                ::site/resource (:xt/id resource)})]
           (if expected
             (is (seq permissions))
             (is (not (seq permissions)))))
@@ -368,8 +368,8 @@
         (let [actual (authz/check-permissions
                       db
                       #{(:xt/id action)}
-                      {:subject (:xt/id subject)
-                       :resource resource})]
+                      {::pass/subject (:xt/id subject)
+                       ::site/resource resource})]
           (if ok? (is (seq actual)) (is (not (seq actual)))))
 
       ;; Alice can read her own private file.
@@ -1048,14 +1048,14 @@
       (authz/check-permissions
        db
        #{(:xt/id CREATE_PERSON_ACTION)}
-       {:subject (:xt/id SUE_SUBJECT)})))
+       {::pass/subject (:xt/id SUE_SUBJECT)})))
     (is
      (not
       (seq
        (authz/check-permissions
         db
         #{}
-        {:subject (:xt/id SUE_SUBJECT)}
+        {::pass/subject (:xt/id SUE_SUBJECT)}
         )))))
 
   (authz/do-action
