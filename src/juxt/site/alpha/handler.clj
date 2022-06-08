@@ -248,10 +248,10 @@
           )
 
         ;; TODO: Should we fail if more than one permitted action available?
-        permitted-action (:action (first (::pass/permitted-actions req)))
+        permitted-action (::pass/action (first (::pass/permitted-actions req)))
 
-        pass-ctx {:subject (:xt/id subject)
-                  :resource (:xt/id resource)}
+        pass-ctx {::pass/subject (:xt/id subject)
+                  ::site/resource (:xt/id resource)}
 
         action-log
         (try

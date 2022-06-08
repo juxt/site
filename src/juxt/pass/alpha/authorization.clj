@@ -37,7 +37,7 @@
             (xt/q
              db
              {:find '[(pull permission [*]) (pull action [*])]
-              :keys '[permission action]
+              :keys '[juxt.pass.alpha/permission juxt.pass.alpha/action]
               :where
               '[
                 [action ::site/type "https://meta.juxt.site/pass/action"]
@@ -138,7 +138,7 @@
          (assoc pass-ctx ::site/resource resource))
 
         pull-expr (vec (mapcat
-                        (fn [{:keys [action]}]
+                        (fn [{::pass/keys [action]}]
                           (::pass/pull action))
                         check-result))]
     (xt/pull db pull-expr resource)))
@@ -235,10 +235,7 @@
           (throw
            (ex-info
             "Action denied"
-            {:subject subject
-             :action action
-             :resource resource
-             :purpose purpose})))
+            pass-ctx)))
 
         (let [ops
               (cond
@@ -251,7 +248,7 @@
                                 {:action action-doc})))]
           (doseq [op ops]
             (when-not (and (vector? op) (keyword? (first op)))
-              (throw (ex-info "Invalid op" {:action action :op op}))))
+              (throw (ex-info "Invalid op" {::pass/action action :op op}))))
 
           (conj
            ops
