@@ -100,7 +100,14 @@
   [stack (concat (if cond t f) queue) env])
 
 ;; "Alternative conditional form that preserves the cond value if it is true."
-(defmethod word :if* [[cond :as stack] [[_ t f] & queue] env]
+(defmethod word :if*
+  [[cond :as stack]
+   ;; TODO: It would be possible to support different variadic forms of 'if'
+   ;; such that the t and f quotations could be given a literal quotations or
+   ;; dynamically computed on the stack. By checking if t and f are both nil
+   ;; upon destructuring, we could tell which form was being used.
+   [[_ t f] & queue]
+   env]
   [stack (concat (if cond t f) queue) env])
 
 (defmethod word :juxt.pipe.alpha.xtdb/q
