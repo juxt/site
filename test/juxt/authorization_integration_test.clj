@@ -1,14 +1,13 @@
 ;; Copyright © 2022, JUXT LTD.
 
 (ns juxt.authorization-integration-test
-  (:require  [clojure.test :refer [deftest testing is] :as t]
-             [juxt.test.util :refer [*xt-node* *handler*] :as tutil]
-             [juxt.site.alpha :as-alias site]
-             [juxt.http.alpha :as-alias http]
-             [juxt.site.alpha.repl :as repl]
-             [clojure.string :as str]
-             [xtdb.api :as xt]
-             [juxt.pass.alpha.application :as application]))
+  (:require
+   [clojure.test :refer [deftest testing is] :as t]
+   [juxt.test.util :refer [*xt-node* *handler*] :as tutil]
+   [juxt.site.alpha :as-alias site]
+   [juxt.site.alpha.repl :as repl]
+   [xtdb.api :as xt]
+   [juxt.pass.alpha.application :as application]))
 
 (def site-prefix "https://test.example.com")
 
