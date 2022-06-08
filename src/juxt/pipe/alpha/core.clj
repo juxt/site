@@ -178,5 +178,5 @@
     (assert list? queue)
     (assert map? env)
     (if (seq queue)
-      (recur (word stack queue env))
+      (recur (word* stack queue env))
       stack)))
