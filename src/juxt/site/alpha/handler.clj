@@ -262,7 +262,7 @@
               (format "Failed to perform action: %s" (:xt/id permitted-action))
               {::site/request-context (assoc req :ring.response/status 500)
                :permitted-action permitted-action
-               :rep rep
+               :received-representation rep
                :cause e
                :body-as-value body-as-value}
               e))))
