@@ -314,7 +314,6 @@
 
         {::xt/keys [tx-id]} (xt/await-tx xt-node tx)]
 
-    ;; Throw a nicer error
     (when-not (xt/tx-committed? xt-node tx)
       (throw
        (ex-info
@@ -337,8 +336,12 @@
         (let [session-token (::pass/session-token result)]
           (cond-> req
             result (assoc ::pass/action-result result)
-            session-token (update :ring.response/headers (fnil into {}) {"set-cookie" session-token})
-            ))))))
+            session-token
+            (update
+             :ring.response/headers
+             (fnil into {})
+             {"set-cookie"
+              (format "id=%s; Path=/; Secure; HttpOnly; SameSite=Lax" session-token)})))))))
 
 ;; TODO: Since it is possible that a permission is in the queue which might
 ;; grant or revoke an action, it is necessary to run this check 'head-of-line'

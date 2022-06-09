@@ -255,14 +255,6 @@
                       #{ ;; We must create this action
                         "https://site.test/actions/login"}}}})
 
-  ;; Grant permission for anyone to access the login handler
-  (repl/do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/login"
-    :juxt.pass.alpha/action "https://site.test/actions/login"
-    :juxt.pass.alpha/purpose nil})
-
   ;; Create login action
   (repl/do-action
    "https://site.test/subjects/repl-default"
@@ -277,6 +269,14 @@
     '[
       [(allowed? permission subject action resource)
        [permission :xt/id]]]})
+
+  ;; Grant permission for anyone to access the login handler
+  (repl/do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/login"
+    :juxt.pass.alpha/action "https://site.test/actions/login"
+    :juxt.pass.alpha/purpose nil})
 
   ;; POST to the /login handler, which call the login action.
   ;; After this there should be a set-cookie escalation

@@ -771,9 +771,156 @@
     :juxt.pass.alpha/cookie-name "id"
     :juxt.pass.alpha/cookie-domain "https://site.test"
     :juxt.pass.alpha/cookie-path "/protected-by-cookie-scope/"
-    :juxt.pass.alpha/login-uri "https://site.test/login.html"})
+    :juxt.pass.alpha/login-uri "https://site.test/login"})
     ;; end::create-cookie-scope![]
-)
+  )
+
+(defn book-create-login-form! []
+  ;; tag::create-login-form![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-immutable-public-resource"
+   {:xt/id "https://site.test/login"
+    :juxt.http.alpha/content-type "text/html;charset=utf-8"
+    :juxt.http.alpha/content
+    "
+<html>
+<head>
+<link rel='icon' href='data:,'>
+</head>
+<body>
+<form method=POST>
+<p>
+Username: <input name=username type=text>
+</p>
+<p>
+Password: <input name=password type=password>
+</p>
+<p>
+<input type=submit value=Login>
+</p>
+</form>
+</body>
+</html>
+\r\n"})
+    ;; end::create-login-form![]
+  )
+
+(defn book-create-login-resource! []
+  ;; tag::create-login-resource![]
+  (put!
+   {:xt/id "https://site.test/login"
+    :juxt.site.alpha/methods
+    {:post
+     {:juxt.pass.alpha/actions #{"https://site.test/actions/login"}}}})
+  ;; end::create-login-resource![]
+  )
+
+(defn book-create-action-login! []
+  ;; tag::create-action-login![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/login"
+
+    :juxt.pipe.alpha/quotation
+    (list
+     [:validate
+      [:map
+       ["username" [:string {:min 1}]]
+       ["password" [:string {:min 1}]]]]
+
+     :dup
+
+     [:push "username"]
+     :of
+
+     :swap
+     [:push "password"]
+     :of
+     :swap
+
+     ;; We now have a stack with: <user> <password>
+
+     [:find-matching-identity-on-password-query
+      {:username-in-identity-key :juxt.pass.alpha/username
+       :password-hash-in-identity-key :juxt.pass.alpha/password-hash}]
+
+     :juxt.pipe.alpha.xtdb/q :first :first
+
+     ;; If nil then return 400
+
+     [:if*
+      (list
+
+       [:push :juxt.pass.alpha/user-identity]
+       :swap :associate
+
+       [:push ::site/type "https://meta.juxt.site/pass/subject"]
+       :set-at
+
+       ;; Make subject
+       [:push :xt/id]
+       10 :random-bytes :as-hex-string
+       "https://site.test/subjects/" :str
+       :set-at
+
+       ;; Create the session, linked to the subject
+       :dup [:push :xt/id] :of
+       [:push ::pass/subject] :swap :associate
+
+       ;; Now we're good to wrap up the subject in a tx-op
+       :swap :xtdb.api/put :swap
+
+       [:push :xt/id]
+       16 :make-nonce
+       "https://site.test/sessions/" :str
+       :set-at
+       [:push ::site/type "https://meta.juxt.site/pass/session"]
+       :set-at
+
+       :dup [:push :xt/id] :of
+       [:push ::pass/session] :swap :associate
+
+       :swap :xtdb.api/put :swap
+
+       16 :make-nonce
+       :swap
+       :over
+       [:push ::pass/session-token]
+       :swap
+       :set-at
+       :swap
+       "https://site.test/session-tokens/" :str
+       [:push :xt/id]
+       :swap
+       :set-at
+       [:push ::site/type "https://meta.juxt.site/pass/session-token"] :set-at
+       :xtdb.api/put)
+
+      (list
+       "Login failed"
+       {:ring.response/status 400} ;; Respond with a 400 status
+       :ex-info :throw
+       )])
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? permission subject action resource)
+       [permission :xt/id]]]})
+  ;; end::create-action-login![]
+  )
+
+(defn book-grant-permission-to-invoke-action-login! []
+  ;; tag::permit-action-login![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/login"
+    :juxt.pass.alpha/action "https://site.test/actions/login"
+    :juxt.pass.alpha/purpose nil})
+  ;; end::permit-action-login![]
+  )
 
 ;; Applications
 
@@ -807,7 +954,7 @@
   ;; end::create-action-put-application![]
   )
 
-(defn book-grant-permission-to-invoke-action-put-application!! []
+(defn book-grant-permission-to-invoke-action-put-application! []
   ;; tag::grant-permission-to-invoke-action-put-application![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -861,8 +1008,6 @@
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-authorize-application![]
   )
-
-;;(defn book-create-resource)
 
 (defn book-create-action-issue-access-token! []
   ;; tag::create-action-issue-access-token![]
@@ -958,7 +1103,7 @@
   ;; end::invoke-authorize-application![]
   )
 
-(defn book-create-test-subject! []
+#_(defn book-create-test-subject! []
   ;; tag::create-test-subject![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -1142,7 +1287,7 @@
 
 (defn applications-preliminaries! []
   (book-create-action-put-application!)
-  (book-grant-permission-to-invoke-action-put-application!!)
+  (book-grant-permission-to-invoke-action-put-application!)
   (book-create-action-authorize-application!)
   (book-grant-permission-to-invoke-action-authorize-application!)
   (book-create-action-issue-access-token!)
@@ -1151,7 +1296,7 @@
 (defn setup-application! []
   (book-invoke-put-application!)
   (book-invoke-authorize-application!)
-  (book-create-test-subject!)
+  #_(book-create-test-subject!)
   (book-invoke-issue-access-token!))
 
 (defn init-all! []
@@ -1172,6 +1317,10 @@
   (book-create-resource-protected-by-cookie-scope!)
   (book-grant-permission-to-resource-protected-by-cookie-scope!)
   (book-create-cookie-scope!)
+  (book-create-login-form!)
+  (book-create-login-resource!)
+  (book-create-action-login!)
+  (book-grant-permission-to-invoke-action-login!)
 
   (applications-preliminaries!)
   (setup-application!)

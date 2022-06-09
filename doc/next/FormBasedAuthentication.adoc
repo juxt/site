@@ -17,12 +17,14 @@ _protected document_. This is explained in <<create-resource-protected-by-cookie
 . A Permission to allow Alice to access this protected document. This is added
 in <<grant-permission-to-resource-protected-by-cookie-scope>>.
 
-. A Cookie Scope that redirects unauthenticated requests when necessary. This is done in
-<<create-cookie-scope>>.
+. A Cookie Scope that redirects unauthenticated requests when necessary. This is
+added in <<create-cookie-scope>>.
 
-. A login form that will be shown to the User, allowing them to authenticate.
+. A login form that will be shown to the User, allowing them to
+authenticate. This is created in <<create-login-form>>.
 
-. A resource that can receive the POST request that occurs when a User submits the login form.
+. A resource that can receive the POST request that occurs when a User submits
+the login form.
 
 . An Action that can be used when the POST request is received. This Action will
 attempt to find a User Identity that matches some received credentials. If one
@@ -150,7 +152,7 @@ procedure throws an error and the transaction aborts.
 
 . (document)
 
-[[basic-create-protected-resource]]
+[[create-resource-protected-by-cookie-scope]]
 == Create the protected resource
 
 .Creating the protected resource
@@ -161,7 +163,7 @@ include::../../test/juxt/book.clj[tag=create-resource-protected-by-cookie-scope!
 ----
 ====
 
-[[basic-permit-user]]
+[[grant-permission-to-resource-protected-by-cookie-scope]]
 == Permit Alice to access the protected resource
 
 .Permitting Alice to access the protected resource
@@ -182,3 +184,38 @@ include::../../test/juxt/book.clj[tag=grant-permission-to-resource-protected-by-
 include::../../test/juxt/book.clj[tag=create-cookie-scope!,indent=0]
 ----
 ====
+
+[[create-login-form]]
+== Create the login form
+
+.Creating the login form
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=create-login-form!,indent=0]
+----
+====
+
+[[create-login-action]]
+== Create the login action
+
+.Creating the login action
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=create-action-login!,indent=0]
+----
+====
+
+.Granting permission for all to perform the login action
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=permit-action-login!,indent=0]
+----
+====
+
+// Local Variables:
+// mode: outline
+// outline-regexp: "[=]+"
+// End:

@@ -150,7 +150,7 @@
                                   :in [uri]}
                              uri))]
      {::site/uri uri
-      ::http/methods {:get {} :head {} :options {}}
+      ::site/methods {:get {} :head {} :options {}}
       ::site/resource-provider r
       ::http/redirect (cond-> loc (.startsWith loc base-uri)
                               (subs (count base-uri)))})
@@ -160,4 +160,4 @@
    (xt/entity db "urn:site:resources:not-found")
 
    {::site/resource-provider ::default-empty-resource
-    ::http/methods {:get {} :head {} :options {} :put {} :post {}}}))
+    ::site/methods {:get {} :head {} :options {} :put {} :post {}}}))

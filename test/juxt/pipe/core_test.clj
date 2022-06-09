@@ -31,84 +31,84 @@
 
 (def LOGIN
   (list
-        [:validate
-         [:map
-          ["username" [:string {:min 1}]]
-          ["password" [:string {:min 1}]]]]
+   [:validate
+    [:map
+     ["username" [:string {:min 1}]]
+     ["password" [:string {:min 1}]]]]
 
-        :dup
+   :dup
 
-        [:push "username"]
-        :of
+   [:push "username"]
+   :of
 
-        :swap
-        [:push "password"]
-        :of
-        :swap
+   :swap
+   [:push "password"]
+   :of
+   :swap
 
-        ;; We now have a stack with: <user> <password>
+   ;; We now have a stack with: <user> <password>
 
-        [:find-matching-identity-on-password-query
-         {:username-in-identity-key ::pass/username
-          :password-hash-in-identity-key ::pass/password-hash}]
+   [:find-matching-identity-on-password-query
+    {:username-in-identity-key ::pass/username
+     :password-hash-in-identity-key ::pass/password-hash}]
 
-        :juxt.pipe.alpha.xtdb/q :first :first
+   :juxt.pipe.alpha.xtdb/q :first :first
 
-        ;; If nil then return 400
+   ;; If nil then return 400
 
-        [:if*
-         (list
+   [:if*
+    (list
 
-          [:push ::pass/user-identity]
-          :swap :associate
+     [:push ::pass/user-identity]
+     :swap :associate
 
-          [:push ::site/type "https://meta.juxt.site/pass/subject"]
-          :set-at
+     [:push ::site/type "https://meta.juxt.site/pass/subject"]
+     :set-at
 
-          ;; Make subject
-          [:push :xt/id]
-          10 :random-bytes :as-hex-string
-          "https://site.test/subjects/alice/" :str
-          :set-at
+     ;; Make subject
+     [:push :xt/id]
+     10 :random-bytes :as-hex-string
+     "https://site.test/subjects/" :str
+     :set-at
 
-          ;; Create the session, linked to the subject
-          :dup [:push :xt/id] :of
-          [:push ::pass/subject] :swap :associate
+     ;; Create the session, linked to the subject
+     :dup [:push :xt/id] :of
+     [:push ::pass/subject] :swap :associate
 
-          ;; Now we're good to wrap up the subject in a tx-op
-          :swap :xtdb.api/put :swap
+     ;; Now we're good to wrap up the subject in a tx-op
+     :swap :xtdb.api/put :swap
 
-          [:push :xt/id]
-          16 :make-nonce
-          "https://site.test/sessions/" :str
-          :set-at
-          [:push ::site/type "https://meta.juxt.site/pass/session"]
-          :set-at
+     [:push :xt/id]
+     16 :make-nonce
+     "https://site.test/sessions/" :str
+     :set-at
+     [:push ::site/type "https://meta.juxt.site/pass/session"]
+     :set-at
 
-          :dup [:push :xt/id] :of
-          [:push ::pass/session] :swap :associate
+     :dup [:push :xt/id] :of
+     [:push ::pass/session] :swap :associate
 
-          :swap :xtdb.api/put :swap
+     :swap :xtdb.api/put :swap
 
-          16 :make-nonce
-          :swap
-          :over
-          [:push ::pass/session-token]
-          :swap
-          :set-at
-          :swap
-          "https://site.test/session-tokens/" :str
-          [:push :xt/id]
-          :swap
-          :set-at
-          [:push ::site/type "https://meta.juxt.site/pass/session-token"] :set-at
-          :xtdb.api/put)
+     16 :make-nonce
+     :swap
+     :over
+     [:push ::pass/session-token]
+     :swap
+     :set-at
+     :swap
+     "https://site.test/session-tokens/" :str
+     [:push :xt/id]
+     :swap
+     :set-at
+     [:push ::site/type "https://meta.juxt.site/pass/session-token"] :set-at
+     :xtdb.api/put)
 
-         (list
-          "Login failed"
-          {:ring.response/status 400} ;; Respond with a 400 status
-          :ex-info :throw
-          )]))
+    (list
+     "Login failed"
+     {:ring.response/status 400} ;; Respond with a 400 status
+     :ex-info :throw
+     )]))
 
 (deftest match-password-test
 
@@ -188,7 +188,7 @@
           ;; Make subject
           [:push :xt/id]
           10 :random-bytes :as-hex-string
-          "https://site.test/subjects/alice/" :str
+          "https://site.test/subjects/" :str
           :set-at
 
           ;; Create the session, linked to the subject
