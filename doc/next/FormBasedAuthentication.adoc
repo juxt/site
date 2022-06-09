@@ -70,7 +70,7 @@ pass -> loginproc: Submit\ntransaction\nfunction
 loginproc -> XTDB: Find identity\nwith credentials
 loginproc <- XTDB: Matched identity
 loginproc -> XTDB: Create subject, session
-pass <- loginproc: Check for session id
+pass <- loginproc: Get session token
 loginhandler <- pass: Set-cookie for session
 browser <- loginhandler: 302 Found with Set-Cookie
 browser -> document: GET
@@ -132,9 +132,9 @@ matches the credentials received in the request body.
 . A matching User Identity exists for Alice which is returned, otherwise the
 procedure throws an error and the transaction aborts.
 
-. (create subject, session)
+. (create subject, session, session-token)
 
-. (check for session id)
+. (associate session token in log entry)
 
 . (set-cookie corresponding to session)
 
@@ -149,3 +149,36 @@ procedure throws an error and the transaction aborts.
 . (200 OK)
 
 . (document)
+
+[[basic-create-protected-resource]]
+== Create the protected resource
+
+.Creating the protected resource
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=create-resource-protected-by-cookie-scope!,indent=0]
+----
+====
+
+[[basic-permit-user]]
+== Permit Alice to access the protected resource
+
+.Permitting Alice to access the protected resource
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=grant-permission-to-resource-protected-by-cookie-scope!,indent=0]
+----
+====
+
+[[create-cookie-scope]]
+== Create the cookie scope
+
+.Creating the cookie scope
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=create-cookie-scope!,indent=0]
+----
+====
