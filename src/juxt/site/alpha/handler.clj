@@ -253,20 +253,13 @@
         pass-ctx {::pass/subject (:xt/id subject)
                   ::site/resource (:xt/id resource)}
 
-        action-log
-        (try
-          (authz/do-action xt-node pass-ctx (:xt/id permitted-action) body-as-value)
-          (catch Exception e
-            (throw
-             (ex-info
-              (.getMessage e)
-              {::site/request-context
-               (merge (assoc req :ring.response/status 500)
-                      (ex-data e))
-               :permitted-action permitted-action
-               :received-representation rep
-               :body-as-value body-as-value}
-              e))))
+        ;; Default
+        req (assoc req :ring.response/status 200)
+
+        req
+
+
+        req
 
         #_post-fn #_(::site/post-fn resource)
         #_post
@@ -300,7 +293,24 @@
             (throw
              (ex-info
               (format "post-fn is neither a function or a symbol, but type '%s'" (type post-fn))
-              {::site/request-context (assoc req :ring.response/status 500)})))]
+              {::site/request-context (assoc req :ring.response/status 500)})))
+
+
+        ]
+
+    (try
+      (authz/do-action req pass-ctx (:xt/id permitted-action) body-as-value)
+      (catch Exception e
+        (throw
+         (ex-info
+          (.getMessage e)
+          {::site/request-context
+           (merge (assoc req :ring.response/status 500)
+                  (ex-data e))
+           :permitted-action permitted-action
+           :received-representation rep
+           :body-as-value body-as-value}
+          e))))
 
     ;;(assert post)
 
@@ -308,7 +318,7 @@
     ;; of any newly created resource with a 201 and Location header. This
     ;; determination perhaps ought to be configured into the Action doing the
     ;; creation.
-    (assoc req :ring.response/status 200)
+    ;;(assoc req :ring.response/status 200)
     ;;(post req)
     ))
 

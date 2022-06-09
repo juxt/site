@@ -245,31 +245,45 @@
                 (pipe (list (first args)) (::pipe/quotation action-doc) (assoc pass-ctx :db db))
                 :else
                 (throw (ex-info "All actions must have some processing steps"
-                                {:action action-doc})))]
-          (doseq [op ops]
-            (when-not (and (vector? op) (keyword? (first op)))
-              (throw (ex-info "Invalid op" {::pass/action action :op op}))))
+                                {:action action-doc})))
+
+              ;; Validate
+              _ (doseq [op ops]
+                  (when-not (and (vector? op) (keyword? (first op)))
+                    (throw (ex-info "Invalid op" {::pass/action action :op op}))))
+
+              session-token
+              (some (fn [[op doc]]
+                      (when (and
+                             (= op :xtdb.api/put)
+                             (= (:juxt.site.alpha/type doc) "https://meta.juxt.site/pass/session-token"))
+                        (:juxt.pass.alpha/session-token doc))) ops)]
+
+          #_(when session-token
+            (throw (ex-info "YES! session token exists" {}))
+            )
 
           (conj
            ops
            [:xtdb.api/put
             (into
-             {:xt/id (format "urn:site:action-log:%s" (::xt/tx-id tx))
-              ::site/type "https://meta.juxt.site/site/action-log-entry"
-              ::pass/subject subject
-              ::pass/action action
-              ::pass/purpose purpose
-              ::pass/puts (vec
-                           (keep
-                            (fn [[tx-op {id :xt/id}]]
-                              (when (= tx-op ::xt/put) id))
-                            ops))
-              ::pass/deletes (vec
-                              (keep
-                               (fn [[tx-op {id :xt/id}]]
-                                 (when (= tx-op ::xt/delete) id))
-                               ops))}
-             tx)])))
+             (cond-> {:xt/id (format "urn:site:action-log:%s" (::xt/tx-id tx))
+                      ::site/type "https://meta.juxt.site/site/action-log-entry"
+                      ::pass/subject subject
+                      ::pass/action action
+                      ::pass/purpose purpose
+                      ::pass/puts (vec
+                                   (keep
+                                    (fn [[tx-op {id :xt/id}]]
+                                      (when (= tx-op ::xt/put) id))
+                                    ops))
+                      ::pass/deletes (vec
+                                      (keep
+                                       (fn [[tx-op {id :xt/id}]]
+                                         (when (= tx-op ::xt/delete) id))
+                                       ops))}
+               tx (into tx)
+               session-token (assoc ::pass/session-token session-token)))])))
 
       (catch Exception e
         (log/errorf e "Error when doing action: %s %s" action (format "urn:site:action-log:%s" (::xt/tx-id tx)))
@@ -288,7 +302,8 @@
    :xt/fn '(fn [xt-ctx pass-ctx args]
              (juxt.pass.alpha.authorization/do-action* xt-ctx pass-ctx (vec args)))})
 
-(defn do-action [xt-node pass-ctx action & args]
+(defn do-action [{::site/keys [xt-node] :as req} pass-ctx action & args]
+  (assert (:juxt.site.alpha/xt-node req) "oh no")
   (assert (xt/entity (xt/db xt-node) "urn:site:tx-fns:do-action"))
   (let [tx (xt/submit-tx
             xt-node
@@ -318,7 +333,12 @@
           (merge
            (dissoc result ::site/type :xt/id ::site/error)
            (:ex-data error))))
-        result))))
+
+        (let [session-token (::pass/session-token result)]
+          (cond-> req
+            result (assoc ::pass/action-result result)
+            session-token (update :ring.response/headers (fnil into {}) {"set-cookie" session-token})
+            ))))))
 
 ;; TODO: Since it is possible that a permission is in the queue which might
 ;; grant or revoke an action, it is necessary to run this check 'head-of-line'
