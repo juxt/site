@@ -230,7 +230,8 @@
     ::pass/purpose nil}))
 
 (defn do-action [xt-node subject action & args]
-  (apply authz/do-action xt-node {::pass/subject subject} action args))
+  (:pass/action-result
+   (apply authz/do-action {::site/xt-node xt-node} {::pass/subject subject} action args)))
 
 #_(defn do-action-with-purpose [xt-node action purpose & args]
   (apply

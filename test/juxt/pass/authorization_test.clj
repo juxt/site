@@ -1058,8 +1058,10 @@
         {::pass/subject (:xt/id SUE_SUBJECT)}
         )))))
 
+  (assert *xt-node*)
+
   (authz/do-action
-   *xt-node*
+   {::site/xt-node *xt-node*}
    {::pass/subject (:xt/id SUE_SUBJECT)}
    (:xt/id CREATE_PERSON_ACTION)
    ALICE)
@@ -1068,8 +1070,9 @@
 
   ;; This fails because we haven't provided the ::username
 
-  (is (thrown? clojure.lang.ExceptionInfo (authz/do-action
-                *xt-node*
+  (is (thrown? clojure.lang.ExceptionInfo
+               (authz/do-action
+                {:juxt.site.alpha/xt-node *xt-node*}
                 {::pass/subject (:xt/id ALICE_SUBJECT)}
                 (:xt/id CREATE_PERSON_ACTION)
                 BOB)))
@@ -1482,7 +1485,7 @@
 
      (let [tmr
            (authz/do-action
-            *xt-node*
+            (::site/xt-node *xt-node*)
             {::pass/subject (:xt/id ALICE_SUBJECT)}
             (:xt/id CREATE_ACCESS_TOKEN_ACTION)
             {::pass/client :client})

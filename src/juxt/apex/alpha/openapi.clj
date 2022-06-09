@@ -220,7 +220,7 @@
                                    ::pass/resource
                                    ])
         action (get-in req [::site/resource ::apex/operation-action])
-        action-result (authz/do-action xt-node pass-ctx action new-resource-state)
+        action-result (authz/do-action req pass-ctx action new-resource-state)
         _ (log/tracef "action result is %s" action-result)]
 
     ;; Since this resource is 'managed' by the locate-resource in this ns, we
