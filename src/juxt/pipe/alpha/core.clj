@@ -73,8 +73,8 @@
 ;; 2dup
 ;; 3dup
 
-(defmethod word :over [[el & stack] [_ & queue] env]
-  [(cons el (cons el stack)) queue env])
+(defmethod word :over [[y x & stack] [_ & queue] env]
+  [(cons x (cons y (cons x stack))) queue env])
 ;; 2over
 ;; pick
 
