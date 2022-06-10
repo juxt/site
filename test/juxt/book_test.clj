@@ -66,11 +66,11 @@
   (book/protected-resource-preliminaries!)
   (book/protection-spaces-preliminaries!)
 
-  (book/book-create-resource-protected-by-basic-auth!)
-  (book/book-grant-permission-to-resource-protected-by-basic-auth!)
-  (book/book-put-basic-protection-space!)
+  (book/create-resource-protected-by-basic-auth!)
+  (book/grant-permission-to-resource-protected-by-basic-auth!)
+  (book/put-basic-protection-space!)
 
-  (book/book-put-basic-auth-user-identity!)
+  (book/put-basic-auth-user-identity!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected-by-basic-auth/document.html"))
 
@@ -103,9 +103,9 @@
 
   (book/cookies-scopes-preliminaries!)
 
-  (book/book-create-resource-protected-by-cookie-scope!)
-  (book/book-grant-permission-to-resource-protected-by-cookie-scope!)
-  (book/book-create-cookie-scope!)
+  (book/create-resource-protected-by-cookie-scope!)
+  (book/grant-permission-to-resource-protected-by-cookie-scope!)
+  (book/create-cookie-scope!)
 
   (let [uri (some :juxt.pass.alpha/login-uri
                   (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie-scope/document.html"))]
@@ -126,9 +126,9 @@
   (book/applications-preliminaries!)
   (book/setup-application!)
 
-  (book/book-create-resource-protected-by-bearer-auth!)
-  (book/book-grant-permission-to-resource-protected-by-bearer-auth!)
-  (book/book-put-bearer-protection-space!)
+  (book/create-resource-protected-by-bearer-auth!)
+  (book/grant-permission-to-resource-protected-by-bearer-auth!)
+  (book/put-bearer-protection-space!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected-by-bearer-auth/document.html"))
 
@@ -221,11 +221,11 @@
 
   (book/cookies-scopes-preliminaries!)
 
-  (book/book-create-resource-protected-by-cookie-scope!)
-  (book/book-grant-permission-to-resource-protected-by-cookie-scope!)
-  (book/book-create-cookie-scope!)
+  (book/create-resource-protected-by-cookie-scope!)
+  (book/grant-permission-to-resource-protected-by-cookie-scope!)
+  (book/create-cookie-scope!)
 
-  (book/book-put-basic-auth-user-identity!)
+  (book/put-basic-auth-user-identity!)
 
   (let [uri (some :juxt.pass.alpha/login-uri
                   (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie-scope/document.html"))]

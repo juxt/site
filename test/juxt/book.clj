@@ -20,7 +20,7 @@
      )
    form))
 
-(defn book-put-user! []
+(defn put-user! []
   ;; tag::install-user![]
   (put! {:xt/id "https://site.test/users/alice"
          :juxt.site.alpha/type "https://meta.juxt.site/pass/user"
@@ -30,7 +30,7 @@
   ;; end::install-user![]
   )
 
-(defn book-put-user-identity! []
+(defn put-user-identity! []
   ;; tag::install-user-identity![]
   (put! {:xt/id "https://site.test/user-identities/alice"
          :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"
@@ -38,7 +38,7 @@
   ;; end::install-user-identity![]
   )
 
-(defn book-put-subject! []
+(defn put-subject! []
   ;; tag::install-subject![]
   (put! {:xt/id "https://site.test/subjects/repl-default"
          :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"
@@ -46,7 +46,7 @@
   ;; end::install-subject![]
   )
 
-(defn book-install-create-action! []
+(defn install-create-action! []
   ;; tag::install-create-action![]
   (put!
    {:xt/id "https://site.test/actions/create-action" ; <1>
@@ -82,7 +82,7 @@
   ;; end::install-do-action-fn![]
   )
 
-(defn book-permit-create-action! []
+(defn permit-create-action! []
   ;; tag::permit-create-action![]
   (put!
    {:xt/id "https://site.test/permissions/administrators/create-action" ; <1>
@@ -94,7 +94,7 @@
   ;; end::permit-create-action![]
   )
 
-(defn book-create-grant-permission-action! []
+(defn create-grant-permission-action! []
   ;; tag::create-grant-permission-action![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -128,7 +128,7 @@
   ;; end::create-grant-permission-action![]
   )
 
-(defn book-permit-grant-permission-action! []
+(defn permit-grant-permission-action! []
   ;; tag::permit-grant-permission-action![]
   (put!
    {:xt/id "https://site.test/permissions/administrators/grant-permission"
@@ -141,7 +141,7 @@
 
 ;; Users Revisited
 
-(defn book-create-action-put-user! []
+(defn create-action-put-user! []
   ;; tag::create-action-put-user![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -177,7 +177,7 @@
   ;; end::create-action-put-user![]
   )
 
-(defn book-grant-permission-to-invoke-action-put-user! []
+(defn grant-permission-to-invoke-action-put-user! []
   ;; tag::grant-permission-to-invoke-action-put-user![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -189,7 +189,7 @@
   ;; end::grant-permission-to-invoke-action-put-user![]
   )
 
-(defn book-create-action-put-user-identity! []
+(defn create-action-put-user-identity! []
   ;; tag::create-action-put-user-identity![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -227,7 +227,7 @@
   ;; end::create-action-put-user-identity![]
   )
 
-(defn book-grant-permission-to-invoke-action-put-user-identity! []
+(defn grant-permission-to-invoke-action-put-user-identity! []
   ;; tag::grant-permission-to-invoke-action-put-user-identity![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -239,7 +239,7 @@
   ;; end::grant-permission-to-invoke-action-put-user-identity![]
   )
 
-(defn book-create-action-put-subject! []
+(defn create-action-put-subject! []
   ;; tag::create-action-put-subject![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -272,7 +272,7 @@
   ;; end::create-action-put-subject![]
   )
 
-(defn book-grant-permission-to-invoke-action-put-subject! []
+(defn grant-permission-to-invoke-action-put-subject! []
   ;; tag::grant-permission-to-invoke-action-put-subject![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -286,7 +286,7 @@
 
 ;; Hello World!
 
-(defn book-create-action-put-immutable-public-resource! []
+(defn create-action-put-immutable-public-resource! []
   ;; tag::create-action-put-immutable-public-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -321,7 +321,7 @@
   ;; end::create-action-put-immutable-public-resource![]
   )
 
-(defn book-grant-permission-to-invoke-action-put-immutable-public-resource! []
+(defn grant-permission-to-invoke-action-put-immutable-public-resource! []
   ;; tag::grant-permission-to-invoke-action-put-immutable-public-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -333,7 +333,7 @@
   ;; end::grant-permission-to-invoke-action-put-immutable-public-resource![]
   )
 
-(defn book-create-action-get-public-resource! []
+(defn create-action-get-public-resource! []
   ;; tag::create-action-get-public-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -349,7 +349,7 @@
   ;; end::create-action-get-public-resource![]
   )
 
-(defn book-grant-permission-to-invoke-get-public-resource! []
+(defn grant-permission-to-invoke-get-public-resource! []
   ;; tag::grant-permission-to-invoke-get-public-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -360,7 +360,7 @@
   ;; end::grant-permission-to-invoke-get-public-resource![]
   )
 
-(defn book-create-hello-world-resource! []
+(defn create-hello-world-resource! []
   ;; tag::create-hello-world-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -374,7 +374,7 @@
 
 ;; Representations
 
-(defn book-create-hello-world-html-representation! []
+(defn create-hello-world-html-representation! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -393,7 +393,7 @@
 
 ;; Templating
 
-(defn book-create-put-template-action! []
+(defn create-put-template-action! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -425,7 +425,7 @@
      ;; end::create-put-template-action![]
      ))))
 
-(defn book-grant-permission-to-invoke-action-put-template! []
+(defn grant-permission-to-invoke-action-put-template! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -440,7 +440,7 @@
      ;; end::grant-permission-to-invoke-action-put-template![]
      ))))
 
-(defn book-create-hello-world-html-template! []
+(defn create-hello-world-html-template! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -454,7 +454,7 @@
      ;; end::create-hello-world-html-template![]
      ))))
 
-(defn book-create-hello-world-with-html-template! []
+(defn create-hello-world-with-html-template! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -470,7 +470,7 @@
 
 ;; Protecting Resources
 
-(defn book-create-action-put-immutable-protected-resource! []
+(defn create-action-put-immutable-protected-resource! []
   ;; tag::create-action-put-immutable-protected-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -505,7 +505,7 @@
   ;; end::create-action-put-immutable-protected-resource![]
   )
 
-(defn book-grant-permission-to-put-immutable-protected-resource! []
+(defn grant-permission-to-put-immutable-protected-resource! []
   ;; tag::grant-permission-to-put-immutable-protected-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -517,7 +517,7 @@
   ;; end::grant-permission-to-put-immutable-protected-resource![]
   )
 
-(defn book-create-action-get-protected-resource! []
+(defn create-action-get-protected-resource! []
   ;; tag::create-action-get-protected-resource![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -538,7 +538,7 @@
 
 ;; Protection Spaces
 
-(defn book-create-action-put-protection-space! []
+(defn create-action-put-protection-space! []
   ;; tag::create-action-put-protection-space![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -573,7 +573,7 @@
   ;; end::create-action-put-protection-space![]
   )
 
-(defn book-grant-permission-to-put-protection-space! []
+(defn grant-permission-to-put-protection-space! []
   ;; tag::grant-permission-to-put-protection-space![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -587,7 +587,7 @@
 
 ;; HTTP Basic Auth
 
-(defn book-create-resource-protected-by-basic-auth! []
+(defn create-resource-protected-by-basic-auth! []
   ;; tag::create-resource-protected-by-basic-auth![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -599,7 +599,7 @@
   ;; end::create-resource-protected-by-basic-auth![]
   )
 
-(defn book-grant-permission-to-resource-protected-by-basic-auth! []
+(defn grant-permission-to-resource-protected-by-basic-auth! []
   ;; tag::grant-permission-to-resource-protected-by-basic-auth![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -613,7 +613,7 @@
   ;; end::grant-permission-to-resource-protected-by-basic-auth![]
   )
 
-(defn book-put-basic-protection-space! []
+(defn put-basic-protection-space! []
   ;; tag::put-basic-protection-space![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -629,7 +629,7 @@
   ;; end::put-basic-protection-space![]
 )
 
-(defn book-put-basic-auth-user-identity! []
+(defn put-basic-auth-user-identity! []
   ;; tag::put-basic-auth-user-identity![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -647,7 +647,7 @@
 
 ;; HTTP Bearer Auth
 
-(defn book-create-resource-protected-by-bearer-auth! []
+(defn create-resource-protected-by-bearer-auth! []
   ;; tag::create-resource-protected-by-bearer-auth![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -659,7 +659,7 @@
   ;; end::create-resource-protected-by-bearer-auth![]
   )
 
-(defn book-grant-permission-to-resource-protected-by-bearer-auth! []
+(defn grant-permission-to-resource-protected-by-bearer-auth! []
   ;; tag::grant-permission-to-resource-protected-by-bearer-auth![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -673,7 +673,7 @@
   ;; end::grant-permission-to-resource-protected-by-bearer-auth![]
   )
 
-(defn book-put-bearer-protection-space! []
+(defn put-bearer-protection-space! []
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/put-protection-space"
@@ -688,7 +688,7 @@
 
 ;; Cookie Scopes Preliminaries
 
-(defn book-create-action-put-cookie-scope! []
+(defn create-action-put-cookie-scope! []
   ;; tag::create-action-put-cookie-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -722,7 +722,7 @@
   ;; end::create-action-put-cookie-scope![]
   )
 
-(defn book-grant-permission-to-put-cookie-scope! []
+(defn grant-permission-to-put-cookie-scope! []
   ;; tag::grant-permission-to-put-cookie-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -736,7 +736,7 @@
 
 ;; Cookie Scope Example
 
-(defn book-create-resource-protected-by-cookie-scope! []
+(defn create-resource-protected-by-cookie-scope! []
   ;; tag::create-resource-protected-by-cookie-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -748,7 +748,7 @@
   ;; end::create-resource-protected-by-cookie-scope![]
   )
 
-(defn book-grant-permission-to-resource-protected-by-cookie-scope! []
+(defn grant-permission-to-resource-protected-by-cookie-scope! []
   ;; tag::grant-permission-to-resource-protected-by-cookie-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -762,7 +762,7 @@
   ;; end::grant-permission-to-resource-protected-by-cookie-scope![]
   )
 
-(defn book-create-cookie-scope! []
+(defn create-cookie-scope! []
   ;; tag::create-cookie-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -775,7 +775,7 @@
     ;; end::create-cookie-scope![]
   )
 
-(defn book-create-login-form! []
+(defn create-login-form! []
   ;; tag::create-login-form![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -806,7 +806,7 @@ Password: <input name=password type=password>
     ;; end::create-login-form![]
   )
 
-(defn book-create-login-resource! []
+(defn create-login-resource! []
   ;; tag::create-login-resource![]
   (put!
    {:xt/id "https://site.test/login"
@@ -816,7 +816,7 @@ Password: <input name=password type=password>
   ;; end::create-login-resource![]
   )
 
-(defn book-create-action-login! []
+(defn create-action-login! []
   ;; tag::create-action-login![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -911,7 +911,7 @@ Password: <input name=password type=password>
   ;; end::create-action-login![]
   )
 
-(defn book-grant-permission-to-invoke-action-login! []
+(defn grant-permission-to-invoke-action-login! []
   ;; tag::permit-action-login![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -924,7 +924,7 @@ Password: <input name=password type=password>
 
 ;; Applications
 
-(defn book-create-action-put-application! []
+(defn create-action-put-application! []
   ;; tag::create-action-put-application![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -954,7 +954,7 @@ Password: <input name=password type=password>
   ;; end::create-action-put-application![]
   )
 
-(defn book-grant-permission-to-invoke-action-put-application! []
+(defn grant-permission-to-invoke-action-put-application! []
   ;; tag::grant-permission-to-invoke-action-put-application![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -966,7 +966,7 @@ Password: <input name=password type=password>
   ;; end::grant-permission-to-invoke-action-put-application![]
   )
 
-(defn book-create-action-authorize-application! []
+(defn create-action-authorize-application! []
   ;; tag::create-action-authorize-application![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -997,7 +997,7 @@ Password: <input name=password type=password>
   ;; end::create-action-authorize-application![]
   )
 
-(defn book-grant-permission-to-invoke-action-authorize-application! []
+(defn grant-permission-to-invoke-action-authorize-application! []
   ;; tag::grant-permission-to-invoke-action-authorize-application![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -1009,7 +1009,7 @@ Password: <input name=password type=password>
   ;; end::grant-permission-to-invoke-action-authorize-application![]
   )
 
-(defn book-create-action-issue-access-token! []
+(defn create-action-issue-access-token! []
   ;; tag::create-action-issue-access-token![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -1039,7 +1039,7 @@ Password: <input name=password type=password>
   ;; end::create-action-issue-access-token![]
   )
 
-(defn book-grant-permission-to-invoke-action-issue-access-token! []
+(defn grant-permission-to-invoke-action-issue-access-token! []
   ;; tag::grant-permission-to-invoke-action-issue-access-token![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -1053,7 +1053,7 @@ Password: <input name=password type=password>
 
 ;; Authorization Server
 
-(defn book-install-authorization-server! []
+(defn install-authorization-server! []
   ;; tag::install-authorization-server![]
   (put!
    {:xt/id "https://auth.site.test/oauth/authorize"
@@ -1079,7 +1079,7 @@ Password: <input name=password type=password>
 
 ;; First Application
 
-(defn book-invoke-put-application! []
+(defn invoke-put-application! []
   ;; tag::invoke-put-application![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -1091,7 +1091,7 @@ Password: <input name=password type=password>
   ;; end::invoke-put-application![]
   )
 
-(defn book-invoke-authorize-application! []
+(defn invoke-authorize-application! []
   ;; tag::invoke-authorize-application![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -1104,7 +1104,7 @@ Password: <input name=password type=password>
   )
 
 ;; Deprecated: This overlaps with an existing subject
-(defn book-create-test-subject! []
+(defn create-test-subject! []
   ;; tag::create-test-subject![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -1115,7 +1115,7 @@ Password: <input name=password type=password>
   ;; end::create-test-subject![]
   )
 
-(defn book-invoke-issue-access-token! []
+(defn invoke-issue-access-token! []
   ;; tag::invoke-issue-access-token![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -1132,7 +1132,7 @@ Password: <input name=password type=password>
 
 ;; Other stuff
 
-(defn book-create-action-put-error-resource! []
+(defn create-action-put-error-resource! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1163,7 +1163,7 @@ Password: <input name=password type=password>
      ;; end::create-action-put-error-resource![]
      ))))
 
-(defn book-grant-permission-to-put-error-resource! []
+(defn grant-permission-to-put-error-resource! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1178,7 +1178,7 @@ Password: <input name=password type=password>
      ;; end::grant-permission-to-put-error-resource![]
      ))))
 
-(defn book-put-unauthorized-error-resource! []
+(defn put-unauthorized-error-resource! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1192,7 +1192,7 @@ Password: <input name=password type=password>
      ;; end::put-unauthorized-error-resource![]
      ))))
 
-(defn book-put-unauthorized-error-representation-for-html! []
+(defn put-unauthorized-error-representation-for-html! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1207,7 +1207,7 @@ Password: <input name=password type=password>
      ;; end::put-unauthorized-error-representation-for-html![]
      ))))
 
-(defn book-put-unauthorized-error-representation-for-html-with-login-link! []
+(defn put-unauthorized-error-representation-for-html-with-login-link! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1248,57 +1248,57 @@ Password: <input name=password type=password>
 
 ;; Complete all tasks thus far directed by the book
 (defn preliminaries! []
-  (book-put-user!)
-  (book-put-user-identity!)
-  (book-put-subject!)
-  (book-install-create-action!)
+  (put-user!)
+  (put-user-identity!)
+  (put-subject!)
+  (install-create-action!)
   (book-install-do-action-fn!)
-  (book-permit-create-action!)
-  (book-create-grant-permission-action!)
-  (book-permit-grant-permission-action!)
-  (book-create-action-put-user!)
-  (book-grant-permission-to-invoke-action-put-user!)
-  (book-create-action-put-user-identity!)
-  (book-grant-permission-to-invoke-action-put-user-identity!)
-  (book-create-action-put-subject!)
-  (book-grant-permission-to-invoke-action-put-subject!)
+  (permit-create-action!)
+  (create-grant-permission-action!)
+  (permit-grant-permission-action!)
+  (create-action-put-user!)
+  (grant-permission-to-invoke-action-put-user!)
+  (create-action-put-user-identity!)
+  (grant-permission-to-invoke-action-put-user-identity!)
+  (create-action-put-subject!)
+  (grant-permission-to-invoke-action-put-subject!)
   ;; This tackles the '404' problem.
   (install-not-found))
 
 (defn setup-hello-world! []
-  (book-create-action-put-immutable-public-resource!)
-  (book-grant-permission-to-invoke-action-put-immutable-public-resource!)
-  (book-create-action-get-public-resource!)
-  (book-grant-permission-to-invoke-get-public-resource!)
-  (book-create-hello-world-resource!)
+  (create-action-put-immutable-public-resource!)
+  (grant-permission-to-invoke-action-put-immutable-public-resource!)
+  (create-action-get-public-resource!)
+  (grant-permission-to-invoke-get-public-resource!)
+  (create-hello-world-resource!)
   )
 
 (defn protected-resource-preliminaries! []
-  (book-create-action-put-immutable-protected-resource!)
-  (book-grant-permission-to-put-immutable-protected-resource!)
-  (book-create-action-get-protected-resource!))
+  (create-action-put-immutable-protected-resource!)
+  (grant-permission-to-put-immutable-protected-resource!)
+  (create-action-get-protected-resource!))
 
 (defn protection-spaces-preliminaries! []
-  (book-create-action-put-protection-space!)
-  (book-grant-permission-to-put-protection-space!))
+  (create-action-put-protection-space!)
+  (grant-permission-to-put-protection-space!))
 
 (defn cookies-scopes-preliminaries! []
-  (book-create-action-put-cookie-scope!)
-  (book-grant-permission-to-put-cookie-scope!))
+  (create-action-put-cookie-scope!)
+  (grant-permission-to-put-cookie-scope!))
 
 (defn applications-preliminaries! []
-  (book-create-action-put-application!)
-  (book-grant-permission-to-invoke-action-put-application!)
-  (book-create-action-authorize-application!)
-  (book-grant-permission-to-invoke-action-authorize-application!)
-  (book-create-action-issue-access-token!)
-  (book-grant-permission-to-invoke-action-issue-access-token!))
+  (create-action-put-application!)
+  (grant-permission-to-invoke-action-put-application!)
+  (create-action-authorize-application!)
+  (grant-permission-to-invoke-action-authorize-application!)
+  (create-action-issue-access-token!)
+  (grant-permission-to-invoke-action-issue-access-token!))
 
 (defn setup-application! []
-  (book-invoke-put-application!)
-  (book-invoke-authorize-application!)
-  (book-create-test-subject!)
-  (book-invoke-issue-access-token!))
+  (invoke-put-application!)
+  (invoke-authorize-application!)
+  (create-test-subject!)
+  (invoke-issue-access-token!))
 
 (defn init-all! []
   (preliminaries!)
@@ -1308,24 +1308,24 @@ Password: <input name=password type=password>
 
   (protection-spaces-preliminaries!)
 
-  (book-create-resource-protected-by-basic-auth!)
-  (book-grant-permission-to-resource-protected-by-basic-auth!)
-  (book-put-basic-protection-space!)
-  (book-put-basic-auth-user-identity!)
+  (create-resource-protected-by-basic-auth!)
+  (grant-permission-to-resource-protected-by-basic-auth!)
+  (put-basic-protection-space!)
+  (put-basic-auth-user-identity!)
 
   (cookies-scopes-preliminaries!)
 
-  (book-create-resource-protected-by-cookie-scope!)
-  (book-grant-permission-to-resource-protected-by-cookie-scope!)
-  (book-create-cookie-scope!)
-  (book-create-login-form!)
-  (book-create-login-resource!)
-  (book-create-action-login!)
-  (book-grant-permission-to-invoke-action-login!)
+  (create-resource-protected-by-cookie-scope!)
+  (grant-permission-to-resource-protected-by-cookie-scope!)
+  (create-cookie-scope!)
+  (create-login-form!)
+  (create-login-resource!)
+  (create-action-login!)
+  (grant-permission-to-invoke-action-login!)
 
   (applications-preliminaries!)
   (setup-application!)
 
-  (book-create-resource-protected-by-bearer-auth!)
-  (book-grant-permission-to-resource-protected-by-bearer-auth!)
-  (book-put-bearer-protection-space!))
+  (create-resource-protected-by-bearer-auth!)
+  (grant-permission-to-resource-protected-by-bearer-auth!)
+  (put-bearer-protection-space!))
