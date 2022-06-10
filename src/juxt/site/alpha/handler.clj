@@ -14,7 +14,8 @@
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.pass.alpha.authorization :as authz]
-   [juxt.pass.alpha.session :as session]
+   [juxt.pass.alpha.oldsession :as oldsession]
+   [juxt.pass.alpha.session-scope :as session-scope]
    [juxt.pick.alpha.core :refer [rate-representation]]
    [juxt.pick.alpha.ring :refer [decode-maybe]]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
@@ -1268,7 +1269,8 @@
 
    ;; Rewrite to work against a cookie-scope, which may use JWTs or sessions.
    ;; wrap-process-cookies
-   #_session/wrap-associate-session
+   ;;oldsession/wrap-associate-session
+   session-scope/wrap-session-scopes
 
    wrap-http-authenticate
 

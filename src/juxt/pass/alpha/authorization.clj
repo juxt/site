@@ -8,6 +8,7 @@
    [juxt.site.alpha.util :refer [random-bytes as-hex-str]]
    [malli.core :as m]
    [malli.error :a me]
+   [ring.util.codec :as codec]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.session-scope :as session-scope]
    [juxt.pass.alpha.malli :as-alias pass.malli]
@@ -406,15 +407,17 @@
             ;; respond with a redirect to a page that will establish (immediately
             ;; or eventually), the cookie.
 
-            (if-let [login-uri (some->> (session-scope/session-scopes db uri) (some :juxt.pass.alpha/login-uri))]
-              ;; If we are in a session-scope that contains a login-uri, let's redirect to that
-              (throw
-               (ex-info
-                (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))
-                {::site/request-context
-                 (-> req
-                     (assoc :ring.response/status 302)
-                     (assoc-in [:ring.response/headers "location"] login-uri))}))
+            (if-let [session-scopes (::pass/session-scopes req)]
+              (let [login-uri (some->> session-scopes (some :juxt.pass.alpha/login-uri))
+                    redirect (str login-uri "?return-to=" (codec/url-encode uri))]
+                ;; If we are in a session-scope that contains a login-uri, let's redirect to that
+                (throw
+                 (ex-info
+                  (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))
+                  {::site/request-context
+                   (-> req
+                       (assoc :ring.response/status 302)
+                       (assoc-in [:ring.response/headers "location"] redirect))})))
               (throw
                (ex-info
                 (format "No anonymous permission for actions: %s" (pr-str actions))

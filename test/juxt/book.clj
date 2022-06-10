@@ -775,12 +775,18 @@
     ;; end::create-session-scope![]
   )
 
-(defn create-login-form! []
-  ;; tag::create-login-form![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-immutable-public-resource"
+;; TODO: Create an action for this - it's rather exotic, might need a privileged
+;; action which is very lax about what it accepts.
+(defn create-login-resource! []
+  ;; tag::create-login-resource![]
+  (put!
    {:xt/id "https://site.test/login"
+    :juxt.site.alpha/methods
+    {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-public-resource"}}
+     :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-public-resource"}}
+     :post {:juxt.pass.alpha/actions #{"https://site.test/actions/login"}}
+     :options {:juxt.pass.alpha/actions #{"https://site.test/actions/get-options"}}
+     }
     :juxt.http.alpha/content-type "text/html;charset=utf-8"
     :juxt.http.alpha/content
     "
@@ -803,16 +809,6 @@ Password: <input name=password type=password>
 </body>
 </html>
 \r\n"})
-    ;; end::create-login-form![]
-  )
-
-(defn create-login-resource! []
-  ;; tag::create-login-resource![]
-  (put!
-   {:xt/id "https://site.test/login"
-    :juxt.site.alpha/methods
-    {:post
-     {:juxt.pass.alpha/actions #{"https://site.test/actions/login"}}}})
   ;; end::create-login-resource![]
   )
 
@@ -1318,7 +1314,6 @@ Password: <input name=password type=password>
   (create-resource-protected-by-session-scope!)
   (grant-permission-to-resource-protected-by-session-scope!)
   (create-session-scope!)
-  (create-login-form!)
   (create-login-resource!)
   (create-action-login!)
   (grant-permission-to-invoke-action-login!)

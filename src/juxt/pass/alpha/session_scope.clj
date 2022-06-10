@@ -21,3 +21,13 @@
             :in [uri]}
           uri)]
      session-scope)))
+
+
+(defn wrap-session-scopes [h]
+  (fn [{::site/keys [db uri] :as req}]
+    (let [session-scopes (session-scopes db uri)]
+      ;; TODO: If we do have session scopes, we should then check for a cookie
+      ;; matching one of session-scopes and look up the session, binding that to
+      ;; the request too.
+      (h (cond-> req
+           session-scopes (assoc ::pass/session-scopes session-scopes))))))

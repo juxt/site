@@ -3,7 +3,7 @@
 ;; References --
 ;; [OWASP-SM]: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
 
-(ns juxt.pass.alpha.session
+(ns juxt.pass.alpha.oldsession
   (:require
    [juxt.pass.alpha.util :refer [make-nonce]]
    [ring.middleware.cookies :refer [cookies-request cookies-response]]

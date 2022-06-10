@@ -12,7 +12,7 @@
    [java-http-clj.core :as hc]
    [juxt.site.alpha.return :refer [return]]
    [juxt.pass.alpha.util :refer [make-nonce new-subject-urn]]
-   [juxt.pass.alpha.session :as session]
+   [juxt.pass.alpha.oldsession :as oldsession]
    [ring.util.codec :as codec]
    [juxt.site.alpha.response :refer [redirect]]
    [jsonista.core :as json]
@@ -63,7 +63,7 @@
 
         ;; Create a pre-auth session
         session-token-id!
-        (session/create-session
+        (oldsession/create-session
          xt-node
          (cond-> {::pass/state state ::pass/nonce nonce}
            return-to (assoc ::pass/return-to return-to)))
@@ -82,7 +82,7 @@
 
     (-> req
         (redirect 303 location)
-        (session/set-cookie session-token-id!))))
+        (oldsession/set-cookie session-token-id!))))
 
 (defn login-with-github [req]
   (login req))
@@ -365,7 +365,7 @@
         (log/warnf "Successful login! %s" (pr-str (select-keys (:claims id-token) ["iss" "sub"])))
         (-> req
             (redirect 303 (get session ::pass/return-to "/login-succeeded"))
-            (session/escalate-session
+            (oldsession/escalate-session
              #(assoc % ::pass/subject subject))))
 
       ;; Login unsuccessful.
