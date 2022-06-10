@@ -116,7 +116,9 @@
     (testing "Redirect"
       (let [response (*handler* request)]
         (is (= 302 (:ring.response/status response)))
-        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"])))))))
+        (is (.startsWith
+             (get-in response [:ring.response/headers "location"])
+             "https://site.test/login?return-to="))))))
 
 (deftest protected-resource-with-http-bearer-auth-test
   (book/preliminaries!)
@@ -239,7 +241,9 @@
     (testing "Redirect"
       (let [response (*handler* request)]
         (is (= 302 (:ring.response/status response)))
-        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"]))))))
+        (is (.startsWith
+             (get-in response [:ring.response/headers "location"])
+             "https://site.test/login")))))
 
   ;; Create a new resource /login resource
   ;; TODO: Put in an action
