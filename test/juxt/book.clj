@@ -1103,7 +1103,8 @@ Password: <input name=password type=password>
   ;; end::invoke-authorize-application![]
   )
 
-#_(defn book-create-test-subject! []
+;; Deprecated: This overlaps with an existing subject
+(defn book-create-test-subject! []
   ;; tag::create-test-subject![]
   (do-action
    "https://site.test/subjects/repl-default"
@@ -1296,7 +1297,7 @@ Password: <input name=password type=password>
 (defn setup-application! []
   (book-invoke-put-application!)
   (book-invoke-authorize-application!)
-  #_(book-create-test-subject!)
+  (book-create-test-subject!)
   (book-invoke-issue-access-token!))
 
 (defn init-all! []

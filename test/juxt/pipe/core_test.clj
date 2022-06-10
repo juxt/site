@@ -126,7 +126,6 @@
       (is
        (= 3 (count result)))))
 
-  ;; TODO: Reinstate
   (testing "Incorrect password throws exception"
     (is
      (thrown-with-msg?

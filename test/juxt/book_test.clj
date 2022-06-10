@@ -116,11 +116,7 @@
     (testing "Redirect"
       (let [response (*handler* request)]
         (is (= 302 (:ring.response/status response)))
-        (is (= "https://site.test/login.html" (get-in response [:ring.response/headers "location"]))))))
-
-
-  ;; POST to a login resource which we create a session - this is done in session
-  )
+        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"])))))))
 
 (deftest protected-resource-with-http-bearer-auth-test
   (book/preliminaries!)
@@ -243,7 +239,7 @@
     (testing "Redirect"
       (let [response (*handler* request)]
         (is (= 302 (:ring.response/status response)))
-        (is (= "https://site.test/login.html" (get-in response [:ring.response/headers "location"]))))))
+        (is (= "https://site.test/login" (get-in response [:ring.response/headers "location"]))))))
 
   ;; Create a new resource /login resource
   ;; TODO: Put in an action
@@ -300,12 +296,7 @@
         [session-token session-token-doc]
         (first (xt/q db '{:find [tok (pull e [*])] :where [[e ::site/type "https://meta.juxt.site/pass/session-token"]
                                                            [e ::pass/session-token tok]]}))]
-    (is (string? session-token))
-
-    )
-
-
-  )
+    (is (string? session-token))))
 
 (comment
   ((t/join-fixtures [with-system-xt with-handler])
