@@ -9,7 +9,7 @@
    [malli.core :as m]
    [malli.error :a me]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.cookie-scope :as cookie-scope]
+   [juxt.pass.alpha.session-scope :as session-scope]
    [juxt.pass.alpha.malli :as-alias pass.malli]
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
@@ -402,12 +402,12 @@
             ;; client MAY repeat the request with new or different credentials. "
             ;; -- Section 6.5.3, RFC 7231
 
-            ;; TODO: But are we inside a cookie-scope ? If so, we can
+            ;; TODO: But are we inside a session-scope ? If so, we can
             ;; respond with a redirect to a page that will establish (immediately
             ;; or eventually), the cookie.
 
-            (if-let [login-uri (some->> (cookie-scope/cookie-scopes db uri) (some :juxt.pass.alpha/login-uri))]
-              ;; If we are in a cookie-scope that contains a login-uri, let's redirect to that
+            (if-let [login-uri (some->> (session-scope/session-scopes db uri) (some :juxt.pass.alpha/login-uri))]
+              ;; If we are in a session-scope that contains a login-uri, let's redirect to that
               (throw
                (ex-info
                 (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))

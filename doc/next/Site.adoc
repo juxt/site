@@ -93,8 +93,8 @@ _protection spaces_, specified in https://www.rfc-editor.org/rfc/rfc7235[RFC
 Authentication is the 'Basic' authentication scheme, which is covered in
 <<ch-basic-authentication>>.
 
-(((authentication,cookie-based))) *Cookie-based Authentication*, which we
-describe in <<ch-cookie-authentication>>, opens up numerous additional options
+(((authentication,session-based))) *Session-based Authentication*, which we
+describe in <<ch-session-authentication>>, opens up numerous additional options
 for authentication. One such option is authenticating via an HTML form, which is
 covered in <<ch-form-based-authentication>>. Another is with the OpenID Connect
 protocol, which is covered in <<ch-openid>> with a worked example.
@@ -107,8 +107,8 @@ include::HttpAuthentication.adoc[leveloffset=+1]
 [[ch-basic-authentication]]
 include::BasicAuthentication.adoc[leveloffset=+1]
 
-[[ch-cookie-authentication]]
-include::CookieAuthentication.adoc[leveloffset=+1]
+[[ch-sessions]]
+include::Sessions.adoc[leveloffset=+1]
 
 [[ch-form-based-authentication]]
 include::FormBasedAuthentication.adoc[leveloffset=+1]

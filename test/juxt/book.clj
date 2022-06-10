@@ -686,21 +686,21 @@
     :juxt.pass.alpha/authentication-scope "/protected-by-bearer-auth/.*" ; regex pattern
     }))
 
-;; Cookie Scopes Preliminaries
+;; Session Scopes Preliminaries
 
-(defn create-action-put-cookie-scope! []
-  ;; tag::create-action-put-cookie-scope![]
+(defn create-action-put-session-scope! []
+  ;; tag::create-action-put-session-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/put-cookie-scope"
+   {:xt/id "https://site.test/actions/put-session-scope"
     :juxt.pass.alpha/scope "write:admin"
 
     :juxt.pass.alpha.malli/args-schema
     [:tuple
      [:map
-      [:xt/id [:re "https://site.test/cookie-scopes/(.+)"]]
-      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/cookie-scope"]]
+      [:xt/id [:re "https://site.test/session-scopes/(.+)"]]
+      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/session-scope"]]
       [:juxt.pass.alpha/cookie-domain [:re "https?://[^/]*"]]
       [:juxt.pass.alpha/cookie-path [:re "/.*"]]
       [:juxt.pass.alpha/login-uri [:re "https?://[^/]*"]]]]
@@ -708,7 +708,7 @@
     :juxt.pass.alpha/process
     [
      [:juxt.pass.alpha.process/update-in [0]
-      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/cookie-scope"}]
+      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/session-scope"}]
      [:juxt.pass.alpha.malli/validate]
      [:xtdb.api/put]]
 
@@ -719,60 +719,60 @@
        [id :juxt.pass.alpha/user user]
        [permission :role role]
        [user :role role]]]})
-  ;; end::create-action-put-cookie-scope![]
+  ;; end::create-action-put-session-scope![]
   )
 
-(defn grant-permission-to-put-cookie-scope! []
-  ;; tag::grant-permission-to-put-cookie-scope![]
+(defn grant-permission-to-put-session-scope! []
+  ;; tag::grant-permission-to-put-session-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-cookie-scope"
+   {:xt/id "https://site.test/permissions/administrators/put-session-scope"
     :role "Administrator"
-    :juxt.pass.alpha/action "https://site.test/actions/put-cookie-scope"
+    :juxt.pass.alpha/action "https://site.test/actions/put-session-scope"
     :juxt.pass.alpha/purpose nil})
-  ;; end::grant-permission-to-put-cookie-scope![]
+  ;; end::grant-permission-to-put-session-scope![]
   )
 
-;; Cookie Scope Example
+;; Session Scope Example
 
-(defn create-resource-protected-by-cookie-scope! []
-  ;; tag::create-resource-protected-by-cookie-scope![]
+(defn create-resource-protected-by-session-scope! []
+  ;; tag::create-resource-protected-by-session-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/put-immutable-protected-resource"
-   {:xt/id "https://site.test/protected-by-cookie-scope/document.html"
+   {:xt/id "https://site.test/protected-by-session-scope/document.html"
     :juxt.http.alpha/content-type "text/html;charset=utf-8"
-    :juxt.http.alpha/content "<p>This is a protected message that is only visible when sending the correct cookie header.</p>"
+    :juxt.http.alpha/content "<p>This is a protected message that is only visible when sending the correct session header.</p>"
     })
-  ;; end::create-resource-protected-by-cookie-scope![]
+  ;; end::create-resource-protected-by-session-scope![]
   )
 
-(defn grant-permission-to-resource-protected-by-cookie-scope! []
-  ;; tag::grant-permission-to-resource-protected-by-cookie-scope![]
+(defn grant-permission-to-resource-protected-by-session-scope! []
+  ;; tag::grant-permission-to-resource-protected-by-session-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/alice/protected-by-cookie-scope/document.html"
+   {:xt/id "https://site.test/permissions/alice/protected-by-session-scope/document.html"
     :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
     :juxt.pass.alpha/user "https://site.test/users/alice"
-    :juxt.site.alpha/uri "https://site.test/protected-by-cookie-scope/document.html"
+    :juxt.site.alpha/uri "https://site.test/protected-by-session-scope/document.html"
     :juxt.pass.alpha/purpose nil
     })
-  ;; end::grant-permission-to-resource-protected-by-cookie-scope![]
+  ;; end::grant-permission-to-resource-protected-by-session-scope![]
   )
 
-(defn create-cookie-scope! []
-  ;; tag::create-cookie-scope![]
+(defn create-session-scope! []
+  ;; tag::create-session-scope![]
   (do-action
    "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-cookie-scope"
-   {:xt/id "https://site.test/cookie-scopes/example"
+   "https://site.test/actions/put-session-scope"
+   {:xt/id "https://site.test/session-scopes/example"
     :juxt.pass.alpha/cookie-name "id"
     :juxt.pass.alpha/cookie-domain "https://site.test"
-    :juxt.pass.alpha/cookie-path "/protected-by-cookie-scope/"
+    :juxt.pass.alpha/cookie-path "/protected-by-session-scope/"
     :juxt.pass.alpha/login-uri "https://site.test/login"})
-    ;; end::create-cookie-scope![]
+    ;; end::create-session-scope![]
   )
 
 (defn create-login-form! []
@@ -1070,7 +1070,7 @@ Password: <input name=password type=password>
       :juxt.pass.alpha/session-cookie "id"
       ;; This will be called with query parameter return-to set to ::site/uri
       ;; (effective URI) of request
-      :juxt.pass.alpha/redirect-when-no-session-cookie "https://site.test/_site/openid/auth0/login"
+      :juxt.pass.alpha/redirect-when-no-session-session "https://site.test/_site/openid/auth0/login"
       }}})
   ;; end::install-authorization-server![]
   )
@@ -1282,9 +1282,9 @@ Password: <input name=password type=password>
   (create-action-put-protection-space!)
   (grant-permission-to-put-protection-space!))
 
-(defn cookies-scopes-preliminaries! []
-  (create-action-put-cookie-scope!)
-  (grant-permission-to-put-cookie-scope!))
+(defn session-scopes-preliminaries! []
+  (create-action-put-session-scope!)
+  (grant-permission-to-put-session-scope!))
 
 (defn applications-preliminaries! []
   (create-action-put-application!)
@@ -1313,11 +1313,11 @@ Password: <input name=password type=password>
   (put-basic-protection-space!)
   (put-basic-auth-user-identity!)
 
-  (cookies-scopes-preliminaries!)
+  (session-scopes-preliminaries!)
 
-  (create-resource-protected-by-cookie-scope!)
-  (grant-permission-to-resource-protected-by-cookie-scope!)
-  (create-cookie-scope!)
+  (create-resource-protected-by-session-scope!)
+  (grant-permission-to-resource-protected-by-session-scope!)
+  (create-session-scope!)
   (create-login-form!)
   (create-login-resource!)
   (create-action-login!)

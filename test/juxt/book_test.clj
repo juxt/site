@@ -8,7 +8,7 @@
    [juxt.book :as book]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
    [xtdb.api :as xt]
-   [juxt.pass.alpha.cookie-scope :as cookie-scope]
+   [juxt.pass.alpha.session-scope :as session-scope]
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.http-authentication :as authn]
@@ -97,22 +97,22 @@
       (is (= 200 (:ring.response/status response)))
       (is (nil? (get-in response [:ring.response/headers "www-authenticate"]))))))
 
-(deftest cookie-scope-test
+(deftest session-scope-test
   (book/preliminaries!)
   (book/protected-resource-preliminaries!)
 
-  (book/cookies-scopes-preliminaries!)
+  (book/session-scopes-preliminaries!)
 
-  (book/create-resource-protected-by-cookie-scope!)
-  (book/grant-permission-to-resource-protected-by-cookie-scope!)
-  (book/create-cookie-scope!)
+  (book/create-resource-protected-by-session-scope!)
+  (book/grant-permission-to-resource-protected-by-session-scope!)
+  (book/create-session-scope!)
 
   (let [uri (some :juxt.pass.alpha/login-uri
-                  (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie-scope/document.html"))]
+                  (session-scope/session-scopes (xt/db *xt-node*) "https://site.test/protected-by-session-scope/document.html"))]
     (is (string? uri)))
 
   (let [request {:ring.request/method :get
-                 :ring.request/path "/protected-by-cookie-scope/document.html"}]
+                 :ring.request/path "/protected-by-session-scope/document.html"}]
     (testing "Redirect"
       (let [response (*handler* request)]
         (is (= 302 (:ring.response/status response)))
@@ -219,22 +219,22 @@
   (book/preliminaries!)
   (book/protected-resource-preliminaries!)
 
-  (book/cookies-scopes-preliminaries!)
+  (book/session-scopes-preliminaries!)
 
-  (book/create-resource-protected-by-cookie-scope!)
-  (book/grant-permission-to-resource-protected-by-cookie-scope!)
-  (book/create-cookie-scope!)
+  (book/create-resource-protected-by-session-scope!)
+  (book/grant-permission-to-resource-protected-by-session-scope!)
+  (book/create-session-scope!)
 
   (book/put-basic-auth-user-identity!)
 
   (let [uri (some :juxt.pass.alpha/login-uri
-                  (cookie-scope/cookie-scopes (xt/db *xt-node*) "https://site.test/protected-by-cookie-scope/document.html"))]
+                  (session-scope/session-scopes (xt/db *xt-node*) "https://site.test/protected-by-session-scope/document.html"))]
     (is (string? uri)))
 
   ;; There is no cookie at present, so no session, so we're expecting a
   ;; redirect to a login form.
   (let [request {:ring.request/method :get
-                 :ring.request/path "/protected-by-cookie-scope/document.html"}]
+                 :ring.request/path "/protected-by-session-scope/document.html"}]
 
     (testing "Redirect"
       (let [response (*handler* request)]

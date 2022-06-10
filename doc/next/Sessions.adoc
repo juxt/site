@@ -1,4 +1,4 @@
-= Cookie Authentication
+= Sessions
 :toc: left
 :experimental:
 
@@ -6,12 +6,12 @@
 
 The use of cookies provide an alternative approach to user authentication.
 
-== Cookie Scopes
+== Session scopes
 
-Site introduces the concept of a _Cookie Scopes_ which are conceptually similar
+Site introduces the concept of a _session scopes_ which are conceptually similar
 to protection spaces, described in <<protection-spaces>>.
 
-A Cookie Scope covers a set of resources. If a request to a resource within this
+A session scope covers a set of resources. If a request to a resource within this
 set is made without a session containing valid credentials, and the request
 cannot be authorized, then the request is redirected to another location. This
 other location is a resource which will presumably establish a session
@@ -23,40 +23,40 @@ access the resource.
 [CAUTION]
 --
 
-Cookie Scopes are not standard nor specified by an RFC, but are Site-specific to
-support common authentication mechanisms used on the Web.
+Session scopes are not standard nor specified by an RFC, but are implemented by
+Site to support session-based authentication commonly used on the Web.
 
 --
 
-== Preparing the creation of Cookie Scopes
+== Preparing the creation of session scopes
 
-To create a Cookie Scope, we first need to establish an Action that will allow
+To create a session scope, we first need to establish an Action that will allow
 us to do so. As always, the Action specifies which attributes are required and
-their values. <<ex-create-action-put-cookie-scope>> demonstrates the creation of
+their values. <<ex-create-action-put-session-scope>> demonstrates the creation of
 such an Action.
 
-[[ex-create-action-put-cookie-scope]]
-.Creating the Action to establish a Cookie Scope
+[[ex-create-action-put-session-scope]]
+.Creating the Action to establish a session scope
 ====
 We first create the Action.
 
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=create-action-put-cookie-scope!,indent=0]
+include::../../test/juxt/book.clj[tag=create-action-put-session-scope!,indent=0]
 ----
 
 We must also ensure our REPL user has permission to call this Action.
 
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=grant-permission-to-put-cookie-scope!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-put-session-scope!,indent=0]
 ----
 ====
 
 [IMPORTANT]
 --
 
-Copy the code in <<ex-create-action-put-cookie-scope>> into a REPL, edit as
+Copy the code in <<ex-create-action-put-session-scope>> into a REPL, edit as
 necessary and evaluate.
 
 --

@@ -9,16 +9,16 @@ protected resource.
 
 We'll need to create the following resources:
 
-. A document at `+https://site.test/protected-by-cookie-scope/document.html+`
+. A document at `+https://site.test/protected-by-session-scope/document.html+`
 which requires the User can perform the Action
 `+https://site.test/actions/get-protected-resource+`. We'll called this the
-_protected document_. This is explained in <<create-resource-protected-by-cookie-scope>>.
+_protected document_. This is explained in <<create-resource-protected-by-session-scope>>.
 
 . A Permission to allow Alice to access this protected document. This is added
-in <<grant-permission-to-resource-protected-by-cookie-scope>>.
+in <<grant-permission-to-resource-protected-by-session-scope>>.
 
-. A Cookie Scope that redirects unauthenticated requests when necessary. This is
-added in <<create-cookie-scope>>.
+. A Session Scope that redirects unauthenticated requests when necessary. This is
+added in <<create-session-scope>>.
 
 . A login form that will be shown to the User, allowing them to
 authenticate. This is created in <<create-login-form>>.
@@ -31,13 +31,13 @@ attempt to find a User Identity that matches some received credentials. If one
 if found, the Action will create a Subject in the database.
 
 . A User Identity for Alice, including a username/password pair, that Alice can use
-to authenticate using the form. This is added in <<cookie-scope-add-user-identity>>.
+to authenticate using the form. This is added in <<session-scope-add-user-identity>>.
 
-<<cookie-scope-flow>> shows the interaction between the components.
+<<session-scope-flow>> shows the interaction between the components.
 
-.How Cookie Authentication works in Site
-[[cookie-scope-flow]]
-[plantuml,cookie-scope-flow,svg]
+.How session-based authentication works in Site
+[[session-scope-flow]]
+[plantuml,session-scope-flow,svg]
 ....
 skinparam monochrome true
 autonumber
@@ -56,8 +56,8 @@ user -> browser: Click href\nto document
 browser -> document: GET
 document -> pass: Check permission
 document <- pass: Denied
-document -> pass: Lookup cookie scopes
-document <- pass: Cookie Scope
+document -> pass: Lookup session scopes
+document <- pass: Session scope
 browser <- document: 302 Found
 browser -> loginform: GET
 ' loginform -> pass: Create session
@@ -73,7 +73,7 @@ loginproc -> XTDB: Find identity\nwith credentials
 loginproc <- XTDB: Matched identity
 loginproc -> XTDB: Create subject, session
 pass <- loginproc: Get session token
-loginhandler <- pass: Set-cookie for session
+loginhandler <- pass: Set-Cookie for session
 browser <- loginhandler: 302 Found with Set-Cookie
 browser -> document: GET
 document -> pass: Check permission
@@ -82,12 +82,12 @@ browser <- document: 200 OK
 user <- browser: document
 ....
 
-In <<cookie-scope-flow>>, the following steps are illustrated:
+In <<session-scope-flow>>, the following steps are illustrated:
 
 . Alice enters a URI (or clicks on a link) to browse a document.
 
 . The browser sends a GET request to the protected document:
-`+https://site.test/protected-by-cookie/document.html+`.
+`+https://site.test/protected-by-session-scope/document.html+`.
 
 . The operation is associated with the Action
 `+https://site.test/actions/get-protected-resource+` and a check is made for a
@@ -95,7 +95,7 @@ permission to perform this Action.
 
 . No permission is matched, the request is denied.
 
-. In denying the request, a Cookie Scope is looked up.
+. In denying the request, a session scope is looked up.
 
 . One is found and returned, associated with the URI of a login form.
 
@@ -152,36 +152,36 @@ procedure throws an error and the transaction aborts.
 
 . (document)
 
-[[create-resource-protected-by-cookie-scope]]
+[[create-resource-protected-by-session-scope]]
 == Create the protected resource
 
 .Creating the protected resource
 ====
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=create-resource-protected-by-cookie-scope!,indent=0]
+include::../../test/juxt/book.clj[tag=create-resource-protected-by-session-scope!,indent=0]
 ----
 ====
 
-[[grant-permission-to-resource-protected-by-cookie-scope]]
+[[grant-permission-to-resource-protected-by-session-scope]]
 == Permit Alice to access the protected resource
 
 .Permitting Alice to access the protected resource
 ====
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=grant-permission-to-resource-protected-by-cookie-scope!,indent=0]
+include::../../test/juxt/book.clj[tag=grant-permission-to-resource-protected-by-session-scope!,indent=0]
 ----
 ====
 
-[[create-cookie-scope]]
-== Create the cookie scope
+[[create-session-scope]]
+== Create the session scope
 
-.Creating the cookie scope
+.Creating the session scope
 ====
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=create-cookie-scope!,indent=0]
+include::../../test/juxt/book.clj[tag=create-session-scope!,indent=0]
 ----
 ====
 
