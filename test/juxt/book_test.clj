@@ -295,15 +295,87 @@
     (is (string? session-token)) ;; TODO: Check for a correct set-cookie header
     (is (= 200 (:ring.response/status response))))
 
-  ;; TODO: Check the database for evidence a session has been created
+  ;; Check the database for evidence a session has been created
   (let [db (xt/db *xt-node*)
-        [session-token session-token-doc]
-        (first (xt/q db '{:find [tok (pull e [*])] :where [[e ::site/type "https://meta.juxt.site/pass/session-token"]
-                                                           [e ::pass/session-token tok]]}))]
+        [session-token]
+        (first (xt/q db '{:find [tok]
+                          :where [[e ::site/type "https://meta.juxt.site/pass/session-token"]
+                                  [e ::pass/session-token tok]]}))]
     (is (string? session-token))))
 
 (comment
   ((t/join-fixtures [with-system-xt with-handler])
    (fn []
-     )
-   ))
+     (book/preliminaries!)
+     (book/protected-resource-preliminaries!)
+
+     (book/session-scopes-preliminaries!)
+
+     (book/create-resource-protected-by-session-scope!)
+     (book/grant-permission-to-resource-protected-by-session-scope!)
+     (book/create-session-scope!)
+
+     (book/put-basic-auth-user-identity!)
+
+     ;; These are needed for the login form
+     (book/create-action-get-public-resource!)
+     (book/grant-permission-to-invoke-get-public-resource!)
+
+     (book/create-login-resource!)
+     (book/create-action-login!)
+     (book/grant-permission-to-invoke-action-login!)
+
+     ;; Test that session scope exists
+     (let [uri (some
+                :juxt.pass.alpha/login-uri
+                (session-scope/session-scopes
+                 (xt/db *xt-node*)
+                 "https://site.test/protected-by-session-scope/document.html"))]
+       (is (string? uri)))
+
+     ;; There is no cookie at present, so no session, so we're expecting a
+     ;; redirect to a login form.
+     (let [request {:ring.request/method :get
+                    :ring.request/path "/protected-by-session-scope/document.html"}]
+
+       (testing "Redirect, login form"
+         (let [response (*handler* request)
+               location (get-in response [:ring.response/headers "location"])]
+           (is (= 302 (:ring.response/status response)))
+           (is (.startsWith location "https://site.test/login?return-to="))
+
+           (let [path (second (re-matches #"\Qhttps://site.test\E(.*)\?.*" location))
+                 request {:ring.request/method :get
+                          :ring.request/path path}
+                 response (*handler* request)
+                 content-type (get-in response [:ring.response/headers "content-type"])]
+             (is (= 200 (:ring.response/status response)))
+             (is (= "text/html;charset=utf-8" content-type))))))
+
+
+     ;; POST to the /login handler, which call the login action.
+     ;; After this there should be a set-cookie escalation
+     (let [body (.getBytes (codec/form-encode {"username" "alice" "password" "garden"}))
+             request
+             {:ring.request/method :post
+              :ring.request/path "/login"
+              :ring.request/query "return-to=/foo"
+              :ring.request/headers
+              {"content-length" (str (count body))
+               "content-type" "application/x-www-form-urlencoded"}
+              :ring.request/body (io/input-stream body)
+              }
+             response (*handler* request)
+             session-token (get-in response [:ring.response/headers "set-cookie"])]
+
+         (is (string? session-token)) ;; TODO: Check for a correct set-cookie header
+         #_(is (= 302 (:ring.response/status response)))
+         response)
+
+     ;; Check the database for evidence a session has been created
+     #_(let [db (xt/db *xt-node*)
+             [session-token]
+             (first (xt/q db '{:find [tok]
+                               :where [[e ::site/type "https://meta.juxt.site/pass/session-token"]
+                                       [e ::pass/session-token tok]]}))]
+         (is (string? session-token))))))
