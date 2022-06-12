@@ -7,7 +7,7 @@
    [clojure.tools.logging :as log]))
 
 (defmethod ig/init-key ::xt-node [_ xtdb-opts]
-  (log/info "Starting XT node...")
+  (log/info "Starting XT node ...")
   (let [node (xt/start-node xtdb-opts)]
     ;; we need to make sure the tx-ingester has caught up before
     ;; declaring the node up
