@@ -254,15 +254,12 @@
                     (throw (ex-info "Invalid op" {::pass/action action :op op}))))
 
               session-token
-              (some (fn [[op doc]]
-                      (when (and
-                             (= op :xtdb.api/put)
-                             (= (:juxt.site.alpha/type doc) "https://meta.juxt.site/pass/session-token"))
-                        (:juxt.pass.alpha/session-token doc))) ops)]
-
-          #_(when session-token
-            (throw (ex-info "YES! session token exists" {}))
-            )
+              (some
+               (fn [[op doc]]
+                 (when (and
+                        (= op :xtdb.api/put)
+                        (= (:juxt.site.alpha/type doc) "https://meta.juxt.site/pass/session-token"))
+                   (:juxt.pass.alpha/session-token doc))) ops)]
 
           (conj
            ops
