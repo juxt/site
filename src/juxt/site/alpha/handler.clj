@@ -33,7 +33,8 @@
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]
-   [juxt.reap.alpha.rfc7230 :as-alias rfc7230])
+   [juxt.reap.alpha.rfc7230 :as-alias rfc7230]
+   [ring.util.codec :as codec])
   (:import (java.net URI)))
 
 (defn join-keywords
@@ -244,7 +245,7 @@
         body-as-value
         (case content-type
           "application/x-www-form-urlencoded"
-          (ring.util.codec/form-decode (String. (::http/body rep)))
+          (codec/form-decode (String. (::http/body rep)))
           )
 
         ;; TODO: Should we fail if more than one permitted action available?
