@@ -180,22 +180,25 @@
         (let [body (.readNBytes in content-length)
               content-type (:juxt.reap.alpha.rfc7231/content-type decoded-representation)]
 
-          (merge
-           decoded-representation
-           {::http/content-length content-length
-            ::http/last-modified start-date}
+          (assoc
+           req
+           ::site/received-representation
+           (merge
+            decoded-representation
+            {::http/content-length content-length
+             ::http/last-modified start-date}
 
-           (if (and
-                (= (:juxt.reap.alpha.rfc7231/type content-type) "text")
-                (nil? (get decoded-representation ::http/content-encoding)))
-             (let [charset
-                   (get-in decoded-representation
-                           [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
-               (merge
-                {::http/content (new String body (or charset "utf-8"))}
-                (when charset {::http/charset charset})))
+            (if (and
+                 (= (:juxt.reap.alpha.rfc7231/type content-type) "text")
+                 (nil? (get decoded-representation ::http/content-encoding)))
+              (let [charset
+                    (get-in decoded-representation
+                            [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
+                (merge
+                 {::http/content (new String body (or charset "utf-8"))}
+                 (when charset {::http/charset charset})))
 
-             {::http/body body})))))))
+              {::http/body body}))))))))
 
 (defn GET [req]
   (conditional/evaluate-preconditions! req)
@@ -234,19 +237,17 @@
 
     (into req {:ring.response/status (if existing 204 201)})))
 
-(defn POST [{::site/keys [xt-node resource]
+(defn POST [{::site/keys [resource]
              ::pass/keys [subject]
-             :ring.request/keys [method]
              :as req}]
-  (let [rep (receive-representation req)
+  (let [req (receive-representation req)
 
-        content-type (get-in req [:ring.request/headers "content-type"] "application/octet-stream")
+        #_#_content-type (get-in req [:ring.request/headers "content-type"] "application/octet-stream")
 
-        body-as-value
+        #_#_body-as-value
         (case content-type
           "application/x-www-form-urlencoded"
-          (codec/form-decode (String. (::http/body rep)))
-          )
+          (codec/form-decode (String. (::http/body rep))))
 
         ;; TODO: Should we fail if more than one permitted action available?
         permitted-action (::pass/action (first (::pass/permitted-actions req)))
@@ -255,52 +256,11 @@
                   ::site/resource (:xt/id resource)}
 
         ;; Default
-        req (assoc req :ring.response/status 200)
-
-        req
-
-
-        req
-
-        #_post-fn #_(::site/post-fn resource)
-        #_post
-        #_(cond
-            (fn? post-fn) post-fn
-
-            (symbol? post-fn)
-            (try
-              (or
-               (requiring-resolve post-fn)
-               (throw
-                (ex-info
-                 (format "Requiring resolve of %s returned nil" post-fn)
-                 {:post-fn post-fn
-                  ::site/request-context (assoc req :ring.response/status 500)})))
-              (catch Exception e
-                (throw
-                 (ex-info
-                  (format "post-fn '%s' is not resolvable" post-fn)
-                  {::post-fn post-fn
-                   ::site/request-context (assoc req :ring.response/status 500)}
-                  e))))
-
-            (nil? post-fn)
-            (throw
-             (ex-info
-              "Resource allows POST but doesn't have a post-fn function"
-              {::site/request-context (assoc req :ring.response/status 500)}))
-
-            :else
-            (throw
-             (ex-info
-              (format "post-fn is neither a function or a symbol, but type '%s'" (type post-fn))
-              {::site/request-context (assoc req :ring.response/status 500)})))
-
-
-        ]
+        req (assoc req :ring.response/status 200)]
 
     (try
-      (authz/do-action req pass-ctx (:xt/id permitted-action) body-as-value)
+      (authz/do-action
+       req pass-ctx (:xt/id permitted-action))
       (catch Exception e
         (throw
          (ex-info
@@ -308,9 +268,7 @@
           {::site/request-context
            (merge (assoc req :ring.response/status 500)
                   (ex-data e))
-           :permitted-action permitted-action
-           :received-representation rep
-           :body-as-value body-as-value}
+           :permitted-action permitted-action}
           e))))
 
     ;;(assert post)
@@ -324,8 +282,7 @@
     ))
 
 (defn PUT [{::site/keys [resource] :as req}]
-  (let [rep (receive-representation req) _ (assert rep)
-        req (assoc req ::site/received-representation rep)
+  (let [req (receive-representation req)
         put-fn (::site/put-fn resource)]
 
     (log/tracef "PUT, put-fn is %s" put-fn)
@@ -366,8 +323,7 @@
            ::site/request-context (assoc req :ring.response/status 500)}))))))
 
 (defn PATCH [{::site/keys [resource] :as req}]
-  (let [rep (receive-representation req) _ (assert rep)
-        req (assoc req ::site/received-representation rep)
+  (let [req (receive-representation req)
         patch-fn (::site/patch-fn resource)]
 
     ;; TODO: evaluate preconditions (in tx fn)
