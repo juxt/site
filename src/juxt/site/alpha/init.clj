@@ -17,15 +17,15 @@
    [juxt.site.alpha :as-alias site]
    [juxt.site.alpha.graphql :as graphql]
    [selmer.parser :as selmer]
-   [xtdb.api :as x]))
+   [xtdb.api :as xt]))
 
 (defn put! [xt-node & ms]
   (->>
-   (x/submit-tx
+   (xt/submit-tx
     xt-node
     (for [m ms]
       [:xtdb.api/put m]))
-   (x/await-tx xt-node)))
+   (xt/await-tx xt-node)))
 
 (defn put-superuser-role!
   "Create the superuser role."
@@ -246,7 +246,7 @@
     ::site/type "Action"
     ::pass/scope "write:admin"          ; make configurable?
 
-    ::pass.malli/args-schema
+    :juxt.pass.alpha.malli/args-schema
     [:tuple
      [:map
       [::site/type [:= "Permission"]]
@@ -380,7 +380,7 @@
 ;; Currently awaiting a fix to https://github.com/juxt/xtdb/issues/1480 because
 ;; these can be used.
 (defn put-site-txfns! [xt-node {::site/keys [base-uri]}]
-  (x/submit-tx
+  (xt/submit-tx
    xt-node
    [[:xtdb.api/put
      {:xt/id (str base-uri "/_site/tx_fns/put_if_match_wildcard")
@@ -393,7 +393,7 @@
              false)))
       :http/content-type "application/clojure"}]])
 
-  (x/submit-tx
+  (xt/submit-tx
    xt-node
    [[:xtdb.api/put
      {:xt/id (str base-uri "/_site/tx_fns/put_if_match_etags")
