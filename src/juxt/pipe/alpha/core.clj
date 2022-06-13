@@ -4,11 +4,10 @@
   ;; When promoting this ns, move the defmethods that require all these
   ;; dependencies:
   (:require
-   [clojure.walk :refer [postwalk]]
    [juxt.site.alpha.util :refer [random-bytes as-hex-str]]
-   [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.malli :as-alias pass.malli]
    [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.site.alpha :as-alias site]
+   [ring.util.codec :as codec]
    [malli.core :as m]
    [malli.error :a me]
    [xtdb.api :as xt]))
@@ -134,6 +133,12 @@
 (defmethod word :str
   [[s1 s2 & stack] [_ & queue] env]
   [(cons (str s1 s2) stack) queue env])
+
+(defmethod word ::site/form-decode
+  [[encoded & stack] [_ & queue] env]
+  [(cons (codec/form-decode encoded) stack)
+   queue
+   env])
 
 ;; This could be in another ns
 (defmethod word :find-matching-identity-on-password-query

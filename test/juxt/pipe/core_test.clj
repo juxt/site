@@ -8,7 +8,9 @@
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node*]]
    [juxt.pass.alpha :as-alias pass]
+   [juxt.http.alpha :as-alias http]
    [juxt.site.alpha :as-alias site]
+   [ring.util.codec :as codec]
    [xtdb.api :as xt]))
 
 (use-fixtures :each with-system-xt)
@@ -147,9 +149,25 @@
         ::pass/password-hash (password/encrypt "garden")})
 
       (pipe/pipe
-       (list {"username" "alice"
-              "password" "garden"})
        (list
+        ;; We simulate a request body containing an encoded set of credentials
+        ;; sent via a web form.
+        {::http/body
+         (codec/form-encode
+          {"username" "alice"
+           "password" "garden"
+           "csrf-tok" "123"})
+
+         :ring.requst/query "foo=bar"
+         ::http/content-type "application/x-www-form-urlencoded"})
+
+       (list
+
+        [:push :juxt.http.alpha/body]
+        :of
+
+        ::site/form-decode
+
         [:validate
          [:map
           ["username" [:string {:min 1}]]
@@ -178,50 +196,50 @@
         [:if*
          (list
 
-          [:push ::pass/user-identity]
-          :swap :associate
+           [:push ::pass/user-identity]
+           :swap :associate
 
-          [:push ::site/type "https://meta.juxt.site/pass/subject"]
-          :set-at
+           [:push ::site/type "https://meta.juxt.site/pass/subject"]
+           :set-at
 
-          ;; Make subject
-          [:push :xt/id]
-          10 :random-bytes :as-hex-string
-          "https://site.test/subjects/" :str
-          :set-at
+           ;; Make subject
+           [:push :xt/id]
+           10 :random-bytes :as-hex-string
+           "https://site.test/subjects/" :str
+           :set-at
 
-          ;; Create the session, linked to the subject
-          :dup [:push :xt/id] :of
-          [:push ::pass/subject] :swap :associate
+           ;; Create the session, linked to the subject
+           :dup [:push :xt/id] :of
+           [:push ::pass/subject] :swap :associate
 
-          ;; Now we're good to wrap up the subject in a tx-op
-          :swap :xtdb.api/put :swap
+           ;; Now we're good to wrap up the subject in a tx-op
+           :swap :xtdb.api/put :swap
 
-          [:push :xt/id]
-          16 :make-nonce
-          "https://site.test/sessions/" :str
-          :set-at
-          [:push ::site/type "https://meta.juxt.site/pass/session"]
-          :set-at
+           [:push :xt/id]
+           16 :make-nonce
+           "https://site.test/sessions/" :str
+           :set-at
+           [:push ::site/type "https://meta.juxt.site/pass/session"]
+           :set-at
 
-          :dup [:push :xt/id] :of
-          [:push ::pass/session] :swap :associate
+           :dup [:push :xt/id] :of
+           [:push ::pass/session] :swap :associate
 
-          :swap :xtdb.api/put :swap
+           :swap :xtdb.api/put :swap
 
-          16 :make-nonce
-          :swap
-          :over
-          [:push ::pass/session-token]
-          :swap
-          :set-at
-          :swap
-          "https://site.test/session-tokens/" :str
-          [:push :xt/id]
-          :swap
-          :set-at
-          [:push ::site/type "https://meta.juxt.site/pass/session-token"] :set-at
-          :xtdb.api/put)
+           16 :make-nonce
+           :swap
+           :over
+           [:push ::pass/session-token]
+           :swap
+           :set-at
+           :swap
+           "https://site.test/session-tokens/" :str
+           [:push :xt/id]
+           :swap
+           :set-at
+           [:push ::site/type "https://meta.juxt.site/pass/session-token"] :set-at
+           :xtdb.api/put)
 
          (list
           "Login failed"
