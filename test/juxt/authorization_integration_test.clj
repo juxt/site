@@ -63,8 +63,6 @@
 
 (apply (partial t/use-fixtures :each) fixtures)
 
-(def test-host-subject (str site-prefix "/subjects/host-test"))
-
 (defn make-action
   [action-id]
   {:xt/id (str site-prefix "/actions/" action-id)

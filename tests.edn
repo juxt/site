@@ -9,7 +9,9 @@
                         "juxt.pass.authorization-test"
                         "juxt.authorization-integration-test"
                         "juxt.book-test"
-
-                        ]}]
+                        "juxt.pass.procedure-test"
+                        "juxt.site.graphql-auth-integration-test"
+                        "juxt.pipe.core-test"
+                        "juxt.site.graphql-compiler-test"]}]
 
  :reporter kaocha.report/documentation}
