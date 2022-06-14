@@ -280,7 +280,8 @@ type Mutation {
         (is (= {:xt/id "https://example.org/persons/mal"
                 :juxt.site/type "Person"
                 :name "Malcolm Sparks"}
-               (xt/entity db "https://example.org/persons/mal"))))
+               (-> (xt/entity db "https://example.org/persons/mal")
+                   (dissoc :_siteCreatedAt)))))
 
       (let [body (json/read-value (:ring.response/body response))]
         (is (= {"data"
