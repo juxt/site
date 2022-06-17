@@ -16,6 +16,7 @@
         com.xtdb/xtdb-jdbc {:mvn/version "1.21.0"}
         com.xtdb/xtdb-s3 {:mvn/version "1.21.0"}
         mysql/mysql-connector-java {:mvn/version "8.0.29"}
+        diehard/diehard {:mvn/version "0.11.3"}
 
         ;; Jetty
         ring/ring-jetty-adapter {:mvn/version "1.9.5"}
