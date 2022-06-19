@@ -197,7 +197,7 @@
                        [])]
 
                 ;; else
-                  [(throw (ex-info "Login failed" {:ring.response/status 400}))]))
+                [(throw (ex-info "Login failed" {:ring.response/status 400}))]))
 
             {::site/db (xt/db *xt-node*)
              ::site/received-representation

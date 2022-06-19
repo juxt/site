@@ -217,7 +217,7 @@
 
 ;; multiargs
 (defmethod word 'ex-info
-  [[msg ex-data & stack] [_ & queue] env]
+  [[ex-data msg & stack] [_ & queue] env]
   [(cons (ex-info msg ex-data) stack) queue env])
 
 (defmethod word 'throw
