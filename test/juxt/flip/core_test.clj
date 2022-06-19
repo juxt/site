@@ -192,7 +192,7 @@
 
                         ;; A quotation that will set a status 302 on the request context
                         (juxt.site.alpha/apply-to-request-context
-                         [(juxt.flip.alpha/assoc 302 :ring.response/status)])]
+                         [302 :ring.response/status rot set-at])]
 
                        [])]
 
