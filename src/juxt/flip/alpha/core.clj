@@ -55,10 +55,10 @@
   [(cons (String. bytes) stack) queue env])
 
 ;; TODO: What is the Factor equivalent name, if any?
-(defmethod word 'juxt.flip.edn/read-string [[el & stack] [_ & queue] env]
+(defmethod word 'juxt.flip.alpha.edn/read-string [[el & stack] [_ & queue] env]
   [(cons (edn/read-string el) stack) queue env])
 
-(defmethod word 'juxt.flip.hashtables/associate [[k v & stack] [_ & queue] env]
+(defmethod word 'juxt.flip.alpha.hashtables/associate [[k v & stack] [_ & queue] env]
   [(cons {k v} stack) queue env])
 
 (defmethod word 'first [[coll & stack] [_ & queue] env]
@@ -192,7 +192,7 @@
   [[s1 s2 & stack] [_ & queue] env]
   [(cons (str s1 s2) stack) queue env])
 
-(defmethod word 'juxt.site.alpha/form-decode
+(defmethod word 'juxt.flip.alpha/form-decode
   [[encoded & stack] [_ & queue] env]
   [(cons (codec/form-decode encoded) stack)
    queue

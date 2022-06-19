@@ -820,7 +820,7 @@ Password: <input name=password type=password>
       :juxt.http.alpha/body of
       bytes-to-string
 
-      juxt.site.alpha/form-decode
+      juxt.flip.alpha/form-decode
 
       (validate
        [:map
@@ -849,7 +849,7 @@ Password: <input name=password type=password>
 
       (if*
           [::pass/user-identity
-           juxt.flip.hashtables/associate
+           juxt.flip.alpha.hashtables/associate
 
            "https://meta.juxt.site/pass/subject"
            :juxt.site.alpha/type
@@ -862,7 +862,7 @@ Password: <input name=password type=password>
 
            ;; Create the session, linked to the subject
            dup :xt/id of
-           ::pass/subject juxt.flip.hashtables/associate
+           ::pass/subject juxt.flip.alpha.hashtables/associate
 
            ;; Now we're good to wrap up the subject in a tx-op
            swap xtdb.api/put swap
@@ -876,7 +876,7 @@ Password: <input name=password type=password>
            juxt.flip.alpha/assoc
 
            dup :xt/id of
-           ::pass/session juxt.flip.hashtables/associate
+           ::pass/session juxt.flip.alpha.hashtables/associate
 
            swap xtdb.api/put swap
 
@@ -935,7 +935,7 @@ Password: <input name=password type=password>
            ;; Finally we pull out and use the return_to query parameter
            :ring.request/query env
            (if*
-               [juxt.site.alpha/form-decode
+               [juxt.flip.alpha/form-decode
                 "return-to" of
                 (if*
                     [(symbol "juxt.flip.alpha/assoc") swap
@@ -1326,7 +1326,7 @@ Password: <input name=password type=password>
            ::http/body
            of
            bytes-to-string
-           juxt.flip.edn/read-string)})
+           juxt.flip.alpha.edn/read-string)})
   ;; Actions
   (create-grant-permission-action!)
   (permit-grant-permission-action!)
