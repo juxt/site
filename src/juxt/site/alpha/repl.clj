@@ -699,7 +699,8 @@
     (->>
      (for [tok (->> (q '{:find [e]
                          :where [[e :xt/id]
-                                 [e ::site/type "https://meta.juxt.site/pass/session"]]
+                                 [e ::site/type #{"https://meta.juxt.site/pass/session"
+                                                  "https://meta.juxt.site/pass/session-token"}]]
                          :in [t]} t)
                     (map first)
                     )
