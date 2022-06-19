@@ -1,10 +1,10 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pipe.core-test
+(ns juxt.swap.core-test
   (:require
    [clojure.test :refer [deftest is use-fixtures testing] :as t]
    [crypto.password.bcrypt :as password]
-   [juxt.pipe.alpha.core :as pipe]
+   [juxt.swap.alpha.core :as swap]
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node*]]
    [juxt.pass.alpha :as-alias pass]
@@ -41,8 +41,8 @@
        ::pass/password-hash (password/encrypt "garden")})
 
      (let [
-           pipe-results
-           (pipe/pipe
+           eval-quotation-results
+           (swap/eval-quotation
             (list)
 
             '(
@@ -70,7 +70,7 @@
 
               ;; We now have a stack with: <user> <password>
 
-              (juxt.pipe.alpha.xtdb/q
+              (juxt.swap.alpha.xtdb/q
                (find-matching-identity-on-password-query
                 {:username-in-identity-key ::pass/username
                  :password-hash-in-identity-key ::pass/password-hash}))
@@ -215,60 +215,60 @@
 
             )]
 
-       pipe-results
+       eval-quotation-results
 
        #_(authz/apply-request-context-operations
           req
           (->>
-           pipe-results
+           eval-quotation-results
            (filter (fn [[op]]  (= op :juxt.site.alpha/apply-to-request-context)))))))))
 
 
 (comment
-  (pipe/pipe
+  (swap/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
    '(dup :ring.response/headers of [<array-map>] [] if* "bar" swap "foo" swap set-at swap :ring.response/headers swap set-at)
    {}))
 
 #_(comment
-    (pipe/pipe
+    (swap/eval-quotation
      (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
      '(dup :ring.response/headers swap :ring.response/headers of [] [<array-map>] if* "foo" "bar" assoc assoc)
      {}))
 
 #_(comment
-    (pipe/pipe
+    (swap/eval-quotation
      (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
      '(dup :ring.response/headers swap (of :ring.response/headers) (if* [] [<array-map>]) "foo" "bar" assoc assoc)
      {}))
 
 #_(comment
-    (pipe/pipe
+    (swap/eval-quotation
      (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
      '(dup :ring.response/headers swap (of :ring.response/headers) (if* [] [<array-map>]) "foo" "bar" assoc assoc)
      {}))
 
 
 (comment
-  (pipe/pipe
+  (swap/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
    '(dup :ring.response/headers of [<array-map>] [] if* "bar" swap "foo" swap set-at swap :ring.response/headers swap set-at)
    {}))
 
 (comment
-  (pipe/pipe
+  (swap/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
    '(dup :ring.response/headers of [<array-map>] [] if* "bar" "foo" assoc :ring.response/headers assoc)
    {}))
 
 (comment
-  (pipe/pipe
+  (swap/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
    '(dup :ring.response/headers of (if* [] [<array-map>]) "bar" "foo" assoc :ring.response/headers assoc)
    {}))
 
 (comment
-  (pipe/pipe
+  (swap/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
    '(dup
      (of :ring.response/headers)
@@ -283,18 +283,18 @@
 
 #_((t/join-fixtures [with-system-xt])
  (fn []
-   (repl/put! {:xt/id "https://site.test/pipe/quotations/req-to-edn-body"
-               :juxt.pipe.alpha/quotation
+   (repl/put! {:xt/id "https://site.test/swap/quotations/req-to-edn-body"
+               :juxt.swap.alpha/quotation
                '(:juxt.site.alpha/received-representation
                  env
                  ::http/body
                  of
                  bytes-to-string
                  read-edn-string)})
-   (pipe/pipe
+   (swap/eval-quotation
     (list )
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
 
       (validate
        [:map
@@ -337,7 +337,7 @@
 
 
 
-;; Password checking is very slow compared to pipe
+;; Password checking is very slow compared to swap
 ;; We must be sure that it is only called once, or we might memoize for performance
 (comment
   (time

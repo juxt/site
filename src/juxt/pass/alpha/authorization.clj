@@ -14,8 +14,8 @@
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha.process :as process]
-   [juxt.pipe.alpha.core :refer [pipe]]
-   [juxt.pipe.alpha :as-alias pipe]
+   [juxt.swap.alpha.core :refer [eval-quotation]]
+   [juxt.swap.alpha :as-alias swap]
    [xtdb.api :as xt]
    [clojure.walk :as walk]))
 
@@ -248,10 +248,10 @@
 
         (let [ops
               (cond
-                (::pipe/quotation action-doc)
-                (pipe
+                (::swap/quotation action-doc)
+                (eval-quotation
                  (reverse args)         ; push the args to the stack
-                 (::pipe/quotation action-doc)
+                 (::swap/quotation action-doc)
                  (assoc ctx ::site/db db))
                 ;; There might be other strategies in the future (although the
                 ;; fewer the better really)
@@ -343,7 +343,7 @@
            (case op
              :juxt.site.alpha/apply-to-request-context
              (let [quotation (first args)]
-               (first (pipe (list ctx) quotation {})))))
+               (first (eval-quotation (list ctx) quotation {})))))
          ctx
          ops)]
     res))

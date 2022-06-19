@@ -15,4 +15,4 @@ WARNING: Terrible puns and word-plays ahead.
 * pass -- authentication, authorization -- as in, "You Shall Not Pass!!!" (Site
   attempts to protect resources from Balrogs)
 
-* pipe -- a concatenative language used in actions, but possible elsewhere
+* swap -- a concatenative language used in actions, but possible elsewhere

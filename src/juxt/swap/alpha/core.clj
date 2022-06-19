@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pipe.alpha.core
+(ns juxt.swap.alpha.core
   ;; When promoting this ns, move the defmethods that require all these
   ;; dependencies:
   (:require
@@ -12,7 +12,6 @@
    [malli.error :a me]
    [xtdb.api :as xt]
    [clojure.edn :as edn]
-   [juxt.pipe.alpha :as-alias pipe]
    [clojure.string :as str]))
 
 ;; See Factor, https://factorcode.org/
@@ -39,7 +38,7 @@
   [(cons (get env el) stack) queue env])
 
 ;; TODO: What is the Factor equivalent name?
-(defmethod word 'juxt.pipe.alpha.xtdb/entity [[id & stack] [_ & queue] {::site/keys [db] :as env}]
+(defmethod word 'juxt.swap.alpha.xtdb/entity [[id & stack] [_ & queue] {::site/keys [db] :as env}]
   (if-let [e (xt/entity db id)]
     [(cons e stack) queue env]
     ;; TODO: Arguably the developer's decision - add a word that throws if
@@ -141,10 +140,10 @@
 (defmethod word 'of [[k m & stack] [_ & queue] env]
   [(cons (get m k) stack) queue env])
 
-(declare pipe)
+(declare eval-quotation)
 
 (defmethod word 'dip [[x & stack] [[_ quotation] & queue] env]
-  (let [stack (pipe stack quotation env)]
+  (let [stack (eval-quotation stack quotation env)]
     [(cons x stack) queue env]))
 
 (defmethod word 'if [[cond t f & stack] [_ & queue] env]
@@ -161,7 +160,7 @@
     [(cons cond stack) (concat t queue) env]
     [stack (concat f queue) env]))
 
-(defmethod word 'juxt.pipe.alpha.xtdb/q
+(defmethod word 'juxt.swap.alpha.xtdb/q
   [[q & stack] [_ & queue] env]
   (assert (map? q))
   (assert (::site/db env))
@@ -236,17 +235,16 @@
     :else
     [(cons w stack) queue env]))
 
-(defn pipe [stack queue env]
+(defn eval-quotation [stack queue env]
   ;; Naiive implementation. A production implementation would put an upper limit
   ;; on the number of iterations to prevent overly long running transactions.
 
   ;; For performance optimization, consider using a transient or a
   ;; java.util.Deque for both stack and queue. Since neither the stack nor queue
-  ;; escape the pipe, and the pipe is run in a single-thread, the data
-  ;; structures can be transient. However, see
-  ;; https://clojure.org/reference/transients that claims that lists cannot be
-  ;; made transient "as there is no benefit to be had.". So lists may be already
-  ;; fast enough.
+  ;; escape, and is run in a single-thread, the data structures can be
+  ;; transient. However, see https://clojure.org/reference/transients that
+  ;; claims that lists cannot be made transient "as there is no benefit to be
+  ;; had.". So lists may be already fast enough.
 
   (loop [[stack queue env] [stack queue env]]
     (assert list? stack)

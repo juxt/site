@@ -51,9 +51,9 @@
     :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
     :juxt.pass.alpha/scope "write:admin"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
       "https://meta.juxt.site/pass/action" :juxt.site.alpha/type assoc
       (validate [:map
                  [:xt/id [:re "https://site.test/actions/(.+)"]]
@@ -98,9 +98,9 @@
     :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
     :juxt.pass.alpha/scope "write:admin"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
       "https://meta.juxt.site/pass/permission" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/permissions/(.+)"]]
@@ -141,9 +141,9 @@
    {:xt/id "https://site.test/actions/put-user"
     :juxt.pass.alpha/scope "write:users"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
 
       "https://meta.juxt.site/pass/user" swap :juxt.site.alpha/type swap set-at
 
@@ -193,9 +193,9 @@
    {:xt/id "https://site.test/actions/put-user-identity"
     :juxt.pass.alpha/scope "write:users"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
 
       (validate
        [:map
@@ -249,9 +249,9 @@
    {:xt/id "https://site.test/actions/put-subject"
     ;;:juxt.pass.alpha/scope "write:users"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
       "https://meta.juxt.site/pass/subject" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/.*"]]
@@ -291,9 +291,9 @@
    {:xt/id "https://site.test/actions/put-immutable-public-resource"
     :juxt.pass.alpha/scope "write:resource" ; <1>
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
 
       [:map
        [:xt/id [:re "https://site.test/.*"]]]
@@ -473,9 +473,9 @@
    {:xt/id "https://site.test/actions/put-immutable-protected-resource"
     :juxt.pass.alpha/scope "write:resource"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
 
       "https://meta.juxt.site/pass/action" swap :juxt.site.alpha/type swap set-at
 
@@ -544,9 +544,9 @@
    {:xt/id "https://site.test/actions/put-protection-space"
     :juxt.pass.alpha/scope "write:admin"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
       "https://meta.juxt.site/pass/protection-space" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/protection-spaces/(.+)"]]
@@ -691,9 +691,9 @@
    {:xt/id "https://site.test/actions/put-session-scope"
     :juxt.pass.alpha/scope "write:admin"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
 
       "https://meta.juxt.site/pass/session-scope" swap :juxt.site.alpha/type swap set-at
 
@@ -814,7 +814,7 @@ Password: <input name=password type=password>
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/login"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
       :juxt.site.alpha/received-representation env
       :juxt.http.alpha/body of
@@ -840,7 +840,7 @@ Password: <input name=password type=password>
 
       ;; We now have a stack with: <user> <password>
 
-      (juxt.pipe.alpha.xtdb/q
+      (juxt.swap.alpha.xtdb/q
        (find-matching-identity-on-password-query
         {:username-in-identity-key ::pass/username
          :password-hash-in-identity-key ::pass/password-hash}))
@@ -998,9 +998,9 @@ Password: <input name=password type=password>
    {:xt/id "https://site.test/actions/put-application"
     :juxt.pass.alpha/scope "write:application"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
       "https://meta.juxt.site/pass/application" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/applications/(.+)"]]
@@ -1038,9 +1038,9 @@ Password: <input name=password type=password>
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/authorize-application"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
       "https://meta.juxt.site/pass/authorization" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/authorizations/(.+)"]]
@@ -1080,9 +1080,9 @@ Password: <input name=password type=password>
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/issue-access-token"
 
-    :juxt.pipe.alpha/quotation
+    :juxt.swap.alpha/quotation
     '(
-      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
       "https://meta.juxt.site/pass/access-token" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/access-tokens/(.+)"]]
@@ -1319,8 +1319,8 @@ Password: <input name=password type=password>
   (book-install-do-action-fn!)
   (permit-create-action!)
   ;; Quotations
-  (put! {:xt/id "https://site.test/pipe/quotations/req-to-edn-body"
-         :juxt.pipe.alpha/quotation
+  (put! {:xt/id "https://site.test/swap/quotations/req-to-edn-body"
+         :juxt.swap.alpha/quotation
          '(:juxt.site.alpha/received-representation
            env
            ::http/body
