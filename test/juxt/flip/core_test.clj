@@ -79,20 +79,20 @@
 
               (if*
                   [::pass/user-identity
-                   swap associate
+                   juxt.flip.hashtables/associate
 
                    "https://meta.juxt.site/pass/subject"
                    :juxt.site.alpha/type
-                   assoc
+                   juxt.flip.alpha/assoc
 
                    ;; Make subject
                    (random-bytes 10) as-hex-string
                    (str "https://site.test/subjects/")
-                   :xt/id assoc
+                   :xt/id juxt.flip.alpha/assoc
 
                    ;; Create the session, linked to the subject
                    dup :xt/id of
-                   ::pass/subject swap associate
+                   ::pass/subject juxt.flip.hashtables/associate
 
                    ;; Now we're good to wrap up the subject in a tx-op
                    swap xtdb.api/put swap
@@ -100,13 +100,13 @@
                    (make-nonce 16)
                    "https://site.test/sessions/" str
                    :xt/id
-                   assoc
+                   juxt.flip.alpha/assoc
                    "https://meta.juxt.site/pass/session"
                    ::site/type
-                   assoc
+                   juxt.flip.alpha/assoc
 
                    dup :xt/id of
-                   ::pass/session swap associate
+                   ::pass/session juxt.flip.hashtables/associate
 
                    swap xtdb.api/put swap
 
@@ -114,44 +114,44 @@
                    swap
                    over
                    ::pass/session-token
-                   assoc
+                   juxt.flip.alpha/assoc
 
                    swap
 
                    (str "https://site.test/session-tokens/")
                    :xt/id
-                   assoc
+                   juxt.flip.alpha/assoc
 
                    "https://meta.juxt.site/pass/session-token"
                    ::site/type
-                   assoc
+                   juxt.flip.alpha/assoc
                    xtdb.api/put
 
                    ;; We now create the following quotation:
                    #_[(of :ring.response/headers dup)
                       (if* [] [<array-map>]) ; if no headers, use an empty map
-                      (assoc "set-cookie" "id=<session token>; Path=/; Secure; HttpOnly; SameSite=Lax")
-                      (assoc :ring.response/headers)]
+                      (juxt.flip.alpha/assoc "set-cookie" "id=<session token>; Path=/; Secure; HttpOnly; SameSite=Lax")
+                      (juxt.flip.alpha/assoc :ring.response/headers)]
 
                    ;; Get the session token back and turn into a quotation
                    dup second :juxt.pass.alpha/session-token of
                    "id=" str
                    "; Path=/; Secure; HttpOnly; SameSite=Lax" swap str
 
-                   (symbol "assoc") swap
-                   "set-cookie" swap
+                   (symbol "juxt.flip.alpha/assoc") swap
+                   "set-cookie"
                    _3array >list
 
                    ;; Now quote the initial two lines
-                   [(of :ring.response/headers dup)
+                   [dup (of :ring.response/headers)
                     (if* [] [<array-map>]) ; if no headers, use an empty map
                     ]
 
-                   ;; Push the '(assoc "set-cookie" ...) line onto the program
+                   ;; Push the '(juxt.flip.alpha/assoc "set-cookie" ...) line onto the program
                    push
 
                    ;; Finish the rest of the program
-                   (symbol "assoc")
+                   (symbol "juxt.flip.alpha/assoc")
                    :ring.response/headers
                    _2array >list
                    swap push
@@ -168,18 +168,18 @@
                        [juxt.site.alpha/form-decode
                         "return-to" of
                         (if*
-                            [(symbol "assoc") swap
-                             "location" swap
+                            [(symbol "juxt.flip.alpha/assoc") swap
+                             "location"
                              _3array >list
 
-                             [(of :ring.response/headers dup)
+                             [dup (of :ring.response/headers)
                               ;; if no headers, use an empty map
                               (if* [] [<array-map>])]
 
                              push
 
                              ;; Finish the rest of the program
-                             (symbol "assoc")
+                             (symbol "juxt.flip.alpha/assoc")
                              :ring.response/headers
                              _2array >list
                              swap push
@@ -192,7 +192,7 @@
 
                         ;; A quotation that will set a status 302 on the request context
                         (juxt.site.alpha/apply-to-request-context
-                         [(assoc :ring.response/status 302)])]
+                         [(juxt.flip.alpha/assoc 302 :ring.response/status)])]
 
                        [])]
 
@@ -233,19 +233,19 @@
 #_(comment
     (flip/eval-quotation
      (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-     '(dup :ring.response/headers swap :ring.response/headers of [] [<array-map>] if* "foo" "bar" assoc assoc)
+     '(dup :ring.response/headers swap :ring.response/headers of [] [<array-map>] if* "foo" "bar" juxt.flip.alpha/assoc juxt.flip.alpha/assoc)
      {}))
 
 #_(comment
     (flip/eval-quotation
      (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-     '(dup :ring.response/headers swap (of :ring.response/headers) (if* [] [<array-map>]) "foo" "bar" assoc assoc)
+     '(dup :ring.response/headers swap (of :ring.response/headers) (if* [] [<array-map>]) "foo" "bar" juxt.flip.alpha/assoc juxt.flip.alpha/assoc)
      {}))
 
 #_(comment
     (flip/eval-quotation
      (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-     '(dup :ring.response/headers swap (of :ring.response/headers) (if* [] [<array-map>]) "foo" "bar" assoc assoc)
+     '(dup :ring.response/headers swap (of :ring.response/headers) (if* [] [<array-map>]) "foo" "bar" juxt.flip.alpha/assoc juxt.flip.alpha/assoc)
      {}))
 
 
@@ -258,13 +258,13 @@
 (comment
   (flip/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-   '(dup :ring.response/headers of [<array-map>] [] if* "bar" "foo" assoc :ring.response/headers assoc)
+   '(dup :ring.response/headers of [<array-map>] [] if* "bar" "foo" juxt.flip.alpha/assoc :ring.response/headers juxt.flip.alpha/assoc)
    {}))
 
 (comment
   (flip/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-   '(dup :ring.response/headers of (if* [] [<array-map>]) "bar" "foo" assoc :ring.response/headers assoc)
+   '(dup :ring.response/headers of (if* [] [<array-map>]) "bar" "foo" juxt.flip.alpha/assoc :ring.response/headers juxt.flip.alpha/assoc)
    {}))
 
 (comment
@@ -273,8 +273,8 @@
    '(dup
      (of :ring.response/headers)
      (if* [] [<array-map>])
-     (assoc "foo" "bar")
-     (assoc :ring.response/headers))
+     (juxt.flip.alpha/assoc "foo" "bar")
+     (juxt.flip.alpha/assoc :ring.response/headers))
    {}))
 
 

@@ -215,8 +215,8 @@
              {"authorization" "Bearer test-access-token"}}]
     (is (= 411 (:ring.response/status (*handler* req))))))
 
-;;
-;;(t/join-fixtures [with-system-xt with-handler])
+;;  (t/join-fixtures [with-system-xt with-handler])
+
 (deftest login-test
   (book/preliminaries!)
   (book/protected-resource-preliminaries!)

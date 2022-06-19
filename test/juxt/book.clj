@@ -54,7 +54,7 @@
     :juxt.flip.alpha/quotation
     '(
       "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
-      "https://meta.juxt.site/pass/action" :juxt.site.alpha/type assoc
+      "https://meta.juxt.site/pass/action" :juxt.site.alpha/type juxt.flip.alpha/assoc
       (validate [:map
                  [:xt/id [:re "https://site.test/actions/(.+)"]]
                  [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/action"]]
@@ -206,16 +206,16 @@
         [:juxt.pass.jwt/iss {:optional true} [:re "https://.+"]]
         [:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]])
 
-      "https://meta.juxt.site/pass/user-identity" :juxt.site.alpha/type assoc
+      "https://meta.juxt.site/pass/user-identity" :juxt.site.alpha/type juxt.flip.alpha/assoc
 
       ;; Lowercase the username, if it exists.
-      dup :juxt.pass.alpha/username of (if* [>lower :juxt.pass.alpha/username assoc] [])
+      dup :juxt.pass.alpha/username of (if* [>lower :juxt.pass.alpha/username juxt.flip.alpha/assoc] [])
 
       {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
        :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
        :options {}}
       :juxt.site.alpha/methods
-      assoc
+      juxt.flip.alpha/assoc
 
       xtdb.api/put)
 
@@ -303,7 +303,7 @@
        :head {::pass/actions #{"https://site.test/actions/get-public-resource"}}
        :options {::pass/actions #{"https://site.test/actions/get-options"}}}
       :juxt.site.alpha/methods
-      assoc
+      juxt.flip.alpha/assoc
 
       xtdb.api/put)
 
@@ -849,20 +849,20 @@ Password: <input name=password type=password>
 
       (if*
           [::pass/user-identity
-           swap associate
+           juxt.flip.hashtables/associate
 
            "https://meta.juxt.site/pass/subject"
            :juxt.site.alpha/type
-           assoc
+           juxt.flip.alpha/assoc
 
            ;; Make subject
            (random-bytes 10) as-hex-string
            (str "https://site.test/subjects/")
-           :xt/id assoc
+           :xt/id juxt.flip.alpha/assoc
 
            ;; Create the session, linked to the subject
            dup :xt/id of
-           ::pass/subject swap associate
+           ::pass/subject juxt.flip.hashtables/associate
 
            ;; Now we're good to wrap up the subject in a tx-op
            swap xtdb.api/put swap
@@ -870,13 +870,13 @@ Password: <input name=password type=password>
            (make-nonce 16)
            "https://site.test/sessions/" str
            :xt/id
-           assoc
+           juxt.flip.alpha/assoc
            "https://meta.juxt.site/pass/session"
            ::site/type
-           assoc
+           juxt.flip.alpha/assoc
 
            dup :xt/id of
-           ::pass/session swap associate
+           ::pass/session juxt.flip.hashtables/associate
 
            swap xtdb.api/put swap
 
@@ -884,44 +884,44 @@ Password: <input name=password type=password>
            swap
            over
            ::pass/session-token
-           assoc
+           juxt.flip.alpha/assoc
 
            swap
 
            (str "https://site.test/session-tokens/")
            :xt/id
-           assoc
+           juxt.flip.alpha/assoc
 
            "https://meta.juxt.site/pass/session-token"
            ::site/type
-           assoc
+           juxt.flip.alpha/assoc
            xtdb.api/put
 
            ;; We now create the following quotation:
            #_[(of :ring.response/headers dup)
               (if* [] [<array-map>])    ; if no headers, use an empty map
-              (assoc "set-cookie" "id=<session token>; Path=/; Secure; HttpOnly; SameSite=Lax")
-              (assoc :ring.response/headers)]
+              (juxt.flip.alpha/assoc "set-cookie" "id=<session token>; Path=/; Secure; HttpOnly; SameSite=Lax")
+              (juxt.flip.alpha/assoc :ring.response/headers)]
 
            ;; Get the session token back and turn into a quotation
            dup second :juxt.pass.alpha/session-token of
            "id=" str
            "; Path=/; Secure; HttpOnly; SameSite=Lax" swap str
 
-           (symbol "assoc") swap
-           "set-cookie" swap
+           (symbol "juxt.flip.alpha/assoc") swap
+           "set-cookie"
            _3array >list
 
            ;; Now quote the initial two lines
-           [(of :ring.response/headers dup)
+           [dup (of :ring.response/headers)
             (if* [] [<array-map>])      ; if no headers, use an empty map
             ]
 
-           ;; Push the '(assoc "set-cookie" ...) line onto the program
+           ;; Push the '(juxt.flip.alpha/assoc "set-cookie" ...) line onto the program
            push
 
            ;; Finish the rest of the program
-           (symbol "assoc")
+           (symbol "juxt.flip.alpha/assoc")
            :ring.response/headers
            _2array >list
            swap push
@@ -938,18 +938,18 @@ Password: <input name=password type=password>
                [juxt.site.alpha/form-decode
                 "return-to" of
                 (if*
-                    [(symbol "assoc") swap
-                     "location" swap
+                    [(symbol "juxt.flip.alpha/assoc") swap
+                     "location"
                      _3array >list
 
-                     [(of :ring.response/headers dup)
+                     [dup (of :ring.response/headers)
                       ;; if no headers, use an empty map
                       (if* [] [<array-map>])]
 
                      push
 
                      ;; Finish the rest of the program
-                     (symbol "assoc")
+                     (symbol "juxt.flip.alpha/assoc")
                      :ring.response/headers
                      _2array >list
                      swap push
@@ -962,7 +962,7 @@ Password: <input name=password type=password>
 
                 ;; A quotation that will set a status 302 on the request context
                 (juxt.site.alpha/apply-to-request-context
-                 [(assoc :ring.response/status 302)])]
+                 [(juxt.flip.alpha/assoc 302 :ring.response/status)])]
 
                [])]
 
@@ -1326,7 +1326,7 @@ Password: <input name=password type=password>
            ::http/body
            of
            bytes-to-string
-           read-edn-string)})
+           juxt.flip.edn/read-string)})
   ;; Actions
   (create-grant-permission-action!)
   (permit-grant-permission-action!)

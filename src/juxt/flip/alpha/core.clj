@@ -55,15 +55,10 @@
   [(cons (String. bytes) stack) queue env])
 
 ;; TODO: What is the Factor equivalent name, if any?
-(defmethod word 'read-edn-string [[el & stack] [_ & queue] env]
+(defmethod word 'juxt.flip.edn/read-string [[el & stack] [_ & queue] env]
   [(cons (edn/read-string el) stack) queue env])
 
-(defmethod word 'new-map [[n & stack] [_ & queue] env]
-  (let [[els stack] (split-at (* 2 n) stack)]
-    [(cons (apply hash-map els) stack) queue env]))
-
-;; hashtables
-(defmethod word 'associate [[v k & stack] [_ & queue] env]
+(defmethod word 'juxt.flip.hashtables/associate [[k v & stack] [_ & queue] env]
   [(cons {k v} stack) queue env])
 
 (defmethod word 'first [[coll & stack] [_ & queue] env]
@@ -81,10 +76,12 @@
 (defmethod word '_2array [[y x & stack] [_ & queue] env]
   [(cons (vector x y) stack) queue env])
 
+;; multiargs
 (defmethod word 'append [[seq2 seq1 & stack] [_ & queue] env]
   [(cons (cond->> (concat seq1 seq2)
            (vector? seq1) vec) stack) queue env])
 
+;; multiargs
 (defmethod word 'push [[seq elt & stack] [_ & queue] env]
   [(cons (cond (vector? seq) (conj seq elt)
                (list? seq) (concat seq [elt])) stack) queue env])
@@ -126,17 +123,21 @@
 ;; 2dup
 ;; 3dup
 
+;; multiargs
 (defmethod word 'over [[y x & stack] [_ & queue] env]
   [(cons x (cons y (cons x stack))) queue env])
 
 ;; 2over
 
+;; multiargs
 (defmethod word 'pick [[z y x & stack] [_ & queue] env]
   [(cons x (cons z (cons y (cons x stack)))) queue env])
 
+;; multiargs
 (defmethod word 'swap [[x y & stack] [_ & queue] env]
   [(cons y (cons x stack)) queue env])
 
+;; multiargs
 (defmethod word 'of [[k m & stack] [_ & queue] env]
   [(cons (get m k) stack) queue env])
 
@@ -146,16 +147,17 @@
   (let [stack (eval-quotation stack quotation env)]
     [(cons x stack) queue env]))
 
-(defmethod word 'if [[cond t f & stack] [_ & queue] env]
+;; multiargs
+(defmethod word 'if [[f t cond & stack] [_ & queue] env]
   [stack (concat (if cond t f) queue) env])
 
 (defmethod word '<array-map> [stack [_ & queue] env]
   [(cons (array-map) stack) queue env])
 
 ;; "Alternative conditional form that preserves the cond value if it is true."
-;; WARNING: reversing t and f from Factor (since this feels better when in a list)
+;; multiargs
 (defmethod word 'if*
-  [[t f cond & stack] [_ & queue] env]
+  [[f t cond & stack] [_ & queue] env]
   (if cond
     [(cons cond stack) (concat t queue) env]
     [stack (concat f queue) env]))
@@ -169,11 +171,12 @@
         results (apply xt/q db q in)]
     [(cons results stack) queue env]))
 
+;; multiargs
 (defmethod word 'set-at
   [[m k v & stack] [_ & queue] env]
   [(cons (assoc m k v) stack) queue env])
 
-(defmethod word 'assoc [[k v m & stack] [_ & queue] env]
+(defmethod word 'juxt.flip.alpha/assoc [[k v m & stack] [_ & queue] env]
   [(cons (assoc m k v) stack) queue env])
 
 (defmethod word 'random-bytes
@@ -184,6 +187,7 @@
   [[bytes & stack] [_ & queue] env]
   [(cons (as-hex-str bytes) stack) queue env])
 
+;; multiargs
 (defmethod word 'str
   [[s1 s2 & stack] [_ & queue] env]
   [(cons (str s1 s2) stack) queue env])
@@ -214,6 +218,7 @@
   [[doc & stack] [_ & queue] env]
   [(cons [:xtdb.api/put doc] stack) queue env])
 
+;; multiargs
 (defmethod word 'ex-info
   [[msg ex-data & stack] [_ & queue] env]
   [(cons (ex-info msg ex-data) stack) queue env])
@@ -231,7 +236,7 @@
     (symbol? w)
     (word stack (cons w queue) env)
     (list? w) ; switch from postfix to prefix notation
-    [stack (concat (reverse w) queue) env]
+    [stack (concat (rest w) (cons (first w) queue)) env]
     :else
     [(cons w stack) queue env]))
 
