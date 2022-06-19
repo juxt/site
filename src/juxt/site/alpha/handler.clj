@@ -15,6 +15,7 @@
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.pass.alpha.authorization :as authz]
    [juxt.pass.alpha.session-scope :as session-scope]
+   [juxt.pass.alpha.session :as session]
    [juxt.pick.alpha.core :refer [rate-representation]]
    [juxt.pick.alpha.ring :refer [decode-maybe]]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
@@ -1226,6 +1227,7 @@
    ;; wrap-process-cookies
    ;;oldsession/wrap-associate-session
    session-scope/wrap-session-scopes
+   session/wrap-associate-session
 
    wrap-http-authenticate
 

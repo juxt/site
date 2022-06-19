@@ -679,7 +679,7 @@
   (let [db (db)]
     (for [tok (->> (q '{:find [e]
                         :where [[e :xt/id]
-                                [e ::site/type "SessionToken"]]
+                                [e ::site/type "https://meta.juxt.site/pass/session"]]
                         :in [t]} t)
                    (map first)
                    )
@@ -691,12 +691,15 @@
        :session session
        :subject subject})))
 
-(defn evict-sessions! []
+(defn evict-session! [token-id]
+  (evict! (format "%s/session-tokens/%s" (base-uri) token-id)))
+
+(defn evict-all-sessions! []
   (let [db (db)]
     (->>
      (for [tok (->> (q '{:find [e]
                          :where [[e :xt/id]
-                                 [e ::site/type "SessionToken"]]
+                                 [e ::site/type "https://meta.juxt.site/pass/session"]]
                          :in [t]} t)
                     (map first)
                     )
