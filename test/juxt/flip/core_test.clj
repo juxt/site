@@ -1,10 +1,10 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.swap.core-test
+(ns juxt.flip.core-test
   (:require
    [clojure.test :refer [deftest is use-fixtures testing] :as t]
    [crypto.password.bcrypt :as password]
-   [juxt.swap.alpha.core :as swap]
+   [juxt.flip.alpha.core :as flip]
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node*]]
    [juxt.pass.alpha :as-alias pass]
@@ -42,7 +42,7 @@
 
      (let [
            eval-quotation-results
-           (swap/eval-quotation
+           (flip/eval-quotation
             (list)
 
             '(
@@ -70,7 +70,7 @@
 
               ;; We now have a stack with: <user> <password>
 
-              (juxt.swap.alpha.xtdb/q
+              (juxt.flip.alpha.xtdb/q
                (find-matching-identity-on-password-query
                 {:username-in-identity-key ::pass/username
                  :password-hash-in-identity-key ::pass/password-hash}))
@@ -225,50 +225,50 @@
 
 
 (comment
-  (swap/eval-quotation
+  (flip/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
    '(dup :ring.response/headers of [<array-map>] [] if* "bar" swap "foo" swap set-at swap :ring.response/headers swap set-at)
    {}))
 
 #_(comment
-    (swap/eval-quotation
+    (flip/eval-quotation
      (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
      '(dup :ring.response/headers swap :ring.response/headers of [] [<array-map>] if* "foo" "bar" assoc assoc)
      {}))
 
 #_(comment
-    (swap/eval-quotation
+    (flip/eval-quotation
      (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
      '(dup :ring.response/headers swap (of :ring.response/headers) (if* [] [<array-map>]) "foo" "bar" assoc assoc)
      {}))
 
 #_(comment
-    (swap/eval-quotation
+    (flip/eval-quotation
      (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
      '(dup :ring.response/headers swap (of :ring.response/headers) (if* [] [<array-map>]) "foo" "bar" assoc assoc)
      {}))
 
 
 (comment
-  (swap/eval-quotation
+  (flip/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
    '(dup :ring.response/headers of [<array-map>] [] if* "bar" swap "foo" swap set-at swap :ring.response/headers swap set-at)
    {}))
 
 (comment
-  (swap/eval-quotation
+  (flip/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
    '(dup :ring.response/headers of [<array-map>] [] if* "bar" "foo" assoc :ring.response/headers assoc)
    {}))
 
 (comment
-  (swap/eval-quotation
+  (flip/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
    '(dup :ring.response/headers of (if* [] [<array-map>]) "bar" "foo" assoc :ring.response/headers assoc)
    {}))
 
 (comment
-  (swap/eval-quotation
+  (flip/eval-quotation
    (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
    '(dup
      (of :ring.response/headers)
@@ -283,18 +283,18 @@
 
 #_((t/join-fixtures [with-system-xt])
  (fn []
-   (repl/put! {:xt/id "https://site.test/swap/quotations/req-to-edn-body"
-               :juxt.swap.alpha/quotation
+   (repl/put! {:xt/id "https://site.test/flip/quotations/req-to-edn-body"
+               :juxt.flip.alpha/quotation
                '(:juxt.site.alpha/received-representation
                  env
                  ::http/body
                  of
                  bytes-to-string
                  read-edn-string)})
-   (swap/eval-quotation
+   (flip/eval-quotation
     (list )
     '(
-      "https://site.test/swap/quotations/req-to-edn-body" juxt.swap.alpha.xtdb/entity :juxt.swap.alpha/quotation of call
+      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
 
       (validate
        [:map

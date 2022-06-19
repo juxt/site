@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.swap.alpha.core
+(ns juxt.flip.alpha.core
   ;; When promoting this ns, move the defmethods that require all these
   ;; dependencies:
   (:require
@@ -38,7 +38,7 @@
   [(cons (get env el) stack) queue env])
 
 ;; TODO: What is the Factor equivalent name?
-(defmethod word 'juxt.swap.alpha.xtdb/entity [[id & stack] [_ & queue] {::site/keys [db] :as env}]
+(defmethod word 'juxt.flip.alpha.xtdb/entity [[id & stack] [_ & queue] {::site/keys [db] :as env}]
   (if-let [e (xt/entity db id)]
     [(cons e stack) queue env]
     ;; TODO: Arguably the developer's decision - add a word that throws if
@@ -160,7 +160,7 @@
     [(cons cond stack) (concat t queue) env]
     [stack (concat f queue) env]))
 
-(defmethod word 'juxt.swap.alpha.xtdb/q
+(defmethod word 'juxt.flip.alpha.xtdb/q
   [[q & stack] [_ & queue] env]
   (assert (map? q))
   (assert (::site/db env))

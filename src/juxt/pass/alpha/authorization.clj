@@ -14,8 +14,8 @@
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha.process :as process]
-   [juxt.swap.alpha.core :refer [eval-quotation]]
-   [juxt.swap.alpha :as-alias swap]
+   [juxt.flip.alpha.core :refer [eval-quotation]]
+   [juxt.flip.alpha :as-alias flip]
    [xtdb.api :as xt]
    [clojure.walk :as walk]))
 
@@ -248,10 +248,10 @@
 
         (let [ops
               (cond
-                (::swap/quotation action-doc)
+                (::flip/quotation action-doc)
                 (eval-quotation
                  (reverse args)         ; push the args to the stack
-                 (::swap/quotation action-doc)
+                 (::flip/quotation action-doc)
                  (assoc ctx ::site/db db))
                 ;; There might be other strategies in the future (although the
                 ;; fewer the better really)
