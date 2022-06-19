@@ -853,12 +853,12 @@ Password: <input name=password type=password>
 
            "https://meta.juxt.site/pass/subject"
            :juxt.site.alpha/type
-           juxt.flip.alpha/assoc
+           rot set-at
 
            ;; Make subject
            (random-bytes 10) as-hex-string
            (str "https://site.test/subjects/")
-           :xt/id juxt.flip.alpha/assoc
+           :xt/id rot set-at
 
            ;; Create the session, linked to the subject
            dup :xt/id of
@@ -870,10 +870,10 @@ Password: <input name=password type=password>
            (make-nonce 16)
            "https://site.test/sessions/" str
            :xt/id
-           juxt.flip.alpha/assoc
+           rot set-at
            "https://meta.juxt.site/pass/session"
            ::site/type
-           juxt.flip.alpha/assoc
+           rot set-at
 
            dup :xt/id of
            ::pass/session juxt.flip.alpha.hashtables/associate
@@ -884,17 +884,17 @@ Password: <input name=password type=password>
            swap
            over
            ::pass/session-token
-           juxt.flip.alpha/assoc
+           rot set-at
 
            swap
 
            (str "https://site.test/session-tokens/")
            :xt/id
-           juxt.flip.alpha/assoc
+           rot set-at
 
            "https://meta.juxt.site/pass/session-token"
            ::site/type
-           juxt.flip.alpha/assoc
+           rot set-at
            xtdb.api/put
 
            ;; We now create the following quotation:

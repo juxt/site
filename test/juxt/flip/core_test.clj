@@ -50,7 +50,7 @@
               :juxt.http.alpha/body of
               bytes-to-string
 
-              juxt.site.alpha/form-decode
+              juxt.flip.alpha/form-decode
 
               (validate
                [:map
@@ -79,20 +79,20 @@
 
               (if*
                   [::pass/user-identity
-                   juxt.flip.hashtables/associate
+                   juxt.flip.alpha.hashtables/associate
 
                    "https://meta.juxt.site/pass/subject"
                    :juxt.site.alpha/type
-                   juxt.flip.alpha/assoc
+                   rot set-at
 
                    ;; Make subject
                    (random-bytes 10) as-hex-string
                    (str "https://site.test/subjects/")
-                   :xt/id juxt.flip.alpha/assoc
+                   :xt/id rot set-at
 
                    ;; Create the session, linked to the subject
                    dup :xt/id of
-                   ::pass/subject juxt.flip.hashtables/associate
+                   ::pass/subject juxt.flip.alpha.hashtables/associate
 
                    ;; Now we're good to wrap up the subject in a tx-op
                    swap xtdb.api/put swap
@@ -100,13 +100,13 @@
                    (make-nonce 16)
                    "https://site.test/sessions/" str
                    :xt/id
-                   juxt.flip.alpha/assoc
+                   rot set-at
                    "https://meta.juxt.site/pass/session"
                    ::site/type
-                   juxt.flip.alpha/assoc
+                   rot set-at
 
                    dup :xt/id of
-                   ::pass/session juxt.flip.hashtables/associate
+                   ::pass/session juxt.flip.alpha.hashtables/associate
 
                    swap xtdb.api/put swap
 
@@ -114,17 +114,17 @@
                    swap
                    over
                    ::pass/session-token
-                   juxt.flip.alpha/assoc
+                   rot set-at
 
                    swap
 
                    (str "https://site.test/session-tokens/")
                    :xt/id
-                   juxt.flip.alpha/assoc
+                   rot set-at
 
                    "https://meta.juxt.site/pass/session-token"
                    ::site/type
-                   juxt.flip.alpha/assoc
+                   rot set-at
                    xtdb.api/put
 
                    ;; We now create the following quotation:
@@ -165,7 +165,7 @@
                    ;; Finally we pull out and use the return_to query parameter
                    :ring.request/query env
                    (if*
-                       [juxt.site.alpha/form-decode
+                       [juxt.flip.alpha/form-decode
                         "return-to" of
                         (if*
                             [(symbol "juxt.flip.alpha/assoc") swap
