@@ -23,6 +23,13 @@
     ;; arguments.
     (if (symbol? word) word (first word))))
 
+(defmethod word :default [stack [name & queue] env]
+  (if-let [quotation (get-in env [:definitions name])]
+    [stack (concat quotation queue) env]
+    ;; Don't apply, simply treat as a symbol. We might be in the process of
+    ;; defining a word.
+    [(cons name stack) queue env]))
+
 (defmethod word 'break [stack [_ & queue] env]
   (throw (ex-info "BREAK" {:stack stack
                            :queue queue
@@ -70,11 +77,17 @@
 (defmethod word 'symbol [[coll & stack] [_ & queue] env]
   [(cons (symbol coll) stack) queue env])
 
-(defmethod word '_3array [[z y x & stack] [_ & queue] env]
+(defmethod word '_3vector [[z y x & stack] [_ & queue] env]
   [(cons (vector x y z) stack) queue env])
 
-(defmethod word '_2array [[y x & stack] [_ & queue] env]
+(defmethod word '_2vector [[y x & stack] [_ & queue] env]
   [(cons (vector x y) stack) queue env])
+
+(defmethod word '_1vector [[x & stack] [_ & queue] env]
+  [(cons (vector x) stack) queue env])
+
+(defmethod word '<vector> [[_ & stack] [_ & queue] env]
+  [(cons (vector) stack) queue env])
 
 (defmethod word 'append [[seq2 seq1 & stack] [_ & queue] env]
   [(cons (cond->> (concat seq1 seq2)
@@ -224,15 +237,14 @@
   [[err & stack] [_ & queue] env]
   (throw err))
 
-(defmethod word 'juxt.site.alpha/apply-to-request-context
-  [[quotation & stack] [_ & queue] env]
-  [(cons [:juxt.site.alpha/apply-to-request-context quotation] stack) queue env])
+(defmethod word 'define [[quotation name & stack] [_ & queue] env]
+  [stack queue (assoc-in env [:definitions name] quotation)])
 
 (defn word* [stack [w & queue] env]
   (cond
     (symbol? w)
     (word stack (cons w queue) env)
-    (list? w) ; switch from postfix to prefix notation
+    (list? w)                           ; switch from postfix to prefix notation
     [stack (concat (rest w) (cons (first w) queue)) env]
     :else
     [(cons w stack) queue env]))

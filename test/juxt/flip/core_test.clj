@@ -78,89 +78,119 @@
               first first
 
               (if*
-                  [::pass/user-identity
-                   juxt.flip.alpha.hashtables/associate
+                  [
 
-                   "https://meta.juxt.site/pass/subject"
-                   :juxt.site.alpha/type
-                   rot set-at
+                   ;; Definitions
 
-                   ;; Make subject
-                   (random-bytes 10) as-hex-string
-                   (str "https://site.test/subjects/")
-                   :xt/id rot set-at
+                   ;; assoc is intended to be used in a list, whereby the value is the top
+                   ;; of the stack. (assoc k v)
+                   (define assoc [swap rot set-at])
+                   ;; assoc* means put the value at the top of the stack into the map with
+                   ;; the given key. (assoc* k)
+                   ;; TODO: Look up the equivalent Factor convention.
+                   (define assoc* [rot set-at])
+
+                   ;; (m k -- m m)
+                   (define ref-as [over second (of :xt/id) swap juxt.flip.alpha.hashtables/associate])
+
+                   ;; The top of the stack is the user identity
+                   ;; Create the subject
+                   (define make-subject
+                     [(juxt.flip.alpha.hashtables/associate ::pass/user-identity)
+                      (assoc :juxt.site.alpha/type "https://meta.juxt.site/pass/subject")
+                      ;; The subject has a random id
+                      (as-hex-string (random-bytes 10))
+                      (str "https://site.test/subjects/")
+                      (assoc* :xt/id)
+                      (xtdb.api/put)])
 
                    ;; Create the session, linked to the subject
-                   dup :xt/id of
-                   ::pass/subject juxt.flip.alpha.hashtables/associate
+                   (define make-session-linked-to-subject
+                     [(ref-as ::pass/subject)
+                      (make-nonce 16)
+                      (str "https://site.test/sessions/")
+                      (assoc* :xt/id)
+                      (assoc ::site/type "https://meta.juxt.site/pass/session")
+                      (xtdb.api/put)])
 
-                   ;; Now we're good to wrap up the subject in a tx-op
-                   swap xtdb.api/put swap
+                   ;; Create the session token, linked to the session
+                   (define make-session-token-linked-to-session
+                     [(ref-as ::pass/session)
+                      (make-nonce 16)
+                      ;; This is more complicated because we want to use the nonce in the
+                      ;; xt/id
+                      swap over
+                      (assoc* ::pass/session-token)
+                      swap
+                      (str "https://site.test/session-tokens/")
+                      (assoc* :xt/id)
+                      (assoc ::site/type "https://meta.juxt.site/pass/session-token")
+                      (xtdb.api/put)])
 
-                   (make-nonce 16)
-                   "https://site.test/sessions/" str
-                   :xt/id
-                   rot set-at
-                   "https://meta.juxt.site/pass/session"
-                   ::site/type
-                   rot set-at
+                   make-subject
+                   make-session-linked-to-subject
+                   make-session-token-linked-to-session
 
-                   dup :xt/id of
-                   ::pass/session juxt.flip.alpha.hashtables/associate
+                   ;; Wrap quotation in a apply-to-request-context operation
+                   ;; (quotation -- op)
+                   (define apply-to-request-context
+                     [:juxt.site.alpha/apply-to-request-context
+                      swap _2vector])
 
-                   swap xtdb.api/put swap
+                   (define set-status
+                     [_1vector
+                      :ring.response/status
+                      swap push
+                      (symbol "rot")
+                      swap push
+                      (symbol "set-at")
+                      swap push
+                      apply-to-request-context])
 
-                   (make-nonce 16)
-                   swap
-                   over
-                   ::pass/session-token
-                   rot set-at
+                   ;; Create an apply-to-request-context operation that sets a header
+                   ;; (header-name value -- op)
+                   (define set-header
+                     [(symbol "dup")
+                      _1vector
 
-                   swap
+                      (symbol "of")
+                      :ring.response/headers
+                      _2vector >list
+                      swap push
 
-                   (str "https://site.test/session-tokens/")
-                   :xt/id
-                   rot set-at
+                      (symbol "if*")
+                      _1vector
+                      0
+                      <vector>
+                      swap push
 
-                   "https://meta.juxt.site/pass/session-token"
-                   ::site/type
-                   rot set-at
-                   xtdb.api/put
+                      (symbol "<array-map>")
+                      _1vector
+                      swap push
+                      >list
+                      swap push
 
-                   ;; We now create the following quotation:
-                   #_[(of :ring.response/headers dup)
-                      (if* [] [<array-map>]) ; if no headers, use an empty map
-                      (juxt.flip.alpha/assoc "set-cookie" "id=<session token>; Path=/; Secure; HttpOnly; SameSite=Lax")
-                      (juxt.flip.alpha/assoc :ring.response/headers)]
+                      push              ; the value on the stack
+                      push              ; the header name
+                      (symbol "rot")
+                      swap push
+                      (symbol "set-at")
+                      swap push
 
-                   ;; Get the session token back and turn into a quotation
+                      :ring.response/headers
+                      swap push
+                      (symbol "rot")
+                      swap push
+                      (symbol "set-at")
+                      swap push
+
+                      apply-to-request-context])
+
+                   ;; Get the session token back and set it on a header
                    dup second :juxt.pass.alpha/session-token of
                    "id=" str
                    "; Path=/; Secure; HttpOnly; SameSite=Lax" swap str
-
-                   (symbol "juxt.flip.alpha/assoc") swap
-                   "set-cookie"
-                   _3array >list
-
-                   ;; Now quote the initial two lines
-                   [dup (of :ring.response/headers)
-                    (if* [] [<array-map>]) ; if no headers, use an empty map
-                    ]
-
-                   ;; Push the '(juxt.flip.alpha/assoc "set-cookie" ...) line onto the program
-                   push
-
-                   ;; Finish the rest of the program
-                   (symbol "juxt.flip.alpha/assoc")
-                   :ring.response/headers
-                   _2array >list
-                   swap push
-
-                   ;; Turn into a apply-to-request-context quotation
-                   :juxt.site.alpha/apply-to-request-context
-                   swap
-                   _2array >vector
-
+                   (set-header "set-cookie" swap)
 
                    ;; Finally we pull out and use the return_to query parameter
                    :ring.request/query env
@@ -168,36 +198,19 @@
                        [juxt.flip.alpha/form-decode
                         "return-to" of
                         (if*
-                            [(symbol "juxt.flip.alpha/assoc") swap
-                             "location"
-                             _3array >list
-
-                             [dup (of :ring.response/headers)
-                              ;; if no headers, use an empty map
-                              (if* [] [<array-map>])]
-
-                             push
-
-                             ;; Finish the rest of the program
-                             (symbol "juxt.flip.alpha/assoc")
-                             :ring.response/headers
-                             _2array >list
-                             swap push
-
-                             ;; Turn into a apply-to-request-context quotation
-                             :juxt.site.alpha/apply-to-request-context
-                             swap
-                             _2array >vector]
+                            [
+                             (set-header "location" swap)
+                             (set-header "server" "Site")
+                             ]
                             [])
 
                         ;; A quotation that will set a status 302 on the request context
-                        (juxt.site.alpha/apply-to-request-context
-                         [302 :ring.response/status rot set-at])]
+                        (set-status 302)]
 
                        [])]
 
                 ;; else
-                [(throw (ex-info "Login failed" {:ring.response/status 400}))]))
+                  [(throw (ex-info "Login failed" {:ring.response/status 400}))]))
 
             {::site/db (xt/db *xt-node*)
              ::site/received-representation
@@ -217,130 +230,24 @@
 
        eval-quotation-results
 
-       #_(authz/apply-request-context-operations
-          req
-          (->>
-           eval-quotation-results
-           (filter (fn [[op]]  (= op :juxt.site.alpha/apply-to-request-context)))))))))
+       (authz/apply-request-context-operations
+        {:ring.response/headers {"foo" "bar"}}
+        (->>
+         eval-quotation-results
+         (filter (fn [[op]]  (= op :juxt.site.alpha/apply-to-request-context)))))))))
 
 
-(comment
-  (flip/eval-quotation
-   (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-   '(dup :ring.response/headers of [<array-map>] [] if* "bar" swap "foo" swap set-at swap :ring.response/headers swap set-at)
-   {}))
-
-#_(comment
-    (flip/eval-quotation
-     (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-     '(dup :ring.response/headers swap :ring.response/headers of [] [<array-map>] if* "foo" "bar" juxt.flip.alpha/assoc juxt.flip.alpha/assoc)
-     {}))
-
-#_(comment
-    (flip/eval-quotation
-     (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-     '(dup :ring.response/headers swap (of :ring.response/headers) (if* [] [<array-map>]) "foo" "bar" juxt.flip.alpha/assoc juxt.flip.alpha/assoc)
-     {}))
-
-#_(comment
-    (flip/eval-quotation
-     (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-     '(dup :ring.response/headers swap (of :ring.response/headers) (if* [] [<array-map>]) "foo" "bar" juxt.flip.alpha/assoc juxt.flip.alpha/assoc)
-     {}))
-
-
-(comment
-  (flip/eval-quotation
-   (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-   '(dup :ring.response/headers of [<array-map>] [] if* "bar" swap "foo" swap set-at swap :ring.response/headers swap set-at)
-   {}))
-
-(comment
-  (flip/eval-quotation
-   (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-   '(dup :ring.response/headers of [<array-map>] [] if* "bar" "foo" juxt.flip.alpha/assoc :ring.response/headers juxt.flip.alpha/assoc)
-   {}))
-
-(comment
-  (flip/eval-quotation
-   (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-   '(dup :ring.response/headers of (if* [] [<array-map>]) "bar" "foo" juxt.flip.alpha/assoc :ring.response/headers juxt.flip.alpha/assoc)
-   {}))
-
-(comment
-  (flip/eval-quotation
-   (list {:ring.response/headers {"a" "b"} :ring.response/status 200 :foo :bar})
-   '(dup
+(authz/apply-request-context-operations
+ {:ring.response/headers {"foo" "bar"}}
+ '[[:juxt.site.alpha/apply-to-request-context
+    [dup
      (of :ring.response/headers)
      (if* [] [<array-map>])
-     (juxt.flip.alpha/assoc "foo" "bar")
-     (juxt.flip.alpha/assoc :ring.response/headers))
-   {}))
-
-
-
-
-
-#_((t/join-fixtures [with-system-xt])
- (fn []
-   (repl/put! {:xt/id "https://site.test/flip/quotations/req-to-edn-body"
-               :juxt.flip.alpha/quotation
-               '(:juxt.site.alpha/received-representation
-                 env
-                 ::http/body
-                 of
-                 bytes-to-string
-                 read-edn-string)})
-   (flip/eval-quotation
-    (list )
-    '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
-
-      (validate
-       [:map
-        [:xt/id [:re "https://site.test/.*"]]
-        [:juxt.pass.alpha/user [:re "https://site.test/users/.+"]]
-        [:juxt.pass.alpha/username {:optional true} [:re "[A-Za-z0-9]{2,}"]]
-        [:juxt.pass.alpha/password-hash {:optional true} [:string]]
-        [:juxt.pass.jwt/iss {:optional true} [:re "https://.+"]]
-        [:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]])
-
-      "https://meta.juxt.site/pass/user-identity" :juxt.site.alpha/type assoc
-
-      ;; Lowercase the username, if it exists.
-      dup :juxt.pass.alpha/username of (if* [>lower :juxt.pass.alpha/username assoc] [])
-
-      {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
-       :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
-       :options {}}
-      :juxt.site.alpha/methods
-      assoc
-
-      xtdb.api/put)
-    {::site/db (xt/db *xt-node*)
-     ::site/received-representation
-     {::http/body
-      (.getBytes
-       (pr-str
-        {:xt/id "https://site.test/user-identities/alice/basic"
-         :juxt.pass.alpha/user "https://site.test/users/alice"
-         ;; Perhaps all user identities need this?
-         :juxt.pass.alpha/canonical-root-uri "https://site.test"
-         :juxt.pass.alpha/realm "Wonderland"
-         ;; Basic auth will only work if these are present
-         :juxt.pass.alpha/username "ALICE"
-         :juxt.pass.alpha/password-hash "asefase"}))
-
-      :ring.requst/query "foo=bar"
-      ::http/content-type "application/x-www-form-urlencoded"
-      :ring.response/headers {"server" "jetty"}}})))
-
-
-
-;; Password checking is very slow compared to swap
-;; We must be sure that it is only called once, or we might memoize for performance
-(comment
-  (time
-   (do
-     (password/check "garden" "$2a$11$mexf3rW6dmoyhqaFnpzHruNmNV0JPt/YhdAJOdAOf6HjIFRz1NN/e")
-     (password/check "garden" "$2a$11$mexf3rW6dmoyhqaFnpzHruNmNV0JPt/YhdAJOdAOf6HjIFRz1NN/e"))))
+     "id=165882feeb5f2e1de3ea06ae28bc1755; Path=/; Secure; HttpOnly; SameSite=Lax"
+     "set-cookie"
+     rot
+     set-at
+     :ring.response/headers
+     rot
+     set-at]]]
+ )
