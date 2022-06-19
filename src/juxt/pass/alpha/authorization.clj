@@ -2,7 +2,6 @@
 
 (ns juxt.pass.alpha.authorization
   (:require
-   [xtdb.api :as xt]
    [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk]]
    [juxt.site.alpha.util :refer [random-bytes as-hex-str]]
@@ -16,50 +15,66 @@
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha.process :as process]
    [juxt.pipe.alpha.core :refer [pipe]]
-   [juxt.pipe.alpha :as-alias pipe]))
+   [juxt.pipe.alpha :as-alias pipe]
+   [xtdb.api :as xt]
+   [clojure.walk :as walk]))
 
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
   action."
   [db actions]
-
   (vec (for [action actions
              :let [e (xt/entity db action)]
              rule (::pass/rules e)]
          (conj rule ['action :xt/id action]))))
 
+;; This is broken out into its own function to assist debugging when
+;; authorization is denied and we don't know why. A better authorization
+;; debugger is definitely required.
+(defn query-permissions [{:keys [db rules subject actions resource purpose] :as args}]
+  (xt/q
+   db
+   {:find '[(pull permission [*]) (pull action [*])]
+    :keys '[juxt.pass.alpha/permission juxt.pass.alpha/action]
+    :where
+    '[
+      [action ::site/type "https://meta.juxt.site/pass/action"]
+
+      ;; Only consider given actions
+      [(contains? actions action)]
+
+      ;; Only consider a permitted action
+      [permission ::site/type "https://meta.juxt.site/pass/permission"]
+      [permission ::pass/action action]
+      (allowed? permission subject action resource)
+
+      ;; Only permissions that match our purpose
+      [permission ::pass/purpose purpose]
+      ]
+
+    :rules rules
+
+    :in '[subject actions resource purpose]}
+
+   subject actions resource purpose)
+  )
+
 (defn check-permissions
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
-  [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose :as pass-ctx}]
+  [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose}]
+
+  (log/debugf "check-permissions: subject %s, resource: %s, purpose: %s, actions: %s, subject: %s" subject resource purpose actions
+              (xt/pull db '[*] subject))
+
+  (log/debugf "Actions: %s" actions)
+  (log/debugf "Rules: %s" (actions->rules db actions))
 
   (let [rules (actions->rules db actions)]
     (when (seq rules)
       (let [permissions
-            (xt/q
-             db
-             {:find '[(pull permission [*]) (pull action [*])]
-              :keys '[juxt.pass.alpha/permission juxt.pass.alpha/action]
-              :where
-              '[
-                [action ::site/type "https://meta.juxt.site/pass/action"]
-
-                ;; Only consider given actions
-                [(contains? actions action)]
-
-                ;; Only consider a permitted action
-                [permission ::site/type "https://meta.juxt.site/pass/permission"]
-                [permission ::pass/action action]
-                (allowed? permission subject action resource)
-
-                ;; Only permissions that match our purpose
-                [permission ::pass/purpose purpose]
-                ]
-
-              :rules rules
-
-              :in '[subject actions resource purpose]}
-
-             subject actions resource purpose)]
+            (query-permissions
+             {:db db :rules rules
+              :subject subject :actions actions :resource resource :purpose purpose})]
         (log/debugf "Returning %s permissions" (pr-str permissions))
         permissions))))
 
@@ -212,18 +227,14 @@
     action ::pass/action
     resource ::site/resource
     purpose ::pass/purpose
-    :as pass-ctx}
-   args]
-  (assert (vector? args))
+    :as ctx} args]
   (let [db (xt/db xt-ctx)
         tx (xt/indexing-tx xt-ctx)]
+
     (try
       ;; Check that we /can/ call the action
       (let [check-permissions-result
-            (check-permissions
-             db
-             #{action}
-             pass-ctx)
+            (check-permissions db #{action} ctx)
 
             action-doc (xt/entity db action)
             _ (when-not action-doc
@@ -233,17 +244,17 @@
                   {:action action})))]
 
         (when-not (seq check-permissions-result)
-          (throw
-           (ex-info
-            "Action denied"
-            pass-ctx)))
+          (throw (ex-info "Action denied" ctx)))
 
         (let [ops
               (cond
-                (::pass/process action-doc)
-                (:ops (process/process-args pass-ctx action-doc args))
                 (::pipe/quotation action-doc)
-                (pipe (list (first args)) (::pipe/quotation action-doc) (assoc pass-ctx :db db))
+                (pipe
+                 (reverse args)         ; push the args to the stack
+                 (::pipe/quotation action-doc)
+                 (assoc ctx ::site/db db))
+                ;; There might be other strategies in the future (although the
+                ;; fewer the better really)
                 :else
                 (throw (ex-info "All actions must have some processing steps"
                                 {:action action-doc})))
@@ -253,19 +264,17 @@
                   (when-not (and (vector? op) (keyword? (first op)))
                     (throw (ex-info "Invalid op" {::pass/action action :op op}))))
 
-              session-token
-              (some
-               (fn [[op doc]]
-                 (when (and
-                        (= op :xtdb.api/put)
-                        (= (:juxt.site.alpha/type doc) "https://meta.juxt.site/pass/session-token"))
-                   (:juxt.pass.alpha/session-token doc))) ops)]
+              xtdb-ops (filter (fn [[op]] (= (namespace op) "xtdb.api")) ops)
+              apply-to-request-context-ops (filter (fn [[op]]  (= op :juxt.site.alpha/apply-to-request-context)) ops)
 
-          (conj
-           ops
-           [:xtdb.api/put
-            (into
-             (cond-> {:xt/id (format "urn:site:action-log:%s" (::xt/tx-id tx))
+              result-ops
+              (conj
+               xtdb-ops
+               ;; Add an action log entry for this transaction
+               [:xtdb.api/put
+                (into
+                 (cond->
+                     {:xt/id (format "urn:site:action-log:%s" (::xt/tx-id tx))
                       ::site/type "https://meta.juxt.site/site/action-log-entry"
                       ::pass/subject subject
                       ::pass/action action
@@ -274,16 +283,26 @@
                                    (keep
                                     (fn [[tx-op {id :xt/id}]]
                                       (when (= tx-op ::xt/put) id))
-                                    ops))
+                                    xtdb-ops))
                       ::pass/deletes (vec
                                       (keep
                                        (fn [[tx-op {id :xt/id}]]
                                          (when (= tx-op ::xt/delete) id))
-                                       ops))}
-               tx (into tx)
-               session-token (assoc ::pass/session-token session-token)))])))
+                                       xtdb-ops))}
+                     tx (into tx)
 
-      (catch Exception e
+                     ;; Any quotations that we want to apply to the request context?
+                     (seq apply-to-request-context-ops)
+                     (assoc :juxt.site.alpha/apply-to-request-context-ops apply-to-request-context-ops)
+
+                     ))])]
+
+          ;; This isn't the best debugger :( - need a better one!
+          ;;(log/tracef "XXXX Result is: %s" result-ops)
+
+          result-ops))
+
+      (catch Throwable e
         (log/errorf e "Error when doing action: %s %s" action (format "urn:site:action-log:%s" (::xt/tx-id tx)))
         [[::xt/put
           {:xt/id (format "urn:site:action-log:%s" (::xt/tx-id tx))
@@ -293,29 +312,56 @@
            ::site/resource resource
            ::pass/purpose purpose
            ::site/error {:message (.getMessage e)
-                         :ex-data (ex-data e)}}]]))))
+                         :ex-data
+                         ;; The site db will not be nippyable
+                         (dissoc (ex-data e) :env)
+                         ;; TODO: Ideally we'd like the environment in the
+                         ;; action log for debugging purposes. But the below
+                         ;; stills fails with a nippy error, haven't
+                         ;; investigated thorougly enough.
+                         #_(let [ex-data (ex-data e)]
+                             (cond-> ex-data
+                               (:env ex-data) (dissoc :env)#_(update :env dissoc ::site/db ::site/xt-node)))}}]]))))
 
 (defn install-do-action-fn []
   {:xt/id "urn:site:tx-fns:do-action"
-   :xt/fn '(fn [xt-ctx pass-ctx args]
-             (juxt.pass.alpha.authorization/do-action* xt-ctx pass-ctx (vec args)))})
+   :xt/fn '(fn [xt-ctx ctx & args]
+             (juxt.pass.alpha.authorization/do-action* xt-ctx ctx args))})
 
-(defn do-action [{::site/keys [xt-node] :as req} pass-ctx action & args]
-  (assert (:juxt.site.alpha/xt-node req) "oh no")
-  (assert (xt/entity (xt/db xt-node) "urn:site:tx-fns:do-action"))
+;; Remove anything in the ctx that will upset nippy. However, in the future
+;; we'll definitely want to record all inputs to actions, so this is an
+;; opportunity to decide which entries form the input 'record' and which are
+;; only transitory for the purposes of responnding to the request.
+
+(defn sanitize-ctx [ctx]
+  (dissoc ctx ::site/xt-node ::site/db))
+
+(defn apply-request-context-operations [ctx ops]
+  (let [res
+        (reduce
+         (fn [ctx [op & args]]
+           (case op
+             :juxt.site.alpha/apply-to-request-context
+             (let [quotation (first args)]
+               (first (pipe (list ctx) quotation {})))))
+         ctx
+         ops)]
+    res))
+
+(defn do-action [{::site/keys [xt-node] ::pass/keys [action] :as ctx}]
+  (assert (:juxt.site.alpha/xt-node ctx) "xt-node must be present")
+  (assert (xt/entity (xt/db xt-node) "urn:site:tx-fns:do-action") "do-action must exist in database")
+  (assert (xt/entity (xt/db xt-node) action) "action must exist in database")
+
   (let [tx (xt/submit-tx
             xt-node
-            [[::xt/fn
-              "urn:site:tx-fns:do-action"
-              (assoc pass-ctx ::pass/action action)
-              args]])
-
+            [[::xt/fn "urn:site:tx-fns:do-action" (sanitize-ctx ctx)]])
         {::xt/keys [tx-id]} (xt/await-tx xt-node tx)]
 
     (when-not (xt/tx-committed? xt-node tx)
       (throw
        (ex-info
-        "Transaction failed to be committed"
+        (format "Transaction failed to be committed for action %s" action)
         {::xt/tx-id tx-id
          ::pass/action action})))
 
@@ -326,20 +372,30 @@
       (if-let [error (::site/error result)]
         (throw
          (ex-info
-          (:message error)
+          (format "Transaction error performing action %s: %s" action (:message error))
           (merge
            (dissoc result ::site/type :xt/id ::site/error)
            (:ex-data error))))
 
-        (let [session-token (::pass/session-token result)]
-          (cond-> req
+        (let [
+              apply-to-request-context-ops (:juxt.site.alpha/apply-to-request-context-ops result)]
+
+          (cond-> ctx
             result (assoc ::pass/action-result result)
-            session-token
-            (update
+            #_session-token
+            #_(update
              :ring.response/headers
              (fnil into {})
              {"set-cookie"
-              (format "id=%s; Path=/; Secure; HttpOnly; SameSite=Lax" session-token)})))))))
+              (format "id=%s; Path=/; Secure; HttpOnly; SameSite=Lax" session-token)})
+
+            ;; These ops are quotations that can be applied to the request
+            ;; context.  The intention if for these quotations to set the
+            ;; response status and add headers.
+            (seq apply-to-request-context-ops)
+            (apply-request-context-operations (reverse apply-to-request-context-ops))
+
+            ))))))
 
 ;; TODO: Since it is possible that a permission is in the queue which might
 ;; grant or revoke an action, it is necessary to run this check 'head-of-line'

@@ -179,7 +179,6 @@
       (with-open [in (:ring.request/body req)]
         (let [body (.readNBytes in content-length)
               content-type (:juxt.reap.alpha.rfc7231/content-type decoded-representation)]
-
           (assoc
            req
            ::site/received-representation
@@ -237,9 +236,7 @@
 
     (into req {:ring.response/status (if existing 204 201)})))
 
-(defn POST [{::site/keys [resource]
-             ::pass/keys [subject]
-             :as req}]
+(defn POST [req]
   (let [req (receive-representation req)
 
         #_#_content-type (get-in req [:ring.request/headers "content-type"] "application/octet-stream")
@@ -252,19 +249,21 @@
         ;; TODO: Should we fail if more than one permitted action available?
         permitted-action (::pass/action (first (::pass/permitted-actions req)))
 
-        pass-ctx {::pass/subject (:xt/id subject)
-                  ::site/resource (:xt/id resource)}
-
         ;; Default
         req (assoc req :ring.response/status 200)]
 
     (try
       (authz/do-action
-       req pass-ctx (:xt/id permitted-action))
+       (-> req
+           (assoc ::pass/action (:xt/id permitted-action))
+           ;; A java.io.BufferedInputStream in the request is sufficient to
+           ;; provoke a "invalid tx-op: Unfreezable type: class
+           ;; java.io.BufferedInputStream" error.
+           (dissoc :ring.request/body)))
       (catch Exception e
         (throw
          (ex-info
-          (.getMessage e)
+          (format "POST transaction failed: %s" (.getMessage e))
           {::site/request-context
            (merge (assoc req :ring.response/status 500)
                   (ex-data e))

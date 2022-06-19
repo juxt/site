@@ -991,31 +991,7 @@
       [subject ::person person]
       [person ::type "Person"]]]})
 
-#_(let [f (fn [tx-id action args]
-          (reduce
-           (fn [args processor]
-             (try
-               (authz/apply-processor processor action args)
-               (catch clojure.lang.ExceptionInfo e
-                 [[::xt/put
-                   {:xt/id (format "urn:site:action-log:%s" tx-id)
-                    :error {:message (.getMessage e)
-                            :ex-data (ex-data e)}}]])))
-           args
-           (::pass/process action))
-          )]
-  (f 123 CREATE_PERSON_ACTION [{::username "alice"
-                                ;;::type "Person"
-                                }])
-  )
-
-#_(def CREATE_IDENTITY_ACTION
-  {:xt/id "https://example.org/actions/create-identity"
-   ::site/type "https://meta.juxt.site/pass/action"
-   ::pass/scope "write:admin"
-   ::pass/action-args [{}]})
-
-(deftest do-action-test
+#_(deftest do-action-test
   (submit-and-await!
    [
     ;; Actors
@@ -1061,9 +1037,9 @@
   (assert *xt-node*)
 
   (authz/do-action
-   {::site/xt-node *xt-node*}
-   {::pass/subject (:xt/id SUE_SUBJECT)}
-   (:xt/id CREATE_PERSON_ACTION)
+   {::site/xt-node *xt-node*
+    ::pass/subject (:xt/id SUE_SUBJECT)
+    ::pass/action CREATE_PERSON_ACTION}
    ALICE)
 
   (is (xt/entity (xt/db *xt-node*) (:xt/id ALICE)))

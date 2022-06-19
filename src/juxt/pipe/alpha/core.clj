@@ -7,9 +7,13 @@
    [juxt.site.alpha.util :refer [random-bytes as-hex-str]]
    [juxt.pass.alpha.util :refer [make-nonce]]
    [ring.util.codec :as codec]
+   [juxt.site.alpha :as-alias site]
    [malli.core :as m]
    [malli.error :a me]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   [clojure.edn :as edn]
+   [juxt.pipe.alpha :as-alias pipe]
+   [clojure.string :as str]))
 
 ;; See Factor, https://factorcode.org/
 ;; See K's XY language, https://www.nsl.com/k/xy/xy.htm
@@ -20,16 +24,40 @@
     ;; arguments.
     (if (symbol? word) word (first word))))
 
-(defmethod word 'break [stack queue env]
-  ;; Don't include the environment, this error may be logged
-  (throw (ex-info "BREAK" {:stack stack :queue queue})))
+(defmethod word 'break [stack [_ & queue] env]
+  (throw (ex-info "BREAK" {:stack stack
+                           :queue queue
+                           :env env
+                           })))
 
 ;; no-op is identity
 (defmethod word 'no-op [stack queue env]
   [stack queue env])
 
-(defmethod word 'push [stack [[_ & els] & queue] env]
-  [(reduce (fn [acc e] (cons e acc)) stack els) queue env])
+;; TODO: What is the Factor equivalent name?
+(defmethod word 'env [[el & stack] [_ & queue] env]
+  [(cons (get env el) stack) queue env])
+
+;; TODO: What is the Factor equivalent name?
+(defmethod word 'juxt.pipe.alpha.xtdb/entity [[id & stack] [_ & queue] {::site/keys [db] :as env}]
+  (if-let [e (xt/entity db id)]
+    [(cons e stack) queue env]
+    ;; TODO: Arguably the developer's decision - add a word that throws if
+    ;; there's a nil at the top of the stack
+    (throw (ex-info "No such entity" {:id id}))))
+
+;; TODO: What is the Factor equivalent name?
+(defmethod word 'call [[quotation & stack] [_ & queue] env]
+  (assert list? quotation)
+  [stack (concat quotation queue) env])
+
+;; TODO: What is the Factor equivalent name, if any?
+(defmethod word 'bytes-to-string [[bytes & stack] [_ & queue] env]
+  [(cons (String. bytes) stack) queue env])
+
+;; TODO: What is the Factor equivalent name, if any?
+(defmethod word 'read-edn-string [[el & stack] [_ & queue] env]
+  [(cons (edn/read-string el) stack) queue env])
 
 (defmethod word 'new-map [[n & stack] [_ & queue] env]
   (let [[els stack] (split-at (* 2 n) stack)]
@@ -42,8 +70,36 @@
 (defmethod word 'first [[coll & stack] [_ & queue] env]
   [(cons (first coll) stack) queue env])
 
-;; ctx must contain :db
-(defmethod word 'validate [stack [[_ schema] & queue] env]
+(defmethod word 'second [[coll & stack] [_ & queue] env]
+  [(cons (second coll) stack) queue env])
+
+(defmethod word 'symbol [[coll & stack] [_ & queue] env]
+  [(cons (symbol coll) stack) queue env])
+
+(defmethod word '_3array [[z y x & stack] [_ & queue] env]
+  [(cons (vector x y z) stack) queue env])
+
+(defmethod word '_2array [[y x & stack] [_ & queue] env]
+  [(cons (vector x y) stack) queue env])
+
+(defmethod word 'append [[seq2 seq1 & stack] [_ & queue] env]
+  [(cons (cond->> (concat seq1 seq2)
+           (vector? seq1) vec) stack) queue env])
+
+(defmethod word 'push [[seq elt & stack] [_ & queue] env]
+  [(cons (cond (vector? seq) (conj seq elt)
+               (list? seq) (concat seq [elt])) stack) queue env])
+
+(defmethod word '>list [[sequence & stack] [_ & queue] env]
+  [(cons (apply list sequence) stack) queue env])
+
+(defmethod word '>vector [[sequence & stack] [_ & queue] env]
+  [(cons (apply vector sequence) stack) queue env])
+
+(defmethod word '>lower [[s & stack] [_ & queue] env]
+  [(cons (str/lower-case s) stack) queue env])
+
+(defmethod word 'validate [[schema & stack] [_ & queue] env]
   (let [schema (m/schema schema)]
     (if-not (m/validate schema (first stack))
       ;; Not sure why Malli throws this error here: No implementation of
@@ -73,20 +129,17 @@
 
 (defmethod word 'over [[y x & stack] [_ & queue] env]
   [(cons x (cons y (cons x stack))) queue env])
+
 ;; 2over
-;; pick
+
+(defmethod word 'pick [[z y x & stack] [_ & queue] env]
+  [(cons x (cons z (cons y (cons x stack)))) queue env])
 
 (defmethod word 'swap [[x y & stack] [_ & queue] env]
   [(cons y (cons x stack)) queue env])
 
 (defmethod word 'of [[k m & stack] [_ & queue] env]
-  (assert (map? m))
   [(cons (get m k) stack) queue env])
-
-(defmethod word 'of [[k m & stack] [_ & queue] env]
-  (if (find m k)
-    [(cons (get m k) stack) queue env]
-    (throw (ex-info "Error, failed to find key" {:k k}))))
 
 (declare pipe)
 
@@ -94,31 +147,34 @@
   (let [stack (pipe stack quotation env)]
     [(cons x stack) queue env]))
 
-(defmethod word 'if [[cond & stack] [[_ t f] & queue] env]
+(defmethod word 'if [[cond t f & stack] [_ & queue] env]
   [stack (concat (if cond t f) queue) env])
 
+(defmethod word '<array-map> [stack [_ & queue] env]
+  [(cons (array-map) stack) queue env])
+
 ;; "Alternative conditional form that preserves the cond value if it is true."
+;; WARNING: reversing t and f from Factor (since this feels better when in a list)
 (defmethod word 'if*
-  [[cond :as stack]
-   ;; TODO: It would be possible to support different variadic forms of 'if'
-   ;; such that the t and f quotations could be given a literal quotations or
-   ;; dynamically computed on the stack. By checking if t and f are both nil
-   ;; upon destructuring, we could tell which form was being used.
-   [[_ t f] & queue]
-   env]
-  [stack (concat (if cond t f) queue) env])
+  [[t f cond & stack] [_ & queue] env]
+  (if cond
+    [(cons cond stack) (concat t queue) env]
+    [stack (concat f queue) env]))
 
 (defmethod word 'juxt.pipe.alpha.xtdb/q
   [[q & stack] [_ & queue] env]
   (assert (map? q))
-  (assert (:db env))
-  (let [db (:db env)
+  (assert (::site/db env))
+  (let [db (::site/db env)
         [in stack] (split-at (count (:in q)) stack)
         results (apply xt/q db q in)]
     [(cons results stack) queue env]))
 
 (defmethod word 'set-at
-  [[v k m & stack] [_ & queue] env]
+  [[m k v & stack] [_ & queue] env]
+  [(cons (assoc m k v) stack) queue env])
+
+(defmethod word 'assoc [[k v m & stack] [_ & queue] env]
   [(cons (assoc m k v) stack) queue env])
 
 (defmethod word 'random-bytes
@@ -140,10 +196,10 @@
    env])
 
 ;; This could be in another ns
+;; TODO: Rewrite with args on stack
 (defmethod word 'find-matching-identity-on-password-query
-  [stack
-   [[_ {:keys [username-in-identity-key password-hash-in-identity-key]}]
-    & queue] env]
+  [[{:keys [username-in-identity-key password-hash-in-identity-key]} & stack]
+   [_ & queue] env]
   [(cons {:find '[e]
           :where [
                   ['e username-in-identity-key 'username]
@@ -160,16 +216,24 @@
   [(cons [:xtdb.api/put doc] stack) queue env])
 
 (defmethod word 'ex-info
-  [[ex-data msg & stack] [_ & queue] env]
+  [[msg ex-data & stack] [_ & queue] env]
   [(cons (ex-info msg ex-data) stack) queue env])
 
 (defmethod word 'throw
   [[err & stack] [_ & queue] env]
   (throw err))
 
+(defmethod word 'juxt.site.alpha/apply-to-request-context
+  [[quotation & stack] [_ & queue] env]
+  [(cons [:juxt.site.alpha/apply-to-request-context quotation] stack) queue env])
+
 (defn word* [stack [w & queue] env]
-  (if (or (symbol? w) (vector? w))
+  (cond
+    (symbol? w)
     (word stack (cons w queue) env)
+    (list? w) ; switch from postfix to prefix notation
+    [stack (concat (reverse w) queue) env]
+    :else
     [(cons w stack) queue env]))
 
 (defn pipe [stack queue env]

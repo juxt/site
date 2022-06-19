@@ -3,12 +3,10 @@
 (ns juxt.book
   (:require
    [juxt.http.alpha :as-alias http]
-   [crypto.password.bcrypt :as password]
    [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]
    [clojure.walk :refer [postwalk]]
    [clojure.string :as str]
-   [malli.core :as m]
    [juxt.site.alpha.repl :refer [base-uri put! install-do-action-fn! do-action make-application-doc make-application-authorization-doc make-access-token-doc encrypt-password]]
    [juxt.site.alpha.util :refer [as-hex-str random-bytes]]))
 
@@ -52,19 +50,16 @@
    {:xt/id "https://site.test/actions/create-action" ; <1>
     :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
     :juxt.pass.alpha/scope "write:admin"
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/actions/(.+)"]] ; <2>
-      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/action"]]
-      [:juxt.pass.alpha/rules [:vector [:vector :any]]]]]
 
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0] ; <3>
-      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/action"}]
-     [:juxt.pass.alpha.malli/validate] ; <4>
-     [:xtdb.api/put]] ; <5>
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://meta.juxt.site/pass/action" :juxt.site.alpha/type assoc
+      (validate [:map
+                 [:xt/id [:re "https://site.test/actions/(.+)"]]
+                 [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/action"]]
+                 [:juxt.pass.alpha/rules [:vector [:vector :any]]]])
+      xtdb.api/put)
 
     :juxt.pass.alpha/rules
     '[
@@ -103,20 +98,17 @@
     :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
     :juxt.pass.alpha/scope "write:admin"
 
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/permissions/(.+)"]]
-      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/permission"]]
-      [:juxt.pass.alpha/action [:re "https://site.test/actions/(.+)"]]
-      [:juxt.pass.alpha/purpose [:maybe :string]]]]
-
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0]
-      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/permission"}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://meta.juxt.site/pass/permission" swap :juxt.site.alpha/type swap set-at
+      [:map
+       [:xt/id [:re "https://site.test/permissions/(.+)"]]
+       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/permission"]]
+       [:juxt.pass.alpha/action [:re "https://site.test/actions/(.+)"]]
+       [:juxt.pass.alpha/purpose [:maybe :string]]]
+      validate
+      xtdb.api/put)
 
     :juxt.pass.alpha/rules
     '[
@@ -149,23 +141,27 @@
    {:xt/id "https://site.test/actions/put-user"
     :juxt.pass.alpha/scope "write:users"
 
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/users/.*"]] ; <1>
-      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/user"]] ; <2>
-      ]]
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
 
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0]
-      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/user" ; <3>
-              :juxt.site.alpha/methods ; <4>
-              {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user"}}
-               :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user"}}
-               :options {}}}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
+      "https://meta.juxt.site/pass/user" swap :juxt.site.alpha/type swap set-at
+
+      [:map
+       [:xt/id [:re "https://site.test/users/.*"]]                     ; <1>
+       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/user"]] ; <2>
+       ]
+      validate
+
+      {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user"}}
+       :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user"}}
+       :options {}}
+      swap
+      :juxt.site.alpha/methods
+      swap
+      set-at
+
+      xtdb.api/put)
 
     :juxt.pass.alpha/rules
     '[
@@ -197,25 +193,31 @@
    {:xt/id "https://site.test/actions/put-user-identity"
     :juxt.pass.alpha/scope "write:users"
 
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/.*"]]
-      [:juxt.pass.alpha/user [:re "https://site.test/users/.+"]]
-      [:juxt.pass.jwt/iss {:optional true} [:re "https://.+"]]
-      [:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]]]
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
 
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in
-      [0] 'merge
-      {:juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"
-       :juxt.site.alpha/methods
-       {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
-        :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
-        :options {}}}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
+      (validate
+       [:map
+        [:xt/id [:re "https://site.test/.*"]]
+        [:juxt.pass.alpha/user [:re "https://site.test/users/.+"]]
+        [:juxt.pass.alpha/username {:optional true} [:re "[A-Za-z0-9]{2,}"]]
+        [:juxt.pass.alpha/password-hash {:optional true} [:string]]
+        [:juxt.pass.jwt/iss {:optional true} [:re "https://.+"]]
+        [:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]])
+
+      "https://meta.juxt.site/pass/user-identity" :juxt.site.alpha/type assoc
+
+      ;; Lowercase the username, if it exists.
+      dup :juxt.pass.alpha/username of (if* [>lower :juxt.pass.alpha/username assoc] [])
+
+      {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
+       :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
+       :options {}}
+      :juxt.site.alpha/methods
+      assoc
+
+      xtdb.api/put)
 
     :juxt.pass.alpha/rules
     '[
@@ -247,20 +249,15 @@
    {:xt/id "https://site.test/actions/put-subject"
     ;;:juxt.pass.alpha/scope "write:users"
 
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/.*"]]
-      [:juxt.pass.alpha/user-identity [:re "https://site.test/user-identities/.+"]]
-      ]]
-
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in
-      [0] 'merge
-      {:juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://meta.juxt.site/pass/subject" swap :juxt.site.alpha/type swap set-at
+      [:map
+       [:xt/id [:re "https://site.test/.*"]]
+       [:juxt.pass.alpha/user-identity [:re "https://site.test/user-identities/.+"]]]
+      validate
+      xtdb.api/put)
 
     :juxt.pass.alpha/rules
     '[
@@ -294,22 +291,21 @@
    {:xt/id "https://site.test/actions/put-immutable-public-resource"
     :juxt.pass.alpha/scope "write:resource" ; <1>
 
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/.*"]]]]
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
 
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in
-      [0] 'merge
-      {:juxt.site.alpha/methods ; <2>
-       {:get {::pass/actions #{"https://site.test/actions/get-public-resource"}}
-        :head {::pass/actions #{"https://site.test/actions/get-public-resource"}}
-        :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
+      [:map
+       [:xt/id [:re "https://site.test/.*"]]]
+      validate
 
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
+      {:get {::pass/actions #{"https://site.test/actions/get-public-resource"}}
+       :head {::pass/actions #{"https://site.test/actions/get-public-resource"}}
+       :options {::pass/actions #{"https://site.test/actions/get-options"}}}
+      :juxt.site.alpha/methods
+      assoc
+
+      xtdb.api/put)
 
     :juxt.pass.alpha/rules
     '[
@@ -371,7 +367,6 @@
   ;; end::create-hello-world-resource![]
   )
 
-
 ;; Representations
 
 (defn create-hello-world-html-representation! []
@@ -393,7 +388,7 @@
 
 ;; Templating
 
-(defn create-put-template-action! []
+#_(defn create-put-template-action! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -478,22 +473,25 @@
    {:xt/id "https://site.test/actions/put-immutable-protected-resource"
     :juxt.pass.alpha/scope "write:resource"
 
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/.*"]]]]
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
 
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in
-      [0] 'merge
-      {:juxt.site.alpha/methods
-       {:get {::pass/actions #{"https://site.test/actions/get-protected-resource"}} ; <1>
-        :head {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
-        :options {::pass/actions #{"https://site.test/actions/get-options"}}}}]
+      "https://meta.juxt.site/pass/action" swap :juxt.site.alpha/type swap set-at
 
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
+      [:map
+       [:xt/id [:re "https://site.test/.*"]]]
+      validate
+
+      {:get {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
+       :head {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
+       :options {::pass/actions #{"https://site.test/actions/get-options"}}}
+      swap
+      :juxt.site.alpha/methods
+      swap
+      set-at
+
+      xtdb.api/put)
 
     :juxt.pass.alpha/rules
     '[
@@ -546,22 +544,19 @@
    {:xt/id "https://site.test/actions/put-protection-space"
     :juxt.pass.alpha/scope "write:admin"
 
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/protection-spaces/(.+)"]]
-      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/protection-space"]]
-      [:juxt.pass.alpha/canonical-root-uri [:re "https?://[^/]*"]]
-      [:juxt.pass.alpha/realm {:optional true} [:string {:min 1}]]
-      [:juxt.pass.alpha/auth-scheme [:enum "Basic" "Bearer"]]
-      [:juxt.pass.alpha/authentication-scope [:string {:min 1}]]]]
-
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0]
-      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/protection-space"}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://meta.juxt.site/pass/protection-space" swap :juxt.site.alpha/type swap set-at
+      [:map
+       [:xt/id [:re "https://site.test/protection-spaces/(.+)"]]
+       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/protection-space"]]
+       [:juxt.pass.alpha/canonical-root-uri [:re "https?://[^/]*"]]
+       [:juxt.pass.alpha/realm {:optional true} [:string {:min 1}]]
+       [:juxt.pass.alpha/auth-scheme [:enum "Basic" "Bearer"]]
+       [:juxt.pass.alpha/authentication-scope [:string {:min 1}]]]
+      validate
+      xtdb.api/put)
 
     :juxt.pass.alpha/rules
     '[
@@ -640,7 +635,7 @@
     :juxt.pass.alpha/canonical-root-uri "https://site.test"
     :juxt.pass.alpha/realm "Wonderland"
     ;; Basic auth will only work if these are present
-    :juxt.pass.alpha/username "alice"
+    :juxt.pass.alpha/username "ALICE" ; this will be downcased
     :juxt.pass.alpha/password-hash (encrypt-password "garden")})
   ;; end::put-basic-auth-user-identity![]
   )
@@ -696,21 +691,21 @@
    {:xt/id "https://site.test/actions/put-session-scope"
     :juxt.pass.alpha/scope "write:admin"
 
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/session-scopes/(.+)"]]
-      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/session-scope"]]
-      [:juxt.pass.alpha/cookie-domain [:re "https?://[^/]*"]]
-      [:juxt.pass.alpha/cookie-path [:re "/.*"]]
-      [:juxt.pass.alpha/login-uri [:re "https?://[^/]*"]]]]
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
 
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0]
-      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/session-scope"}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
+      "https://meta.juxt.site/pass/session-scope" swap :juxt.site.alpha/type swap set-at
+
+      [:map
+       [:xt/id [:re "https://site.test/session-scopes/(.+)"]]
+       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/session-scope"]]
+       [:juxt.pass.alpha/cookie-domain [:re "https?://[^/]*"]]
+       [:juxt.pass.alpha/cookie-path [:re "/.*"]]
+       [:juxt.pass.alpha/login-uri [:re "https?://[^/]*"]]]
+      validate
+
+      xtdb.api/put)
 
     :juxt.pass.alpha/rules
     '[
@@ -820,85 +815,160 @@ Password: <input name=password type=password>
    {:xt/id "https://site.test/actions/login"
 
     :juxt.pipe.alpha/quotation
-    (list
-     [:validate
-      [:map
-       ["username" [:string {:min 1}]]
-       ["password" [:string {:min 1}]]]]
+    '(
+      :juxt.site.alpha/received-representation env
+      :juxt.http.alpha/body of
+      bytes-to-string
 
-     :dup
+      juxt.site.alpha/form-decode
 
-     [:push "username"]
-     :of
+      (validate
+       [:map
+        ["username" [:string {:min 1}]]
+        ["password" [:string {:min 1}]]])
 
-     :swap
-     [:push "password"]
-     :of
-     :swap
+      dup
 
-     ;; We now have a stack with: <user> <password>
+      "username"
+      of
+      >lower           ; Make usernames case-insensitive as per OWASP guidelines
 
-     [:find-matching-identity-on-password-query
-      {:username-in-identity-key :juxt.pass.alpha/username
-       :password-hash-in-identity-key :juxt.pass.alpha/password-hash}]
+      swap
+      "password"
+      of
+      swap
 
-     :juxt.pipe.alpha.xtdb/q :first :first
+      ;; We now have a stack with: <user> <password>
 
-     ;; If nil then return 400
+      (juxt.pipe.alpha.xtdb/q
+       (find-matching-identity-on-password-query
+        {:username-in-identity-key ::pass/username
+         :password-hash-in-identity-key ::pass/password-hash}))
 
-     [:if*
-      (list
+      first first
 
-       [:push :juxt.pass.alpha/user-identity]
-       :swap :associate
+      (if*
+          [::pass/user-identity
+           swap associate
 
-       [:push ::site/type "https://meta.juxt.site/pass/subject"]
-       :set-at
+           "https://meta.juxt.site/pass/subject"
+           :juxt.site.alpha/type
+           assoc
 
-       ;; Make subject
-       [:push :xt/id]
-       10 :random-bytes :as-hex-string
-       "https://site.test/subjects/" :str
-       :set-at
+           ;; Make subject
+           (random-bytes 10) as-hex-string
+           (str "https://site.test/subjects/")
+           :xt/id assoc
 
-       ;; Create the session, linked to the subject
-       :dup [:push :xt/id] :of
-       [:push ::pass/subject] :swap :associate
+           ;; Create the session, linked to the subject
+           dup :xt/id of
+           ::pass/subject swap associate
 
-       ;; Now we're good to wrap up the subject in a tx-op
-       :swap :xtdb.api/put :swap
+           ;; Now we're good to wrap up the subject in a tx-op
+           swap xtdb.api/put swap
 
-       [:push :xt/id]
-       16 :make-nonce
-       "https://site.test/sessions/" :str
-       :set-at
-       [:push ::site/type "https://meta.juxt.site/pass/session"]
-       :set-at
+           (make-nonce 16)
+           "https://site.test/sessions/" str
+           :xt/id
+           assoc
+           "https://meta.juxt.site/pass/session"
+           ::site/type
+           assoc
 
-       :dup [:push :xt/id] :of
-       [:push ::pass/session] :swap :associate
+           dup :xt/id of
+           ::pass/session swap associate
 
-       :swap :xtdb.api/put :swap
+           swap xtdb.api/put swap
 
-       16 :make-nonce
-       :swap
-       :over
-       [:push ::pass/session-token]
-       :swap
-       :set-at
-       :swap
-       "https://site.test/session-tokens/" :str
-       [:push :xt/id]
-       :swap
-       :set-at
-       [:push ::site/type "https://meta.juxt.site/pass/session-token"] :set-at
-       :xtdb.api/put)
+           (make-nonce 16)
+           swap
+           over
+           ::pass/session-token
+           assoc
 
-      (list
-       "Login failed"
-       {:ring.response/status 400} ;; Respond with a 400 status
-       :ex-info :throw
-       )])
+           swap
+
+           (str "https://site.test/session-tokens/")
+           :xt/id
+           assoc
+
+           "https://meta.juxt.site/pass/session-token"
+           ::site/type
+           assoc
+           xtdb.api/put
+
+           ;; We now create the following quotation:
+           #_[(of :ring.response/headers dup)
+              (if* [] [<array-map>])    ; if no headers, use an empty map
+              (assoc "set-cookie" "id=<session token>; Path=/; Secure; HttpOnly; SameSite=Lax")
+              (assoc :ring.response/headers)]
+
+           ;; Get the session token back and turn into a quotation
+           dup second :juxt.pass.alpha/session-token of
+           "id=" str
+           "; Path=/; Secure; HttpOnly; SameSite=Lax" swap str
+
+           (symbol "assoc") swap
+           "set-cookie" swap
+           _3array >list
+
+           ;; Now quote the initial two lines
+           [(of :ring.response/headers dup)
+            (if* [] [<array-map>])      ; if no headers, use an empty map
+            ]
+
+           ;; Push the '(assoc "set-cookie" ...) line onto the program
+           push
+
+           ;; Finish the rest of the program
+           (symbol "assoc")
+           :ring.response/headers
+           _2array >list
+           swap push
+
+           ;; Turn into a apply-to-request-context quotation
+           :juxt.site.alpha/apply-to-request-context
+           swap
+           _2array >vector
+
+
+           ;; Finally we pull out and use the return_to query parameter
+           :ring.request/query env
+           (if*
+               [juxt.site.alpha/form-decode
+                "return-to" of
+                (if*
+                    [(symbol "assoc") swap
+                     "location" swap
+                     _3array >list
+
+                     [(of :ring.response/headers dup)
+                      ;; if no headers, use an empty map
+                      (if* [] [<array-map>])]
+
+                     push
+
+                     ;; Finish the rest of the program
+                     (symbol "assoc")
+                     :ring.response/headers
+                     _2array >list
+                     swap push
+
+                     ;; Turn into a apply-to-request-context quotation
+                     :juxt.site.alpha/apply-to-request-context
+                     swap
+                     _2array >vector]
+                    [])
+
+                ;; A quotation that will set a status 302 on the request context
+                (juxt.site.alpha/apply-to-request-context
+                 [(assoc :ring.response/status 302)])]
+
+               [])]
+
+        ;; else
+          [(throw (ex-info "Login failed" {:ring.response/status 400}))]))
+
 
     :juxt.pass.alpha/rules
     '[
@@ -927,20 +997,19 @@ Password: <input name=password type=password>
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/put-application"
     :juxt.pass.alpha/scope "write:application"
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/applications/(.+)"]]
-      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/application"]]
-      [:juxt.pass.alpha/oauth-client-id [:string {:min 10}]]
-      [:juxt.pass.alpha/oauth-client-secret [:string {:min 16}]]]]
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0]
-      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/application"}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]
-     ]
+
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://meta.juxt.site/pass/application" swap :juxt.site.alpha/type swap set-at
+      [:map
+       [:xt/id [:re "https://site.test/applications/(.+)"]]
+       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/application"]]
+       [:juxt.pass.alpha/oauth-client-id [:string {:min 10}]]
+       [:juxt.pass.alpha/oauth-client-secret [:string {:min 16}]]]
+      validate
+      xtdb.api/put)
+
     :juxt.pass.alpha/rules
     '[[(allowed? permission subject action resource)
        [id :juxt.pass.alpha/user user]
@@ -968,22 +1037,21 @@ Password: <input name=password type=password>
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/authorize-application"
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/authorizations/(.+)"]]
-      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/authorization"]]
-      [:juxt.pass.alpha/user [:re "https://site.test/users/(.+)"]]
-      [:juxt.pass.alpha/application [:re "https://site.test/applications/(.+)"]]
-      ;; A space-delimited list of permissions that the application requires.
-      [:juxt.pass.alpha/scope {:optional true} :string]]]
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0]
-      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/authorization"}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]
-     ]
+
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://meta.juxt.site/pass/authorization" swap :juxt.site.alpha/type swap set-at
+      [:map
+       [:xt/id [:re "https://site.test/authorizations/(.+)"]]
+       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/authorization"]]
+       [:juxt.pass.alpha/user [:re "https://site.test/users/(.+)"]]
+       [:juxt.pass.alpha/application [:re "https://site.test/applications/(.+)"]]
+       ;; A space-delimited list of permissions that the application requires.
+       [:juxt.pass.alpha/scope {:optional true} :string]]
+      validate
+      xtdb.api/put)
+
     :juxt.pass.alpha/rules
     '[[(allowed? permission subject action resource)
        [id :juxt.pass.alpha/user user]
@@ -1011,21 +1079,20 @@ Password: <input name=password type=password>
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/issue-access-token"
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re "https://site.test/access-tokens/(.+)"]]
-      [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/access-token"]]
-      [:juxt.pass.alpha/subject [:re "https://site.test/subjects/(.+)"]]
-      [:juxt.pass.alpha/application [:re "https://site.test/applications/(.+)"]]
-      [:juxt.pass.alpha/scope {:optional true} :string]]]
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0]
-      'merge {:juxt.site.alpha/type "https://meta.juxt.site/pass/access-token"}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]
-     ]
+
+    :juxt.pipe.alpha/quotation
+    '(
+      "https://site.test/pipe/quotations/req-to-edn-body" juxt.pipe.alpha.xtdb/entity :juxt.pipe.alpha/quotation of call
+      "https://meta.juxt.site/pass/access-token" swap :juxt.site.alpha/type swap set-at
+      [:map
+       [:xt/id [:re "https://site.test/access-tokens/(.+)"]]
+       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/access-token"]]
+       [:juxt.pass.alpha/subject [:re "https://site.test/subjects/(.+)"]]
+       [:juxt.pass.alpha/application [:re "https://site.test/applications/(.+)"]]
+       [:juxt.pass.alpha/scope {:optional true} :string]]
+      validate
+      xtdb.api/put)
+
     :juxt.pass.alpha/rules
     '[[(allowed? permission subject action resource)
        [id :juxt.pass.alpha/user user]
@@ -1128,7 +1195,7 @@ Password: <input name=password type=password>
 
 ;; Other stuff
 
-(defn create-action-put-error-resource! []
+#_(defn create-action-put-error-resource! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1244,12 +1311,23 @@ Password: <input name=password type=password>
 
 ;; Complete all tasks thus far directed by the book
 (defn preliminaries! []
+  ;; Puts
   (put-user!)
   (put-user-identity!)
   (put-subject!)
   (install-create-action!)
   (book-install-do-action-fn!)
   (permit-create-action!)
+  ;; Quotations
+  (put! {:xt/id "https://site.test/pipe/quotations/req-to-edn-body"
+         :juxt.pipe.alpha/quotation
+         '(:juxt.site.alpha/received-representation
+           env
+           ::http/body
+           of
+           bytes-to-string
+           read-edn-string)})
+  ;; Actions
   (create-grant-permission-action!)
   (permit-grant-permission-action!)
   (create-action-put-user!)
@@ -1266,8 +1344,7 @@ Password: <input name=password type=password>
   (grant-permission-to-invoke-action-put-immutable-public-resource!)
   (create-action-get-public-resource!)
   (grant-permission-to-invoke-get-public-resource!)
-  (create-hello-world-resource!)
-  )
+  (create-hello-world-resource!))
 
 (defn protected-resource-preliminaries! []
   (create-action-put-immutable-protected-resource!)

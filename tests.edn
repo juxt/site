@@ -4,11 +4,12 @@
 
  :tests [{:id :test
           :test-paths ["test"]
-          :ns-patterns ["juxt.book-test"
-                        "juxt.authorization-integration-test"
+          :ns-patterns [#_"juxt.pipe.core-test"
+                        #_"juxt.pass.action-test"
                         "juxt.pass.authorization-test"
-                        "juxt.pass.procedure-test"
-                        "juxt.pipe.core-test"
+                        "juxt.authorization-integration-test"
+                        "juxt.book-test"
+
                         ]}]
 
  :reporter kaocha.report/documentation}
