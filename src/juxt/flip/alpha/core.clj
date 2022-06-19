@@ -76,12 +76,10 @@
 (defmethod word '_2array [[y x & stack] [_ & queue] env]
   [(cons (vector x y) stack) queue env])
 
-;; multiargs
 (defmethod word 'append [[seq2 seq1 & stack] [_ & queue] env]
   [(cons (cond->> (concat seq1 seq2)
            (vector? seq1) vec) stack) queue env])
 
-;; multiargs
 (defmethod word 'push [[seq elt & stack] [_ & queue] env]
   [(cons (cond (vector? seq) (conj seq elt)
                (list? seq) (concat seq [elt])) stack) queue env])
@@ -123,23 +121,22 @@
 ;; 2dup
 ;; 3dup
 
-;; multiargs
 (defmethod word 'over [[y x & stack] [_ & queue] env]
   [(cons x (cons y (cons x stack))) queue env])
 
 ;; 2over
 
-;; multiargs
 (defmethod word 'pick [[z y x & stack] [_ & queue] env]
   [(cons x (cons z (cons y (cons x stack)))) queue env])
 
-;; multiargs
 (defmethod word 'swap [[x y & stack] [_ & queue] env]
   [(cons y (cons x stack)) queue env])
 
-;; multiargs
 (defmethod word 'of [[k m & stack] [_ & queue] env]
   [(cons (get m k) stack) queue env])
+
+(defmethod word 'rot [[z y x & stack] [_ & queue] env]
+  [(cons x (cons z (cons y stack))) queue env])
 
 (declare eval-quotation)
 
@@ -240,21 +237,24 @@
     :else
     [(cons w stack) queue env]))
 
-(defn eval-quotation [stack queue env]
-  ;; Naiive implementation. A production implementation would put an upper limit
-  ;; on the number of iterations to prevent overly long running transactions.
+(defn eval-quotation
+   ;; Naiive implementation. A production implementation would put an upper limit
+   ;; on the number of iterations to prevent overly long running transactions.
 
-  ;; For performance optimization, consider using a transient or a
-  ;; java.util.Deque for both stack and queue. Since neither the stack nor queue
-  ;; escape, and is run in a single-thread, the data structures can be
-  ;; transient. However, see https://clojure.org/reference/transients that
-  ;; claims that lists cannot be made transient "as there is no benefit to be
-  ;; had.". So lists may be already fast enough.
+   ;; For performance optimization, consider using a transient or a
+   ;; java.util.Deque for both stack and queue. Since neither the stack nor queue
+   ;; escape, and is run in a single-thread, the data structures can be
+   ;; transient. However, see https://clojure.org/reference/transients that
+   ;; claims that lists cannot be made transient "as there is no benefit to be
+   ;; had.". So lists may be already fast enough.
 
-  (loop [[stack queue env] [stack queue env]]
-    (assert list? stack)
-    (assert list? queue)
-    (assert map? env)
-    (if (seq queue)
-      (recur (word* stack queue env))
-      stack)))
+  ([stack queue]
+   (eval-quotation stack queue {}))
+  ([stack queue env]
+   (loop [[stack queue env] [stack queue env]]
+     (assert list? stack)
+     (assert list? queue)
+     (assert map? env)
+     (if (seq queue)
+       (recur (word* stack queue env))
+       stack))))
