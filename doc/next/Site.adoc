@@ -48,22 +48,16 @@ recommended that you invest time in building up both your working and conceptual
 knowledge of Site. These chapters will help to build up your knowledge of Site
 'from scratch'. If you've chosen this course, welcome to the slow track!
 
-include::Elements.adoc[leveloffset=+1]
-
-[[ch-users]]
-include::Users.adoc[leveloffset=+1]
+include::Concepts.adoc[leveloffset=+1]
 
 [[ch-actions]]
 include::Actions.adoc[leveloffset=+1]
 
-[[ch-permissions]]
-include::Permissions.adoc[leveloffset=+1]
-
+[[ch-users]]
+include::Users.adoc[leveloffset=+1]
+// Merge this chapter
 [[ch-creating-users]]
-include::UsersRevisited.adoc[leveloffset=+1]
-
-[[ch-pipe]]
-include::Pipe.adoc[leveloffset=+1]
+include::UsersRevisited.adoc[leveloffset=+2]
 
 = Resources
 

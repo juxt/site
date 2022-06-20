@@ -21,10 +21,9 @@ in <<grant-permission-to-resource-protected-by-session-scope>>.
 added in <<create-session-scope>>.
 
 . A login form that will be shown to the User, allowing them to
-authenticate. This is created in <<create-login-form>>.
-
-. A resource that can receive the POST request that occurs when a User submits
-the login form.
+authenticate. We'll also want this resource to handle the POST request that
+occurs when a User submits the login formfootnote:[Keeping the resource the same is convenient because it means we don't have to worry about the value of the form's `action` attribute.]. This is created in
+<<create-login-resource>>.
 
 . An Action that can be used when the POST request is received. This Action will
 attempt to find a User Identity that matches some received credentials. If one
@@ -185,14 +184,14 @@ include::../../test/juxt/book.clj[tag=create-session-scope!,indent=0]
 ----
 ====
 
-[[create-login-form]]
-== Create the login form
+[[create-login-resource]]
+== Create the login resource
 
-.Creating the login form
+.Creating the login resource
 ====
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=create-login-form!,indent=0]
+include::../../test/juxt/book.clj[tag=create-login-resource!,indent=0]
 ----
 ====
 

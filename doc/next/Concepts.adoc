@@ -1,0 +1,220 @@
+= Concepts
+:step:
+
+This chapter introduces the key concepts in Site.
+
+You should read this chapter in order to gain an overview before diving into the
+details and practical examples in subsequent chapters.
+
+== Documents
+
+// (((XTDB)))
+Data in Site is stored as documents in the https://xtdb.com[XTDB] database.
+
+A document is a set of named values, as shown in <<ex-cat-document>>.
+
+[[ex-cat-document]]
+.A Document representing a cat
+====
+[source,clojure]
+----
+{:name "Arya"
+ :species "Cat"
+ :color "black"
+ :favorite-activity "playing with string"}
+----
+====
+
+Names are 'keywords', which identifiers prefixed with a colon (:).
+
+Values can be strings, numbers, sets, collections, nested documents and more.
+
+All documents in Site can contain any additional attributes you need.
+
+// (((property graph)))
+This flexibility to compose documents from different attributes is one of the
+strengths of using a property-graph database such as XTDB under the hood.
+
+[TIP]
+--
+// ((("Halloway, Stuart")))
+See this talk segment by Stu Halloway to explain the rationale for using namespaces in attribute keywords:
+https://youtu.be/Qx0-pViyIDU?t=1464
+--
+
+== Entities
+
+Before being stored in the database, each document is identified with an entity
+id, indicated by the attribute `:xt/id`.
+
+A document can be considered a particular _version_ of an entity at a given
+point in time, as shown in <<ex-cat-entity>>.
+
+[[ex-cat-entity]]
+.A cat can change
+====
+[source,clojure]
+----
+{:xt/id "https://example.org/cats/arya"
+ :name "Arya"
+ :species "cat"
+ :color "black"
+ :favorite-activity "playing with string"}
+----
+
+and, at a later date…
+
+[source,clojure]
+----
+{:xt/id "https://example.org/cats/arya"
+ :name "Arya"
+ :species "cat"
+ :color "black"
+ :favorite-activity "hunting mice"}
+----
+====
+
+TIP: For more information about Documents and Entities, see https://xtdb.com.
+
+The `juxt.site`, `juxt.pass`, `juxt.http`, `xtdb.api` and `xt` namespaces are reserved to avoid the potential for attribute clashes.
+
+== Resources
+
+Notice in <<ex-cat-entity>> we chose to set the `:xt/id` attribute to a URL: `+https://example.org/cats/arya+`.
+
+An Entity has features common to a web resource: it is uniquely identifiable, holds state that may change over time.
+A Document represents the _current state_ of a Resource.
+
+In fact, the only difference between a web resource and an Entity is that a web resource is accessible over HTTP.
+So, it's _that_ feature that Site adds to Entities.
+
+We can now stop using the term Entity entirely, and start using the term Resource.
+
+Resources are discussed more fully in <<ch-resources>>.
+
+== Actions
+
+Since Resources are accessible over the network, we must ensure that we protect them against unauthorized access.
+This is where Actions come in.
+
+All read and write access to Resources are associated with one or more Actions.
+
+Actions are domain-specific.
+Which Actions to define and how they are defined will depend on your business requirements, domain and access policies.
+
+Actions are defined in Documents.
+
+Examples of Actions include:
+
+- Login
+- List all products
+- Edit a product
+- Add a customer
+- Promote an employee
+- Post an article
+
+A more detailed explanation of Actions can be found in <<ch-actions>>.
+
+=== Rules & Permissions
+
+Actions are associated with Rules that specify who can access which resources, and how.
+
+Rules are considered in the context of the person or machine requesting access, together with the Resource being accessed. Attributes of both can be considered together.
+
+For example, it might be that a person's access might depend upon a role they have been assigned, and the document classification of the Resource.
+Or a VIP customer can access 'exclusive' special offers.
+
+For access to be granted to a Resource, a Permission document must exist in the database.
+
+When Rules are evaluated, these Permission documents are returned.
+A Permission document represents the granting of access, whether to a specific user explicitly, or to set of users assigned a particular role, or some other relationship.
+
+A Permission document is easily deleted, and so revoking access it as straight-forward as granting access.
+
+Permission documents provide a permanent record of who had access to what, and when.
+
+Rules & Permissions are described more fully in <<ch-rules-and-permissions>>.
+
+== Users
+
+Users are individuals that have access to Site. Users might be permitted to
+query, create, update and/or delete certain documents.
+
+A User is stored in the database as a document. Since every system has its own
+requirements about what data must be captured to represent a User, Site doesn't
+prescribe what a User should be, and allows the document to contain any and all
+details that might be necessary footnote:[in fact, this is true for all
+documents in Site].
+
+In fact, we could designate our black cat Arya as a user.
+
+.The cat as a User
+====
+This is the same document as in <<ex-cat-user-identity>>, nothing to see here.
+
+[source,clojure]
+----
+{:xt/id "https://example.org/cats/arya"
+ :name "Arya"
+ :species "cat"
+ :color "black"
+ :favorite-activity "playing with string"}
+----
+====
+
+=== User Identities
+
+Site can tell when a particular user is logging in by matching the User's login
+credentials with the user's identity details stored in the database.
+
+Since users might have multiple identities, a User Identity is stored as a separate
+document.
+
+Again, Site makes no prescription as to what this User Identity document contains,
+except one: it must contain a `:juxt.pass.alpha/user` attribute whose value is
+the `:xt/id` of the User entity it relates to. This is shown in
+<<ex-cat-user-identity>>.
+
+[[ex-cat-user-identity]]
+.A cat's User Identity
+====
+[source,clojure]
+----
+{:xt/id "https://example.org/user-identities/arya"
+ :username "arya"
+ :password "meow" <1>
+ :juxt.pass.alpha/user "https://example.org/cats/arya" <2>
+}
+----
+<1> Of course, you'd never ever _ever_ store a password in plain-text like
+this. In the real-world, this attribute might reference the AI model you'd
+trained to recognise Arya's unique _meow_.
+====
+
+=== Subjects
+
+When our cat logs in, a new document is created to capture details of the login
+event itself, such as which User Identity was used, perhaps the geo-location of
+Arya when she logged in, and so on. These details may be important later, if we
+want to write authorization rules that make use of this information.
+
+This document is called a Subject. The document references the User Identity
+document, which in turn, references the User document, which may in turn
+reference numerous other documents, recursively.
+
+Thus, the Subject can be considered a _sub-graph_ of everything we know about
+the User logging in.
+
+.The Subject's view
+[[cat-model]]
+====
+[plantuml,cat,svg]
+....
+skinparam monochrome true
+@startjson
+include::cat.json[]
+@endjson
+....
+====
+
+Users, user identities and subjects are described in <<ch-users>>.
