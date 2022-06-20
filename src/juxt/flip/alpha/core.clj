@@ -122,7 +122,9 @@
 ;; Shuffle words - see
 ;; https://docs.factorcode.org/content/article-shuffle-words.html
 
-;; drop
+(defmethod word 'drop [[el & stack] [_ & queue] env]
+  [stack queue env])
+
 ;; 2drop
 ;; 3drop
 ;; nip
@@ -157,20 +159,47 @@
   (let [stack (eval-quotation stack quotation env)]
     [(cons x stack) queue env]))
 
-;; multiargs
-(defmethod word 'if [[f t cond & stack] [_ & queue] env]
-  [stack (concat (if cond t f) queue) env])
+(defmethod word 'if [[f t ? & stack] [_ & queue] env]
+  (assert (vector? t) "Expecting t to be a quotation")
+  (assert (vector? f) "Expecting f to be a quotation")
+  [stack (concat (if ? t f) queue) env])
+
+;; "Alternative conditional form that preserves the cond value if it is true."
+(defmethod word 'if*
+  [[f t ? & stack] [_ & queue] env]
+  (assert (vector? t) "Expecting t to be a quotation")
+  (assert (vector? f) "Expecting f to be a quotation")
+  (if ?
+    [(cons ? stack) (concat t queue) env]
+    [stack (concat f queue) env]))
+
+(defmethod word 'when [[t ? & stack] [_ & queue] env]
+  (assert (vector? t) "Expecting t to be a quotation")
+  [stack (concat (when ? t) queue) env])
+
+(defmethod word 'when*
+  [[t ? & stack] [_ & queue] env]
+  (assert (vector? t) "Expecting t to be a quotation")
+  (if ?
+    [(cons ? stack) (concat t queue) env]
+    [stack queue env]))
+
+(defmethod word 'unless [[f ? & stack] [_ & queue] env]
+  [stack (concat (when-not ? f) queue) env])
+
+(defmethod word 'unless*
+  [[f ? & stack] [_ & queue] env]
+  (assert (vector? f) "Expecting f to be a quotation")
+  (if-not ?
+    [(cons ? stack) (concat f queue) env]
+    [stack queue env]))
+
+(defmethod word '+
+  [[y x & stack] [_ & queue] env]
+  [(cons (+ x y) stack) queue env])
 
 (defmethod word '<array-map> [stack [_ & queue] env]
   [(cons (array-map) stack) queue env])
-
-;; "Alternative conditional form that preserves the cond value if it is true."
-;; multiargs
-(defmethod word 'if*
-  [[f t cond & stack] [_ & queue] env]
-  (if cond
-    [(cons cond stack) (concat t queue) env]
-    [stack (concat f queue) env]))
 
 (defmethod word 'juxt.flip.alpha.xtdb/q
   [[q & stack] [_ & queue] env]
@@ -181,7 +210,6 @@
         results (apply xt/q db q in)]
     [(cons results stack) queue env]))
 
-;; multiargs
 (defmethod word 'set-at
   [[m k v & stack] [_ & queue] env]
   [(cons (assoc m k v) stack) queue env])
@@ -197,7 +225,6 @@
   [[bytes & stack] [_ & queue] env]
   [(cons (as-hex-str bytes) stack) queue env])
 
-;; multiargs
 (defmethod word 'str
   [[s1 s2 & stack] [_ & queue] env]
   [(cons (str s1 s2) stack) queue env])
@@ -228,7 +255,6 @@
   [[doc & stack] [_ & queue] env]
   [(cons [:xtdb.api/put doc] stack) queue env])
 
-;; multiargs
 (defmethod word 'ex-info
   [[ex-data msg & stack] [_ & queue] env]
   [(cons (ex-info msg ex-data) stack) queue env])

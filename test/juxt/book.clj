@@ -389,36 +389,36 @@
 ;; Templating
 
 #_(defn create-put-template-action! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-put-template-action![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/put-template"
-       :juxt.pass.alpha/scope "write:resource"
+    (eval
+     (substitute-actual-base-uri
+      (quote
+       ;; tag::create-put-template-action![]
+       (do-action
+        "https://site.test/subjects/repl-default"
+        "https://site.test/actions/create-action"
+        {:xt/id "https://site.test/actions/put-template"
+         :juxt.pass.alpha/scope "write:resource"
 
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/templates/.*"]]]]
+         :juxt.pass.alpha.malli/args-schema
+         [:tuple
+          [:map
+           [:xt/id [:re "https://site.test/templates/.*"]]]]
 
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.process/update-in
-         [0] 'merge
-         {:juxt.site.alpha/methods {}}]
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]]
+         :juxt.pass.alpha/process
+         [
+          [:juxt.pass.alpha.process/update-in
+           [0] 'merge
+           {:juxt.site.alpha/methods {}}]
+          [:juxt.pass.alpha.malli/validate]
+          [:xtdb.api/put]]
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? permission subject action resource)
-          [permission :juxt.pass.alpha/user-identity i]
-          [subject :juxt.pass.alpha/user-identity i]]]})
-     ;; end::create-put-template-action![]
-     ))))
+         :juxt.pass.alpha/rules
+         '[
+           [(allowed? permission subject action resource)
+            [permission :juxt.pass.alpha/user-identity i]
+            [subject :juxt.pass.alpha/user-identity i]]]})
+       ;; end::create-put-template-action![]
+       ))))
 
 (defn grant-permission-to-invoke-action-put-template! []
   (eval
@@ -622,7 +622,7 @@
     :juxt.pass.alpha/authentication-scope "/protected-by-basic-auth/.*" ; regex pattern
     })
   ;; end::put-basic-protection-space![]
-)
+  )
 
 (defn put-basic-auth-user-identity! []
   ;; tag::put-basic-auth-user-identity![]
@@ -767,7 +767,7 @@
     :juxt.pass.alpha/cookie-domain "https://site.test"
     :juxt.pass.alpha/cookie-path "/protected-by-session-scope/"
     :juxt.pass.alpha/login-uri "https://site.test/login"})
-    ;; end::create-session-scope![]
+  ;; end::create-session-scope![]
   )
 
 ;; TODO: Create an action for this - it's rather exotic, might need a privileged
@@ -816,171 +816,168 @@ Password: <input name=password type=password>
 
     :juxt.flip.alpha/quotation
     '(
-              :juxt.site.alpha/received-representation env
-              :juxt.http.alpha/body of
-              bytes-to-string
+      ;; Definitions
 
-              juxt.flip.alpha/form-decode
+      ;; assoc is intended to be used in a list, whereby the value is the top
+      ;; of the stack. (assoc k v)
+      (define assoc [swap rot set-at])
+      ;; assoc* means put the value at the top of the stack into the map with
+      ;; the given key. (assoc* k)
+      ;; TODO: Look up the equivalent Factor convention.
+      (define assoc* [rot set-at])
 
-              (validate
-               [:map
-                ["username" [:string {:min 1}]]
-                ["password" [:string {:min 1}]]])
+      ;; (m k -- m m)
+      (define ref-as [over second (of :xt/id) swap juxt.flip.alpha.hashtables/associate])
 
-              dup
+      ;; The top of the stack is the user identity
+      ;; Create the subject
+      (define make-subject
+        [(juxt.flip.alpha.hashtables/associate ::pass/user-identity)
+         (assoc :juxt.site.alpha/type "https://meta.juxt.site/pass/subject")
+         ;; The subject has a random id
+         (as-hex-string (random-bytes 10))
+         (str "https://site.test/subjects/")
+         (assoc* :xt/id)
+         (xtdb.api/put)])
 
-              "username"
-              of
-              >lower   ; Make usernames case-insensitive as per OWASP guidelines
+      ;; Create the session, linked to the subject
+      (define make-session-linked-to-subject
+        [(ref-as ::pass/subject)
+         (make-nonce 16)
+         (str "https://site.test/sessions/")
+         (assoc* :xt/id)
+         (assoc ::site/type "https://meta.juxt.site/pass/session")
+         (xtdb.api/put)])
 
-              swap
-              "password"
-              of
-              swap
+      ;; Create the session token, linked to the session
+      (define make-session-token-linked-to-session
+        [(ref-as ::pass/session)
+         (make-nonce 16)
+         ;; This is more complicated because we want to use the nonce in the
+         ;; xt/id
+         swap over
+         (assoc* ::pass/session-token)
+         swap
+         (str "https://site.test/session-tokens/")
+         (assoc* :xt/id)
+         (assoc ::site/type "https://meta.juxt.site/pass/session-token")
+         (xtdb.api/put)])
 
-              ;; We now have a stack with: <user> <password>
+      ;; Wrap quotation in a apply-to-request-context operation
+      ;; (quotation -- op)
+      (define apply-to-request-context
+        [:juxt.site.alpha/apply-to-request-context
+         swap _2vector])
 
-              (juxt.flip.alpha.xtdb/q
-               (find-matching-identity-on-password-query
-                {:username-in-identity-key ::pass/username
-                 :password-hash-in-identity-key ::pass/password-hash}))
+      (define set-status
+        [_1vector
+         :ring.response/status
+         swap push
+         (symbol "rot")
+         swap push
+         (symbol "set-at")
+         swap push
+         apply-to-request-context])
 
-              first first
+      ;; Create an apply-to-request-context operation that sets a header
+      ;; (header-name value -- op)
+      (define set-header
+        [(symbol "dup")
+         _1vector
 
-              (if*
-                  [
+         (symbol "of")
+         :ring.response/headers
+         _2vector >list
+         swap push
 
-                   ;; Definitions
+         (symbol "if*")
+         _1vector
+         0
+         <vector>
+         swap push
 
-                   ;; assoc is intended to be used in a list, whereby the value is the top
-                   ;; of the stack. (assoc k v)
-                   (define assoc [swap rot set-at])
-                   ;; assoc* means put the value at the top of the stack into the map with
-                   ;; the given key. (assoc* k)
-                   ;; TODO: Look up the equivalent Factor convention.
-                   (define assoc* [rot set-at])
+         (symbol "<array-map>")
+         _1vector
+         swap push
+         >list
+         swap push
 
-                   ;; (m k -- m m)
-                   (define ref-as [over second (of :xt/id) swap juxt.flip.alpha.hashtables/associate])
+         push                           ; the value on the stack
+         push                           ; the header name
+         (symbol "rot")
+         swap push
+         (symbol "set-at")
+         swap push
 
-                   ;; The top of the stack is the user identity
-                   ;; Create the subject
-                   (define make-subject
-                     [(juxt.flip.alpha.hashtables/associate ::pass/user-identity)
-                      (assoc :juxt.site.alpha/type "https://meta.juxt.site/pass/subject")
-                      ;; The subject has a random id
-                      (as-hex-string (random-bytes 10))
-                      (str "https://site.test/subjects/")
-                      (assoc* :xt/id)
-                      (xtdb.api/put)])
+         :ring.response/headers
+         swap push
+         (symbol "rot")
+         swap push
+         (symbol "set-at")
+         swap push
 
-                   ;; Create the session, linked to the subject
-                   (define make-session-linked-to-subject
-                     [(ref-as ::pass/subject)
-                      (make-nonce 16)
-                      (str "https://site.test/sessions/")
-                      (assoc* :xt/id)
-                      (assoc ::site/type "https://meta.juxt.site/pass/session")
-                      (xtdb.api/put)])
+         apply-to-request-context])
 
-                   ;; Create the session token, linked to the session
-                   (define make-session-token-linked-to-session
-                     [(ref-as ::pass/session)
-                      (make-nonce 16)
-                      ;; This is more complicated because we want to use the nonce in the
-                      ;; xt/id
-                      swap over
-                      (assoc* ::pass/session-token)
-                      swap
-                      (str "https://site.test/session-tokens/")
-                      (assoc* :xt/id)
-                      (assoc ::site/type "https://meta.juxt.site/pass/session-token")
-                      (xtdb.api/put)])
+      ;; Start of program
 
-                   make-subject
-                   make-session-linked-to-subject
-                   make-session-token-linked-to-session
+      ;; Get form
+      :juxt.site.alpha/received-representation env
+      :juxt.http.alpha/body of
+      bytes-to-string
+      juxt.flip.alpha/form-decode
 
-                   ;; Wrap quotation in a apply-to-request-context operation
-                   ;; (quotation -- op)
-                   (define apply-to-request-context
-                     [:juxt.site.alpha/apply-to-request-context
-                      swap _2vector])
+      ;; Validate we have what we're expecting
+      (validate
+       [:map
+        ["username" [:string {:min 1}]]
+        ["password" [:string {:min 1}]]])
 
-                   (define set-status
-                     [_1vector
-                      :ring.response/status
-                      swap push
-                      (symbol "rot")
-                      swap push
-                      (symbol "set-at")
-                      swap push
-                      apply-to-request-context])
+      dup
 
-                   ;; Create an apply-to-request-context operation that sets a header
-                   ;; (header-name value -- op)
-                   (define set-header
-                     [(symbol "dup")
-                      _1vector
+      "username"
+      of
+      >lower           ; Make usernames case-insensitive as per OWASP guidelines
 
-                      (symbol "of")
-                      :ring.response/headers
-                      _2vector >list
-                      swap push
+      swap
+      "password"
+      of
+      swap
 
-                      (symbol "if*")
-                      _1vector
-                      0
-                      <vector>
-                      swap push
+      ;; We now have a stack with: <user> <password>
 
-                      (symbol "<array-map>")
-                      _1vector
-                      swap push
-                      >list
-                      swap push
+      (juxt.flip.alpha.xtdb/q
+       (find-matching-identity-on-password-query
+        {:username-in-identity-key ::pass/username
+         :password-hash-in-identity-key ::pass/password-hash}))
 
-                      push              ; the value on the stack
-                      push              ; the header name
-                      (symbol "rot")
-                      swap push
-                      (symbol "set-at")
-                      swap push
+      first first
 
-                      :ring.response/headers
-                      swap push
-                      (symbol "rot")
-                      swap push
-                      (symbol "set-at")
-                      swap push
+      (if*
+          [make-subject
+           make-session-linked-to-subject
+           make-session-token-linked-to-session
 
-                      apply-to-request-context])
+           ;; Get the session token back and set it on a header
+           dup second :juxt.pass.alpha/session-token of
+           "id=" str
+           "; Path=/; Secure; HttpOnly; SameSite=Lax" swap str
+           (set-header "set-cookie" swap)
 
-                   ;; Get the session token back and set it on a header
-                   dup second :juxt.pass.alpha/session-token of
-                   "id=" str
-                   "; Path=/; Secure; HttpOnly; SameSite=Lax" swap str
-                   (set-header "set-cookie" swap)
+           ;; Finally we pull out and use the return_to query parameter
+           :ring.request/query env
+           (when* [juxt.flip.alpha/form-decode
+                   "return-to" of
+                   (when*
+                       [
+                        (set-header "location" swap)
+                        ]
+                     )
 
-                   ;; Finally we pull out and use the return_to query parameter
-                   :ring.request/query env
-                   (if*
-                       [juxt.flip.alpha/form-decode
-                        "return-to" of
-                        (if*
-                            [
-                             (set-header "location" swap)
-                             (set-header "server" "Site")
-                             ]
-                            [])
+                   ;; A quotation that will set a status 302 on the request context
+                   (set-status 302)])]
 
-                        ;; A quotation that will set a status 302 on the request context
-                        (set-status 302)]
-
-                       [])]
-
-                ;; else
-                  [(throw (ex-info "Login failed" {:ring.response/status 400}))]))
+        ;; else
+        [(throw (ex-info "Login failed" {:ring.response/status 400}))]))
 
 
     :juxt.pass.alpha/rules
@@ -1209,35 +1206,35 @@ Password: <input name=password type=password>
 ;; Other stuff
 
 #_(defn create-action-put-error-resource! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-put-error-resource![]
-     (do-action
-      "https://site.test/subjects/repl-default"
-      "https://site.test/actions/create-action"
-      {:xt/id "https://site.test/actions/put-error-resource"
-       :juxt.pass.alpha/scope "write:resource"
+    (eval
+     (substitute-actual-base-uri
+      (quote
+       ;; tag::create-action-put-error-resource![]
+       (do-action
+        "https://site.test/subjects/repl-default"
+        "https://site.test/actions/create-action"
+        {:xt/id "https://site.test/actions/put-error-resource"
+         :juxt.pass.alpha/scope "write:resource"
 
-       :juxt.pass.alpha.malli/args-schema
-       [:tuple
-        [:map
-         [:xt/id [:re "https://site.test/_site/errors/[a-z\\-]{3,}"]]
-         [:juxt.site.alpha/type [:= "ErrorResource"]]
-         [:ring.response/status :int]]]
+         :juxt.pass.alpha.malli/args-schema
+         [:tuple
+          [:map
+           [:xt/id [:re "https://site.test/_site/errors/[a-z\\-]{3,}"]]
+           [:juxt.site.alpha/type [:= "ErrorResource"]]
+           [:ring.response/status :int]]]
 
-       :juxt.pass.alpha/process
-       [
-        [:juxt.pass.alpha.malli/validate]
-        [:xtdb.api/put]]
+         :juxt.pass.alpha/process
+         [
+          [:juxt.pass.alpha.malli/validate]
+          [:xtdb.api/put]]
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? permission subject action resource)
-          [permission :juxt.pass.alpha/user-identity i]
-          [subject :juxt.pass.alpha/user-identity i]]]})
-     ;; end::create-action-put-error-resource![]
-     ))))
+         :juxt.pass.alpha/rules
+         '[
+           [(allowed? permission subject action resource)
+            [permission :juxt.pass.alpha/user-identity i]
+            [subject :juxt.pass.alpha/user-identity i]]]})
+       ;; end::create-action-put-error-resource![]
+       ))))
 
 (defn grant-permission-to-put-error-resource! []
   (eval
