@@ -512,8 +512,7 @@
             :as field-resolver-args}]
 
         #_(when (= "SiteError" (get-in object-type [::g/name]))
-            (def object-value object-value)
-            )
+            (def object-value object-value))
 
         (let [types-by-name (::schema/types-by-name schema)
               field (get-in object-type [::schema/fields-by-name field-name])
@@ -527,21 +526,21 @@
                          (::g/name object-type))
               db (try
                    (cond
-                       (and (not mutation?)
-                            (get argument-values "asOf"))
-                       (xt/db xt-node (-> argument-values
-                                          (get "asOf")
-                                          t/instant
-                                          t/inst))
-                       (and
-                        (get variable-values "historicalDb")
-                        (:_siteValidTime object-value))
-                       (do
-                         (xt/db xt-node (-> object-value
-                                            :_siteValidTime
-                                            t/inst)))
-                       :else
-                       db)
+                     (and (not mutation?)
+                          (get argument-values "asOf"))
+                     (xt/db xt-node (-> argument-values
+                                        (get "asOf")
+                                        t/instant
+                                        t/inst))
+                     (and
+                      (get variable-values "historicalDb")
+                      (:_siteValidTime object-value))
+                     (do
+                       (xt/db xt-node (-> object-value
+                                          :_siteValidTime
+                                          t/inst)))
+                     :else
+                     db)
                    (catch Exception _ db))
               object-id (:xt/id object-value)
               ;; TODO: Protected lookup please!
@@ -610,7 +609,11 @@
                   args (if (second query-args) query-args (first query-args))
                   results
                   (try
-                    (xt/q db q args)
+                    ;; XTDB >= 1.21.0 is asserting (= (count in-bindings) (count in-args))
+                    ;; args can be `nil` and `xt/q` is variadic
+                    (if (nil? args)
+                      (xt/q db q) ;; XTDB 1.21 has an
+                      (xt/q db q args))
                     (catch Exception e
                       (throw (ex-info "Failure when running XTDB query"
                                       {:message (ex-message e)
@@ -619,12 +622,11 @@
                                       e))))
                   limited-results (limit-results argument-values results)
                   result-entities (cond->>
-                                      (pull-entities db xt-node subject limited-results q)
-                                      (get site-args "a")
-                                      (map (keyword (get site-args "a")))
+                                   (pull-entities db xt-node subject limited-results q)
+                                    (get site-args "a")
+                                    (map (keyword (get site-args "a"))))]
 
-                                      )]
-              ;;(log/tracef "GraphQL results is %s" (seq result-entities))
+;;(log/tracef "GraphQL results is %s" (seq result-entities))
 
               (process-xt-results field result-entities))
 
@@ -648,8 +650,7 @@
                         (traverse object-value att subject db xt-node)
                         (get object-value (keyword att)))
                   transform-sym (some-> site-args (get "transform") symbol)
-                  transform (when transform-sym (requiring-resolve transform-sym))
-                  ]
+                  transform (when transform-sym (requiring-resolve transform-sym))]
               (if (= field-kind 'OBJECT)
                 (protected-lookup val subject db xt-node)
                 ;; TODO: check for lists
@@ -748,12 +749,12 @@
                   (get-in field [::schema/directives-by-name "onObject"])
                   (contains? object-value (keyword field-name))))
             (let [result (get object-value (keyword field-name))]
-                (cond
-                  (-> field ::g/type-ref list-type?)
-                  (limit-results argument-values result)
+              (cond
+                (-> field ::g/type-ref list-type?)
+                (limit-results argument-values result)
                   ;; TODO validate enum (enum? (field->type field) types-by-name)
-                  :else
-                  result))
+                :else
+                result))
 
             (and (field->type field)
                  (not (scalar? (field->type field) types-by-name))
