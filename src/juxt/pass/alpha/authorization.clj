@@ -382,12 +382,6 @@
 
           (cond-> ctx
             result (assoc ::pass/action-result result)
-            #_session-token
-            #_(update
-             :ring.response/headers
-             (fnil into {})
-             {"set-cookie"
-              (format "id=%s; Path=/; Secure; HttpOnly; SameSite=Lax" session-token)})
 
             ;; These ops are quotations that can be applied to the request
             ;; context.  The intention if for these quotations to set the
