@@ -135,21 +135,18 @@
    ::pass/rules
    '[
      ;; Unidentified visitors can read of PUBLIC resources
-     [(allowed? permission subject action resource)
-      [permission ::pass/action action]
+     [(allowed? permission subject resource)
       [resource ::pass/classification "PUBLIC"]
       [(nil? subject)]
       ]
 
      ;; Identified visitors can also read PUBLIC resource
-     [(allowed? permission subject action resource)
-      [permission ::pass/action action]
+     [(allowed? permission subject resource)
       [resource ::pass/classification "PUBLIC"]
       [subject :xt/id]]
 
      ;; Only persons granted permission to read INTERNAL resources
-     [(allowed? permission subject action resource)
-      [permission ::pass/action action]
+     [(allowed? permission subject resource)
       [resource ::pass/classification "INTERNAL"]
       [permission ::person person]
       [subject ::person person]]
@@ -238,17 +235,14 @@
   {:xt/id "https://example.org/actions/read-user-dir"
    ::site/type "https://meta.juxt.site/pass/action"
    ::pass/scope "read:resource"
-   ::pass/resource-matches "https://example.org/~([a-z]+)/.+"
    ::pass/rules
-   '[[(allowed? permission subject action resource)
-      [permission ::pass/action action]
-      [action ::pass/resource-matches resource-regex]
+   '[[(allowed? permission subject resource)
       [permission ::person person]
       [subject ::person person]
       [person ::type "Person"]
       [resource :xt/id]
       [person ::username username]
-      [(re-pattern resource-regex) resource-pattern]
+      [(re-pattern "https://example.org/~([a-z]+)/.+") resource-pattern]
       [(re-matches resource-pattern resource) [_ user]]
       [(= user username)]]]})
 
@@ -256,17 +250,13 @@
   {:xt/id "https://example.org/actions/write-user-dir"
    ::site/type "https://meta.juxt.site/pass/action"
    ::pass/scope "write:resource"
-   ::pass/resource-matches "https://example.org/~([a-z]+)/.+"
-   ::pass/action-args [{}]
    ::pass/rules
-   '[[(allowed? permission subject action resource)
-      [permission ::pass/action action]
-      [action ::pass/resource-matches resource-regex]
+   '[[(allowed? permission subject resource)
       [permission ::person person]
       [subject ::person person]
       [person ::type "Person"]
       [person ::username username]
-      [(re-pattern resource-regex) resource-pattern]
+      [(re-pattern "https://example.org/~([a-z]+)/.+") resource-pattern]
       [(re-matches resource-pattern resource) [_ user]]
       [(= user username)]]]})
 
@@ -275,8 +265,7 @@
    ::site/type "https://meta.juxt.site/pass/action"
    ::pass/scope "read:resource"
    ::pass/rules
-   '[[(allowed? permission subject action resource)
-      [permission ::pass/action action]
+   '[[(allowed? permission subject resource)
       [permission ::person person]
       [person ::type "Person"]
       [subject ::person person]
@@ -506,7 +495,7 @@
          ::pass/scope "read:user"
          ::pass/pull [::username]
          ::pass/rules
-         '[[(allowed? permission subject action resource)
+         '[[(allowed? permission subject resource)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -518,7 +507,7 @@
          ::pass/scope "read:user"
          ::pass/pull [::secret]
          ::pass/rules
-         '[[(allowed? permission subject action resource)
+         '[[(allowed? permission subject resource)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -611,7 +600,7 @@
          ::pass/scope "read:messages"
          ::pass/pull [::content]
          ::pass/rules
-         '[[(allowed? permission subject action resource)
+         '[[(allowed? permission subject resource)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -625,7 +614,7 @@
          ::pass/scope "read:messages"
          ::pass/pull [::from ::to ::date]
          ::pass/rules
-         '[[(allowed? permission subject action resource)
+         '[[(allowed? permission subject resource)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -793,8 +782,7 @@
          ::pass/pull ['*]
          ::pass/alert-log false
          ::pass/rules
-         '[[(allowed? permission subject action resource)
-            [permission ::pass/action action]
+         '[[(allowed? permission subject resource)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -807,8 +795,7 @@
          ::pass/pull ['*]
          ::pass/alert-log true
          ::pass/rules
-         '[[(allowed? permission subject action resource)
-            [permission ::pass/action action]
+         '[[(allowed? permission subject resource)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -875,8 +862,7 @@
          ::pass/scope "read:health"
          ::pass/pull ['*]
          ::pass/rules
-         '[[(allowed? permission subject action resource)
-            [permission ::pass/action action]
+         '[[(allowed? permission subject resource)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -985,8 +971,7 @@
     [::xt/put]]
 
    ::pass/rules
-   '[[(allowed? permission subject action resource)
-      [permission ::pass/action action]
+   '[[(allowed? permission subject resource)
       [permission ::person person]
       [subject ::person person]
       [person ::type "Person"]]]})
@@ -1086,19 +1071,16 @@
                ::pass/rules
                '[
                  ;; Allow traders to see their own trades
-                 [(allowed? role-membership person action trade)
-                  [action :xt/id "https://example.org/actions/list-trades"]
+                 [(allowed? role-membership person trade)
                   [role-membership ::role "https://example.org/roles/trader"]
                   [role-membership ::person person]
                   [trade ::type "Trade"]
                   [trade ::trader person]]
 
-                 [(allowed? role-membership person action trade)
+                 [(allowed? role-membership person trade)
                   ;; Subjects who have the head-of-desk role
                   [role-membership ::role "https://example.org/roles/head-of-desk"]
                   [role-membership ::person person]
-                  ;; Can list
-                  [action :xt/id "https://example.org/actions/list-trades"]
                   ;; trades
                   [trade ::type "Trade"]
                   ;; from the same desk
@@ -1112,10 +1094,9 @@
                ::pass/pull '[::desk ::value :xt/id]
                ::pass/rules
                '[
-                 [(allowed? role-membership person action trade)
+                 [(allowed? role-membership person trade)
                   [role-membership ::role "https://example.org/roles/regulatory-risk-controller"]
                   [role-membership ::person person]
-                  [action :xt/id "https://example.org/actions/control-list-trades"]
                   [trade ::type "Trade"]
                   ]]}]
 
@@ -1124,14 +1105,12 @@
                ::pass/pull '[*]
                ::pass/rules
                '[
-                 [(allowed? role-membership head-of-desk get-trader-personal-info trader)
+                 [(allowed? role-membership head-of-desk trader)
 
                   ;; Subjects who have the head-of-desk role
                   [role-membership ::site/type "https://meta.juxt.site/pass/permission"]
                   [role-membership ::role "https://example.org/roles/head-of-desk"]
                   [role-membership ::person head-of-desk]
-
-                  [get-trader-personal-info :xt/id "https://example.org/actions/get-trader-personal-info"]
 
                   [trader ::type "Person"]
                   ;; Only for a trader that works on the same desk
@@ -1432,7 +1411,7 @@
             [::xt/put]]
 
           ::pass/rules
-          '[[(allowed? permission subject action resource)
+          '[[(allowed? permission subject resource)
              [permission ::person person]
              [subject ::person person]
              [person ::type "Person"]]]}]

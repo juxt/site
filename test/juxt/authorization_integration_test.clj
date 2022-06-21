@@ -71,7 +71,7 @@
    :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
    :juxt.pass.alpha/scope "read:resource"
    :juxt.pass.alpha/rules
-   [['(allowed? permission subject action resource)
+   [['(allowed? permission subject resource)
      ['permission :xt/id]]]})
 
 (defn add-not-found-resource
@@ -86,7 +86,7 @@
   {:xt/id (str site-prefix path)
    ::site/methods {:get {:juxt.pass.alpha/actions #{(str site-prefix "/actions/get-public-resource")}}}
    :juxt.pass.alpha/rules
-   [['(allowed? permission subject action resource)
+   [['(allowed? permission subject resource)
      ['permission :xt/id]]]})
 
 (defn make-access-token
@@ -119,13 +119,23 @@
       (is (= "Hello World" (:ring.response/body resp))))))
 
 (deftest unauthorized-test
-  (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
-                                                          '[[(allowed? permission subject action resource)
-                                                             [permission :juxt.pass.alpha/user user]
-                                                             [subject :juxt.pass.alpha/identity ident]
-                                                             [ident :juxt.pass.alpha/user user]]]}))
-  (repl/put! (merge (make-permission "get-public-resource") {:juxt.pass.alpha/user (str site-prefix "/users/unauthorized-user")}))
-  (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
+  (repl/put!
+   (merge (make-action "get-public-resource")
+          {:juxt.pass.alpha/rules
+           '[[(allowed? permission subject resource)
+              [permission :juxt.pass.alpha/user user]
+              [subject :juxt.pass.alpha/identity ident]
+              [ident :juxt.pass.alpha/user user]]]}))
+  (repl/put!
+   (merge
+    (make-permission "get-public-resource")
+    {:juxt.pass.alpha/user (str site-prefix "/users/unauthorized-user")}))
+
+  (repl/put!
+   (merge
+    (make-resource "/hello")
+    {:juxt.http.alpha/content-type "text/plain"
+     :juxt.http.alpha/content "Hello World" }))
 
   (repl/put! (make-bearer-protection-space "test"))
 
@@ -135,11 +145,14 @@
       (is (= 401 (:ring.response/status resp))))))
 
 (deftest forbidden-test
-  (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
-                                                     '[[(allowed? permission subject action resource)
-                                                        [permission :xt/id]
-                                                        [subject :juxt.pass.alpha/identity ident]
-                                                        [ident :juxt.pass.alpha/user "https://test.example.com/users/alice"]]]}))
+  (repl/put!
+   (merge
+    (make-action "get-public-resource")
+    {:juxt.pass.alpha/rules
+     '[[(allowed? permission subject resource)
+        [permission :xt/id]
+        [subject :juxt.pass.alpha/identity ident]
+        [ident :juxt.pass.alpha/user "https://test.example.com/users/alice"]]]}))
   (repl/put! (merge (make-permission "get-public-resource")))
   (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
   (repl/put! (make-user "bob"))
@@ -178,11 +191,15 @@
 
 
 (deftest issue-bearer-token-test
-  (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
-                                                          '[[(allowed? permission subject action resource)
-                                                             [permission :xt/id]
-                                                             [subject :juxt.pass.alpha/identity ident]
-                                                             [ident :juxt.pass.alpha/user "https://test.example.com/users/alice"]]]}))
+  (repl/put!
+   (merge
+    (make-action "get-public-resource")
+    {:juxt.pass.alpha/rules
+     '[[(allowed? permission subject resource)
+        [permission :xt/id]
+        [subject :juxt.pass.alpha/identity ident]
+        [ident :juxt.pass.alpha/user "https://test.example.com/users/alice"]]]}
+    ))
   (repl/put! (make-permission "get-public-resource"))
   (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
   (repl/put! (make-user "alice"))
@@ -225,11 +242,14 @@
         (is (= 403 (:ring.response/status resp)))))
 
 
-    (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
-                                                           '[[(allowed? permission subject action resource)
-                                                              [permission :xt/id]
-                                                              [subject :juxt.pass.alpha/identity ident]
-                                                              [ident :juxt.pass.alpha/user #{"https://test.example.com/users/alice" "https://test.example.com/users/bob"}]]]}))
+    (repl/put!
+     (merge
+      (make-action "get-public-resource")
+      {:juxt.pass.alpha/rules
+       '[[(allowed? permission subject resource)
+          [permission :xt/id]
+          [subject :juxt.pass.alpha/identity ident]
+          [ident :juxt.pass.alpha/user #{"https://test.example.com/users/alice" "https://test.example.com/users/bob"}]]]}))
 
     (testing "Access to a resource which requires authorization is permitted when a valid bearer token is provided for a user with permission (when multiple users are specified)"
       (let [resp (*handler* {:ring.request/method :get
@@ -238,12 +258,15 @@
         (is (= 200 (:ring.response/status resp)))))))
 
 (deftest arbitrary-field-permission-test
-  (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
-                                                          '[[(allowed? permission subject action resource)
-                                                             [permission :xt/id]
-                                                             [subject :juxt.pass.alpha/identity ident]
-                                                             [ident :juxt.pass.alpha/user user]
-                                                             [user :roles :developer]]]}))
+  (repl/put!
+   (merge
+    (make-action "get-public-resource")
+    {:juxt.pass.alpha/rules
+     '[[(allowed? permission subject resource)
+        [permission :xt/id]
+        [subject :juxt.pass.alpha/identity ident]
+        [ident :juxt.pass.alpha/user user]
+        [user :roles :developer]]]}))
   (repl/put! (make-permission "get-public-resource"))
   (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
   (repl/put! (assoc (make-user "alice") :roles #{:developer :admin}))
@@ -265,32 +288,35 @@
         carlos-access-token-doc (make-access-token "carlos-subj")
         carlos-access-token (:juxt.pass.alpha/token carlos-access-token-doc)
         attempt-access-fn (fn [access-token] (*handler* {:ring.request/method :get
-                             :ring.request/headers {"authorization" (str "Bearer " access-token)}
-                             :ring.request/path "/hello"}))]
-        (repl/put! alice-access-token-doc)
-        (repl/put! bob-access-token-doc)
-        (repl/put! carlos-access-token-doc)
+                                                         :ring.request/headers {"authorization" (str "Bearer " access-token)}
+                                                         :ring.request/path "/hello"}))]
+    (repl/put! alice-access-token-doc)
+    (repl/put! bob-access-token-doc)
+    (repl/put! carlos-access-token-doc)
 
-        (testing "A user who is in the single permitted role can access the resource"
-          (is (= 200 (:ring.response/status (attempt-access-fn alice-access-token))))
-          (is (= 200 (:ring.response/status (attempt-access-fn bob-access-token)))))
+    (testing "A user who is in the single permitted role can access the resource"
+      (is (= 200 (:ring.response/status (attempt-access-fn alice-access-token))))
+      (is (= 200 (:ring.response/status (attempt-access-fn bob-access-token)))))
 
-        (testing "A user who is not in the single permitted role cannot access the resource"
-          (is (= 403 (:ring.response/status (attempt-access-fn carlos-access-token)))))
+    (testing "A user who is not in the single permitted role cannot access the resource"
+      (is (= 403 (:ring.response/status (attempt-access-fn carlos-access-token)))))
 
-        (repl/put! (merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
-                                                               '[[(allowed? permission subject action resource)
-                                                                  [permission :xt/id]
-                                                                  [subject :juxt.pass.alpha/identity ident]
-                                                                  [ident :juxt.pass.alpha/user user]
-                                                                  [user :roles #{:admin :infrastructure}]]]}))
+    (repl/put!
+     (merge
+      (make-action "get-public-resource")
+      {:juxt.pass.alpha/rules
+       '[[(allowed? permission subject resource)
+          [permission :xt/id]
+          [subject :juxt.pass.alpha/identity ident]
+          [ident :juxt.pass.alpha/user user]
+          [user :roles #{:admin :infrastructure}]]]}))
 
-        (testing "A user who is in one of the multiple permitted roles can access the resource"
-          (is (= 200 (:ring.response/status (attempt-access-fn alice-access-token))))
-          (is (= 200 (:ring.response/status (attempt-access-fn carlos-access-token)))))
+    (testing "A user who is in one of the multiple permitted roles can access the resource"
+      (is (= 200 (:ring.response/status (attempt-access-fn alice-access-token))))
+      (is (= 200 (:ring.response/status (attempt-access-fn carlos-access-token)))))
 
-        (testing "A user who is not in one of the permitted roles cannot access the resource"
-          (is (= 403 (:ring.response/status (attempt-access-fn bob-access-token)))))))
+    (testing "A user who is not in one of the permitted roles cannot access the resource"
+      (is (= 403 (:ring.response/status (attempt-access-fn bob-access-token)))))))
 
 
 ;;;; TESTS END ;;;;
@@ -300,17 +326,20 @@
   ((t/join-fixtures fixtures)
    (fn []
 
-     (repl/put!(merge (make-action "get-public-resource") {:juxt.pass.alpha/rules
-                                                             '[[(allowed? permission subject action resource)
-                                                                [permission :xt/id]
-                                                                [subject :juxt.pass.alpha/identity ident]]]}))
+     (repl/put!
+      (merge
+       (make-action "get-public-resource")
+       {:juxt.pass.alpha/rules
+        '[[(allowed? permission subject resource)
+           [permission :xt/id]
+           [subject :juxt.pass.alpha/identity ident]]]}))
      (repl/put! (merge (make-permission "get-public-resource") {:juxt.pass.alpha/user (str site-prefix "/users/unauthorized-user")}))
      (repl/put! (merge (make-resource "/hello") { :juxt.http.alpha/content-type "text/plain" :juxt.http.alpha/content "Hello World" }))
      (repl/put! (make-user "alice"))
      (repl/put! (make-identity "alice"))
      (repl/put! (make-subject "alice" "alice-subj"))
      (let [access-token-doc (make-access-token "alice-subj")
-        access-token (:juxt.pass.alpha/token access-token-doc)]
+           access-token (:juxt.pass.alpha/token access-token-doc)]
        (repl/put! access-token-doc)
        (juxt.pass.alpha.authentication/lookup-subject-from-bearer (xt/db *xt-node*) access-token))
      #_(juxt.pass.alpha.authorization/check-permissions (xt/db *xt-node*) #{"https://test.example.com/actions/get-public-resource"} {:resource "https://test.example.com/hello" :subject "https://test.example.com/subjects/alice-subj"})

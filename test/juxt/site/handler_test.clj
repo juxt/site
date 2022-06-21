@@ -41,7 +41,7 @@
 
       ::pass/rules
       '[
-        [(allowed? permission subject action resource)
+        [(allowed? permission subject resource)
          [permission ::pass/subject subject]
          [(nil? resource)]]]}]
 
@@ -110,7 +110,7 @@
 
        ::pass/rules
        '[
-         [(allowed? permission subject action resource)
+         [(allowed? permission subject resource)
           [permission ::pass/subject subject]
           [(nil? resource)]]]}]
 
@@ -220,7 +220,7 @@
 
       ::pass/rules
       '[
-        [(allowed? permission subject action resource)
+        [(allowed? permission subject resource)
          [permission ::pass/subject subject]
          [(nil? resource)]]]}]
 
@@ -300,7 +300,7 @@
 
       ::pass/rules
       '[
-        [(allowed? permission subject action resource)
+        [(allowed? permission subject resource)
          [permission ::pass/subject subject]
          [(nil? resource)]]]}]
 

@@ -620,7 +620,7 @@
 
     ::pass/rules
     '[
-      [(allowed? permission subject action resource)
+      [(allowed? permission subject resource)
        [permission ::pass/subject subject]]]})
 
   (grant-permission!
@@ -653,7 +653,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject action resource)
+      [(allowed? permission subject resource)
        [permission :juxt.pass.alpha/subject subject]]]})
 
   (grant-permission!
