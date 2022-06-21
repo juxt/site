@@ -27,18 +27,25 @@ HTML edition available at https://text.juxt.site/site-book.html
 
 toc::[]
 
-= Introduction
+= Preliminaries
 
 include::Introduction.adoc[leveloffset=+1]
 
-include::Values.adoc[leveloffset=+1]
+include::Concepts.adoc[leveloffset=+1]
 
-include::Principles.adoc[leveloffset=+1]
+== Values & Principles
+
+include::Values.adoc[leveloffset=+2]
+
+include::Principles.adoc[leveloffset=+2]
 
 = Getting Started
 
+This part contains tutorials to help gain a basic familiarity with Site.
+
 include::Installation.adoc[leveloffset=+1]
 
+////
 = Preliminaries
 
 If you're in a hurry, or want to get started quickly with Site, you should skip
@@ -48,8 +55,9 @@ However, in keeping with our value of <<understanding,Understanding>>, we
 recommended that you invest time in building up both your working and conceptual
 knowledge of Site. These chapters will help to build up your knowledge of Site
 'from scratch'. If you've chosen this course, welcome to the slow track!
+////
 
-include::Concepts.adoc[leveloffset=+1]
+= Essentials
 
 [[ch-actions]]
 include::Actions.adoc[leveloffset=+1]
@@ -60,12 +68,10 @@ include::Users.adoc[leveloffset=+1]
 [[ch-creating-users]]
 include::UsersRevisited.adoc[leveloffset=+2]
 
-= Resources
-
 [[ch-resources]]
 include::Resources.adoc[leveloffset=+1]
 
-include::Representations.adoc[leveloffset=+1]
+include::Representations.adoc[leveloffset=+2]
 
 = Authentication
 

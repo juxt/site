@@ -1,4 +1,4 @@
-= Site Values
+= Values
 :toc: left
 
 Here are Site's values.
