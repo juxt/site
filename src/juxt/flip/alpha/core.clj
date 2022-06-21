@@ -37,7 +37,7 @@
                            })))
 
 ;; no-op is identity
-(defmethod word 'no-op [stack queue env]
+(defmethod word 'no-op [stack [_ & queue] env]
   [stack queue env])
 
 ;; TODO: What is the Factor equivalent name?
