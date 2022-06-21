@@ -84,12 +84,13 @@ You will need to define your own actions to represent the activities you want to
 
 Here are some example actions:
 
-- Loginfootnote:[Assuming that logging in results in the creation of a session, that is a change to the database]
+- Login
 - List all products
 - Edit a product
 - Add a customer
 - Promote an employee
 - Post an article
+- Logout
 
 Actions are themselves defined as documents.
 
@@ -124,8 +125,8 @@ Site provides a built-in stack-based language which is specially designed for wr
 include::../../test/juxt/book.clj[tag=example-action,indent=0]
 ----
 <1> This document is an action.
-<1> Rules that govern whether this action can be used to access a document.
-<2> A program which creates any effects resulting from performing the action.
+<2> Rules that govern whether this action can be used to access a document.
+<3> A program which creates any effects resulting from performing the action.
 --
 
 ////
@@ -195,9 +196,17 @@ Users, user identities and subjects are described in <<ch-users>>.
 
 == Resources
 
-////
-TODO
-////
+Site maps the concept of an XTDB entity onto the concept of a REST resource.
+
+[quote,Roy Fielding,https://www.ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm]
+--
+The key abstraction of information in REST is a resource. Any information that can be named can be a resource: a document or image, a temporal service (e.g. "today's weather in Los Angeles"), a collection of other resources, a non-virtual object (e.g. a person), and so on. In other words, any concept that might be the target of an author's hypertext reference must fit within the definition of a resource. A resource is a conceptual mapping to a set of [.line-through]#entities#(XTDB documents), not the [.line-through]#entitys#(XTDB document) that corresponds to the mapping at any particular point in time.
+
+More precisely, a resource latexmath:[R] is a temporally varying membership function latexmath:[M{\text{R}}(t)], which for time t maps to a set of [.line-through]#entities#(XTDB documents), or values, which are equivalent.
+--
+
+An entity shares a number of and a web resource have a number of features in common.
+
 
 Notice in <<ex-cat-entity>> we chose to set the `:xt/id` attribute to a URL string: `+https://example.org/cats/arya+`.
 
@@ -206,7 +215,7 @@ Both are uniquely identifiable, both contain state that may change over time.
 In Site, A document represents the _current state_ of a web resource.
 
 In fact, the only difference between a web resource and an entity is that a web resource is accessible over HTTP.
-So, it's _that_ capability that Site gives an entity.
+So, it's _that_ capability that Site adds to an entity.
 
 ////
 We can now stop using the term document.
