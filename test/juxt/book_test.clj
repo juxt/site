@@ -170,7 +170,7 @@
     :juxt.pass.alpha/scope "write:user-content"
     :juxt.pass.alpha/rules
     [
-     '[(allowed? permission subject resource)
+     '[(allowed? subject resource permission)
        [permission ::pass/user user]
        [subject ::pass/user-identity id]
        [id ::pass/user user]

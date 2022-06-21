@@ -135,18 +135,18 @@
    ::pass/rules
    '[
      ;; Unidentified visitors can read of PUBLIC resources
-     [(allowed? permission subject resource)
+     [(allowed? subject resource permission)
       [resource ::pass/classification "PUBLIC"]
       [(nil? subject)]
       ]
 
      ;; Identified visitors can also read PUBLIC resource
-     [(allowed? permission subject resource)
+     [(allowed? subject resource permission)
       [resource ::pass/classification "PUBLIC"]
       [subject :xt/id]]
 
      ;; Only persons granted permission to read INTERNAL resources
-     [(allowed? permission subject resource)
+     [(allowed? subject resource permission)
       [resource ::pass/classification "INTERNAL"]
       [permission ::person person]
       [subject ::person person]]
@@ -236,7 +236,7 @@
    ::site/type "https://meta.juxt.site/pass/action"
    ::pass/scope "read:resource"
    ::pass/rules
-   '[[(allowed? permission subject resource)
+   '[[(allowed? subject resource permission)
       [permission ::person person]
       [subject ::person person]
       [person ::type "Person"]
@@ -251,7 +251,7 @@
    ::site/type "https://meta.juxt.site/pass/action"
    ::pass/scope "write:resource"
    ::pass/rules
-   '[[(allowed? permission subject resource)
+   '[[(allowed? subject resource permission)
       [permission ::person person]
       [subject ::person person]
       [person ::type "Person"]
@@ -265,7 +265,7 @@
    ::site/type "https://meta.juxt.site/pass/action"
    ::pass/scope "read:resource"
    ::pass/rules
-   '[[(allowed? permission subject resource)
+   '[[(allowed? subject resource permission)
       [permission ::person person]
       [person ::type "Person"]
       [subject ::person person]
@@ -495,7 +495,7 @@
          ::pass/scope "read:user"
          ::pass/pull [::username]
          ::pass/rules
-         '[[(allowed? permission subject resource)
+         '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -507,7 +507,7 @@
          ::pass/scope "read:user"
          ::pass/pull [::secret]
          ::pass/rules
-         '[[(allowed? permission subject resource)
+         '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -600,7 +600,7 @@
          ::pass/scope "read:messages"
          ::pass/pull [::content]
          ::pass/rules
-         '[[(allowed? permission subject resource)
+         '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -614,7 +614,7 @@
          ::pass/scope "read:messages"
          ::pass/pull [::from ::to ::date]
          ::pass/rules
-         '[[(allowed? permission subject resource)
+         '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -782,7 +782,7 @@
          ::pass/pull ['*]
          ::pass/alert-log false
          ::pass/rules
-         '[[(allowed? permission subject resource)
+         '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -795,7 +795,7 @@
          ::pass/pull ['*]
          ::pass/alert-log true
          ::pass/rules
-         '[[(allowed? permission subject resource)
+         '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -862,7 +862,7 @@
          ::pass/scope "read:health"
          ::pass/pull ['*]
          ::pass/rules
-         '[[(allowed? permission subject resource)
+         '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
@@ -971,7 +971,7 @@
     [::xt/put]]
 
    ::pass/rules
-   '[[(allowed? permission subject resource)
+   '[[(allowed? subject resource permission)
       [permission ::person person]
       [subject ::person person]
       [person ::type "Person"]]]})
@@ -1071,13 +1071,13 @@
                ::pass/rules
                '[
                  ;; Allow traders to see their own trades
-                 [(allowed? role-membership person trade)
+                 [(allowed? person trade role-membership)
                   [role-membership ::role "https://example.org/roles/trader"]
                   [role-membership ::person person]
                   [trade ::type "Trade"]
                   [trade ::trader person]]
 
-                 [(allowed? role-membership person trade)
+                 [(allowed? person trade role-membership)
                   ;; Subjects who have the head-of-desk role
                   [role-membership ::role "https://example.org/roles/head-of-desk"]
                   [role-membership ::person person]
@@ -1094,7 +1094,7 @@
                ::pass/pull '[::desk ::value :xt/id]
                ::pass/rules
                '[
-                 [(allowed? role-membership person trade)
+                 [(allowed? person trade role-membership)
                   [role-membership ::role "https://example.org/roles/regulatory-risk-controller"]
                   [role-membership ::person person]
                   [trade ::type "Trade"]
@@ -1105,7 +1105,7 @@
                ::pass/pull '[*]
                ::pass/rules
                '[
-                 [(allowed? role-membership head-of-desk trader)
+                 [(allowed? head-of-desk trader role-membership)
 
                   ;; Subjects who have the head-of-desk role
                   [role-membership ::site/type "https://meta.juxt.site/pass/permission"]
@@ -1411,7 +1411,7 @@
             [::xt/put]]
 
           ::pass/rules
-          '[[(allowed? permission subject resource)
+          '[[(allowed? subject resource permission)
              [permission ::person person]
              [subject ::person person]
              [person ::type "Person"]]]}]

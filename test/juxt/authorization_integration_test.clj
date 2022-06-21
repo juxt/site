@@ -71,7 +71,7 @@
    :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
    :juxt.pass.alpha/scope "read:resource"
    :juxt.pass.alpha/rules
-   [['(allowed? permission subject resource)
+   [['(allowed? subject resource permission)
      ['permission :xt/id]]]})
 
 (defn add-not-found-resource
@@ -86,7 +86,7 @@
   {:xt/id (str site-prefix path)
    ::site/methods {:get {:juxt.pass.alpha/actions #{(str site-prefix "/actions/get-public-resource")}}}
    :juxt.pass.alpha/rules
-   [['(allowed? permission subject resource)
+   [['(allowed? subject resource permission)
      ['permission :xt/id]]]})
 
 (defn make-access-token
@@ -122,7 +122,7 @@
   (repl/put!
    (merge (make-action "get-public-resource")
           {:juxt.pass.alpha/rules
-           '[[(allowed? permission subject resource)
+           '[[(allowed? subject resource permission)
               [permission :juxt.pass.alpha/user user]
               [subject :juxt.pass.alpha/identity ident]
               [ident :juxt.pass.alpha/user user]]]}))
@@ -149,7 +149,7 @@
    (merge
     (make-action "get-public-resource")
     {:juxt.pass.alpha/rules
-     '[[(allowed? permission subject resource)
+     '[[(allowed? subject resource permission)
         [permission :xt/id]
         [subject :juxt.pass.alpha/identity ident]
         [ident :juxt.pass.alpha/user "https://test.example.com/users/alice"]]]}))
@@ -195,7 +195,7 @@
    (merge
     (make-action "get-public-resource")
     {:juxt.pass.alpha/rules
-     '[[(allowed? permission subject resource)
+     '[[(allowed? subject resource permission)
         [permission :xt/id]
         [subject :juxt.pass.alpha/identity ident]
         [ident :juxt.pass.alpha/user "https://test.example.com/users/alice"]]]}
@@ -246,7 +246,7 @@
      (merge
       (make-action "get-public-resource")
       {:juxt.pass.alpha/rules
-       '[[(allowed? permission subject resource)
+       '[[(allowed? subject resource permission)
           [permission :xt/id]
           [subject :juxt.pass.alpha/identity ident]
           [ident :juxt.pass.alpha/user #{"https://test.example.com/users/alice" "https://test.example.com/users/bob"}]]]}))
@@ -262,7 +262,7 @@
    (merge
     (make-action "get-public-resource")
     {:juxt.pass.alpha/rules
-     '[[(allowed? permission subject resource)
+     '[[(allowed? subject resource permission)
         [permission :xt/id]
         [subject :juxt.pass.alpha/identity ident]
         [ident :juxt.pass.alpha/user user]
@@ -305,7 +305,7 @@
      (merge
       (make-action "get-public-resource")
       {:juxt.pass.alpha/rules
-       '[[(allowed? permission subject resource)
+       '[[(allowed? subject resource permission)
           [permission :xt/id]
           [subject :juxt.pass.alpha/identity ident]
           [ident :juxt.pass.alpha/user user]
@@ -330,7 +330,7 @@
       (merge
        (make-action "get-public-resource")
        {:juxt.pass.alpha/rules
-        '[[(allowed? permission subject resource)
+        '[[(allowed? subject resource permission)
            [permission :xt/id]
            [subject :juxt.pass.alpha/identity ident]]]}))
      (repl/put! (merge (make-permission "get-public-resource") {:juxt.pass.alpha/user (str site-prefix "/users/unauthorized-user")}))

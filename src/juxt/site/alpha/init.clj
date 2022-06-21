@@ -260,7 +260,7 @@
     ::pass/rules
     '[
       ;; See related comment above
-      [(allowed? permission subject resource)
+      [(allowed? subject resource permission)
        [permission ::pass/identity i]
        [subject ::pass/identity i]]]}))
 
@@ -444,7 +444,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource)
+      [(allowed? subject resource permission)
        [permission :juxt.pass.alpha/identity i]
        [subject :juxt.pass.alpha/identity i]]]})
 
@@ -465,7 +465,7 @@
 
     :juxt.pass.alpha/rules
     [
-     ['(allowed? permission subject resource)
+     ['(allowed? subject resource permission)
       ['permission :xt/id (str base-uri "/permissions/public-resources-to-all")]]]})
 
   ;; All actions must be granted a permission. This permission allows anyone to
@@ -504,7 +504,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource)
+      [(allowed? subject resource permission)
        [permission :juxt.pass.alpha/subject subject]]]})
 
   (grant-permission!
@@ -524,7 +524,7 @@
 
     :juxt.pass.alpha/rules
     [
-     ['(allowed? permission subject resource)
+     ['(allowed? subject resource permission)
       '[permission :juxt.pass.alpha/resource resource]
       ['permission :juxt.pass.alpha/action (str base-uri "/actions/get-private-resource")]
       ['subject :xt/id]]]}))

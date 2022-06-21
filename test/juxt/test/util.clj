@@ -96,10 +96,10 @@
       ::site/type "Action"
       ::pass/rules
       '[
-        [(allowed? permission subject resource)
+        [(allowed? subject resource permission)
          [permission ::pass/subject subject]
          [(nil? resource)]]
-        [(allowed? permission subject resource)
+        [(allowed? subject resource permission)
          [permission ::pass/subject subject]
          [resource :xt/id]]]}]
 

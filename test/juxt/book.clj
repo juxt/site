@@ -21,14 +21,12 @@
 (comment
   ;; tag::example-action[]
   {:xt/id "https://site.test/example/add-customer"
-
-   :juxt.pass.alpha/rules
-   '[
-     [(allowed? permission subject resource)
-      [permission :xt/id "https://site.test/permissions/add-customer"]]]
-
-   :juxt.pass.alpha/run
-   '()
+   :juxt.site.alpha/type "https://meta.juxt.site/pass/action" ; <1>
+   :juxt.pass.alpha/rules ; <2>
+   [
+    ['(allowed? subject resource permission) …]
+    ]
+   :juxt.flip.alpha/quotation '(…) ; <3>
    }
   ;; end::example-action[]
   )
@@ -78,7 +76,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource) ; <6>
+      [(allowed? subject resource permission) ; <6>
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
@@ -127,7 +125,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource)
+      [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
@@ -180,7 +178,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource) ; <5>
+      [(allowed? subject resource permission) ; <5>
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
@@ -236,7 +234,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource)
+      [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
@@ -276,7 +274,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource)
+      [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
@@ -324,7 +322,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource) ; <3>
+      [(allowed? subject resource permission) ; <3>
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
@@ -354,7 +352,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource)
+      [(allowed? subject resource permission)
        [permission :xt/id "https://site.test/permissions/public-resources-to-all"] ; <2>
        ]]})
   ;; end::create-action-get-public-resource![]
@@ -429,7 +427,7 @@
 
          :juxt.pass.alpha/rules
          '[
-           [(allowed? permission subject resource)
+           [(allowed? subject resource permission)
             [permission :juxt.pass.alpha/user-identity i]
             [subject :juxt.pass.alpha/user-identity i]]]})
        ;; end::create-put-template-action![]
@@ -510,7 +508,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource) ; <2>
+      [(allowed? subject resource permission) ; <2>
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [permission :role role]
@@ -540,7 +538,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource)
+      [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [permission :juxt.pass.alpha/user user] ; <1>
@@ -575,7 +573,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource)
+      [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [permission :role role]
@@ -724,7 +722,7 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource)
+      [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [permission :role role]
@@ -997,7 +995,7 @@ Password: <input name=password type=password>
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? permission subject resource)
+      [(allowed? subject resource permission)
        [permission :xt/id]]]})
   ;; end::create-action-login![]
   )
@@ -1036,7 +1034,7 @@ Password: <input name=password type=password>
       xtdb.api/put)
 
     :juxt.pass.alpha/rules
-    '[[(allowed? permission subject resource)
+    '[[(allowed? subject resource permission)
        [id :juxt.pass.alpha/user user]
        [subject :juxt.pass.alpha/user-identity id]
        [user :role role]
@@ -1078,7 +1076,7 @@ Password: <input name=password type=password>
       xtdb.api/put)
 
     :juxt.pass.alpha/rules
-    '[[(allowed? permission subject resource)
+    '[[(allowed? subject resource permission)
        [id :juxt.pass.alpha/user user]
        [subject :juxt.pass.alpha/user-identity id]
        [user :role role]
@@ -1119,7 +1117,7 @@ Password: <input name=password type=password>
       xtdb.api/put)
 
     :juxt.pass.alpha/rules
-    '[[(allowed? permission subject resource)
+    '[[(allowed? subject resource permission)
        [id :juxt.pass.alpha/user user]
        [subject :juxt.pass.alpha/user-identity id]
        [permission :role role]
@@ -1245,7 +1243,7 @@ Password: <input name=password type=password>
 
          :juxt.pass.alpha/rules
          '[
-           [(allowed? permission subject resource)
+           [(allowed? subject resource permission)
             [permission :juxt.pass.alpha/user-identity i]
             [subject :juxt.pass.alpha/user-identity i]]]})
        ;; end::create-action-put-error-resource![]
@@ -1318,7 +1316,7 @@ Password: <input name=password type=password>
     :juxt.pass.alpha/scope "read:resource"
     :juxt.pass.alpha/rules
     [
-     ['(allowed? permission subject resource)
+     ['(allowed? subject resource permission)
       ['permission :xt/id]]]})
 
   (do-action

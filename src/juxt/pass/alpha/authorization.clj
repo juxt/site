@@ -46,7 +46,7 @@
       ;; Only consider a permitted action
       [permission ::site/type "https://meta.juxt.site/pass/permission"]
       [permission ::pass/action action]
-      (allowed? permission subject resource)
+      (allowed? subject resource permission)
 
       ;; Only permissions that match our purpose
       [permission ::pass/purpose purpose]
@@ -96,7 +96,7 @@
         ;; Only consider a permitted action
         [permission ::site/type "https://meta.juxt.site/pass/permission"]
         [permission ::pass/action action]
-        (allowed? permission subject resource)
+        (allowed? subject resource permission)
 
         ;; Only permissions that match our purpose
         [permission ::pass/purpose purpose]]
@@ -128,7 +128,7 @@
              ;; Only consider a permitted action
              [permission ::site/type "https://meta.juxt.site/pass/permission"]
              [permission ::pass/action action]
-             (allowed? permission subject resource)
+             (allowed? subject resource permission)
 
              ;; Only permissions that match our purpose
              [permission ::pass/purpose purpose]
@@ -181,7 +181,7 @@
                     ;; Only consider allowed permssions
                     [permission ::site/type "https://meta.juxt.site/pass/permission"]
                     [permission ::pass/action action]
-                    (allowed? permission subject resource)
+                    (allowed? subject resource permission)
 
                     ;; Only permissions that match our purpose
                     [permission ::pass/purpose purpose]]
