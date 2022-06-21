@@ -13,6 +13,11 @@ fonts:
 	-a toc=macro \
 	-r asciidoctor-diagram \
 	-r asciidoctor-mathematical \
+	-r asciidoctor-bibtex \
+	-a bibtex-file=references.bib \
+	-a bibtex-throw=true \
+	-a bibtex-style=apa \
+	-a mathematical-format=svg \
 	-a icons=font \
 	-a media=prepress \
 	-a pdf-style=juxt \

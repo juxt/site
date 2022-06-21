@@ -1,5 +1,6 @@
 = Site
 Malcolm Sparks <mal@juxt.pro>
+v1.0, 2022-06-21
 :doctype: book
 :toc: left
 :toclevels: 1
@@ -155,9 +156,12 @@ include::AppDevelopment.adoc[leveloffset=+1]
 
 include::Templates.adoc[leveloffset=+1]
 
-= Backmatter
+include::Glossary.adoc[]
 
-include::Glossary.adoc[leveloffset=+1]
+[bibliography]
+= References
+
+bibliography::[]
 
 [index]
 == Index

@@ -1,0 +1,16 @@
+= Site Book
+
+== Dependencies
+
+gem install things in Makefile
+
+
+== References
+
+See in `references.bib`
+
+https://github.com/asciidoctor/asciidoctor-bibtex
+https://www.bibsonomy.org/ is a good resource for finding entries.
+
+bibtex entries found by adding /bibtex/ to rfc: e.g.
+https://datatracker.ietf.org/doc/rfc7231/bibtex/

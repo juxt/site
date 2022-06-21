@@ -4,39 +4,28 @@
 
 [glossary]
 
-(((Action, definition)))
 Action:: An authorized read from, or write to, a Document or set of Documents.
 
-(((Document, definition)))
 Document:: A set of attributes, possibly nested, as a Clojure map, stored in the
 database.
 
-(((Entity, definition)))
 Entity:: A Record with its own identity (as the `:xt/id` attribute).
 
-(((Permission, definition)))
 Permission:: A Document capturing the act of granting or revoking access,
 typically to a Subject accessing a Resource.
 
-(((Protection Space, definition)))
 Protection Space:: A set of the resources, usually in the same domain identified by URIs with a given prefix, that will authenticate the User making the request and use that in any authorization decisions.
 
-(((Record, definition)))
 Record:: The set of all versions of a given Document.
 
-(((Resource, definition)))
-Resource:: A web resource. Most Entities in Site are Resources. See RFC 7231 Chapter 2
+Resource:: A web resource. Most Entities in Site are Resources. See cite:[rfc7231(7)]
 
-(((Resource Server, definition)))
 Resource Server:: "The server hosting the protected resources, capable of
 accepting and responding to protected resource requests using access tokens."
 
-(((Subject, definition)))
 Subject:: A Document containing the login details of a User
 
-(((User, definition)))
 User:: An individual person with access to Site resources
 
-(((User Identity, definition)))
 User Identity:: An Entity containing attributes that can uniquely identify a
 User

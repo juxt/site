@@ -196,37 +196,33 @@ Users, user identities and subjects are described in <<ch-users>>.
 
 == Resources
 
-Site maps the concept of an XTDB entity onto the concept of a REST resource.
+Site maps the XTDB entity onto the concept of a web resource, as defined in REST.
 
-[quote,Roy Fielding,https://www.ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm]
+We can understand why XTDB entities make for good web resources, by reading the following quote cite:[rest], replacing the term 'entity' for 'XTDB document'.
+
+[quote,Roy Fielding]
 --
-The key abstraction of information in REST is a resource. Any information that can be named can be a resource: a document or image, a temporal service (e.g. "today's weather in Los Angeles"), a collection of other resources, a non-virtual object (e.g. a person), and so on. In other words, any concept that might be the target of an author's hypertext reference must fit within the definition of a resource. A resource is a conceptual mapping to a set of [.line-through]#entities#(XTDB documents), not the [.line-through]#entitys#(XTDB document) that corresponds to the mapping at any particular point in time.
+The key abstraction of information in REST is a resource. Any information that
+can be named can be a resource: a document or image, a temporal service
+(e.g. "today's weather in Los Angeles"), a collection of other resources, a
+non-virtual object (e.g. a person), and so on. In other words, any concept that
+might be the target of an author's hypertext reference must fit within the
+definition of a resource. A resource is a conceptual mapping to a set of
+entities, not the entity that corresponds to the mapping at any particular point
+in time.
 
-More precisely, a resource latexmath:[R] is a temporally varying membership function latexmath:[M{\text{R}}(t)], which for time t maps to a set of [.line-through]#entities#(XTDB documents), or values, which are equivalent.
+More precisely, a resource R is a temporally varying membership function
+M~R~(t), which for time t maps to a set of entities, or values, which are
+equivalent. The values in the set may be resource representations and/or
+resource identifiers.
 --
 
-An entity shares a number of and a web resource have a number of features in common.
+The mapping from an XTDB entity to a web resource is accomplished by the following:
 
+* Each XTDB entity's `:xt/id` attribute is set to a URL (string), identifying the resource.
+* Representations are documents, encoding representation metadata in attributes.
 
-Notice in <<ex-cat-entity>> we chose to set the `:xt/id` attribute to a URL string: `+https://example.org/cats/arya+`.
-
-An entity and a web resource have a number of features in common.
-Both are uniquely identifiable, both contain state that may change over time.
-In Site, A document represents the _current state_ of a web resource.
-
-In fact, the only difference between a web resource and an entity is that a web resource is accessible over HTTP.
-So, it's _that_ capability that Site adds to an entity.
-
-////
-We can now stop using the term document.
-Instead, for an entity that is identified by a URL, we'll use the term **resource**.
-
-(this isn't quite right, we often use 'resource' to mean the current state, e.g. in 'allowed?', hence why this is commented)
-////
-
-=== Resource metadata
-
-Along with a URL identity, there are a number of particular attributes that can be added to a document to specify **resource metadata**.
+<<ex-cat-resource>> shows a document that, currently, has a single HTML representation.
 
 [[ex-cat-resource]]
 .A cat can be browsed
