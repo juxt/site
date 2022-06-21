@@ -808,6 +808,13 @@
 ;; itself should be ignorant of such policies. Additionally, this is more
 ;; aligned to OpenAPI's declaration of per-resource errors.
 
+(defn- q
+  "xt/q is variadic; XTDB 1.21 assert (= (count args-in-query) (count args))"
+  [db query args]
+  (if (nil? args)
+    (xt/q db query)
+    (xt/q db query args)))
+
 (defn error-resource
   "Locate an error resource. Currently only uses a simple database lookup of an
   'ErrorResource' entity matching the status. In future this could use rules to
@@ -815,7 +822,7 @@
   variables to determine the resource to use."
   [{::site/keys [db]} status]
   (when-let [res (ffirst
-            (xt/q db '{:find [(pull er [*])]
+            (q db '{:find [(pull er [*])]
                       :where [[er ::site/type "ErrorResource"]
                               [er :ring.response/status status]]
                       :in [status]} status))]
