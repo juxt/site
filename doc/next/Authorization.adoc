@@ -67,7 +67,7 @@ First, we'll need to create an action which will create our person entity.
 
  ::pass/rules <5>
  '[
-   [(allowed? permission subject action resource)
+   [(allowed? permission subject resource)
     [permission ::pass/subject subject]]]}
 )
 ----
@@ -152,7 +152,7 @@ location or from a different country.
 
   :juxt.pass.alpha/rules
   '[
-    [(allowed? permission subject action resource)
+    [(allowed? permission subject resource)
      [permission :juxt.pass.alpha/subject subject]]]})
 ----
 ====

@@ -258,7 +258,7 @@ These prescriptions are encoded as Datalog rules, as shown in <<ex-action>>.
 Each rule is a collection of clauses, the first clause is always:
 
 ----
-(allowed? permission subject action resource)
+(allowed? permission subject resource)
 ----
 
 Think of this as an equation where the 'permission' variable must be found,
@@ -274,7 +274,7 @@ Rules are applied to queries as well as to mutating writes.
 ----
 {:xt/id "https://example.org/actions/sit"
  :just.pass.alpha/rules
- [(allowed? permission subject action resource)
+ [(allowed? permission subject resource)
   [subject :juxt.pass.alpha/identity id]
   [id :juxt.pass.alpha/user user]
   [user :species "cat"]

@@ -1,128 +1,143 @@
 = Concepts
 :step:
 
-This chapter introduces the key concepts in Site.
+This chapter should give you a basic understanding of the key concepts in Site.
 
-You should read this chapter in order to gain an overview before diving into the
-details and practical examples in subsequent chapters.
+You should read this chapter to gain an overview before diving into the details
+and practical examples in subsequent chapters.
 
 == Documents
 
 // (((XTDB)))
 Data in Site is stored as documents in the https://xtdb.com[XTDB] database.
 
-A document is a set of named values, as shown in <<ex-cat-document>>.
+A **document** is a set of named values.
 
-[[ex-cat-document]]
-.A Document representing a cat
-====
-[source,clojure]
-----
-{:name "Arya"
- :species "Cat"
- :color "black"
- :favorite-activity "playing with string"}
-----
-====
+Values can be strings, numbers, sets, collections, or nested documents, recursively.
 
 Names are 'keywords', which identifiers prefixed with a colon (:).
 
-Values can be strings, numbers, sets, collections, nested documents and more.
+An example document is shown in <<ex-cat-document>>.
 
-All documents in Site can contain any additional attributes you need.
-
-// (((property graph)))
-This flexibility to compose documents from different attributes is one of the
-strengths of using a property-graph database such as XTDB under the hood.
-
-[TIP]
+[[ex-cat-document]]
+.A document representing a cat
+[example]
 --
-// ((("Halloway, Stuart")))
-See this talk segment by Stu Halloway to explain the rationale for using namespaces in attribute keywords:
-https://youtu.be/Qx0-pViyIDU?t=1464
+[source,clojure]
+----
+{:petshop/name "Arya"
+ :petshop/species "Cat"
+ :petshop/color "black"
+ :petshop/favorite-activity "playing with string"}
+----
 --
+
+All documents in Site can contain any number of additional attributes.
+
+Keyword namespaces are used to protected data from being overwritten when documents are merged together.
+
+Attributes with namespaces of `juxt.site`, `juxt.pass`, `juxt.http`, `xtdb.api` and `xt` are reserved.
 
 == Entities
 
-Before being stored in the database, each document is identified with an entity
-id, indicated by the attribute `:xt/id`.
+Each document has the special attribute `:xt/id` which identifies the **entity** to which the document belongs.
 
-A document can be considered a particular _version_ of an entity at a given
-point in time, as shown in <<ex-cat-entity>>.
+The document is a _version_ of the **entity**. There can be just one version of a document for an entity at any one time.
+
+The example given in <<ex-cat-entity>> shows two documents representing the same entity, but at different times.
 
 [[ex-cat-entity]]
 .A cat can change
-====
-[source,clojure]
-----
-{:xt/id "https://example.org/cats/arya"
- :name "Arya"
- :species "cat"
- :color "black"
- :favorite-activity "playing with string"}
-----
-
-and, at a later date…
+[example]
+--
+A cat might be represented by the following document:
 
 [source,clojure]
 ----
 {:xt/id "https://example.org/cats/arya"
- :name "Arya"
- :species "cat"
- :color "black"
- :favorite-activity "hunting mice"}
+ :petshop/name "Arya"
+ :petshop/species "cat"
+ :petshop/color "black"
+ :petshop/favorite-activity "playing with string"}
 ----
-====
 
-TIP: For more information about Documents and Entities, see https://xtdb.com.
+But, at a later date, the document might be updated:
 
-The `juxt.site`, `juxt.pass`, `juxt.http`, `xtdb.api` and `xt` namespaces are reserved to avoid the potential for attribute clashes.
+[source,clojure]
+----
+{:xt/id "https://example.org/cats/arya"
+ :petshop/name "Arya"
+ :petshop/species "cat"
+ :petshop/color "black"
+ :petshop/favorite-activity "hunting mice"}
+----
+--
 
-== Resources
-
-Notice in <<ex-cat-entity>> we chose to set the `:xt/id` attribute to a URL: `+https://example.org/cats/arya+`.
-
-An Entity has features common to a web resource: it is uniquely identifiable, holds state that may change over time.
-A Document represents the _current state_ of a Resource.
-
-In fact, the only difference between a web resource and an Entity is that a web resource is accessible over HTTP.
-So, it's _that_ feature that Site adds to Entities.
-
-We can now stop using the term Entity entirely, and start using the term Resource.
-
-Resources are discussed more fully in <<ch-resources>>.
+TIP: For more information about documents and entities, visit https://xtdb.com.
 
 == Actions
 
-Since Resources are accessible over the network, we must ensure that we protect them against unauthorized access.
-This is where Actions come in.
+Actions govern who can read and write documents.
 
-All read and write access to Resources are associated with one or more Actions.
+Action are _domain-specific_.
+You will need to define your own actions to represent the activities you want to perform on your system.
 
-Actions are domain-specific.
-Which Actions to define and how they are defined will depend on your business requirements, domain and access policies.
+Here are some example actions:
 
-Actions are defined in Documents.
-
-Examples of Actions include:
-
-- Login
+- Loginfootnote:[Assuming that logging in results in the creation of a session, that is a change to the database]
 - List all products
 - Edit a product
 - Add a customer
 - Promote an employee
 - Post an article
 
-A more detailed explanation of Actions can be found in <<ch-actions>>.
+Actions are themselves defined as documents.
 
-=== Rules & Permissions
+An action document contains one or more *rules*, written in *Datalog* syntax.
 
-Actions are associated with Rules that specify who can access which resources, and how.
+A **rule** is written in terms of:
 
-Rules are considered in the context of the person or machine requesting access, together with the Resource being accessed. Attributes of both can be considered together.
+- what is known about the person or machine requesting access (the **subject**)
+- what is known about the document being accessed (the **resource**)
+- an explicit document that permits access to the action (the **permission**)
 
 For example, it might be that a person's access might depend upon a role they have been assigned, and the document classification of the Resource.
-Or a VIP customer can access 'exclusive' special offers.
+Or that 'VIP' customers may access 'exclusive' special offers.
+
+If a rule is satisfied, access to a document is granted.
+
+When an action grants the creation, modification or deletion of documents, it will also have a program that _performs_ the action.
+This program might carry out validation of any inputs and return operations or effects which are applied.
+
+Such a program runs as a *transaction function* in XTDB, which gives certain consistency guarentees.
+
+Site provides a built-in stack-based language which is specially designed for writing these programs.
+
+<<ex-concept-action>> shows a sketch of an action document.
+
+[[ex-concept-action]]
+.An example action
+[example]
+--
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=example-action,indent=0]
+----
+<1> This document is an action.
+<1> Rules that govern whether this action can be used to access a document.
+<2> A program which creates any effects resulting from performing the action.
+--
+
+////
+Sometimes a resource is are hierarchical collections of other resources,  to an *action* (or, to be precise, actions), whether the action is a query or a modification.
+Some resources are a composition of other resources. For example, a resource might represent a list of produces
+////
+
+
+////
+Possibly demote this into the relevant chapter
+
+=== Permissions
 
 For access to be granted to a Resource, a Permission document must exist in the database.
 
@@ -135,79 +150,37 @@ Permission documents provide a permanent record of who had access to what, and w
 
 Rules & Permissions are described more fully in <<ch-rules-and-permissions>>.
 
+A more detailed explanation of actions, rules and permissions can be found in <<ch-actions>>.
+////
+
 == Users
 
-Users are individuals that have access to Site. Users might be permitted to
-query, create, update and/or delete certain documents.
+An individual that have access to Site is called a **user**.
 
-A User is stored in the database as a document. Since every system has its own
-requirements about what data must be captured to represent a User, Site doesn't
-prescribe what a User should be, and allows the document to contain any and all
-details that might be necessary footnote:[in fact, this is true for all
-documents in Site].
+Each user is defined in a document.
 
-In fact, we could designate our black cat Arya as a user.
+(Since every system has its own requirements about what data must be captured to represent a user, Site doesn't prescribe the data model.)
 
-.The cat as a User
-====
-This is the same document as in <<ex-cat-user-identity>>, nothing to see here.
+A user is identified by separate document, called a **user identity**.
 
-[source,clojure]
-----
-{:xt/id "https://example.org/cats/arya"
- :name "Arya"
- :species "cat"
- :color "black"
- :favorite-activity "playing with string"}
-----
-====
+Site can tell when a particular user is logging in by matching the user's login credentials with an identity document that relates to the user.
 
-=== User Identities
+A user may have multiple identities.
 
-Site can tell when a particular user is logging in by matching the User's login
-credentials with the user's identity details stored in the database.
+When a user successfully logs in, a new entity is created to represent the subject.
+The subject document references the user identity (which, in turn, references the user), using attributes that are recognised by Site.
+Additionally, the document captures certain details including security attributes of the login.
 
-Since users might have multiple identities, a User Identity is stored as a separate
-document.
-
-Again, Site makes no prescription as to what this User Identity document contains,
-except one: it must contain a `:juxt.pass.alpha/user` attribute whose value is
-the `:xt/id` of the User entity it relates to. This is shown in
-<<ex-cat-user-identity>>.
-
-[[ex-cat-user-identity]]
-.A cat's User Identity
-====
-[source,clojure]
-----
-{:xt/id "https://example.org/user-identities/arya"
- :username "arya"
- :password "meow" <1>
- :juxt.pass.alpha/user "https://example.org/cats/arya" <2>
-}
-----
-<1> Of course, you'd never ever _ever_ store a password in plain-text like
-this. In the real-world, this attribute might reference the AI model you'd
-trained to recognise Arya's unique _meow_.
-====
-
-=== Subjects
-
-When our cat logs in, a new document is created to capture details of the login
-event itself, such as which User Identity was used, perhaps the geo-location of
-Arya when she logged in, and so on. These details may be important later, if we
-want to write authorization rules that make use of this information.
-
-This document is called a Subject. The document references the User Identity
-document, which in turn, references the User document, which may in turn
-reference numerous other documents, recursively.
+////
+good but perhaps could be demoted to another chapter
 
 Thus, the Subject can be considered a _sub-graph_ of everything we know about
 the User logging in.
 
 .The Subject's view
 [[cat-model]]
-====
+[example]
+--
 [plantuml,cat,svg]
 ....
 skinparam monochrome true
@@ -215,6 +188,58 @@ skinparam monochrome true
 include::cat.json[]
 @endjson
 ....
-====
+--
+////
 
 Users, user identities and subjects are described in <<ch-users>>.
+
+== Resources
+
+////
+TODO
+////
+
+Notice in <<ex-cat-entity>> we chose to set the `:xt/id` attribute to a URL string: `+https://example.org/cats/arya+`.
+
+An entity and a web resource have a number of features in common.
+Both are uniquely identifiable, both contain state that may change over time.
+In Site, A document represents the _current state_ of a web resource.
+
+In fact, the only difference between a web resource and an entity is that a web resource is accessible over HTTP.
+So, it's _that_ capability that Site gives an entity.
+
+////
+We can now stop using the term document.
+Instead, for an entity that is identified by a URL, we'll use the term **resource**.
+
+(this isn't quite right, we often use 'resource' to mean the current state, e.g. in 'allowed?', hence why this is commented)
+////
+
+=== Resource metadata
+
+Along with a URL identity, there are a number of particular attributes that can be added to a document to specify **resource metadata**.
+
+[[ex-cat-resource]]
+.A cat can be browsed
+[example]
+--
+[source,clojure]
+----
+{:xt/id "https://example.org/cats/arya"
+ :juxt.http.alpha/content-type "text/html;charset=utf-8" <1>
+ :petshop/name "Arya"
+ :petshop/species "cat"
+ :petshop/color "black"
+ :petshop/favorite-activity "playing with string"}
+----
+<1> This attribute declares that the resource is representable as HTML.
+--
+
+Site implements many aspects of the HTTP standards, such as *content-negotiation* and *conditional requests*.
+
+Resources are covered in depth in <<ch-resources>>.
+
+// Local Variables:
+// mode: outline
+// outline-regexp: "[=]+"
+// End:
