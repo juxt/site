@@ -811,7 +811,7 @@
 (defn- q
   "xt/q is variadic; XTDB 1.21 assert (= (count args-in-query) (count args))"
   [db query args]
-  (if (nil? args)
+  (if (= '(nil) args)
     (xt/q db query)
     (xt/q db query args)))
 

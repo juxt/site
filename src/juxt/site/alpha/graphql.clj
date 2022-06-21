@@ -612,8 +612,8 @@
                   results
                   (try
                     ;; XTDB >= 1.21.0 is asserting (= (count in-bindings) (count in-args))
-                    ;; args can be `nil` and `xt/q` is variadic
-                    (if (nil? args)
+                    ;; args can be `(nil)` and `xt/q` is variadic
+                    (if (= '(nil) args)
                       (xt/q db q) ;; XTDB 1.21 has an
                       (xt/q db q args))
                     (catch Exception e
