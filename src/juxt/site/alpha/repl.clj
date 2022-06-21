@@ -107,9 +107,7 @@
    (xt/await-tx (xt-node))))
 
 (defn q [query & args]
-  (if (= '(nil) args)
-    (apply xt/q (db) query)
-    (apply xt/q (db) query args)))
+  (apply xt/q (db) query args))
 
 (defn t [t]
   (map

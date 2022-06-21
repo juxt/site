@@ -405,12 +405,9 @@
                 :_siteQuery (and query (pr-str query)))))
 
 (defn infer-query
-  [db xt-node subject field query args]
+  [db xt-node subject field query]
   (let [type (field->type field)
-        results (pull-entities db xt-node subject
-                               (if (nil? type)
-                                 (xt/q db query)
-                                 (xt/q db query type)) query)]
+        results (pull-entities db xt-node subject (xt/q db query) query)]
     (or (process-xt-results field results)
         (throw (ex-info "No resolver found for " type)))))
 
@@ -611,11 +608,10 @@
                   args (if (second query-args) query-args (first query-args))
                   results
                   (try
-                    ;; XTDB >= 1.21.0 is asserting (= (count in-bindings) (count in-args))
-                    ;; args can be `(nil)` and `xt/q` is variadic
-                    (if (= '(nil) args)
-                      (xt/q db q) ;; XTDB 1.21 has an
+                    (if (nil? args)
+                      (xt/q db q)
                       (xt/q db q args))
+
                     (catch Exception e
                       (throw (ex-info "Failure when running XTDB query"
                                       {:message (ex-message e)
@@ -765,8 +761,7 @@
                          xt-node
                          subject
                          field
-                         (to-xt-query opts)
-                         argument-values)
+                         (to-xt-query opts))
 
             (get argument-values "id")
             (xt/entity db (get argument-values "id"))
