@@ -222,6 +222,8 @@
     (map #(update % join-key (comp first idx)) coll)))
 
 (defn do-action*
+  "This function is applied within a transaction function. It should be fast, but
+  at least doesn't have to worry about the database being stale!"
   [xt-ctx
    {subject ::pass/subject
     action ::pass/action
