@@ -510,3 +510,27 @@
         schema (:juxt.grab.alpha/schema (e (format "%s/_site/graphql" (::site/base-uri config))))
         document (graphql.document/compile-document (graphql.parser/parse (slurp (io/file "opt/graphql/graphiql-introspection-query.graphql"))) schema)]
     (graphql/query schema document "IntrospectionQuery" {} {::site/db (db)})))
+
+(defn repl-post-handler [{::site/keys [uri db]
+                          ::pass/keys [subject]
+                          :as req}]
+  (let [
+        body (some-> req ::site/received-representation ::http/body (String.) read-string)
+        _ (when (nil? body)
+            (throw
+              (ex-info
+                "Invalid body"
+                {::site/request-context req})))
+
+        results (try
+                  (binding [*ns* (find-ns 'juxt.site.alpha.repl)]
+                    (eval body))
+                  (catch Exception e
+                    (throw (ex-info "Syntax error" e))))]
+
+    (-> req
+        (assoc
+          :ring.response/status 200
+          :ring.response/body
+          (json/write-value-as-string results))
+        (update :ring.response/headers assoc "content-type" "application/json"))))
