@@ -11,21 +11,15 @@
   (first
    (xt/q db '{:find [(pull session-token [*])
                      (pull session [*])
-                     (pull subject [*])
-                     (pull user-identity [*])
-                     (pull user [*])]
+                     (pull subject [*])]
               :keys [juxt.pass.alpha/session-token
                      juxt.pass.alpha/session
-                     juxt.pass.alpha/subject
-                     juxt.pass.alpha/user-identity
-                     juxt.pass.alpha/user]
+                     juxt.pass.alpha/subject]
               :where
               [[session-token ::site/type "https://meta.juxt.site/pass/session-token"]
                [session-token ::pass/session-token token-id]
                [session-token ::pass/session session]
-               [session ::pass/subject subject]
-               [subject ::pass/user-identity user-identity]
-               [user-identity ::pass/user user]]
+               [session ::pass/subject subject]]
               :in [token-id]}
          session-token-id!)))
 

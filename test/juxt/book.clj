@@ -34,7 +34,6 @@
 (defn put-user! []
   ;; tag::install-user![]
   (put! {:xt/id "https://site.test/users/alice"
-         :juxt.site.alpha/type "https://meta.juxt.site/pass/user"
          :name "Alice" ; <1>
          :role #{"User" "Administrator"} ; <2>
          })
@@ -44,7 +43,6 @@
 (defn put-user-identity! []
   ;; tag::install-user-identity![]
   (put! {:xt/id "https://site.test/user-identities/alice"
-         :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"
          :juxt.pass.alpha/user "https://site.test/users/alice"})
   ;; end::install-user-identity![]
   )
@@ -158,11 +156,8 @@
     '(
       "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
 
-      "https://meta.juxt.site/pass/user" swap :juxt.site.alpha/type swap set-at
-
       [:map
        [:xt/id [:re "https://site.test/users/.*"]]                     ; <1>
-       [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/user"]] ; <2>
        ]
       validate
 
@@ -198,34 +193,30 @@
   ;; end::grant-permission-to-invoke-action-put-user![]
   )
 
-(defn create-action-put-user-identity! []
-  ;; tag::create-action-put-user-identity![]
+(defn create-action-put-basic-auth-identity! []
+  ;; tag::create-action-put-basic-auth-identity![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/put-user-identity"
+   {:xt/id "https://site.test/actions/put-basic-auth-identity"
     :juxt.pass.alpha/scope "write:users"
 
     :juxt.flip.alpha/quotation
     '(
       "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
-
+      "https://meta.juxt.site/pass/basic-auth-identity" :juxt.site.alpha/type juxt.flip.alpha/assoc
       (validate
        [:map
         [:xt/id [:re "https://site.test/.*"]]
         [:juxt.pass.alpha/user [:re "https://site.test/users/.+"]]
-        [:juxt.pass.alpha/username {:optional true} [:re "[A-Za-z0-9]{2,}"]]
-        [:juxt.pass.alpha/password-hash {:optional true} [:string]]
-        [:juxt.pass.jwt/iss {:optional true} [:re "https://.+"]]
-        [:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]])
-
-      "https://meta.juxt.site/pass/user-identity" :juxt.site.alpha/type juxt.flip.alpha/assoc
+        [:juxt.pass.alpha/username [:re "[A-Za-z0-9]{2,}"]]
+        [:juxt.pass.alpha/password-hash [:string]]])
 
       ;; Lowercase the username, if it exists.
       dup :juxt.pass.alpha/username of (if* [>lower :juxt.pass.alpha/username juxt.flip.alpha/assoc] [])
 
-      {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
-       :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
+      {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-basic-auth-identity"}}
+       :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-basic-auth-identity"}}
        :options {}}
       :juxt.site.alpha/methods
       juxt.flip.alpha/assoc
@@ -239,19 +230,19 @@
        [id :juxt.pass.alpha/user user]
        [user :role role]
        [permission :role role]]]})
-  ;; end::create-action-put-user-identity![]
+  ;; end::create-action-put-basic-auth-identity![]
   )
 
-(defn grant-permission-to-invoke-action-put-user-identity! []
-  ;; tag::grant-permission-to-invoke-action-put-user-identity![]
+(defn grant-permission-to-invoke-action-put-basic-auth-identity! []
+  ;; tag::grant-permission-to-invoke-action-put-basic-auth-identity![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-user-identity"
+   {:xt/id "https://site.test/permissions/administrators/put-basic-auth-identity"
     :role "Administrator"
-    :juxt.pass.alpha/action "https://site.test/actions/put-user-identity"
+    :juxt.pass.alpha/action "https://site.test/actions/put-basic-auth-identity"
     :juxt.pass.alpha/purpose nil})
-  ;; end::grant-permission-to-invoke-action-put-user-identity![]
+  ;; end::grant-permission-to-invoke-action-put-basic-auth-identity![]
   )
 
 (defn create-action-put-subject! []
@@ -641,15 +632,17 @@
   ;; tag::put-basic-auth-user-identity![]
   (do-action
    "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-user-identity"
-   {:xt/id "https://site.test/user-identities/alice/basic"
+   "https://site.test/actions/put-basic-auth-identity"
+   {:xt/id "https://site.test/user-identities/alice/basic-auth-identity"
+    :juxt.site.alpha/type "https://meta.juxt.site/pass/basic-auth-identity"
     :juxt.pass.alpha/user "https://site.test/users/alice"
     ;; Perhaps all user identities need this?
     :juxt.pass.alpha/canonical-root-uri "https://site.test"
     :juxt.pass.alpha/realm "Wonderland"
     ;; Basic auth will only work if these are present
     :juxt.pass.alpha/username "ALICE" ; this will be downcased
-    :juxt.pass.alpha/password-hash (encrypt-password "garden")})
+    :juxt.pass.alpha/password-hash (encrypt-password "garden")
+    })
   ;; end::put-basic-auth-user-identity![]
   )
 
@@ -1350,17 +1343,21 @@ Password: <input name=password type=password>
            of
            bytes-to-string
            juxt.flip.alpha.edn/read-string)})
+
   ;; Actions
   (create-grant-permission-action!)
   (permit-grant-permission-action!)
   (create-action-put-user!)
   (grant-permission-to-invoke-action-put-user!)
-  (create-action-put-user-identity!)
-  (grant-permission-to-invoke-action-put-user-identity!)
+
   (create-action-put-subject!)
   (grant-permission-to-invoke-action-put-subject!)
   ;; This tackles the '404' problem.
-  (install-not-found))
+  (install-not-found)
+
+  ;; TODO: These might not be preliminaries
+  (create-action-put-basic-auth-identity!)
+  (grant-permission-to-invoke-action-put-basic-auth-identity!))
 
 (defn setup-hello-world! []
   (create-action-put-immutable-public-resource!)

@@ -292,7 +292,7 @@
 
           query (cond-> '{:find [(pull e [*])]
                           :keys [identity]
-                          :where [[e ::site/type "https://meta.juxt.site/pass/user-identity"]
+                          :where [[e ::site/type "https://meta.juxt.site/pass/basic-auth-identity"]
                                   [e ::pass/canonical-root-uri canonical-root-uri]
                                   [e ::pass/username username]]
                           :in [username canonical-root-uri realm]}
