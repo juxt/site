@@ -31,4 +31,4 @@ fonts:
 	-o $@ $<
 
 watch:
-	find . -name "*.adoc" | entr -n make
+	find . -name "*.adoc" -or -name "*.json" | entr -n make

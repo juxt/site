@@ -1,10 +1,10 @@
-= Users
+= Subjects
 :toc: left
 :experimental:
 
 Users are individuals with access to Site.
 
-== User documents
+== Users
 
 (((User, document structure)))
 A User is a database document, with the `juxt.site.alpha/type` attribute value

@@ -49,9 +49,7 @@ For this reason, API services hosted by Site should be:
   citizen' when interoperating with other services and components in a wider
   software architecture.
 
-_So, while Site offers many other features which can be found in other software,
-the ability to rapidly deploy API services from declarative specifications is
-unique to Site (to the best of our knowledge)._
+_So, while Site offers many other features which can be found in other software, the ability to rapidly deploy API services from declarative specifications is unique to Site (to the best of our knowledge)._
 
 === What kind of software is Site?
 
@@ -63,11 +61,9 @@ Site can run on a local machine or remote server, on premise or in the cloud.
 
 === What is the relationship between Site and REST?
 
-REST is a term coined by Roy Fielding to describe a certain _architectural
-style_, one that underpins the web.
+REST is a term coined by Roy Fielding to describe a certain _architectural style_, one that underpins the web.
 
-The term 'RESTful' is informally applied to web APIs that try to conform to the
-principles described in Fielding's original dissertation.
+The term 'RESTful' is informally applied to web APIs that try to conform to the principles described in Fielding's original dissertation cite:[rest].
 
 NOTE: TODO, we're not done here
 
@@ -98,9 +94,8 @@ authorization server
    authenticating the resource owner and obtaining authorization.
 ____
 
-In a wider architecture, Site can play the roles of a Resource Server
-and,optionally, an Authorization Server. It is able to fully interact with other
-components that play the other OAuth roles in a standards compliant manner.
+In a wider architecture, Site can play the roles of a Resource Server and, optionally, an Authorization Server.
+It is able to fully interact with other components that play the other OAuth roles in a standards compliant manner.
 
 == This book
 
@@ -116,22 +111,17 @@ Docker images that provide shortcuts to setting up a Site instance.
 
 ==== Reader interventions
 
-We use an admonition with an exclamation mark to indicate where we require that
-you act, and do something. In code, the exclamation mark is commonly used to
-indicate a side-effect. In this book, the side-effect is carried out by the
-reader!
+We use an admonition with an exclamation mark to indicate where we require that you act, and do something.
+In code, the exclamation mark is commonly used to indicate a side-effect.
+In this book, the side-effect is carried out by the reader!
 
 ====
 IMPORTANT: Make tea!
 ====
 
-==== Proper nouns
+==== Bold text
 
-Where nouns are well specified and appear in a glossary, we write them as proper
-nouns rather than common nouns. Whenever such a noun is capitalised, it has the
-formal meaning as defined in the <<glossary>> rather than its common
-meaning. This allows us to use common nouns with less risk of confusion.
-
+Where we introduce Site terminology for the first time, or in a new context, we'll often write the term in *bold text*.
 
 ==== Keyword namespaces
 

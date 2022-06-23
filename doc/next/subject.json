@@ -1,0 +1,8 @@
+{"xt/id":"https://example.org/subjects/arya",
+ "juxt.site.alpha/type": "https://meta.juxt.site/pass/subject",
+ "juxt.pass.alpha/user-identity":
+ {"xt/id":"https://example.org/user-identities/arya",
+  "juxt.site.alpha/type": "https://meta.juxt.site/pass/user-identity",
+  "username":"arya",
+  "password":"meow"
+  }}

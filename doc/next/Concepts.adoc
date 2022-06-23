@@ -9,18 +9,13 @@ and practical examples in subsequent chapters.
 == Documents
 
 // (((XTDB)))
-Data in Site is stored as documents in the https://xtdb.com[XTDB] database.
+Site stores data in the form of documents.
 
-A **document** is a set of named values.
-
-Values can be strings, numbers, sets, collections, or nested documents, recursively.
-
-Names are 'keywords', which identifiers prefixed with a colon (:).
-
+A *document* is a set of named values called *attributes*.
 An example document is shown in <<ex-cat-document>>.
 
 [[ex-cat-document]]
-.A document representing a cat
+.A document representing a cat.
 [example]
 --
 [source,clojure]
@@ -32,22 +27,36 @@ An example document is shown in <<ex-cat-document>>.
 ----
 --
 
-All documents in Site can contain any number of additional attributes.
+Names are *keywords*, which are identifiers prefixed with a colon (:).
 
-Keyword namespaces are used to protected data from being overwritten when documents are merged together.
+Values can be strings, numbers, sets, collections, or nested documents.
 
-Attributes with namespaces of `juxt.site`, `juxt.pass`, `juxt.http`, `xtdb.api` and `xt` are reserved.
+Since nesting is recursive, a document might be a large hierarchical structure but are typically fairly small.
 
-== Entities
+=== Domain independence
 
-Each document has the special attribute `:xt/id` which identifies the **entity** to which the document belongs.
+Site itself is independent of the domain or business context it is part of.
+It is these documents that represent the domain.
 
-The document is a _version_ of the **entity**. There can be just one version of a document for an entity at any one time.
+A document can contain any number of attributes.
+Some of these attributes are recognised by Site, and these are documented in this book.
+But the rest of the attributes are entirely up to you.
 
+Keyword namespaces are used to keep the attributes that Site recognised from conflicting with attributes that represent the domain.
+
+As a rule, Site may recognise attributes under the namespaces of `juxt.site`, `juxt.pass`, `juxt.http`, `xtdb.api` and `xt`, but will ignore attributes in all other namespaces, including those with no namespace.
+
+=== Entities
+
+The document is a _version_ of an *entity*.
+
+Each document has a special attribute `:xt/id` which identifies the *entity* to which the document belongs.
+
+At any point in time there can, at most, be just one document for any given entity.
 The example given in <<ex-cat-entity>> shows two documents representing the same entity, but at different times.
 
 [[ex-cat-entity]]
-.A cat can change
+.Two versions of the same cat.
 [example]
 --
 A cat might be represented by the following document:
@@ -75,12 +84,64 @@ But, at a later date, the document might be updated:
 
 TIP: For more information about documents and entities, visit https://xtdb.com.
 
+=== References
+
+Documents can reference other entities by using a value that is equal to the `:xt/id` of the referenced entity.
+
+References can be thought of as edges in a *graph*.
+
+== Subjects
+
+An individual that has access to documents in Site is represented by a *subject* document.
+This is created automatically by Site when a recognised individual accesses the system.
+
+Individuals are recognised when the credentials they present match a *user-identity* document.
+A subject document will reference this user-identity document, as part of the subject's graph, as shown in <<subject-model>>.
+
+.A subject document.
+[[subject-model]]
+[example]
+--
+[plantuml,subject,svg]
+....
+skinparam monochrome true
+@startjson
+include::subject.json[]
+@endjson
+....
+--
+
+The user-identity document does not represent the individual, only the identity of an individual.
+Rather, the user-identity document references a further document, the *user*, that represents the recognised individual. This is shown in <<user-identity-model>>.
+
+.A user-identity document.
+
+[[user-identity-model]]
+[example]
+--
+[plantuml,user-identity,svg]
+....
+skinparam monochrome true
+@startjson
+include::user-identity.json[]
+@endjson
+....
+--
+
+This scheme adds a little extra complexity, but allows an individual to have multiple identities, since it multiple user-identity documents can reference the same user document.
+
+The only attributes of a user-identity document that are prescribed by Site are the `:juxt.site.alpha/type` and `:juxt.pass.alpha/user` attributes.
+The sole prescribed attribute of a user document is the `:juxt.site.alpha/type` attribute.
+Other attributes can be added according to the domain model.
+
+Subjects, users, and user-identities are described in <<ch-subjects>>.
+
 == Actions
 
-Actions govern who can read and write documents.
+Actions determine _who_ has access to documents and _how_ documents are queried, created, updated and deleted.
 
-Action are _domain-specific_.
-You will need to define your own actions to represent the activities you want to perform on your system.
+Actions are independent words that make up the _language of the system_.
+You will need to define your own actions to represent the activities you want your system to perform.
 
 Here are some example actions:
 
@@ -92,32 +153,37 @@ Here are some example actions:
 - Post an article
 - Logout
 
-Actions are themselves defined as documents.
+Naturally, actions are represented by documents.
 
-An action document contains one or more *rules*, written in *Datalog* syntax.
+An action document contains one or more *rules*.
+A *rule* is written in terms of:
 
-A **rule** is written in terms of:
-
-- what is known about the person or machine requesting access (the **subject**)
-- what is known about the document being accessed (the **resource**)
-- an explicit document that permits access to the action (the **permission**)
+- what is known about the person or machine requesting access (the *subject*)
+- what is known about the document being accessed (the *resource*)
+- an explicit document that permits access to the action (the *permission*)
 
 For example, it might be that a person's access might depend upon a role they have been assigned, and the document classification of the Resource.
 Or that 'VIP' customers may access 'exclusive' special offers.
 
 If a rule is satisfied, access to a document is granted.
 
+Practically speaking, a rule is written as a set of *Datalog* clauses.
+
 When an action grants the creation, modification or deletion of documents, it will also have a program that _performs_ the action.
-This program might carry out validation of any inputs and return operations or effects which are applied.
+This program might carry out validation of any inputs and return operations or effects which are applied to the state of the system.
 
-Such a program runs as a *transaction function* in XTDB, which gives certain consistency guarentees.
+[NOTE]
+--
+Technically speaking, the program associated with an action runs as part of a *transaction function* in XTDB.
+If the program needs to read data from the database, this guarantees the data is up-to-date.
+--
 
-Site provides a built-in stack-based language which is specially designed for writing these programs.
+Site provides a built-in stack-based language called *Flip* for writing these programs.
 
 <<ex-concept-action>> shows a sketch of an action document.
 
 [[ex-concept-action]]
-.An example action
+.An example action.
 [example]
 --
 [source,clojure]
@@ -129,10 +195,7 @@ include::../../test/juxt/book.clj[tag=example-action,indent=0]
 <3> A program which creates any effects resulting from performing the action.
 --
 
-////
-Sometimes a resource is are hierarchical collections of other resources,  to an *action* (or, to be precise, actions), whether the action is a query or a modification.
-Some resources are a composition of other resources. For example, a resource might represent a list of produces
-////
+A detailed explanation of actions, rules, permissions and the Flip language can be found in <<ch-actions>>.
 
 
 ////
@@ -151,54 +214,14 @@ Permission documents provide a permanent record of who had access to what, and w
 
 Rules & Permissions are described more fully in <<ch-rules-and-permissions>>.
 
-A more detailed explanation of actions, rules and permissions can be found in <<ch-actions>>.
 ////
 
-== Users
-
-An individual that have access to Site is called a **user**.
-
-Each user is defined in a document.
-
-(Since every system has its own requirements about what data must be captured to represent a user, Site doesn't prescribe the data model.)
-
-A user is identified by separate document, called a **user identity**.
-
-Site can tell when a particular user is logging in by matching the user's login credentials with an identity document that relates to the user.
-
-A user may have multiple identities.
-
-When a user successfully logs in, a new entity is created to represent the subject.
-The subject document references the user identity (which, in turn, references the user), using attributes that are recognised by Site.
-Additionally, the document captures certain details including security attributes of the login.
-
-////
-good but perhaps could be demoted to another chapter
-
-Thus, the Subject can be considered a _sub-graph_ of everything we know about
-the User logging in.
-
-.The Subject's view
-[[cat-model]]
-[example]
---
-[plantuml,cat,svg]
-....
-skinparam monochrome true
-@startjson
-include::cat.json[]
-@endjson
-....
---
-////
-
-Users, user identities and subjects are described in <<ch-users>>.
 
 == Resources
 
 Site maps the XTDB entity onto the concept of a web resource, as defined in REST.
 
-We can understand why XTDB entities make for good web resources, by reading the following quote cite:[rest], replacing the term 'entity' for 'XTDB document'.
+We can understand why XTDB entities make for good web resources, by reading the following quote from Roy Fielding's seminal paper introducing REST cite:[rest] (replacing Fielding's uses of the word 'entity for 'XTDB document).
 
 [quote,Roy Fielding]
 --
@@ -220,12 +243,12 @@ resource identifiers.
 The mapping from an XTDB entity to a web resource is accomplished by the following:
 
 * Each XTDB entity's `:xt/id` attribute is set to a URL (string), identifying the resource.
-* Representations are documents, encoding representation metadata in attributes.
+* Representation metadata is encoded into document attributes.
 
-<<ex-cat-resource>> shows a document that, currently, has a single HTML representation.
+<<ex-cat-resource>> shows a document that (currently) has a single representation, of HTML.
 
 [[ex-cat-resource]]
-.A cat can be browsed
+.A cat, viewable in a web browser.
 [example]
 --
 [source,clojure]
@@ -240,7 +263,14 @@ The mapping from an XTDB entity to a web resource is accomplished by the followi
 <1> This attribute declares that the resource is representable as HTML.
 --
 
-Site implements many aspects of the HTTP standards, such as *content-negotiation* and *conditional requests*.
+Site provides access to these resources via the HTTP protocol cite:[rfc7231], including support for:
+
+* content-negotiation
+* method semantics
+* response codes
+* conditional requests
+* range requests
+* authentication
 
 Resources are covered in depth in <<ch-resources>>.
 

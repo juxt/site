@@ -1,0 +1,11 @@
+{"xt/id":"https://example.org/user-identities/arya",
+ "juxt.site.alpha/type": "https://meta.juxt.site/pass/user-identity",
+ "username":"arya",
+ "password":"meow",
+ "juxt.pass.alpha/user":
+ {"xt/id":"https://example.org/cats/arya",
+  "juxt.site.alpha/type": "https://meta.juxt.site/pass/user",
+  "name":"Arya",
+  "species":"cat",
+  "color":"black",
+  "favorite-activity":"playing with string"}}
