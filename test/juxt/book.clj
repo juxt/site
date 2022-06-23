@@ -20,7 +20,7 @@
 
 (comment
   ;; tag::example-action[]
-  {:xt/id "https://site.test/example/add-cat"
+  {:xt/id "https://site.test/example/feed-cat"
    :juxt.site.alpha/type "https://meta.juxt.site/pass/action" ; <1>
    :juxt.pass.alpha/rules ; <2>
    [

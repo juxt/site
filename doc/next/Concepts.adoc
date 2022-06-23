@@ -134,7 +134,7 @@ The only attributes of a user-identity document that are prescribed by Site are 
 The sole prescribed attribute of a user document is the `:juxt.site.alpha/type` attribute.
 Other attributes can be added according to the domain model.
 
-Subjects, users, and user-identities are described in <<ch-subjects>>.
+Subjects, users, and user-identities are covered in <<ch-subjects>>.
 
 == Actions
 
@@ -154,33 +154,7 @@ Here are some example actions:
 - Logout
 
 Naturally, actions are represented by documents.
-
-An action document contains one or more *rules*.
-A *rule* is written in terms of:
-
-- what is known about the person or machine requesting access (the *subject*)
-- what is known about the document being accessed (the *resource*)
-- an explicit document that permits access to the action (the *permission*)
-
-For example, it might be that a person's access might depend upon a role they have been assigned, and the document classification of the Resource.
-Or that 'VIP' customers may access 'exclusive' special offers.
-
-If a rule is satisfied, access to a document is granted.
-
-Practically speaking, a rule is written as a set of *Datalog* clauses.
-
-When an action grants the creation, modification or deletion of documents, it will also have a program that _performs_ the action.
-This program might carry out validation of any inputs and return operations or effects which are applied to the state of the system.
-
-[NOTE]
---
-Technically speaking, the program associated with an action runs as part of a *transaction function* in XTDB.
-If the program needs to read data from the database, this guarantees the data is up-to-date.
---
-
-Site provides a built-in stack-based language called *Flip* for writing these programs.
-
-<<ex-concept-action>> shows a sketch of an action document.
+An example is shown in <<ex-concept-action>>.
 
 [[ex-concept-action]]
 .An example action.
@@ -194,6 +168,34 @@ include::../../test/juxt/book.clj[tag=example-action,indent=0]
 <2> Rules that govern whether this action can be used to access a document.
 <3> A program which creates any effects resulting from performing the action.
 --
+
+An action document contains one or more *rules*.
+A *rule* is written in terms of:
+
+- what is known about the person or machine requesting access (the *subject*)
+- what is known about the document being accessed (the *resource*)
+- an explicit document that permits access to the action (the *permission*)
+
+For example, it might be that a person's access depends on a role they have been assigned, together with the value of the resource's document classification attribute.
+Or that only 'VIP' customers may access 'exclusive' special offers.
+
+If a rule is satisfied by the existence of a permission, access to the resource is granted.
+
+Practically speaking, a rule is written as a set of *Datalog* clauses.
+
+=== Performing actions
+
+When an action grants the creation, modification or deletion of documents, it will also have a program that _performs_ the action.
+
+This program might carry out validation of any inputs and return operations or effects which are applied to the state of the system.
+
+[NOTE]
+--
+Technically speaking, the program associated with an action runs as part of a *transaction function* in XTDB.
+If the program needs to read data from the database, this guarantees the data is up-to-date.
+--
+
+Site provides a built-in stack-based language called *Flip* for writing these programs.
 
 A detailed explanation of actions, rules, permissions and the Flip language can be found in <<ch-actions>>.
 
@@ -212,7 +214,7 @@ A Permission document is easily deleted, and so revoking access it as straight-f
 
 Permission documents provide a permanent record of who had access to what, and when.
 
-Rules & Permissions are described more fully in <<ch-rules-and-permissions>>.
+Rules & Permissions are covered more fully in <<ch-rules-and-permissions>>.
 
 ////
 
