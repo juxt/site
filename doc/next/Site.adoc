@@ -53,25 +53,32 @@ knowledge of Site. These chapters will help to build up your knowledge of Site
 'from scratch'. If you've chosen this course, welcome to the slow track!
 ////
 
-= Subjects, Actions & Resources
+= Access Control
 
-Consider the English sentence: "The cat sat on the mat".
+Consider the English sentence:
+
+"The cat sat on the mat".
 
 The 'cat' is the *subject*.
 The word 'sat' is the _verb_ (which we will call the *action*), and the 'mat' is the _object_ (which we will call the *resource*).
 
-When considering **access control**, we might rephrase the sentence as a question: "Is the cat allowed to sit on the mat?".
+When considering **access control**, we might rephrase the sentence as a question:
 
-If we were to ask a different question, such as
+"Is the cat allowed to sit on the mat?".
 
-* "Is the dog allowed to sit on the mat?", or
-* "Is the cat allowed to wee on the mat?", or
-* "Is the cat allowed to sit on the sofa?",
+If we were to ask a different question, such as:
+
+"Is the _dog_ allowed to sit on the mat?", or
+
+"Is the cat allowed to _wee_ on the mat?", or
+
+"Is the cat allowed to sit on the _sofa_?",
 
 then we may get different answers.
 
-The point is, we cannot effectively control access to resources without considering the subject, action and resource *together*.
+The point is, we cannot effectively control access to resources without considering the subject, action and resource _together_.
 
+This part includes chapters on subjects (<<ch-subjects>>), actions (<<ch-actions>>) and resources (<<ch-resources>>), including examples.
 
 [[ch-subjects]]
 include::Subjects.adoc[leveloffset=+1]
