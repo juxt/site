@@ -1,0 +1,30 @@
+= Access Control
+:toc: left
+:experimental:
+
+== Introduction
+
+Consider the English sentence:
+
+"The cat sat on the mat".
+
+The 'cat' is the *subject*.
+The word 'sat' is the _verb_ (which we will call the *action*), and the 'mat' is the _object_ (which we will call the *resource*).
+
+When considering **access control**, we might rephrase the sentence as a question:
+
+"Is the cat allowed to sit on the mat?".
+
+If we were to ask a different question, such as:
+
+"Is the _dog_ allowed to sit on the mat?", or
+
+"Is the cat allowed to _wee_ on the mat?", or
+
+"Is the cat allowed to sit on the _sofa_?",
+
+then we may get different answers.
+
+The point is, we cannot effectively control access to resources without considering the subject, action and resource _together_.
+
+The chapters that now follow cover subjects (<<ch-subjects>>), actions (<<ch-actions>>) and resources (<<ch-resources>>), including examples.
