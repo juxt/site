@@ -215,11 +215,6 @@
              {"authorization" "Bearer test-access-token"}}]
     (is (= 411 (:ring.response/status (*handler* req))))))
 
-;;  (t/join-fixtures [with-system-xt with-handler])
-
-;; (t/join-fixtures [with-system-xt with-handler])
-;;
-
 (deftest login-test
   (book/preliminaries!)
   (book/protected-resource-preliminaries!)
@@ -280,34 +275,32 @@
       (is (string? session-token)) ;; TODO: Check for a correct set-cookie header
       (is (= 302 (:ring.response/status response)))
 
-      response
+      (let [cookie-value (get-in response [:ring.response/headers "set-cookie"])
+            location (get-in response [:ring.response/headers "location"])
+            token (when cookie-value (second (re-matches #"id=(.*?);.*" cookie-value)))
+            db (xt/db *xt-node*)
+            ;; Check the database for evidence a session has been created
+            [e]
+            (first (when token
+                     (xt/q db '{:find [(pull e [*])]
+                                :where [[e ::site/type "https://meta.juxt.site/pass/session-token"]
+                                        [e ::pass/session-token tok]]
+                                :in [tok]}
+                           token)))]
+        (is cookie-value)
+        (is token "Cookie value doesn't contain an id")
+        (is (> (count token) 20))
+        (is e)
+        (is (= "https://meta.juxt.site/pass/session-token" (:juxt.site.alpha/type e)))
 
-      #_(let [cookie-value (get-in response [:ring.response/headers "set-cookie"])
-              location (get-in response [:ring.response/headers "location"])
-              token (when cookie-value (second (re-matches #"id=(.*?);.*" cookie-value)))
-              db (xt/db *xt-node*)
-              ;; Check the database for evidence a session has been created
-              [e]
-              (first (when token
-                       (xt/q db '{:find [(pull e [*])]
-                                  :where [[e ::site/type "https://meta.juxt.site/pass/session-token"]
-                                          [e ::pass/session-token tok]]
-                                  :in [tok]}
-                             token)))]
-          (is cookie-value)
-          (is token "Cookie value doesn't contain an id")
-          (is (> (count token) 20))
-          (is e)
-          (is (= "https://meta.juxt.site/pass/session-token" (:juxt.site.alpha/type e)))
+        (is (= "/document.html" location))
 
-          (is (= "/document.html" location))
-
-          (testing "Access protected document with cookie"
-            (let [request (assoc-in request [:ring.request/headers "cookie"] (format "id=%s" token))
-                  response (*handler* request)]
-              (is (= 200 (:ring.response/status response)))
-              (is (= "<p>This is a protected message that is only visible when sending the correct session header.</p>"
-                     (:ring.response/body response)))))))))
+        (testing "Access protected document with cookie"
+          (let [request (assoc-in request [:ring.request/headers "cookie"] (format "id=%s" token))
+                response (*handler* request)]
+            (is (= 200 (:ring.response/status response)))
+            (is (= "<p>This is a protected message that is only visible when sending the correct session header.</p>"
+                   (:ring.response/body response)))))))))
 
 ;; This is a test just to check that
 ;; https://site.test/actions/put-immutable-protected-resource functions
