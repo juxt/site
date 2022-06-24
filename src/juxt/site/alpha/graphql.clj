@@ -4,6 +4,8 @@
   (:require
    [ring.util.codec :refer [form-decode]]
    [selmer.parser :as selmer]
+   [malli.core :as m]
+   [malli.error :as me]
    [juxt.grab.alpha.schema :as schema]
    [juxt.grab.alpha.document :as document]
    [jsonista.core :as json]
@@ -439,6 +441,26 @@
         (log/debugf "defaulting to nil, type-ref is %s" type-ref)
         nil))))
 
+(def validation-template
+  {"minlen" 1
+   "maxlen" 10})
+
+(defn invalid-arguments?
+  [{:keys [argument-values field]}]
+  (let [[k v] (apply vec argument-values)
+        k (keyword k)
+        validation-directive (-> field
+                                 (get-in [::schema/directives-by-name
+                                          "site"
+                                          ::g/arguments
+                                          "validation"])
+                                 (get k)
+                                 ;; TODO: overwrite it with system-level config
+                                 (selmer/render validation-template)
+                                 edn/read-string)]
+    (me/humanize (m/explain validation-directive v))))
+
+
 (defn perform-mutation!
   [{:keys [argument-values site-args xt-node lookup-entity field-kind pass/subject] :as opts}]
   (let [action (or (get site-args "mutation") "put")
@@ -455,13 +477,15 @@
         ;; @site(a: "xtdb.api/valid-time").
         (lookup-entity id))
       "put"
-      (if bulk-mutation
-        (let [txes (args-to-entities opts)]
-          (put-objects! xt-node txes)
-          txes)
-        (let [tx (args-to-entity opts)]
-          (put-objects! xt-node [tx])
-          tx))
+      (if-let [validation-report (invalid-arguments? opts)]
+        (throw (Exception. (pr-str validation-report)))
+        (if bulk-mutation
+          (let [txes (args-to-entities opts)]
+            (put-objects! xt-node txes)
+            txes)
+          (let [tx (args-to-entity opts)]
+            (put-objects! xt-node [tx])
+            tx)))
       "update"
       (let [new-entity (args-to-entity opts)
             old-entity (some-> new-entity :xt/id lookup-entity)

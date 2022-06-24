@@ -19,6 +19,9 @@
         ;; Jetty
         ring/ring-jetty-adapter {:mvn/version "1.9.5"}
 
+        ;; GraphQL schema validation
+        metosin/malli {:mvn/version "0.8.4"}
+
         ;; Logging
         org.clojure/tools.logging {:mvn/version "1.2.4"}
         org.slf4j/jcl-over-slf4j {:mvn/version "1.7.36"}
