@@ -449,16 +449,19 @@
   [{:keys [argument-values field]}]
   (let [[k v] (apply vec argument-values)
         k (keyword k)
-        validation-directive (-> field
-                                 (get-in [::schema/directives-by-name
-                                          "site"
-                                          ::g/arguments
-                                          "validation"])
-                                 (get k)
-                                 ;; TODO: overwrite it with system-level config
-                                 (selmer/render validation-template)
-                                 edn/read-string)]
-    (me/humanize (m/explain validation-directive v))))
+        validation-directive (some-> field
+                                     (get-in [::schema/directives-by-name
+                                              "site"
+                                              ::g/arguments
+                                              "validation"])
+                                     (get k)
+                                     ;; TODO: overwrite it with system-level config
+                                     (selmer/render validation-template)
+                                     edn/read-string)
+        invalid? (when (seq validation-directive)
+                   (m/validate validation-template v))]
+    (when invalid?
+      (me/humanize (m/explain validation-directive v)))))
 
 
 (defn perform-mutation!
