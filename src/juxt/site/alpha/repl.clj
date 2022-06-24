@@ -185,7 +185,7 @@
     (xt/await-tx node tx-id)))
 
 (defn import-resources
-  ([] (import-resources-skip "import/resources.edn"))
+  ([] (import-resources "import/resources.edn"))
   ([filename]
    (let [node (xt-node)]
      (if (xt/entity (xt/db (xt-node)) filename)
@@ -202,7 +202,7 @@
 
 
 (defn import-resources-non-skip
-  ([] (import-resources "import/resources.edn"))
+  ([] (import-resources-non-skip "import/resources.edn"))
   ([filename]
    (let [node (xt-node)
          in (java.io.PushbackReader. (io/reader (io/input-stream (io/file filename))))]
