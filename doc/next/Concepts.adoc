@@ -128,7 +128,7 @@ include::user-identity.json[]
 ....
 --
 
-This scheme adds a little extra complexity, but allows an individual to have multiple identities, since it multiple user-identity documents can reference the same user document.
+This scheme adds a little extra complexity, but allows an individual to have multiple identities, since multiple user-identity documents can reference the same user document.
 
 The only attributes of a user-identity document that are prescribed by Site are the `:juxt.site.alpha/type` and `:juxt.pass.alpha/user` attributes.
 The sole prescribed attribute of a user document is the `:juxt.site.alpha/type` attribute.
@@ -173,7 +173,7 @@ An action document contains one or more *rules*.
 A *rule* is written in terms of:
 
 - what is known about the person or machine requesting access (the *subject*)
-- what is known about the document being accessed (the *resource*)
+- what is known about the document being accessed, if applicable (the *resource*)
 - an explicit document that permits access to the action (the *permission*)
 
 For example, it might be that a person's access depends on a role they have been assigned, together with the value of the resource's document classification attribute.
