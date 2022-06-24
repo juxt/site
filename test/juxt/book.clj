@@ -24,7 +24,7 @@
    :juxt.site.alpha/type "https://meta.juxt.site/pass/action" ; <1>
    :juxt.pass.alpha/rules ; <2>
    [
-    ['(allowed? subject resource permission) …]
+    '[(allowed? subject resource permission) …]
     ]
    :juxt.flip.alpha/quotation '(…) ; <3>
    }
