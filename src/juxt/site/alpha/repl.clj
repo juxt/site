@@ -184,7 +184,7 @@
   (let [tx-id (xt/submit-tx node tx)]
     (xt/await-tx node tx-id)))
 
-(defn import-resources-skip
+(defn import-resources
   ([] (import-resources-skip "import/resources.edn"))
   ([filename]
    (let [node (xt-node)]
@@ -201,7 +201,7 @@
 
 
 
-(defn import-resources
+(defn import-resources-non-skip
   ([] (import-resources "import/resources.edn"))
   ([filename]
    (let [node (xt-node)
