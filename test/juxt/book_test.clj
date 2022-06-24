@@ -68,7 +68,10 @@
   (book/grant-permission-to-resource-protected-by-basic-auth!)
   (book/put-basic-protection-space!)
 
-  (book/put-basic-auth-user-identity!)
+  (book/users-preliminaries!)
+  (book/create-action-put-basic-user-identity!)
+  (book/grant-permission-to-invoke-action-put-basic-user-identity!)
+  (book/put-basic-user-identity-alice!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected-by-basic-auth/document.html"))
 
@@ -137,8 +140,10 @@
 
     (testing "Cannot be accessed without a bearer token"
       (let [response (*handler* request)]
+        response
         (is (= 401 (:ring.response/status response)))
-        (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"])))))
+        (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"])))
+        ))
 
     (testing "Can be accessed with a valid bearer token"
       (let [response (*handler*
@@ -228,7 +233,11 @@
   (book/create-action-login!)
   (book/grant-permission-to-invoke-action-login!)
 
-  (book/put-basic-auth-user-identity!)
+  (book/users-preliminaries!)
+  (book/create-action-put-basic-user-identity!)
+  (book/grant-permission-to-invoke-action-put-basic-user-identity!)
+  (book/put-user-alice!)
+  (book/put-basic-user-identity-alice!)
 
   (let [uri (some :juxt.pass.alpha/login-uri
                   (session-scope/session-scopes (xt/db *xt-node*) "https://site.test/protected-by-session-scope/document.html"))]

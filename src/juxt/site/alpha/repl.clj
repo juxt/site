@@ -531,9 +531,7 @@
 ;; The REPL is having to construct the more usual network representation of a
 ;; request context.
 
-;; TODO: Rename this, it's too confusing and has different semantics to
-;; init/do-action
-(defn make-action-context [subject action edn-arg]
+(defn make-repl-request-context [subject action edn-arg]
   (let [xt-node (xt-node)]
     {::site/xt-node xt-node
      ::site/db (xt/db xt-node)
@@ -544,7 +542,7 @@
       ::http/body (.getBytes (pr-str edn-arg))}}))
 
 (defn do-action [subject action edn-arg]
-  (init/do-action (make-action-context subject action edn-arg)))
+  (init/do-action (make-repl-request-context subject action edn-arg)))
 
 #_(defn do-action-with-purpose [action purpose & args]
   (apply init/do-action-with-purpose (xt-node) action purpose args))

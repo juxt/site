@@ -350,10 +350,11 @@
          ops)]
     res))
 
-(defn do-action [{::site/keys [xt-node] ::pass/keys [action] :as ctx}]
+(defn do-action [{::site/keys [xt-node db] ::pass/keys [action] :as ctx}]
   (assert (:juxt.site.alpha/xt-node ctx) "xt-node must be present")
-  (assert (xt/entity (xt/db xt-node) "urn:site:tx-fns:do-action") "do-action must exist in database")
-  (assert (xt/entity (xt/db xt-node) action) "action must exist in database")
+  (assert (xt/entity db "urn:site:tx-fns:do-action") "do-action must exist in database")
+  (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
+  ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed by an anonymous user.
 
   (let [tx (xt/submit-tx
             xt-node
@@ -379,9 +380,7 @@
            (dissoc result ::site/type :xt/id ::site/error)
            (:ex-data error))))
 
-        (let [
-              apply-to-request-context-ops (:juxt.site.alpha/apply-to-request-context-ops result)]
-
+        (let [apply-to-request-context-ops (:juxt.site.alpha/apply-to-request-context-ops result)]
           (cond-> ctx
             result (assoc ::pass/action-result result)
 
@@ -389,9 +388,7 @@
             ;; context.  The intention if for these quotations to set the
             ;; response status and add headers.
             (seq apply-to-request-context-ops)
-            (apply-request-context-operations (reverse apply-to-request-context-ops))
-
-            ))))))
+            (apply-request-context-operations (reverse apply-to-request-context-ops))))))))
 
 ;; TODO: Since it is possible that a permission is in the queue which might
 ;; grant or revoke an action, it is necessary to run this check 'head-of-line'

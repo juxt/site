@@ -8,7 +8,8 @@
    [clojure.walk :refer [postwalk]]
    [clojure.string :as str]
    [juxt.site.alpha.repl :refer [base-uri put! install-do-action-fn! do-action make-application-doc make-application-authorization-doc make-access-token-doc encrypt-password]]
-   [juxt.site.alpha.util :refer [as-hex-str random-bytes]]))
+   [juxt.site.alpha.util :refer [as-hex-str random-bytes]]
+   [juxt.book :as book]))
 
 (defn substitute-actual-base-uri [form]
   (postwalk
@@ -31,30 +32,11 @@
   ;; end::example-action[]
   )
 
-(defn put-user! []
-  ;; tag::install-user![]
-  (put! {:xt/id "https://site.test/users/alice"
-         :juxt.site.alpha/type "https://meta.juxt.site/pass/user"
-         :name "Alice" ; <1>
-         :role #{"User" "Administrator"} ; <2>
-         })
-  ;; end::install-user![]
-  )
-
-(defn put-user-identity! []
-  ;; tag::install-user-identity![]
-  (put! {:xt/id "https://site.test/user-identities/alice"
-         :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"
-         :juxt.pass.alpha/user "https://site.test/users/alice"})
-  ;; end::install-user-identity![]
-  )
-
-(defn put-subject! []
-  ;; tag::install-subject![]
+(defn put-repl-subject! []
+  ;; tag::put-repl-subject![]
   (put! {:xt/id "https://site.test/subjects/repl-default"
-         :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"
-         :juxt.pass.alpha/user-identity "https://site.test/user-identities/alice"})
-  ;; end::install-subject![]
+         :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"})
+  ;; end::put-repl-subject![]
   )
 
 (defn install-create-action! []
@@ -66,7 +48,7 @@
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
+      juxt.site.alpha/request-body-as-edn
       "https://meta.juxt.site/pass/action" :juxt.site.alpha/type juxt.flip.alpha/assoc
       (validate [:map
                  [:xt/id [:re "https://site.test/actions/(.+)"]]
@@ -76,7 +58,10 @@
 
     :juxt.pass.alpha/rules
     '[
-      [(allowed? subject resource permission) ; <6>
+      [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"]]
+
+      [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
@@ -90,16 +75,16 @@
   ;; end::install-do-action-fn![]
   )
 
-(defn permit-create-action! []
-  ;; tag::permit-create-action![]
+(defn install-repl-permission-to-create-action! []
+  ;; tag::install-repl-permission-to-create-action![]
   (put!
-   {:xt/id "https://site.test/permissions/administrators/create-action" ; <1>
+   {:xt/id "https://site.test/permissions/repl/create-action" ; <1>
     :juxt.site.alpha/type "https://meta.juxt.site/pass/permission" ; <2>
     :juxt.pass.alpha/action "https://site.test/actions/create-action" ; <3>
     :juxt.pass.alpha/purpose nil ; <4>
-    :role "Administrator" ; <5>
+    :juxt.pass.alpha/subject "https://site.test/subjects/repl-default" ; <5>
     })
-  ;; end::permit-create-action![]
+  ;; end::install-repl-permission-to-create-action![]
   )
 
 (defn create-grant-permission-action! []
@@ -113,7 +98,7 @@
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
+      juxt.site.alpha/request-body-as-edn
       "https://meta.juxt.site/pass/permission" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/permissions/(.+)"]]
@@ -126,6 +111,9 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"]]
+
+      [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
@@ -133,18 +121,18 @@
   ;; end::create-grant-permission-action![]
   )
 
-(defn permit-grant-permission-action! []
-  ;; tag::permit-grant-permission-action![]
+(defn install-repl-permission-to-grant-permission! []
+  ;; tag::install-repl-permission-to-grant-permission![]
   (put!
-   {:xt/id "https://site.test/permissions/administrators/grant-permission"
+   {:xt/id "https://site.test/permissions/repl/grant-permission"
     :juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
-    :role "Administrator"
+    :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"
     :juxt.pass.alpha/action "https://site.test/actions/grant-permission"
     :juxt.pass.alpha/purpose nil})
-  ;; end::permit-grant-permission-action![]
+  ;; end::install-repl-permission-to-grant-permission![]
   )
 
-;; Users Revisited
+;; User actions
 
 (defn create-action-put-user! []
   ;; tag::create-action-put-user![]
@@ -156,10 +144,8 @@
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
-
+      juxt.site.alpha/request-body-as-edn
       "https://meta.juxt.site/pass/user" swap :juxt.site.alpha/type swap set-at
-
       [:map
        [:xt/id [:re "https://site.test/users/.*"]]                     ; <1>
        [:juxt.site.alpha/type [:= "https://meta.juxt.site/pass/user"]] ; <2>
@@ -178,6 +164,9 @@
 
     :juxt.pass.alpha/rules
     '[
+      [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"]]
+
       [(allowed? subject resource permission) ; <5>
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
@@ -191,41 +180,46 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-user"
-    :role "Administrator"
+   {:xt/id "https://site.test/permissions/repl/put-user"
+    :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"
     :juxt.pass.alpha/action "https://site.test/actions/put-user"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-put-user![]
   )
 
-(defn create-action-put-user-identity! []
-  ;; tag::create-action-put-user-identity![]
+(defn create-action-put-basic-user-identity! []
+  ;; tag::create-action-put-basic-user-identity![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/put-user-identity"
+   {:xt/id "https://site.test/actions/put-basic-user-identity"
     :juxt.pass.alpha/scope "write:users"
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
-
+      juxt.site.alpha/request-body-as-edn
       (validate
        [:map
         [:xt/id [:re "https://site.test/.*"]]
         [:juxt.pass.alpha/user [:re "https://site.test/users/.+"]]
-        [:juxt.pass.alpha/username {:optional true} [:re "[A-Za-z0-9]{2,}"]]
-        [:juxt.pass.alpha/password-hash {:optional true} [:string]]
-        [:juxt.pass.jwt/iss {:optional true} [:re "https://.+"]]
-        [:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]])
 
-      "https://meta.juxt.site/pass/user-identity" :juxt.site.alpha/type juxt.flip.alpha/assoc
+        ;; Required by basic-user-identity
+        [:juxt.pass.alpha/username [:re "[A-Za-z0-9]{2,}"]]
+        ;; TODO: We should be hashing the password in Flip
+        [:juxt.pass.alpha/password-hash [:string]]
+        ;;[:juxt.pass.jwt/iss {:optional true} [:re "https://.+"]]
+        ;;[:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]
+        ])
+
+      #{"https://meta.juxt.site/pass/user-identity"
+        "https://meta.juxt.site/pass/basic-user-identity"}
+      :juxt.site.alpha/type juxt.flip.alpha/assoc
 
       ;; Lowercase the username, if it exists.
       dup :juxt.pass.alpha/username of (if* [>lower :juxt.pass.alpha/username juxt.flip.alpha/assoc] [])
 
-      {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
-       :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-user-identity"}}
+      {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-basic-user-identity"}}
+       :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-basic-user-identity"}}
        :options {}}
       :juxt.site.alpha/methods
       juxt.flip.alpha/assoc
@@ -235,23 +229,26 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"]]
+
+      [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [user :role role]
        [permission :role role]]]})
-  ;; end::create-action-put-user-identity![]
+  ;; end::create-action-put-basic-user-identity![]
   )
 
-(defn grant-permission-to-invoke-action-put-user-identity! []
-  ;; tag::grant-permission-to-invoke-action-put-user-identity![]
+(defn grant-permission-to-invoke-action-put-basic-user-identity! []
+  ;; tag::grant-permission-to-invoke-action-put-basic-user-identity![]
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-user-identity"
-    :role "Administrator"
-    :juxt.pass.alpha/action "https://site.test/actions/put-user-identity"
+   {:xt/id "https://site.test/permissions/repl/put-basic-user-identity"
+    :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"
+    :juxt.pass.alpha/action "https://site.test/actions/put-basic-user-identity"
     :juxt.pass.alpha/purpose nil})
-  ;; end::grant-permission-to-invoke-action-put-user-identity![]
+  ;; end::grant-permission-to-invoke-action-put-basic-user-identity![]
   )
 
 (defn create-action-put-subject! []
@@ -264,7 +261,7 @@
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
+      juxt.site.alpha/request-body-as-edn
       "https://meta.juxt.site/pass/subject" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/.*"]]
@@ -274,6 +271,9 @@
 
     :juxt.pass.alpha/rules
     '[
+      [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"]]
+
       [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
@@ -287,11 +287,45 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-subject"
-    :role "Administrator"
+   {:xt/id "https://site.test/permissions/repl/put-subject"
+    :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"
     :juxt.pass.alpha/action "https://site.test/actions/put-subject"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-put-subject![]
+  )
+
+;; Create Alice
+
+(defn put-user-alice! []
+  ;; tag::put-user-alice![]
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-user"
+   {:xt/id "https://site.test/users/alice"
+    :name "Alice"
+    :role "User"})
+    ;; end::put-user-alice![]
+  )
+
+(defn install-user-identity-no-credentials-for-alice!
+  "Put a minimal user-identity for Alice, which has no credentials. There is no
+  action because this is only for education and testing from the REPL."
+  []
+  ;; tag::install-user-identity-no-credentials-for-alice![]
+  (put! {:xt/id "https://site.test/user-identities/alice"
+         :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"
+         :juxt.pass.alpha/user "https://site.test/users/alice"})
+  ;; end::install-user-identity-no-credentials-for-alice![]
+  )
+
+(defn put-subject-no-credentials-for-alice!
+  "Put a subject document for Alice, pointing to the user identity with no credentials"
+  []
+  (do-action
+   "https://site.test/subjects/repl-default"
+   "https://site.test/actions/put-subject"
+   {:xt/id "https://site.test/subjects/alice"
+    :juxt.pass.alpha/user-identity "https://site.test/user-identities/alice"})
   )
 
 ;; Hello World!
@@ -306,7 +340,7 @@
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
+      juxt.site.alpha/request-body-as-edn
 
       [:map
        [:xt/id [:re "https://site.test/.*"]]]
@@ -322,6 +356,9 @@
 
     :juxt.pass.alpha/rules
     '[
+      [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"]]
+
       [(allowed? subject resource permission) ; <3>
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
@@ -335,8 +372,8 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-immutable-public-resource"
-    :role "Administrator"
+   {:xt/id "https://site.test/permissions/repl/put-immutable-public-resource"
+    :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"
     :juxt.pass.alpha/action "https://site.test/actions/put-immutable-public-resource"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-put-immutable-public-resource![]
@@ -488,7 +525,7 @@
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
+      juxt.site.alpha/request-body-as-edn
 
       "https://meta.juxt.site/pass/action" swap :juxt.site.alpha/type swap set-at
 
@@ -508,6 +545,9 @@
 
     :juxt.pass.alpha/rules
     '[
+      [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"]]
+
       [(allowed? subject resource permission) ; <2>
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
@@ -521,8 +561,8 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-immutable-protected-resource"
-    :role "Administrator"
+   {:xt/id "https://site.test/permissions/repl/put-immutable-protected-resource"
+    :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"
     :juxt.pass.alpha/action "https://site.test/actions/put-immutable-protected-resource"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-put-immutable-protected-resource![]
@@ -559,7 +599,8 @@
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
+      juxt.site.alpha/request-body-as-edn
+
       "https://meta.juxt.site/pass/protection-space" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/protection-spaces/(.+)"]]
@@ -574,6 +615,9 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"]]
+
+      [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [permission :role role]
@@ -586,8 +630,8 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-protection-space"
-    :role "Administrator"
+   {:xt/id "https://site.test/permissions/repl/put-protection-space"
+    :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"
     :juxt.pass.alpha/action "https://site.test/actions/put-protection-space"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-put-protection-space![]
@@ -637,11 +681,11 @@
   ;; end::put-basic-protection-space![]
   )
 
-(defn put-basic-auth-user-identity! []
-  ;; tag::put-basic-auth-user-identity![]
+(defn put-basic-user-identity-alice! []
+  ;; tag::put-basic-user-identity-alice![]
   (do-action
    "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-user-identity"
+   "https://site.test/actions/put-basic-user-identity"
    {:xt/id "https://site.test/user-identities/alice/basic"
     :juxt.pass.alpha/user "https://site.test/users/alice"
     ;; Perhaps all user identities need this?
@@ -649,8 +693,9 @@
     :juxt.pass.alpha/realm "Wonderland"
     ;; Basic auth will only work if these are present
     :juxt.pass.alpha/username "ALICE" ; this will be downcased
+    ;; TODO: Encrypt password in action
     :juxt.pass.alpha/password-hash (encrypt-password "garden")})
-  ;; end::put-basic-auth-user-identity![]
+  ;; end::put-basic-user-identity-alice![]
   )
 
 ;; HTTP Bearer Auth
@@ -706,7 +751,7 @@
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
+      juxt.site.alpha/request-body-as-edn
 
       "https://meta.juxt.site/pass/session-scope" swap :juxt.site.alpha/type swap set-at
 
@@ -723,6 +768,9 @@
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"]]
+
+      [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
        [permission :role role]
@@ -735,8 +783,8 @@
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-session-scope"
-    :role "Administrator"
+   {:xt/id "https://site.test/permissions/repl/put-session-scope"
+    :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"
     :juxt.pass.alpha/action "https://site.test/actions/put-session-scope"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-put-session-scope![]
@@ -1023,7 +1071,7 @@ Password: <input name=password type=password>
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
+      juxt.site.alpha/request-body-as-edn
       "https://meta.juxt.site/pass/application" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/applications/(.+)"]]
@@ -1035,6 +1083,9 @@ Password: <input name=password type=password>
 
     :juxt.pass.alpha/rules
     '[[(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"]]
+
+      [(allowed? subject resource permission)
        [id :juxt.pass.alpha/user user]
        [subject :juxt.pass.alpha/user-identity id]
        [user :role role]
@@ -1047,8 +1098,8 @@ Password: <input name=password type=password>
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/administrators/put-application"
-    :role "Administrator"
+   {:xt/id "https://site.test/permissions/repl/put-application"
+    :juxt.pass.alpha/subject "https://site.test/subjects/repl-default"
     :juxt.pass.alpha/action "https://site.test/actions/put-application"
     :juxt.pass.alpha/purpose nil})
   ;; end::grant-permission-to-invoke-action-put-application![]
@@ -1063,7 +1114,7 @@ Password: <input name=password type=password>
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
+      juxt.site.alpha/request-body-as-edn
       "https://meta.juxt.site/pass/authorization" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/authorizations/(.+)"]]
@@ -1084,6 +1135,7 @@ Password: <input name=password type=password>
   ;; end::create-action-authorize-application![]
   )
 
+;; TODO: Rename function to indicate this permission is granted to those in the role 'user'
 (defn grant-permission-to-invoke-action-authorize-application! []
   ;; tag::grant-permission-to-invoke-action-authorize-application![]
   (do-action
@@ -1105,7 +1157,7 @@ Password: <input name=password type=password>
 
     :juxt.flip.alpha/quotation
     '(
-      "https://site.test/flip/quotations/req-to-edn-body" juxt.flip.alpha.xtdb/entity :juxt.flip.alpha/quotation of call
+      juxt.site.alpha/request-body-as-edn
       "https://meta.juxt.site/pass/access-token" swap :juxt.site.alpha/type swap set-at
       [:map
        [:xt/id [:re "https://site.test/access-tokens/(.+)"]]
@@ -1180,7 +1232,7 @@ Password: <input name=password type=password>
 (defn invoke-authorize-application! []
   ;; tag::invoke-authorize-application![]
   (do-action
-   "https://site.test/subjects/repl-default"
+   "https://site.test/subjects/alice"
    "https://site.test/actions/authorize-application"
    (make-application-authorization-doc
     :prefix "https://site.test/authorizations/"
@@ -1189,27 +1241,15 @@ Password: <input name=password type=password>
   ;; end::invoke-authorize-application![]
   )
 
-;; Deprecated: This overlaps with an existing subject
-(defn create-test-subject! []
-  ;; tag::create-test-subject![]
-  (do-action
-   "https://site.test/subjects/repl-default"
-   "https://site.test/actions/put-subject"
-   {:xt/id "https://site.test/subjects/test"
-    :juxt.pass.alpha/user-identity "https://site.test/user-identities/alice"}
-   )
-  ;; end::create-test-subject![]
-  )
-
 (defn invoke-issue-access-token! []
   ;; tag::invoke-issue-access-token![]
   (do-action
-   "https://site.test/subjects/repl-default"
+   "https://site.test/subjects/alice"
    "https://site.test/actions/issue-access-token"
    (make-access-token-doc
     :token "test-access-token"
     :prefix "https://site.test/access-tokens/"
-    :subject "https://site.test/subjects/test"
+    :subject "https://site.test/subjects/alice"
     :application "https://site.test/applications/local-terminal"
     :scope "read:admin"
     :expires-in-seconds (* 5 60)))
@@ -1308,7 +1348,9 @@ Password: <input name=password type=password>
      ;; end::put-unauthorized-error-representation-for-html-with-login-link![]
      ))))
 
-(defn install-not-found []
+(defn install-not-found
+  "Install an action to perform on '404'."
+  []
   (do-action
    "https://site.test/subjects/repl-default"
    "https://site.test/actions/create-action"
@@ -1332,35 +1374,26 @@ Password: <input name=password type=password>
     {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-not-found"}}
      :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-not-found"}}}}))
 
+(defn bootstrap!
+  "Add just enough for the REPL to call actions"
+  []
+  (put-repl-subject!)
+  (install-create-action!)
+  (install-repl-permission-to-create-action!)
+  (book-install-do-action-fn!))
+
 ;; Complete all tasks thus far directed by the book
 (defn preliminaries! []
-  ;; Puts
-  (put-user!)
-  (put-user-identity!)
-  (put-subject!)
-  (install-create-action!)
-  (book-install-do-action-fn!)
-  (permit-create-action!)
-  ;; Quotations
-  (put! {:xt/id "https://site.test/flip/quotations/req-to-edn-body"
-         :juxt.flip.alpha/quotation
-         '(:juxt.site.alpha/received-representation
-           env
-           ::http/body
-           of
-           bytes-to-string
-           juxt.flip.alpha.edn/read-string)})
-  ;; Actions
+  (bootstrap!)
   (create-grant-permission-action!)
-  (permit-grant-permission-action!)
+  (install-repl-permission-to-grant-permission!)
+  (install-not-found))
+
+(defn users-preliminaries! []
   (create-action-put-user!)
   (grant-permission-to-invoke-action-put-user!)
-  (create-action-put-user-identity!)
-  (grant-permission-to-invoke-action-put-user-identity!)
   (create-action-put-subject!)
-  (grant-permission-to-invoke-action-put-subject!)
-  ;; This tackles the '404' problem.
-  (install-not-found))
+  (grant-permission-to-invoke-action-put-subject!))
 
 (defn setup-hello-world! []
   (create-action-put-immutable-public-resource!)
@@ -1392,9 +1425,15 @@ Password: <input name=password type=password>
 
 (defn setup-application! []
   (invoke-put-application!)
+  (users-preliminaries!)
+  (put-user-alice!)
+  (install-user-identity-no-credentials-for-alice!)
+  (put-subject-no-credentials-for-alice!)
   (invoke-authorize-application!)
-  (create-test-subject!)
   (invoke-issue-access-token!))
+
+;; TODO: We could use a dependency graph here, to allow installation of a set of
+;; documents where there are dependencies on other documents being created.
 
 (defn init-all! []
   (preliminaries!)
@@ -1407,7 +1446,11 @@ Password: <input name=password type=password>
   (create-resource-protected-by-basic-auth!)
   (grant-permission-to-resource-protected-by-basic-auth!)
   (put-basic-protection-space!)
-  (put-basic-auth-user-identity!)
+
+  (users-preliminaries!)
+  (create-action-put-basic-user-identity!)
+  (grant-permission-to-invoke-action-put-basic-user-identity!)
+  (put-basic-user-identity-alice!)
 
   (session-scopes-preliminaries!)
 

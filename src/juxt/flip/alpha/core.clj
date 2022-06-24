@@ -263,6 +263,16 @@
   [[err & stack] [_ & queue] env]
   (throw err))
 
+;; Convenience words
+
+(defmethod word 'juxt.site.alpha/request-body-as-edn
+  [stack [_ & queue] env]
+  [stack (concat '(:juxt.site.alpha/received-representation
+                   env :juxt.http.alpha/body
+                   of
+                   bytes-to-string
+                   juxt.flip.alpha.edn/read-string) queue) env])
+
 (defmethod word 'define [[quotation name & stack] [_ & queue] env]
   [stack queue (assoc-in env [:definitions name] quotation)])
 

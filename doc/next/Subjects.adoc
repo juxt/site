@@ -182,7 +182,7 @@ the User Identity when a User logs in.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=install-subject!,indent=0]
+include::../../test/juxt/book.clj[tag=put-repl-subject!,indent=0]
 ----
 ====
 
