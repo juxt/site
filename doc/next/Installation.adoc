@@ -233,3 +233,50 @@ There are a few useful Site REPL commands you should be familiar with:
 (put! <doc>+)):: Put one or more resources into the database
 (factory-reset!):: Start over. (Delete everything in the database!)
 --
+
+[[bootstrap]]
+== Bootstrap
+
+Now we are ready to bootstrap the system by installing these four entities.
+
+[TIP]
+--
+You can view the entities in your database with the following:
+
+----
+user> (ls)
+----
+
+If the database is not empty, you can clear it with:
+
+----
+user> (factory-reset!)
+----
+--
+
+Ensure that the database is empty. Now install the entities:
+
+[IMPORTANT]
+--
+From the REPL, install the four primordial entities with the following:
+
+----
+user> (book/bootstrap!)
+----
+
+If this is successful, run `(ls)` to check the four entities have been installed.
+
+This will look similar to:
+
+----
+("https://site.test/_site/do-action"
+ "https://site.test/actions/create-action"
+ "https://site.test/permissions/system/bootstrap"
+ "https://site.test/subjects/system")
+----
+--
+
+// Local Variables:
+// mode: outline
+// outline-regexp: "[=]+"
+// End:

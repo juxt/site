@@ -3,7 +3,7 @@ Malcolm Sparks <mal@juxt.pro>
 v1.0, 2022-06-21
 :doctype: book
 :toc: left
-:toclevels: 2
+:toclevels: 1
 :sectnums:
 :sectnumlevels: 4
 :xrefstyle: short
@@ -35,38 +35,43 @@ include::Values.adoc[leveloffset=+3]
 
 include::Principles.adoc[leveloffset=+3]
 
+= Foundations
 
+In keeping with our value of <<understanding,Understanding>>, we recommended that you invest time in building up both your working and conceptual knowledge of Site.
+
+The chapters in this part of the book will help to build up your knowledge of Site 'from scratch'.
 
 include::Concepts.adoc[leveloffset=+1]
 
 include::Installation.adoc[leveloffset=+1]
 
+include::Genesis.adoc[leveloffset=+1]
+
+include::CreatingActions.adoc[leveloffset=+2]
+
+// TODO: Gently move sections from Actions.adoc and Permissions.adoc into chapters here
+
+// TODO: Include a chapter on Flip
+
+[[ch-actions]]
+include::UnderstandingActions.adoc[leveloffset=+1]
+
 ////
-= Preliminaries
-
-If you're in a hurry, or want to get started quickly with Site, you should skip
-these chapters and move onto <<ch-resources>>.
-
-However, in keeping with our value of <<understanding,Understanding>>, we
-recommended that you invest time in building up both your working and conceptual
-knowledge of Site. These chapters will help to build up your knowledge of Site
-'from scratch'. If you've chosen this course, welcome to the slow track!
-////
-
-include::AccessControl.adoc[leveloffset=+1]
-
+include::Permissions.adoc[leveloffset=+0]
 [[ch-subjects]]
 include::Subjects.adoc[leveloffset=+1]
 [[ch-creating-users]]
 include::UsersRevisited.adoc[leveloffset=+2]
+////
 
-[[ch-actions]]
-include::Actions.adoc[leveloffset=+1]
+
+
+
 
 [[ch-resources]]
 include::Resources.adoc[leveloffset=+1]
 
-include::Representations.adoc[leveloffset=+2]
+include::Representations.adoc[leveloffset=+1]
 
 = Authentication
 

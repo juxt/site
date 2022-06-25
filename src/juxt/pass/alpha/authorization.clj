@@ -325,8 +325,8 @@
                              (cond-> ex-data
                                (:env ex-data) (dissoc :env)#_(update :env dissoc ::site/db ::site/xt-node)))}}]]))))
 
-(defn install-do-action-fn []
-  {:xt/id "urn:site:tx-fns:do-action"
+(defn install-do-action-fn [uri]
+  {:xt/id (str uri "/_site/do-action")
    :xt/fn '(fn [xt-ctx ctx & args]
              (juxt.pass.alpha.authorization/do-action* xt-ctx ctx args))})
 
@@ -350,45 +350,46 @@
          ops)]
     res))
 
-(defn do-action [{::site/keys [xt-node db] ::pass/keys [action] :as ctx}]
+(defn do-action [{::site/keys [xt-node db base-uri] ::pass/keys [action] :as ctx}]
   (assert (:juxt.site.alpha/xt-node ctx) "xt-node must be present")
-  (assert (xt/entity db "urn:site:tx-fns:do-action") "do-action must exist in database")
   (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
-  ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed by an anonymous user.
+  ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed
+  ;; by an anonymous user.
+  (let [tx-fn (str base-uri "/_site/do-action")]
+    (assert (xt/entity db tx-fn) "do-action must exist in database")
+    (let [tx (xt/submit-tx
+              xt-node
+              [[::xt/fn tx-fn (sanitize-ctx ctx)]])
+          {::xt/keys [tx-id]} (xt/await-tx xt-node tx)]
 
-  (let [tx (xt/submit-tx
-            xt-node
-            [[::xt/fn "urn:site:tx-fns:do-action" (sanitize-ctx ctx)]])
-        {::xt/keys [tx-id]} (xt/await-tx xt-node tx)]
-
-    (when-not (xt/tx-committed? xt-node tx)
-      (throw
-       (ex-info
-        (format "Transaction failed to be committed for action %s" action)
-        {::xt/tx-id tx-id
-         ::pass/action action})))
-
-    (let [result
-          (xt/entity
-           (xt/db xt-node)
-           (format "urn:site:action-log:%s" tx-id))]
-      (if-let [error (::site/error result)]
+      (when-not (xt/tx-committed? xt-node tx)
         (throw
          (ex-info
-          (format "Transaction error performing action %s: %s" action (:message error))
-          (merge
-           (dissoc result ::site/type :xt/id ::site/error)
-           (:ex-data error))))
+          (format "Transaction failed to be committed for action %s" action)
+          {::xt/tx-id tx-id
+           ::pass/action action})))
 
-        (let [apply-to-request-context-ops (:juxt.site.alpha/apply-to-request-context-ops result)]
-          (cond-> ctx
-            result (assoc ::pass/action-result result)
+      (let [result
+            (xt/entity
+             (xt/db xt-node)
+             (format "urn:site:action-log:%s" tx-id))]
+        (if-let [error (::site/error result)]
+          (throw
+           (ex-info
+            (format "Transaction error performing action %s: %s" action (:message error))
+            (merge
+             (dissoc result ::site/type :xt/id ::site/error)
+             (:ex-data error))))
 
-            ;; These ops are quotations that can be applied to the request
-            ;; context.  The intention if for these quotations to set the
-            ;; response status and add headers.
-            (seq apply-to-request-context-ops)
-            (apply-request-context-operations (reverse apply-to-request-context-ops))))))))
+          (let [apply-to-request-context-ops (:juxt.site.alpha/apply-to-request-context-ops result)]
+            (cond-> ctx
+              result (assoc ::pass/action-result result)
+
+              ;; These ops are quotations that can be applied to the request
+              ;; context.  The intention if for these quotations to set the
+              ;; response status and add headers.
+              (seq apply-to-request-context-ops)
+              (apply-request-context-operations (reverse apply-to-request-context-ops)))))))))
 
 ;; TODO: Since it is possible that a permission is in the queue which might
 ;; grant or revoke an action, it is necessary to run this check 'head-of-line'

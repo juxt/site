@@ -2,6 +2,15 @@
 :toc: left
 :experimental:
 
+
+////
+When Site receives a request, it will attempt to use data in the HTTP request headers to establish the *subject*, which represents the individual accessing the system.
+
+If an individual cannot be established, then some or all of the documents that are used in creating a response to the request may not be accessible.
+////
+
+
+
 Users are individuals with access to Site.
 
 == Users
@@ -38,7 +47,7 @@ invoking our actions.
 ====
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=install-user!,indent=0]
+include::../../test/juxt/book.clj[tag=put-repl-user!,indent=0]
 ----
 
 <1> The user's name (arbitary data associated with this user).
@@ -160,7 +169,7 @@ s|Required
 <<user-model>> shows an example of how a Subject may relate to an Identity, and
 how an Identity, in turn, may relate to a User.
 
-.A possible relationship between a User, Subject and Identity
+.The relationship between a User, Subject and Identity
 [[user-model]]
 ====
 [plantuml,user-model,svg]
@@ -192,3 +201,8 @@ include::../../test/juxt/book.clj[tag=put-repl-subject!,indent=0]
 . Personalise it according to your own user details.
 . Copy the result into a REPL and evaluate it.
 --
+
+// Local Variables:
+// mode: outline
+// outline-regexp: "[=]+"
+// End:

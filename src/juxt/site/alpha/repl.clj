@@ -27,7 +27,8 @@
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]
-   [juxt.site.alpha.util :as util])
+   [juxt.site.alpha.util :as util]
+   [juxt.site.alpha.repl :as repl])
   (:import (java.util Date)))
 
 (defn base64-reader [form]
@@ -537,6 +538,7 @@
      ::site/db (xt/db xt-node)
      ::pass/subject subject
      ::pass/action action
+     ::site/base-uri (base-uri)
      ::site/received-representation
      {::http/content-type "application/edn"
       ::http/body (.getBytes (pr-str edn-arg))}}))
@@ -548,7 +550,7 @@
   (apply init/do-action-with-purpose (xt-node) action purpose args))
 
 (defn install-do-action-fn! []
-  (put! (authz/install-do-action-fn)))
+  (put! (authz/install-do-action-fn (base-uri))))
 
 #_(defn install-repl-user! []
   (put! {:xt/id (repl-subject)

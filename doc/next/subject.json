@@ -1,8 +1,11 @@
 {"xt/id":"https://example.org/subjects/arya",
  "juxt.site.alpha/type": "https://meta.juxt.site/pass/subject",
+ "email-verified?": "true",
+ "second-factor?": "false",
+ "ip-address": "161.50.29.3",
  "juxt.pass.alpha/user-identity":
  {"xt/id":"https://example.org/user-identities/arya",
   "juxt.site.alpha/type": "https://meta.juxt.site/pass/user-identity",
   "username":"arya",
-  "password":"meow"
+  "password-hash":"$2a$11$mmtzK.Kt1CxLpeyn579A.R4hemLi"
   }}

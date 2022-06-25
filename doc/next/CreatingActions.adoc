@@ -1,0 +1,33 @@
+= Creating Actions
+:toc: left
+:experimental:
+
+We are now ready to create and perform actions.
+
+== Creating the action to permit actions
+
+One action that we need to create immediately is an action to grant a permission.
+
+Now that we have our system subject, and our `create-action` action, we can call `do-action`.
+
+`do-action` is a function that takes the following arguments:
+
+* the subject identifier (in this case, `+https://site.test/subjects/system+`),
+* the action identifier (in this case, `+https://site.test/actions/create-action+`),
+* a document
+
+The actual call to `do-action` is shown below:
+
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=create-grant-permission-action!,indent=0]
+----
+
+NOTE: We would usually have to grant permission to our system subject for this action.
+However, this permission was already installed in <<bootstrap-install-system-permissions>>.
+
+
+// Local Variables:
+// mode: outline
+// outline-regexp: "[=]+"
+// End:

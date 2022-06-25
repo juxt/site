@@ -1,0 +1,156 @@
+= Understanding Actions
+:toc: left
+:experimental:
+
+// Make this more of like reference material
+
+Actions authorize all reads and writes to the database.
+
+Actions also record all writes, and some reads from the database.
+
+////
+TODO: Use xrefs from these bullet-points to more detailed explanations, such
+that these set of items can become a launchpad for diving into the
+documentation.
+////
+
+Actions run in transaction functions to ensure atomicity and consistency.
+
+Actions can provide involve input validation.
+
+Actions define their access control in rules, which are sufficient powerful to
+model any access control policy (RBAC, ABAC, PBAC, etc.)
+
+Actions leave an audit trail and may trigger alerts.
+
+Actions can be grouped into OAuth2 scopes.
+
+Actions can be exposed to the network, using OpenAPI and/or GraphQL operations.
+
+Actions can cause side-effects (e.g. lambda functions).
+
+Actions decouple network APIs from lower-level effects. For example, an API
+implementation can use a 'send-email', without having to know the implementation
+details of sending emails.
+
+////
+(old text)
+
+A Site instance is a collection of documents, stored in XTDB.
+
+Like XTDB, Site is schemaless and requires that you define your own documents.
+However, by included document attributes known to Site (usually in the `juxt.site.alpha` namespace) Site is able to interpret the documents as web or API resources, and serve them over HTTP.
+
+We need to set up sufficient resources in the REPL so that we no longer need to access Site via the REPL.
+
+Secure remote access to Site resources requires an *access token*.
+
+In this section we use the REPL to build up the minimal resources required to acquire an access token which can let us continue setting up the server remotely, without requiring further REPL access.
+
+An access token is granted for a *subject* and an *application*, so we'll need to create those too.
+
+But first, we need to install some preliminary resources into our REPL.
+////
+
+=== Data consistency
+
+(((data consistency)))
+Actions that modify the database are run in a transaction function.
+
+This ensures that the authorization check is made at the latest possible point, just before the database is potentially modified.
+This avoids any potential for race-conditions, for example, if the authorization to perform an Action is revoked just before the Action is invoked.
+
+=== Audit logging
+
+(((audit logging)))
+(((do-action)))
+Whenever an Action is invoked, the `do-action` transaction function is executed which results in a *transaction metadata record* being created in the database.
+
+This makes it possible to find out when an action was invoked, by whom, which entities were affected and, potentially, other details such as the 'business justification'.
+
+(((transaction, metadata)))
+If the Action is denied, or if errors occur when the Action is executed, details will be recorded in the transaction metadata.
+
+This allows us later to answer questions as to whether an Action was allowed or denied, with an explanation.
+We will also be able to answer questions regarding the who, when, why and how for each resource in the database.
+A copy of the transaction metadata record is returned as a result of the `do-action` function, as shown in <<transaction-metadata-record-example>>.
+
+[[transaction-metadata-record-example]]
+.A *transaction metadata record*
+====
+
+[source,clojure]
+----
+{:xt/id "urn:site:action-log:134"
+ :xtdb.api/tx-id 134
+ :juxt.pass.alpha/subject "urn:site:subjects:repl"
+ :juxt.pass.alpha/action "https://site.test/actions/create-action"
+ :juxt.pass.alpha/purpose nil
+ :juxt.pass.alpha/puts ["https://site.test/actions/grant-permission"]
+ :juxt.pass.alpha/deletes []}
+----
+====
+
+== Document structure of an action
+
+(((action, document structure)))
+<<action-doc-structure>> lists the attributes commonly found in action documents.
+
+.Document structure of an Action
+[[action-doc-structure]]
+[%header,cols="2l,1,3d,1"]
+|===
+|Attribute|Type|Value|Required?
+
+|:xt/id
+|String
+|Actions are resources, so this is a URI. Callers of actions use this attribute to reference an action.
+s|Required
+
+|:juxt.site.alpha/type
+|String
+l|"https://meta.juxt.site/pass/action"
+s|Required
+
+|:juxt.site.alpha/description
+|String
+l|Some text describing what the action is for.
+|Optional
+
+|:juxt.pass.alpha/rules
+|Collection
+|A collection of Datalog rules that determine whether the action is allowed.
+s|Required
+
+|:juxt.pass.alpha/scope
+|String
+|A _String_ representing the OAuth 2.0 scope containing the action.
+|Optional
+
+|:juxt.flip.alpha/quotation
+|Collection
+|A Flip program that performs the action.
+s|Required
+|===
+
+== Performing actions with Flip
+
+An action are performed in a transaction function.
+A transaction function must return one or more transaction operations that will be submitted to the database atomically.
+
+Often, actions are required to validate input and construct documents that must be put into the database.
+
+Flip is a bespoke language that is used in transaction functions which is specially designed for the purpose of producing transaction operations.
+
+Flip is a stack-based https://www.concatenative.org/wiki/view/Front%20Page[concatenative] language, drawing heavily from https://factorcode.org/[Factor] and https://www.nsl.com/k/xy/xy.htm[XY].
+
+.Why a dedicated language?
+****
+The rationale for Flip is that we need a DSL that is constrained so that it is easier to secure.
+Another issue with allowing a general purpose language such as Clojure or JavaScript is that we cannot know whether the program will terminate.
+
+The problem with only allowing extensions to be defmethods is that this implies that we need to allow users to add methods to the code-base, and track versions, etc.
+
+The benefit of an internal language is that its primitives can be established earlier on and compositions can be defined in terms of primitives.
+Compositions can be added to the database rather than the codebase.
+****

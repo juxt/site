@@ -169,7 +169,7 @@
   (book/applications-preliminaries!)
   (book/setup-application!)
   (repl/do-action
-   "https://site.test/subjects/repl-default"
+   "https://site.test/subjects/system"
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/put-user-owned-content"
     :juxt.pass.alpha/scope "write:user-content"
@@ -182,7 +182,7 @@
        [resource :owner user]]]})
 
   (repl/do-action
-   "https://site.test/subjects/repl-default"
+   "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/put-user-owned-content"
     :juxt.pass.alpha/action "https://site.test/actions/put-user-owned-content"
@@ -318,7 +318,7 @@
   (book/preliminaries!)
   (book/protected-resource-preliminaries!)
   (is (=
-       {:juxt.pass.alpha/subject "https://site.test/subjects/repl-default"
+       {:juxt.pass.alpha/subject "https://site.test/subjects/system"
         :juxt.site.alpha/type "https://meta.juxt.site/site/action-log-entry"
         :juxt.pass.alpha/action
         "https://site.test/actions/put-immutable-protected-resource"

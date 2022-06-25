@@ -1,0 +1,186 @@
+== Rules & Permissions
+:toc: left
+:experimental:
+
+With Actions and Users established, we've got everything we need to start
+creating other resources.
+
+However, in practice, it is cumbersome to have to update Actions every time we
+want to authorize a new User to perform an Action. This is where Permissions
+come in.
+
+(((permission, definition)))
+Permissions are separate Documents that represent a specific authorization. A
+document can be put into the database to represent a permission when it is
+granted, and (just as easily) deleted from the database when the authorization
+is revoked.
+
+TIP: Permissions are straight-forward to grant and revoke, as they are
+represented as XTDB documents, so granting and revoking a permission can be done
+with XTDB's respective `:xtdb.api/put` and `:xtdb.api/delete` operations.
+
+An Action's Rules specify how Permissions determine the outcome of authorization
+decisions.
+
+By writing Rules in terms of Permissions, as opposed to Users, grants and
+revocations are easier to manage and report on.
+
+=== Document structure of a Permission
+
+(((permission, document structure)))
+<<permission-doc-structure>> lists the attributes found in Permission documents.
+
+.Document structure of a Permission
+[[permission-doc-structure]]
+[%header,cols="2l,3d,1"]
+|===
+|Attribute|Value|Required?
+
+|:xt/id
+|Permssions are resources, so this is a URI.
+s|Required
+
+|:juxt.site.alpha/type
+l|"https://meta.juxt.site/pass/permission"
+s|Required
+
+|:juxt.pass.alpha/action
+|The URI of the Action this Permission grants access to.
+s|Required
+
+|:juxt.pass.alpha/purpose
+|The purpose of the Permission. Can be nil.
+s|Required
+|===
+
+=== Creating a permission
+
+We must install a Permission which will allow our user to call our
+`create-action` Action.
+
+This gives us an opportunity to inspect the document structure of a real
+Permission.
+
+<<example-put-permission-to-create-action>> demonstrates creating a Permission
+that works with the Action we created in <<example-create-action>>.
+
+.Permitting the create-action action
+[[example-put-permission-to-create-action]]
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=install-repl-permission-to-create-action!,indent=0]
+----
+
+<1> Permissions are individual resources, and must have unique URIs.
+
+<2> Each Permission must have a `:juxt.site.alpha/type` attribute of
+"`Permission`".
+
+<3> The Permission must be tied to a specific Action.
+
+<4> The Permission can be granted for a particular purpose, but if not, this
+attribute must be nil.
+
+<5> In this case, the Permission references the `Administrator` role. All Users
+with this `Administrator` role will be able to call the
+`+https://site.test/actions/create-action+` action.
+
+====
+
+[NOTE]
+--
+In future we might allow different users using the same REPL to identify
+themselves. Of course, REPL users have no restrictions to what they can do, so
+this is just for audit purposes among trusted users.
+--
+
+WARNING: Access to the REPL must be restricted to a very limited set of
+authorized users.
+
+[IMPORTANT]
+--
+Grant your user the Permission to invoke the create-action function you created in <<example-create-action>>:
+
+. Copy the code in <<example-put-permission-to-create-action>> to an editor.
+. Update it according to the Base URI you have chosen.
+. Copy the modified code into the REPL.
+. Evaluate!
+--
+
+=== Creating the grant-permssion action
+
+We have now created a `create-action` Action and granted a Permission for our
+User to invoke it. Let's invoke this action to create a new `grant-permission`
+action.
+
+<<ex-create-grant-permission-action>> demonstrates how this is achieved.
+
+.Creating the grant-permission action
+[[ex-create-grant-permission-action]]
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=create-grant-permission-action!,indent=0]
+----
+====
+
+[IMPORTANT]
+--
+Create the grant-permission action by following these steps:
+
+. Copy the code from <<ex-create-grant-permission-action>> into an editor
+. Make appropriate changes
+. Copy into the REPL
+. Evaluate
+--
+
+Finally, we need to permit our REPL user to invoke this grant-permission action, and this
+permission too needs to be put directly into the database since we don't yet
+have a way of granting permissions!
+
+This is shown in <<ex-permit-grant-permission-action>>.
+
+.Permitting the grant-permission action
+[[ex-permit-grant-permission-action]]
+====
+[source,clojure]
+----
+include::../../test/juxt/book.clj[tag=install-repl-permission-to-grant-permission!,indent=0]
+----
+====
+
+[IMPORTANT]
+--
+Permit the grant-permission action by following these steps:
+
+. Copy the code from <<ex-permit-grant-permission-action>> into an editor
+. Make appropriate changes
+. Copy into the REPL
+. Evaluate
+--
+
+Now that we have the ability to create actions, and grant permissions to invoke
+them, we have the building blocks we need to start creating
+<<ch-resources,Resources>>.
+
+
+////
+
+Moved from Concepts
+
+The Action in <<ex-action>> potentially allows cats to sit on the mat, but a
+Permission must still explicitly exist for the rule to be satisfied.
+
+The reason for this is simply that we often want to be able grant and revoke
+access without having to continually update rules. Permissions are documents
+that mark the event when access was granted or revoked, and the history of
+Permission documents is recorded on the timeline just as it is for every other
+type of document.
+
+This architecture leads to a wide number of possible designs. For example, it's
+possible to construct a permission to last for a few hours. Or model actions in
+terms of roles, and have the Permission document grant an individual their
+membership of a particular role.
+
+////

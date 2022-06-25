@@ -1,6 +1,60 @@
 = Resources
 :toc: left
 
+Site maps the XTDB entity onto the concept of a web resource, as defined in REST.
+
+(((Roy Fielding)))
+We can understand why XTDB entities make for good web resources, by reading the following quote from Roy Fielding's seminal paper introducing REST cite:[rest] (replacing Fielding's uses of the word 'entity for 'XTDB document).
+
+[quote,Roy Fielding]
+--
+The key abstraction of information in REST is a resource. Any information that
+can be named can be a resource: a document or image, a temporal service
+(e.g. "today's weather in Los Angeles"), a collection of other resources, a
+non-virtual object (e.g. a person), and so on. In other words, any concept that
+might be the target of an author's hypertext reference must fit within the
+definition of a resource. A resource is a conceptual mapping to a set of
+entities, not the entity that corresponds to the mapping at any particular point
+in time.
+
+More precisely, a resource R is a temporally varying membership function
+M~R~(t), which for time t maps to a set of entities, or values, which are
+equivalent. The values in the set may be resource representations and/or
+resource identifiers.
+--
+
+The mapping from an XTDB entity to a web resource is accomplished by the following:
+
+* Each XTDB entity's `:xt/id` attribute is set to a URL (string), identifying the resource.
+* Representation metadata is encoded into document attributes.
+
+<<ex-cat-resource>> shows a document that (currently) has a single representation, of HTML.
+
+[[ex-cat-resource]]
+.A cat, viewable in a web browser.
+[example]
+--
+[source,clojure]
+----
+{:xt/id "https://example.org/cats/arya"
+ :juxt.http.alpha/content-type "text/html;charset=utf-8" <1>
+ :petshop/name "Arya"
+ :petshop/species "cat"
+ :petshop/color "black"
+ :petshop/favorite-activity "playing with string"}
+----
+<1> This attribute declares that the resource is representable as HTML.
+--
+
+Site provides access to these resources via the HTTP protocol cite:[rfc7231], including support for:
+
+* content-negotiation
+* method semantics
+* response codes
+* conditional requests
+* range requests
+* authentication
+
 (((resource,definition)))
 Resources in Site are web resources, as per
 https://httpwg.org/specs/rfc7231.html#resources[RFC 7231].

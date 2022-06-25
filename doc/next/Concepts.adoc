@@ -8,9 +8,10 @@ and practical examples in subsequent chapters.
 
 == Documents
 
-// (((XTDB)))
 Site stores data in the form of documents.
 
+(((document, definition)))
+(((attributes, definition)))
 A *document* is a set of named values called *attributes*.
 An example document is shown in <<ex-cat-document>>.
 
@@ -27,13 +28,12 @@ An example document is shown in <<ex-cat-document>>.
 ----
 --
 
+(((keywords)))
 Names are *keywords*, which are identifiers prefixed with a colon (:).
 
 Values can be strings, numbers, sets, collections, or nested documents.
 
 Since nesting is recursive, a document might be a large hierarchical structure but are typically fairly small.
-
-=== Domain independence
 
 Site itself is independent of the domain or business context it is part of.
 It is these documents that represent the domain.
@@ -44,14 +44,18 @@ But the rest of the attributes are entirely up to you.
 
 Keyword namespaces are used to keep the attributes that Site recognised from conflicting with attributes that represent the domain.
 
+(((keywords, namespaces, reserved)))
 As a rule, Site may recognise attributes under the namespaces of `juxt.site`, `juxt.pass`, `juxt.http`, `xtdb.api` and `xt`, but will ignore attributes in all other namespaces, including those with no namespace.
 
-=== Entities
+== Entities
 
+(((entity, definition)))
 The document is a _version_ of an *entity*.
 
+(((document, identity)))
 Each document has a special attribute `:xt/id` which identifies the *entity* to which the document belongs.
 
+(((document, versioning)))
 At any point in time there can, at most, be just one document for any given entity.
 The example given in <<ex-cat-entity>> shows two documents representing the same entity, but at different times.
 
@@ -86,19 +90,62 @@ TIP: For more information about documents and entities, visit https://xtdb.com.
 
 === References
 
-Documents can reference other entities by using a value that is equal to the `:xt/id` of the referenced entity.
+Documents can reference another entity by using the value of its `:xt/id` attribute.
 
 References can be thought of as edges in a *graph*.
 
+== Access control
+
+Consider the English sentence:
+
+"The cat sat on the mat".
+
+The 'cat' is the *subject*.
+The word 'sat' is the _verb_ (which we will call the *action*), and the 'mat' is the _object_ (which we will call the *resource*).
+
+(((access control)))
+When considering **access control**, we might rephrase the sentence as a question:
+
+"Is the cat allowed to sit on the mat?".
+
+If we were to ask a different question, such as:
+
+"Is the _dog_ allowed to sit on the mat?", or
+
+"Is the cat allowed to _wee_ on the mat?", or
+
+"Is the cat allowed to sit on the _sofa_?",
+
+then we may get different answers.
+
+The point is, to satisfy most access control requirements we should consider the subject, action and resource _together_.
+
+To avoid making access control decisions based on stale data, we need the decision logic to be where the data resides.
+
+****
+Site takes the view that data must be protected from unauthorized access.
+
+The greater the distance between the data and the mechanisms that protect the data, the greater the 'attack surface' that must be defended.
+
+Placing the defences as close as possible to the data prevents a hard problem becoming a largely infeasible one.
+****
+
+[[concept-subjects]]
 == Subjects
 
+(((subject, definition)))
 An individual that has access to documents in Site is represented by a *subject* document.
-This is created automatically by Site when a recognised individual accesses the system.
+This is established automatically by Site when a recognised individual accesses the system.
 
-Individuals are recognised when the credentials they present match a *user-identity* document.
-A subject document will reference this user-identity document, as part of the subject's graph, as shown in <<subject-model>>.
+A subject document may also contain other details, such as how and from where the user logged in, security and organisational details and other data that may be stored outside of Site.
 
-.A subject document.
+== User identities
+
+(((user identity, definition)))
+Individuals can be recognised when they present credentials that match a *user-identity* document.
+If applicable, a subject document may reference this user-identity document as part of the subject's graph, as shown in <<subject-model>>.
+
+.The relationship between a subject and a user-identity.
 [[subject-model]]
 [example]
 --
@@ -111,10 +158,16 @@ include::subject.json[]
 ....
 --
 
-The user-identity document does not represent the individual, only the identity of an individual.
-Rather, the user-identity document references a further document, the *user*, that represents the recognised individual. This is shown in <<user-identity-model>>.
+The only attributes of a user-identity document that are prescribed by Site are the `:juxt.site.alpha/type` and `:juxt.pass.alpha/user` attributes.
 
-.A user-identity document.
+== Users
+
+(((user, definition)))
+The user-identity document does not represent the individual, only an _identity_ of an individual.
+Rather, the user-identity document references another document, the *user*, that represents the recognised individual.
+This is shown in <<user-identity-model>>.
+
+.The relationship between a user-identity and a user.
 
 [[user-identity-model]]
 [example]
@@ -130,31 +183,38 @@ include::user-identity.json[]
 
 This scheme adds a little extra complexity, but allows an individual to have multiple identities, since multiple user-identity documents can reference the same user document.
 
-The only attributes of a user-identity document that are prescribed by Site are the `:juxt.site.alpha/type` and `:juxt.pass.alpha/user` attributes.
 The sole prescribed attribute of a user document is the `:juxt.site.alpha/type` attribute.
-Other attributes can be added according to the domain model.
+Other attributes can be added to the user document as required by the business or domain model.
 
-Subjects, users, and user-identities are covered in <<ch-subjects>>.
-
+[[concept-actions]]
 == Actions
 
-Actions determine _who_ has access to documents and _how_ documents are queried, created, updated and deleted.
+// tag::actions-definition[]
+Actions govern _who_ has access to documents. Actions also govern _how_ documents are queried, created, updated and deleted.
+// end::actions-definition[]
 
-Actions are independent words that make up the _language of the system_.
-You will need to define your own actions to represent the activities you want your system to perform.
-
-Here are some example actions:
-
-- Login
-- List all products
-- Edit a product
-- Add a customer
-- Promote an employee
-- Post an article
-- Logout
+(((action, definition)))
+Actions are the verbs of the domain _language_ used to tailor Site to a given business problem.
 
 Naturally, actions are represented by documents.
-An example is shown in <<ex-concept-action>>.
+
+<<ex-some-actions>> illustrates some possible actions in a system:
+
+[[ex-some-actions]]
+.Some example actions
+[options=header,unbreakable,cols="2,5m"]
+|===
+|Action|Entity id
+|Login|https://example.org/actions/login
+|List all products|https://example.org/actions/list-products
+|Edit a product|https://example.org/actions/edit-product
+|Add a customer|https://example.org/actions/add-customer
+|Promote an employee|https://example.org/actions/promote-employee
+|Post an article|https://example.org/actions/post-article
+|Logout|https://example.org/actions/logout
+|===
+
+An example document is shown in <<ex-concept-action>>.
 
 [[ex-concept-action]]
 .An example action.
@@ -164,117 +224,109 @@ An example is shown in <<ex-concept-action>>.
 ----
 include::../../test/juxt/book.clj[tag=example-action,indent=0]
 ----
-<1> This document is an action.
-<2> Rules that govern whether this action can be used to access a document.
-<3> A program which creates any effects resulting from performing the action.
+<1> This document is marked as an action.
+<2> Access control rules which govern whether this action can be used
+<3> A program which computes the effects of performing this action.
 --
 
+== Rules
+
 An action document contains one or more *rules*.
+
+(((rule, definition)))
 A *rule* is written in terms of:
 
 - what is known about the person or machine requesting access (the *subject*)
 - what is known about the document being accessed, if applicable (the *resource*)
-- an explicit document that permits access to the action (the *permission*)
 
 For example, it might be that a person's access depends on a role they have been assigned, together with the value of the resource's document classification attribute.
 Or that only 'VIP' customers may access 'exclusive' special offers.
 
-If a rule is satisfied by the existence of a permission, access to the resource is granted.
+(((datalog)))
+Practically speaking, a rule is written as a set of *datalog* clauses.
 
-Practically speaking, a rule is written as a set of *Datalog* clauses.
+****
+Rules can be as simple or as complex as the domain requires. The power and
+expressiveness of Datalog allows for a wide range of possibilities.
 
-=== Performing actions
+When compared to other 'third-party' solutions, Site's authorization system has
+two further key advantages:
 
-When an action grants the creation, modification or deletion of documents, it will also have a program that _performs_ the action.
+* Action rules are written as graphs which are free to traverse as deep as
+  necessary into the complete database of facts. Other systems must often rely
+  on a small subset of facts which place limits on the flexibility of
+  authorization policies.
 
-This program might carry out validation of any inputs and return operations or effects which are applied to the state of the system.
+* Action rules benefit from strong database consistency. Rules are run only
+  after any pending updates to a permission have been applied. Other systems often
+  cannot achieve consistency because they are implemented as services across a
+  network boundary and their database of facts may be out-of-date when making
+  critical authorization decisions.
+****
 
-[NOTE]
+== Permissions
+
+(((rule head)))
+Each rule is a collection of clauses, headed by the following *rule head*:
+
+----
+(allowed? subject resource permission)
+----
+
+(((permission, definition)))
+A *permission* is a document which allows an action's rule to be satisfied.
+
+If at least one permission document exists, such that all the clauses in the rule are satisfied (referencing the subject and resource, if applicable), then the action is allowed.
+
+[TIP]
 --
-Technically speaking, the program associated with an action runs as part of a *transaction function* in XTDB.
-If the program needs to read data from the database, this guarantees the data is up-to-date.
+Think of this as an equation where a solution for the _permission_ variable must be found, in the same way as we might ask to find solutions of latexmath:[x] for the equation latexmath:[0 = x^2 - 2x + 6].
+If there are no solutions which satisfy the equation, then the rule is not satisfied (and the action is denied).
 --
+
+A permission is easily deleted, and so revoking access is as straight-forward as granting access.
+
+Permissions provide a permanent record of who had access to what, and when.
+
+== Transactions
+
+Actions can be given programs that will be run when the action is performed.
+
+The program computes the effects of performing the action.
+These effects may include mutations to the database.
+
+Frequently a program will need to access the existing state of the database in order to compute its result.
+So that a program does not access stale data, and thereby compute an inconstent result, the program is run as part of a transaction function.
+
+Typically, a program will carry out input validation and transformation.
+If the program completes successfully, the effects it computes are atomically applied to the state of the system.
 
 Site provides a built-in stack-based language called *Flip* for writing these programs.
 
-A detailed explanation of actions, rules, permissions and the Flip language can be found in <<ch-actions>>.
+// A detailed explanation of actions, rules, permissions and the Flip language can be found in <<ch-actions>>.
 
-
-////
-Possibly demote this into the relevant chapter
-
-=== Permissions
-
-For access to be granted to a Resource, a Permission document must exist in the database.
-
-When Rules are evaluated, these Permission documents are returned.
-A Permission document represents the granting of access, whether to a specific user explicitly, or to set of users assigned a particular role, or some other relationship.
-
-A Permission document is easily deleted, and so revoking access it as straight-forward as granting access.
-
-Permission documents provide a permanent record of who had access to what, and when.
-
-Rules & Permissions are covered more fully in <<ch-rules-and-permissions>>.
-
-////
-
-
+[[concept-resources]]
 == Resources
 
-Site maps the XTDB entity onto the concept of a web resource, as defined in REST.
-
-We can understand why XTDB entities make for good web resources, by reading the following quote from Roy Fielding's seminal paper introducing REST cite:[rest] (replacing Fielding's uses of the word 'entity for 'XTDB document).
-
-[quote,Roy Fielding]
---
-The key abstraction of information in REST is a resource. Any information that
-can be named can be a resource: a document or image, a temporal service
-(e.g. "today's weather in Los Angeles"), a collection of other resources, a
-non-virtual object (e.g. a person), and so on. In other words, any concept that
-might be the target of an author's hypertext reference must fit within the
-definition of a resource. A resource is a conceptual mapping to a set of
-entities, not the entity that corresponds to the mapping at any particular point
-in time.
-
-More precisely, a resource R is a temporally varying membership function
-M~R~(t), which for time t maps to a set of entities, or values, which are
-equivalent. The values in the set may be resource representations and/or
-resource identifiers.
---
-
-The mapping from an XTDB entity to a web resource is accomplished by the following:
-
-* Each XTDB entity's `:xt/id` attribute is set to a URL (string), identifying the resource.
-* Representation metadata is encoded into document attributes.
-
-<<ex-cat-resource>> shows a document that (currently) has a single representation, of HTML.
-
-[[ex-cat-resource]]
-.A cat, viewable in a web browser.
-[example]
---
-[source,clojure]
-----
-{:xt/id "https://example.org/cats/arya"
- :juxt.http.alpha/content-type "text/html;charset=utf-8" <1>
- :petshop/name "Arya"
- :petshop/species "cat"
- :petshop/color "black"
- :petshop/favorite-activity "playing with string"}
-----
-<1> This attribute declares that the resource is representable as HTML.
---
-
-Site provides access to these resources via the HTTP protocol cite:[rfc7231], including support for:
-
-* content-negotiation
-* method semantics
-* response codes
-* conditional requests
-* range requests
-* authentication
-
 Resources are covered in depth in <<ch-resources>>.
+
+// TODO: Write something short
+
+== Representations
+
+NOTE: TODO
+
+== Authentication
+
+NOTE: TODO
+
+== APIs
+
+NOTE: TODO
+
+== Applications
+
+NOTE: TODO
 
 // Local Variables:
 // mode: outline
