@@ -27,82 +27,7 @@
       [:xtdb.api/put m]))
    (xt/await-tx xt-node)))
 
-(defn put-superuser-role!
-  "Create the superuser role."
-  [xt-node {::site/keys [base-uri]}]
-  (log/info "Creating superuser role")
-  (let [role (str base-uri "/_site/roles/superuser")]
-    (put!
-     xt-node
-     {:xt/id role
-      ::site/type "Role"
-      :name "superuser"
-      :description "Superuser"}
-
-     ;; Add rule that allows superusers to do everything.
-     {:xt/id (str base-uri "/_site/rules/superuser-allow-all")
-      :description "Superusers can do everything"
-      ::site/type "Rule"
-      ::pass/target [['subject :juxt.pass.alpha/user 'user]
-                     ['mapping :juxt.site.alpha/type "UserRoleMapping"]
-                     ['mapping :juxt.pass.alpha/role role]
-                     ['mapping :juxt.pass.alpha/assignee 'user]]
-      ::pass/effect ::pass/allow
-      ::http/max-content-length (Math/pow 2 40)})))
-
-(defn put-superuser!
-  "Create a superuser."
-  [xt-node {:keys [username password fullname email]} {::site/keys [base-uri]}]
-  (assert username)
-  (assert password)
-  (assert fullname)
-  (let [user (str base-uri "/_site/users/" username)]
-    (put!
-     xt-node
-     (merge
-      {:xt/id user
-       ::site/type "User"
-       ::pass/username username
-       :name fullname}
-      (when email {:email email}))
-
-     {:xt/id (str user "/password")
-      ::site/type "Password"
-      ::pass/user user
-      ::pass/password-hash (password/encrypt password)
-      ::pass/classification "RESTRICTED"}
-
-     {:xt/id (format "%s/_site/roles/%s/users/%s" base-uri "superuser" username)
-      ::site/type "UserRoleMapping"
-      ::pass/assignee (format "%s/_site/users/%s" base-uri username)
-      ::pass/role (str base-uri "/_site/roles/superuser")})))
-
-(defn allow-public-access-to-public-resources!
-  "Resources classified as PUBLIC should be readable (but not writable). For
-  example, a login page needs to be a PUBLIC resource."
-  [xt-node {::site/keys [base-uri]}]
-  (put!
-   xt-node
-   {:xt/id (str base-uri "/_site/rules/public-resources")
-    ::site/type "Rule"
-    ::site/description "PUBLIC resources are accessible to GET"
-    ::pass/target '[[request :ring.request/method #{:get :head :options}]
-                    [resource ::pass/classification "PUBLIC"]]
-    ::pass/effect ::pass/allow}))
-
-(defn restict-access-to-restricted-resources!
-  "Resources classified as RESTRICTED should never be accessed, unless another
-  policy explicitly authorizes access."
-  [xt-node {::site/keys [base-uri]}]
-  (put!
-   xt-node
-   {:xt/id (str base-uri "/_site/rules/restricted-resources")
-    ::site/type "Rule"
-    ::site/description "RESTRICTED access is denied by default"
-    ::pass/target '[[resource ::pass/classification "RESTRICTED"]]
-    ::pass/effect ::pass/deny}))
-
-(defn put-graphql-schema-endpoint!
+#_(defn put-graphql-schema-endpoint!
   "Initialise the resource that will host Site's GraphQL schema, as well as the
   endpoint to post queries pertaining to the schema."
   ;; TODO: The 'and' above indicates this resource is conflating two concerns.
@@ -124,7 +49,7 @@
           ;; TODO:
           (graphql/schema-resource % (slurp (io/resource "juxt/site/alpha/site-schema.graphql"))))))
 
-(defn put-graphql-operations!
+#_(defn put-graphql-operations!
   "Add GraphQL operations that provide idiomatic requests to Site's GraphQL endpoint."
   [xt-node {::site/keys [base-uri]}]
   (let [schema-id (str base-uri "/_site/graphql")
@@ -151,7 +76,7 @@
     :juxt.http.alpha/content-type "text/plain;charset=utf-8"
     :juxt.site.alpha/body-fn 'juxt.site.alpha.graphql/text-plain-representation-body}))
 
-(defn put-request-template!
+#_(defn put-request-template!
   "Add the default request template, useful for debugging."
   [xt-node {::site/keys [base-uri]}]
   (log/info "Installing default request template")
@@ -168,7 +93,7 @@
       ::http/content-length (count body)
       ::http/body body})))
 
-(defn put-site-openapi!
+#_(defn put-site-openapi!
   "Add the Site API"
   [xt-node json {::site/keys [base-uri]}]
   (log/info "Installing Site API")
@@ -190,7 +115,7 @@
       :version (get-in openapi ["info" "version"])
       :description (get-in openapi ["info" "description"])})))
 
-(defn put-site-api! [xt-node {::site/keys [base-uri] :as config}]
+#_(defn put-site-api! [xt-node {::site/keys [base-uri] :as config}]
   ;; Site API's dependencies need to be established in advance.
   (put-graphql-schema-endpoint! xt-node config)
   (put-graphql-operations! xt-node config)
@@ -231,7 +156,7 @@
     ::pass/purpose purpose}
    action args))
 
-(defn create-action! [xt-node {::site/keys [base-uri] :as config} action]
+#_(defn create-action! [xt-node {::site/keys [base-uri] :as config} action]
   (do-action
    xt-node
    (str base-uri "/actions/create-action")
@@ -378,7 +303,7 @@
 
 ;; Currently awaiting a fix to https://github.com/juxt/xtdb/issues/1480 because
 ;; these can be used.
-(defn put-site-txfns! [xt-node {::site/keys [base-uri]}]
+#_(defn put-site-txfns! [xt-node {::site/keys [base-uri]}]
   (xt/submit-tx
    xt-node
    [[:xtdb.api/put
