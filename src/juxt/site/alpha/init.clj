@@ -276,7 +276,7 @@
     ::pass/action (str base-uri "/actions/grant-permission")
     ::pass/purpose nil}))
 
-(defn grant-permission! [xt-node {::site/keys [base-uri]} permission]
+#_(defn grant-permission! [xt-node {::site/keys [base-uri]} permission]
   (do-action
    xt-node
    (str base-uri "/actions/grant-permission")
