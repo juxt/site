@@ -459,7 +459,7 @@
                                      (selmer/render validation-template)
                                      edn/read-string)
         invalid? (when (seq validation-directive)
-                   (m/validate validation-directive v))]
+                   (not (m/validate validation-directive v)))]
     (when invalid?
       (me/humanize (m/explain validation-directive v)))))
 
