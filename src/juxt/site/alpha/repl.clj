@@ -206,7 +206,7 @@
          in (java.io.PushbackReader. (io/reader (io/input-stream (io/file filename))))]
      (doseq [rec (resources-from-stream in)]
        (when (:xt/id rec)
-         (if (xt/entity node (:xt/id rec))
+         (if (xt/entity (xt/db node) (:xt/id rec))
            (println "Skipping existing resource: " (:xt/id rec))
            (do
              (submit-and-wait-tx node [[:xtdb.api/put rec]])
