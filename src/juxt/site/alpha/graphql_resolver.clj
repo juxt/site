@@ -34,10 +34,10 @@
       ;; Set empty strings to "true" rather than empty-string, to enable selmer
       ;; truthy on 'if'.
       (reduce-kv
-       (fn [acc k v]
-         (assoc acc k (if (str/blank? v) "true" v)))
-       {}
-       form))))
+        (fn [acc k v]
+          (assoc acc k (if (str/blank? v) "true" v)))
+        {}
+        form))))
 
 (defn query-parameters [args]
   (mapv (fn [[k v]] {"name" k "value" v}) (form args)))
@@ -53,8 +53,8 @@
 (defn df [dir]
   (when-let [out (:out (sh/sh "df" "--output=avail" dir))]
     (Long/parseLong
-     (str/trim
-      (second (str/split out #"\n"))))))
+      (str/trim
+        (second (str/split out #"\n"))))))
 
 (defn tx-log-avail [])
 
@@ -76,8 +76,8 @@
 (defn apis [{:keys [db]}]
   (let [openapis
         (for [[uri api] (xt/q
-                         db '{:find [openapi-uri openapi]
-                              :where [[openapi-uri :juxt.apex.alpha/openapi openapi]]})]
+                          db '{:find [openapi-uri openapi]
+                               :where [[openapi-uri :juxt.apex.alpha/openapi openapi]]})]
           {:xt/id uri
            :type "OPENAPI"
            :contents api})
@@ -126,18 +126,18 @@
        (let [node (:juxt.site.alpha.db/xt-node system)
              status (xt/status node)]
          (merge
-          (set/rename-keys
-           status
-           {:xtdb.version/version "version"
-            :xtdb.version/revision "revision"
-            :xtdb.index/index-version "indexVersion"
-            :xtdb.kv/kv-store "kvStore"
-            :xtdb.kv/estimate-num-keys "estimateNumKeys"
-            :xtdb.kv/size "kvSize"})
-          {"attributeStats"
-           (fn [_]
-             (for [[name frequency] (xt/attribute-stats node)]
-               {"attribute" (str name) "frequency" frequency}))})))
+           (set/rename-keys
+             status
+             {:xtdb.version/version "version"
+              :xtdb.version/revision "revision"
+              :xtdb.index/index-version "indexVersion"
+              :xtdb.kv/kv-store "kvStore"
+              :xtdb.kv/estimate-num-keys "estimateNumKeys"
+              :xtdb.kv/size "kvSize"})
+           {"attributeStats"
+            (fn [_]
+              (for [[name frequency] (xt/attribute-stats node)]
+                {"attribute" (str name) "frequency" frequency}))})))
 
      "version"
      {"gitSha" (fn [_] (git-sha))}
@@ -153,22 +153,22 @@
 
 (defn extract-errors-resolver [args]
   (some->>
-   args
-   :object-value
-   :juxt.site.alpha/errors
-   (map (fn [error]
-          (let [ex-data (:ex-data error)
-                graphql-type-name (::site/graphql-type ex-data "SiteGeneralError")]
-            (into
-             (into error {::site/graphql-type graphql-type-name})
-             (case graphql-type-name
-               "SiteGraphqlExecutionError"
-               (select-keys ex-data [::site/graphql-stored-query-resource-path
-                                     ::site/graphql-operation-name
-                                     ::site/graphql-variables
-                                     ::grab/errors])
-               {}
-               )))))))
+    args
+    :object-value
+    :juxt.site.alpha/errors
+    (map (fn [error]
+           (let [ex-data (:ex-data error)
+                 graphql-type-name (::site/graphql-type ex-data "SiteGeneralError")]
+             (into
+               (into error {::site/graphql-type graphql-type-name})
+               (case graphql-type-name
+                 "SiteGraphqlExecutionError"
+                 (select-keys ex-data [::site/graphql-stored-query-resource-path
+                                       ::site/graphql-operation-name
+                                       ::site/graphql-variables
+                                       ::grab/errors])
+                 {}
+                 )))))))
 
 (defn graphql-errors [args]
   (for [error (some-> args :object-value ::grab/errors)]
