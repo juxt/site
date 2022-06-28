@@ -636,7 +636,9 @@
                   args (if (second query-args) query-args (first query-args))
                   results
                   (try
-                    (xt/q db q args)
+                    (if (nil? args)
+                      (xt/q db q)
+                      (xt/q db q args))
                     (catch Exception e
                       (throw (ex-info "Failure when running XTDB query"
                                       {:message (ex-message e)
