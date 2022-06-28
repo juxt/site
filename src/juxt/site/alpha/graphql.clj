@@ -65,7 +65,8 @@
              ['e :_siteCreatedAt '_siteCreatedAt]]}))
 
 (defn to-xt-query
-  [{:keys [custom-xt-query field argument-values type-k site-args object-value]}]
+  [{:keys [custom-xt-query field argument-values type-k
+           site-args object-value juxt.pass.alpha/subject]}]
   (let [values argument-values
         field-or-type (or
                         (get site-args "type")
@@ -86,6 +87,7 @@
                 (and (map? x) (:edn x))
                 (-> (get :edn)
                     (selmer/render {"type" type-k
+                                    "subject" (::pass/username subject)
                                     "object-id" (:xt/id object-value)
                                     "args" values})
                     edn/read-string)
