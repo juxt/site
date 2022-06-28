@@ -88,8 +88,9 @@
  :aliases
  {:dev
   {:extra-paths ["dev" "test"]
-   :extra-deps {;; Convenience libraries made available during development
+   :extra-deps { ;; Convenience libraries made available during development
                 org.clojure/test.check {:mvn/version "1.1.1"}
+                nrepl/nrepl {:mvn/version "0.9.0"}
                 org.clojure/alpha.spec {:git/url "https://github.com/clojure/spec-alpha2.git"
                                         :sha "99456b1856a6fd934e2c30b17920bd790dd81775"}
                 org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}}
