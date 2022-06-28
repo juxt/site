@@ -232,7 +232,7 @@
                        transform transform)]
 
                  (cond
-                   (or kw (scalar? arg-type types-by-name))
+                   (or kw (scalar? arg-type types-by-name) (enum? arg-type types-by-name))
                    (assoc-some acc key value)
 
                    :else
