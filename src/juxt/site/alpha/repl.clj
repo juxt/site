@@ -179,6 +179,11 @@
       :else
       nil)))
 
+(defn- submit-and-wait-tx
+  [node tx]
+  (let [tx-id (xt/submit-tx node tx)]
+    (xt/await-tx node tx-id)))
+
 (defn import-resources
   ([] (import-resources "import/resources.edn"))
   ([filename]
