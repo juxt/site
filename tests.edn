@@ -8,7 +8,7 @@
                         #_"juxt.pass.action-test"
                         "juxt.pass.authorization-test"
                         "juxt.authorization-integration-test"
-                        "juxt.book-test"
+                        #_"juxt.book-test"
                         "juxt.pass.procedure-test"
                         "juxt.site.graphql-auth-integration-test"
                         "juxt.pipe.core-test"
