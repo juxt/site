@@ -27,8 +27,7 @@
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]
-   [juxt.site.alpha.util :as util]
-   [juxt.site.alpha.repl :as repl])
+   [juxt.site.alpha.util :as util])
   (:import (java.util Date)))
 
 (defn base64-reader [form]

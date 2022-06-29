@@ -8,8 +8,7 @@
    [clojure.walk :refer [postwalk]]
    [clojure.string :as str]
    [juxt.site.alpha.repl :refer [base-uri put! install-do-action-fn! do-action make-application-doc make-application-authorization-doc make-access-token-doc encrypt-password]]
-   [juxt.site.alpha.util :refer [as-hex-str random-bytes]]
-   [juxt.book :as book]))
+   [juxt.site.alpha.util :refer [as-hex-str random-bytes]]))
 
 (defn substitute-actual-base-uri [form]
   (postwalk
