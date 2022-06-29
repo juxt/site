@@ -447,21 +447,23 @@
 
 (defn invalid-arguments?
   [{:keys [argument-values field]}]
-  (let [[k v] (apply vec argument-values)
-        k (keyword k)
-        validation-directive (some-> field
-                                     (get-in [::schema/directives-by-name
-                                              "site"
-                                              ::g/arguments
-                                              "validation"])
-                                     (get k)
-                                     ;; TODO: overwrite it with system-level config
-                                     (selmer/render validation-template)
-                                     edn/read-string)
-        invalid? (when (seq validation-directive)
-                   (not (m/validate validation-directive v)))]
-    (when invalid?
-      (me/humanize (m/explain validation-directive v)))))
+  (when-let [directive (get-in field [::schema/directives-by-name
+                                      "site"
+                                      ::g/arguments
+                                      "validation"])]
+    (->> (keywordize-keys argument-values)
+         (map
+          (fn [[k v]]
+            (let [validation-schema (some-> directive
+                                            (get k)
+                                            (selmer/render validation-template)
+                                            edn/read-string)
+                  invalid? (when (seq validation-schema)
+                             (not (m/validate validation-schema v)))]
+              (when invalid?
+                (me/humanize (m/explain validation-schema v))))))
+         (remove nil?))))
+
 
 
 (defn perform-mutation!
@@ -480,7 +482,7 @@
         ;; @site(a: "xtdb.api/valid-time").
         (lookup-entity id))
       "put"
-      (if-let [validation-report (invalid-arguments? opts)]
+      (if-let [validation-report (seq (invalid-arguments? opts))]
         (throw (Exception. (pr-str validation-report)))
         (if bulk-mutation
           (let [txes (args-to-entities opts)]
