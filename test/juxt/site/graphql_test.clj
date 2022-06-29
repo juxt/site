@@ -225,82 +225,38 @@ type Person { name: String @site(a: \"name\")}"
 (comment
   (schema/compile-schema (parser/parse "extend schema @site(import: \"/graphql\") type Query { person: Person } type Person { name: String }")))
 
-
-(defn mutation []
-  (let [schema "
+(def straight-mutation-schema
+  "
 schema { query: Query mutation: Mutation }
 type Query { person: Person }
 type Person { id: ID @site(a: \"xt/id\") name: String }
-scalar Date
 type Mutation {
   addPerson(id: ID @site(a: \"xt/id\") name: String): Person
 }
-"
-        query "mutation { addPerson(id: \"https://example.org/persons/mal\" name: \"Malcolm Sparks\") { id name }}"]
+")
 
-    (submit-and-await!
-      [[:xtdb.api/put access-all-areas]
+(def straight-query
+  "
+mutation {
+  addPerson(
+      id: \"https://example.org/persons/mal\"
+      name: \"Malcolm Sparks\"
+  ) { id name }
+}
+")
 
-       [:xtdb.api/put
-        {:xt/id "https://example.org/graphql"
-         :doc "A GraphQL endpoint"
-         :juxt.http.alpha/methods #{:post :put :options}
-         :juxt.http.alpha/acceptable "application/graphql"
-         :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/put-handler
-         :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/post-handler}]])
+(def query-with-input
+  "
+mutation {
+  addPerson(person: {
+      id: \"https://example.org/persons/mal\"
+      name: \"Malcolm Sparks\"})
+  { id name }
+}
+")
 
-    ;; Install a GraphQL schema at /graphql
-    (let [response (*handler*
-                     (-> {:ring.request/method :put
-                          :ring.request/path "/graphql"}
-                         (add-body schema "application/graphql")))]
-      (is (= 204 (:ring.response/status response))))
-
-    ;; POST a mutation to that endpoint
-    (let [response
-          (*handler*
-            (-> {:ring.request/method :post
-                 :ring.request/path "/graphql"}
-                (add-body query "application/graphql")))]
-
-      (when (= (get-in response [:ring.response/status]) 500)
-        (throw (ex-info "Unexpected error" {:response response})))
-
-      (is (= 200 (:ring.response/status response)))
-
-      response
-
-      (when-not (= (get-in response [:ring.response/headers "content-type"])
-                   "application/json")
-        (throw (ex-info "Unexpected content-type"
-                        {:content-type (get-in response [:ring.response/headers "content-type"])})))
-
-      ;; Ensure mutation worked
-      (let [db (xt/db *xt-node*)]
-        (is (= {:xt/id "https://example.org/persons/mal"
-                :juxt.site/type "Person"
-                :name "Malcolm Sparks"}
-               (-> (xt/entity db "https://example.org/persons/mal")
-                   (select-keys [:xt/id :juxt.site/type :name])))))
-
-      (let [body (json/read-value (:ring.response/body response))]
-        (is (= {"data"
-                {"addPerson"
-                 {"id" "https://example.org/persons/mal"
-                  "name" "Malcolm Sparks"}}}
-               body))
-        ;;body
-        ))))
-
-#_((t/join-fixtures [with-xt with-handler])
-   mutation
-   )
-
-(deftest mutation-test
-  (mutation))
-
-(defn mutation-with-validation-directive []
-  (let [schema "
+(def valid-mutation-schema
+  "
 schema { query: Query mutation: Mutation }
 type Query { person: Person }
 type Person { id: ID @site(a: \"xt/id\") name: String }
@@ -314,12 +270,31 @@ type Mutation {
       person: \"[:map [:id {:optional true} :any] [:name [:string {:min 1 :max 20}]]]\"
     }
   )
-}"
+}
+")
 
-        query "
-mutation { addPerson(
-  person: {id: \"https://example.org/persons/mal\" name: \"Malcolm Sparks\"}) { id name }}
-"]
+(def invalid-mutation-schema
+  "
+schema { query: Query mutation: Mutation }
+type Query { person: Person }
+  type Person { id: ID @site(a: \"xt/id\") name: String }
+input PersonInput { name: String! id: ID }
+
+type Mutation {
+  addPerson(
+    person: PersonInput
+  ): Person @site(
+    validation: {
+      person: \"[:map [:id {:optional true} :any] [:name [:string {:min 1 :max 5}]]]\"
+    }
+  )
+}
+")
+
+
+(defn mutation []
+  (let [schema straight-mutation-schema
+        query straight-query]
 
     (submit-and-await!
      [[:xtdb.api/put access-all-areas]
@@ -373,32 +348,79 @@ mutation { addPerson(
                   "name" "Malcolm Sparks"}}}
                body))
         ;;body
-        ))))
+        ))
 
-(deftest mutation-with-validation-directive-test []
+    ))
+
+#_((t/join-fixtures [with-xt with-handler])
+   mutation
+ )
+
+(deftest mutation-test
+  (mutation))
+
+(defn mutation-with-validation-directive []
+  (let [schema valid-mutation-schema
+        query query-with-input]
+
+    (submit-and-await!
+     [[:xtdb.api/put access-all-areas]
+
+      [:xtdb.api/put
+       {:xt/id "https://example.org/graphql"
+        :doc "A GraphQL endpoint"
+        :juxt.http.alpha/methods #{:post :put :options}
+        :juxt.http.alpha/acceptable "application/graphql"
+        :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/put-handler
+        :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/post-handler}]])
+
+    ;; Install a GraphQL schema at /graphql
+    (let [response (*handler*
+                    (-> {:ring.request/method :put
+                         :ring.request/path "/graphql"}
+                        (add-body schema "application/graphql")))]
+      (is (= 204 (:ring.response/status response))))
+
+    ;; POST a mutation to that endpoint
+    (let [response
+          (*handler*
+           (-> {:ring.request/method :post
+                :ring.request/path "/graphql"}
+               (add-body query "application/graphql")))]
+
+      (when (= (get-in response [:ring.response/status]) 500)
+        (throw (ex-info "Unexpected error" {:response response})))
+
+      (is (= 200 (:ring.response/status response)))
+
+      response
+
+      (when-not (= (get-in response [:ring.response/headers "content-type"])
+                   "application/json")
+        (throw (ex-info "Unexpected content-type"
+                        {:content-type (get-in response [:ring.response/headers "content-type"])})))
+
+      ;; Ensure mutation worked
+      (let [db (xt/db *xt-node*)]
+        (is (= {:xt/id "https://example.org/persons/mal"
+                :juxt.site/type "Person"
+                :name "Malcolm Sparks"}
+               (-> (xt/entity db "https://example.org/persons/mal")
+                   (dissoc :_siteCreatedAt)))))
+
+      (let [body (json/read-value (:ring.response/body response))]
+        (is (= {"data"
+                {"addPerson"
+                 {"id" "https://example.org/persons/mal"
+                  "name" "Malcolm Sparks"}}}
+               body))))))
+
+(deftest mutation-with-validation-directive-test
   (mutation-with-validation-directive))
 
 (defn invalid-mutation-with-validation-directive []
-  (let [schema "
-schema { query: Query mutation: Mutation }
-type Query { person: Person }
-type Person { id: ID @site(a: \"xt/id\") name: String }
-input PersonInput { name: String! id: ID }
-
-type Mutation {
-  addPerson(
-    person: PersonInput
-  ): Person @site(
-    validation: {
-      person: \"[:map [:id {:optional true} :any] [:name [:string {:min 1 :max 5}]]]\"
-    }
-  )
-}"
-
-        query "
-mutation { addPerson(
-  person: {id: \"https://example.org/persons/mal\" name: \"Malcolm Sparks\"}) { id name }}
-"]
+  (let [schema invalid-mutation-schema
+        query query-with-input]
 
     (submit-and-await!
      [[:xtdb.api/put access-all-areas]
@@ -450,11 +472,9 @@ mutation { addPerson(
                               (get "message"))]
 
         (is (= error-message
-               "{:name [\"should be between 1 and 5 characters\"]}"))
-        ;;body
-        ))))
+               "({:name [\"should be between 1 and 5 characters\"]})"))))))
 
-(deftest invalid-mutation-with-validation-directive-test []
+(deftest invalid-mutation-with-validation-directive-test
   (invalid-mutation-with-validation-directive))
 
 
