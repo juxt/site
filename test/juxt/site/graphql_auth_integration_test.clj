@@ -86,6 +86,12 @@
    [['(allowed? permission subject action resource)
      ['permission :xt/id]]]})
 
+(defn make-lookup-action
+  [action-id lookup-type]
+  (update (make-action action-id)
+          :juxt.pass.alpha/rules conj ['(include? action e)
+                                       ['e :juxt.site.alpha/type (str site-prefix "/" lookup-type)]]))
+
 (def example-compiled-schema (-> "juxt/data/example.graphql"
                                  io/resource
                                  slurp
@@ -95,46 +101,49 @@
 
 (defn setup-db
   []
-  (let [prj-alpha (make-project "alpha")
-           prj-bravo (make-project "bravo")
-           cwi (assoc (make-employee "cwi")
-                      :phonenumber "1234"
-                      :projects (:xt/id prj-alpha))
-           repository-a (make-repository "repository-a")
-           repository-b (make-repository "repository-b")]
-       (repl/put! repository-a)
-       (repl/put! repository-b)
-       (repl/put! (assoc prj-alpha
-                         :assigned #{(:xt/id cwi)}
+  (let [repository-a (make-repository "repository-a")
+        repository-b (make-repository "repository-b")
+        prj-alpha (assoc (make-project "alpha")
                          :repositories #{(:xt/id repository-a)
-                                         (:xt/id repository-b)}
-                         ))
-       (repl/put! prj-bravo)
-       (repl/put! (assoc (make-client "acme-corp") :projects #{(:xt/id prj-alpha)
-                                                               (:xt/id prj-bravo)}))
-       (repl/put! cwi)
-       (repl/put! (assoc (make-employee "bob") :phonenumber "5678" :manager (:xt/id cwi)))
-       (repl/put! (assoc (make-employee "ali") :phonenumber "91011" :juxt.site.alpha/type "https://test.example.com/contractor"))
-       (repl/put! (update (make-action "getEmployee")
-                          :juxt.pass.alpha/rules conj ['(include? action e)
-                                                       ['e :juxt.site.alpha/type "https://test.example.com/employee"]]))
-       (repl/put! (make-permission "getEmployee"))
-       (repl/put! (update (make-action "getContractor")
-                          :juxt.pass.alpha/rules conj ['(include? action e)
-                                                       ['e :juxt.site.alpha/type "https://test.example.com/contractor"]]))
-       (repl/put! (make-permission "getContractor"))
-       (repl/put! (update (make-action "getProject")
-                          :juxt.pass.alpha/rules conj ['(include? action e)
-                                                       ['e :juxt.site.alpha/type "https://test.example.com/project"]]))
-       (repl/put! (make-permission "getProject"))
-       (repl/put! (update (make-action "getRepository")
-                          :juxt.pass.alpha/rules conj ['(include? action e)
-                                                       ['e :juxt.site.alpha/type "https://test.example.com/repository"]]))
-       (repl/put! (make-permission "getRepository"))
-       (repl/put! (update (make-action "getClient")
-                          :juxt.pass.alpha/rules conj ['(include? action e)
-                                                       ['e :juxt.site.alpha/type "https://test.example.com/client"]]))
-       (repl/put! (make-permission "getClient"))))
+                                         (:xt/id repository-b)})
+        prj-bravo (make-project "bravo")
+        manager (assoc (make-employee "cwi")
+                           :phonenumber "1234"
+                           :projects #{(:xt/id prj-alpha)
+                                       (:xt/id prj-bravo)})
+        employee (assoc (make-employee "bob") :phonenumber "5678" :manager (:xt/id manager))
+        contractor (assoc (make-employee "ali") :phonenumber "91011" :juxt.site.alpha/type "https://test.example.com/contractor")
+        client (assoc (make-client "acme-corp") :projects #{(:xt/id prj-alpha)
+                                                            (:xt/id prj-bravo)})]
+    (repl/put! repository-a)
+    (repl/put! repository-b)
+    (repl/put! prj-alpha)
+    (repl/put! prj-bravo)
+    (repl/put! client)
+    (repl/put! manager)
+    (repl/put! employee)
+    (repl/put! contractor)
+
+    (repl/put! (make-lookup-action "getEmployee" "employee"))
+    (repl/put! (make-permission "getEmployee"))
+    (repl/put! (make-lookup-action "getContractor" "contractor"))
+    (repl/put! (make-permission "getContractor"))
+    (repl/put! (make-lookup-action "getProject" "project"))
+    (repl/put! (make-permission "getProject"))
+    (repl/put! (make-lookup-action "getRepository" "repository"))
+    (repl/put! (make-permission "getRepository"))
+    (repl/put! (make-lookup-action "getClient" "client"))
+    (repl/put! (make-permission "getClient"))
+    (repl/put! (update (make-action "getProject")
+                       :juxt.pass.alpha/rules conj ['(include? action e)
+                                                    ['e :juxt.site.alpha/type "https://test.example.com/project"]]))
+    (repl/put! (update (make-action "getRepository")
+                       :juxt.pass.alpha/rules conj ['(include? action e)
+                                                    ['e :juxt.site.alpha/type "https://test.example.com/repository"]]))
+    (repl/put! (update (make-action "getClient")
+                       :juxt.pass.alpha/rules conj ['(include? action e)
+                                                    ['e :juxt.site.alpha/type "https://test.example.com/client"]]))
+    ))
 
 (deftest graphql->xtdb-test
 
@@ -198,17 +207,18 @@
   (testing "Can return multi-layer result with no local fields"
     (is (= #{{:juxtcode "bob"
               :manager #{{:juxtcode "cwi"
-                          :projects #{{:assigned #{{:juxtcode "cwi"}}}}}}}}
+                          :projects #{{:repositories #{{:name "repository-a"} {:name "repository-b"}}}}}}}}
            (graphql-proc/run
-             "query findEmployeePhoneNumbers { employee { juxtcode, manager { juxtcode, projects { assigned { juxtcode } } } } }"
+             "query findEmployeePhoneNumbers { employee { juxtcode, manager { juxtcode, projects { repositories { name } } } } }"
              (repl/db)
              example-compiled-schema
              "subject"
              nil)))
+
     (is (= #{{:juxtcode "bob"
-              :manager #{{:projects #{{:assigned #{{:juxtcode "cwi"}}}}}}}}
+              :manager #{{:projects #{{:repositories #{{:name "repository-a"} {:name "repository-b"}}}}}}}}
            (graphql-proc/run
-             "query findEmployeePhoneNumbers { employee { juxtcode, manager { projects { assigned { juxtcode } } } } }"
+             "query findEmployeePhoneNumbers { employee { juxtcode, manager { projects { repositories { name } } } } }"
              (repl/db)
              example-compiled-schema
              "subject"

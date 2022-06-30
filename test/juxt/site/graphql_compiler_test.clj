@@ -11,25 +11,49 @@
                         sut/compile-schema))
 
 (deftest query-doc->actions-test
-  (testing "Can extract the linked actions for a single layer query"
+  (testing "Can extract the single linked actions for a single layer query"
     (is (= #{"https://test.example.com/actions/getEmployee"}
            (sut/query-doc->actions (sut/query->query-doc
-                                                          "query findEmployeePhoneNumbers { employee { juxtcode } }"
-                                                          example-schema) example-schema)))
+                                    "query findEmployeePhoneNumbers { employee { juxtcode } }"
+                                    example-schema) example-schema)))
+
     (is (= #{"https://test.example.com/actions/getContractor"}
            (sut/query-doc->actions (sut/query->query-doc
-                                                          "query findContractorPhoneNumbers { contractor { juxtcode } }"
-                                                          example-schema) example-schema))))
+                                    "query findContractorPhoneNumbers { contractor { juxtcode } }"
+                                    example-schema) example-schema))))
+
+  (testing "Can extract the multiple linked actions for a single layer query"
+    (is (= #{"https://test.example.com/actions/getEmployee"
+             "https://test.example.com/actions/getContractor"}
+           (sut/query-doc->actions (sut/query->query-doc
+                                    "query findEmployeePhoneNumbers { allStaff { juxtcode } }"
+                                    example-schema) example-schema))))
+
   (testing "Can extract the linked actions for a simple multi-layer query"
-    (is (= #{"https://test.example.com/actions/getEmployee" "https://test.example.com/actions/getProject"}
+    (is (= #{"https://test.example.com/actions/getClient" "https://test.example.com/actions/getProject"}
            (sut/query-doc->actions (sut/query->query-doc
-                                                          "query findEmployeeProjects { employee { juxtcode, projects { name } } }"
-                                                          example-schema) example-schema))))
+                                    "query findEmployeeProjects { client { name, projects { name } } }"
+                                    example-schema) example-schema))))
+
+  (testing "Can extract the linked actions when multiple actions are linked to the same field"
+    (is (= #{"https://test.example.com/actions/getEmployee"
+             "https://test.example.com/actions/getContractor"}
+           (sut/query-doc->actions (sut/query->query-doc
+                                    "query findEmployeePhoneNumbers { employee { manager { juxtcode } } }"
+                                    example-schema) example-schema))))
+
   (testing "Can extract the linked actions for a query with a cycle in the type graph (and only includes the action once)"
-    (is (= #{"https://test.example.com/actions/getEmployee" "https://test.example.com/actions/getProject"}
+    (is (= #{"https://test.example.com/actions/getEmployee"
+             "https://test.example.com/actions/getContractor"
+             "https://test.example.com/actions/getProject"}
            (sut/query-doc->actions (sut/query->query-doc
-                                                          "query findEmployeeProjects { employee { juxtcode, projects { name, assigned { name } } } }"
-                                                          example-schema) example-schema)))))
+                                    "query findEmployeeProjects { employee { juxtcode, projects { name, assigned { name } } } }"
+                                    example-schema) example-schema))))
+
+  (testing "Throws exception if no linked action for field with inner-selection-sets"
+    (is (thrown? Exception (sut/query-doc->actions (sut/query->query-doc
+                                                    "query findEmployeePhoneNumbers { employee { juxtcode { juxtcode } } }"
+                                                    example-schema) example-schema)))))
 
 
 (deftest build-query-for-selection-set-test
@@ -153,6 +177,41 @@
            ['(include? action e)]]
           false))))
 
+  (testing "Returns query with multiple actions if field has multiple linked acitons"
+    (is (=
+         '{:find [e (pull e [:juxtcode])],
+              :where
+              [[e :xt/id _]
+               [action :juxt.site.alpha/type "https://meta.juxt.site/pass/action"]
+               [action
+                :xt/id
+                #{"https://test.example.com/actions/getEmployee"
+                  "https://test.example.com/actions/getContractor"}]
+               [permission
+                :juxt.site.alpha/type
+                "https://meta.juxt.site/pass/permission"]
+               [permission
+                :juxt.pass.alpha/action
+                #{"https://test.example.com/actions/getEmployee"
+                  "https://test.example.com/actions/getContractor"}]
+               [permission :juxt.pass.alpha/purpose purpose]
+               (allowed? permission subject action e)
+               (include? action e)],
+              :rules
+              [[(allowed? permission subject action e)] [(include? action e)]],
+           :in [subject purpose]}
+
+         (sut/build-query-for-selection-set
+          {::document/scoped-type-name "Query"
+           ::graphql/name "allStaff"
+           ::graphql/selection-set [{::document/scoped-type-name "StaffMember"
+                                     ::graphql/name "juxtcode"}]}
+          example-schema
+          [['(allowed? permission subject action e)]
+           ['(include? action e)]]
+          false)
+         )))
+
   (testing "Returns multi-layer result with multiple local fields"
     (is (=
          {:find ['e '(pull e [:juxtcode]) {:projects 'inner-projects}]
@@ -199,4 +258,68 @@
           example-schema
           [['(allowed? permission subject action e)]
            ['(include? action e)]]
-          false)))))
+          false))))
+
+  (testing "Returns multi-layer result with multipe linked actions if required"
+    (is (=
+         '{:find [e {} {:manager inner-manager}],
+           :where
+           [[e :xt/id _]
+            [action :juxt.site.alpha/type "https://meta.juxt.site/pass/action"]
+            [action :xt/id "https://test.example.com/actions/getEmployee"]
+            [permission
+             :juxt.site.alpha/type
+             "https://meta.juxt.site/pass/permission"]
+            [permission
+             :juxt.pass.alpha/action
+             "https://test.example.com/actions/getEmployee"]
+            [permission :juxt.pass.alpha/purpose purpose]
+            (allowed? permission subject action e)
+            (include? action e)
+            [e :manager manager]
+            [(q
+              {:find [e (pull e [:name])],
+               :where
+               [[e :xt/id input-id]
+                [action
+                 :juxt.site.alpha/type
+                 "https://meta.juxt.site/pass/action"]
+                [action
+                 :xt/id
+                 #{"https://test.example.com/actions/getEmployee"
+                   "https://test.example.com/actions/getContractor"}]
+                [permission
+                 :juxt.site.alpha/type
+                 "https://meta.juxt.site/pass/permission"]
+                [permission
+                 :juxt.pass.alpha/action
+                 #{"https://test.example.com/actions/getEmployee"
+                   "https://test.example.com/actions/getContractor"}]
+                [permission :juxt.pass.alpha/purpose purpose]
+                (allowed? permission subject action e)
+                (include? action e)],
+               :rules
+               [[(allowed? permission subject action e)]
+                [(include? action e)]],
+               :in   [subject purpose input-id]}
+              subject
+              purpose
+              manager)
+             inner-manager]],
+           :rules
+           [[(allowed? permission subject action e)] [(include? action e)]],
+           :in   [subject purpose]}
+         (sut/build-query-for-selection-set
+          {::document/scoped-type-name "Query"
+           ::graphql/name              "employee"
+           ::graphql/selection-set     [{::document/scoped-type-name "Employee"
+                                         ::graphql/name              "manager"
+                                         ::graphql/selection-set     [{::document/scoped-type-name "StaffMember"
+                                                                       ::graphql/name              "name"}]}]}
+          example-schema
+          [['(allowed? permission subject action e)]
+           ['(include? action e)]]
+          false)
+          )))
+
+  )
