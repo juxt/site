@@ -17,18 +17,23 @@
 
 (declare build-query-for-selection-set)
 
+
 (defn build-where-clause
-  [compiled-schema action-id action-rules-map subquery-data incoming-resources?]
+  [compiled-schema action-ids action-rules-map subquery-data incoming-resources?]
   (let [entity-selection-clause (if incoming-resources? ['e :xt/id 'input-id] ['e :xt/id '_])
         has-subquery-data? (seq subquery-data)
+        actions-ids-as-single-or-set (if (vector? action-ids)
+                                       (set action-ids)
+                                       action-ids)
         where-clause [entity-selection-clause
                       ['action :juxt.site.alpha/type "https://meta.juxt.site/pass/action"]
-                      ['action :xt/id action-id]
+                      ['action :xt/id actions-ids-as-single-or-set]
                       ['permission :juxt.site.alpha/type "https://meta.juxt.site/pass/permission"]
-                      ['permission :juxt.pass.alpha/action action-id]
+                      ['permission :juxt.pass.alpha/action actions-ids-as-single-or-set]
                       '[permission :juxt.pass.alpha/purpose purpose]
                       '(allowed? permission subject action e)
-                      '(include? action e)]]
+                      '(include? action e)
+                      ]]
     (if has-subquery-data?
       (-> where-clause
           ;; Add the clause to pull the key into the query
@@ -59,9 +64,9 @@
       find-clause)))
 
 (defn build-query-xtdb
-  [compiled-schema action-id fields-to-pull action-rules-map subquery-data incoming-resources?]
+  [compiled-schema action-ids fields-to-pull action-rules-map subquery-data incoming-resources?]
   (let [pull-fields (vec fields-to-pull)
-        where-clause (build-where-clause compiled-schema action-id action-rules-map subquery-data incoming-resources?)
+        where-clause (build-where-clause compiled-schema action-ids action-rules-map subquery-data incoming-resources?)
         find-clause (build-find-clause pull-fields subquery-data)
         in-clause (if incoming-resources? '[subject purpose input-id] '[subject purpose])]
     {:find find-clause
@@ -84,12 +89,12 @@
 
 (defn build-query-for-selection-set
   [selection-set compiled-schema action-rules incoming-resources?]
-  (let [action (name-scoped-name-pair->actions selection-set compiled-schema)
+  (let [actions (name-scoped-name-pair->actions selection-set compiled-schema)
         sel-set (:juxt.grab.alpha.graphql/selection-set selection-set)
         grouped-by-inners (group-by (comp some? :juxt.grab.alpha.graphql/selection-set) sel-set)]
     (build-query-xtdb
      compiled-schema
-     action
+     actions
      (map (comp keyword :juxt.grab.alpha.graphql/name) (get grouped-by-inners false))
      action-rules
      (get grouped-by-inners true)
@@ -112,8 +117,26 @@
 
 (defn query-doc->actions
   [query-document schema]
-  (let [root-selection-set (-> query-document ::document/operations first :juxt.grab.alpha.graphql/selection-set)]
-    (set (map #(name-scoped-name-pair->actions % schema) (selection-set->name-scoped-name-pair schema root-selection-set)))))
+  (let [root-selection-set
+        (->
+         query-document
+         ::document/operations
+         first
+         :juxt.grab.alpha.graphql/selection-set)
+        name-scoped-name-pairs (selection-set->name-scoped-name-pair schema root-selection-set)]
+    (reduce (fn [acc n] (let [actions (name-scoped-name-pair->actions n schema)]
+                          (cond
+                            (vector? actions) (into acc actions)
+                            (some? actions) (conj acc actions)
+                            :default (throw
+                                      (ex-info
+                                       "Failed to find linked actions for field. Ensure @site directive is available in the schema for this field."
+                                       {:target-pair n :schema schema})))
+                          (if (vector? actions)
+                            (into acc actions)
+                            (conj acc actions))))
+            #{}
+            name-scoped-name-pairs)))
 
 (defn compile-schema
   [schema-string]
