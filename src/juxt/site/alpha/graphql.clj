@@ -26,6 +26,13 @@
    [juxt.pass.alpha :as-alias pass]
    [juxt.grab.alpha.graphql :as-alias g]))
 
+(defn selmer-args
+  [{:keys [argument-values pass/subject object-value type-k]}]
+  {"object-id" (:xt/id object-value)
+   "args" argument-values
+   "type-k" type-k
+   "username" (::pass/username subject)})
+
 (defn field->type
   [field]
   (or
@@ -68,7 +75,7 @@
 
 (defn to-xt-query
   [{:keys [custom-xt-query field argument-values type-k
-           site-args object-value juxt.pass.alpha/subject]}]
+           site-args] :as opts}]
   (let [values argument-values
         field-or-type (or
                         (get site-args "type")
@@ -88,10 +95,7 @@
                 (-> (get :set) set)
                 (and (map? x) (:edn x))
                 (-> (get :edn)
-                    (selmer/render {"type" type-k
-                                    "subject" (::pass/username subject)
-                                    "object-id" (:xt/id object-value)
-                                    "args" values})
+                    (selmer/render (selmer-args opts))
                     edn/read-string)
                 (= 'type x)
                 ((constantly type-k)))
@@ -441,12 +445,8 @@
         (log/debugf "defaulting to nil, type-ref is %s" type-ref)
         nil))))
 
-(def validation-template
-  {"minlen" 1
-   "maxlen" 10})
-
 (defn invalid-arguments?
-  [{:keys [argument-values field]}]
+  [{:keys [argument-values field] :as opts}]
   (when-let [directive (get-in field [::schema/directives-by-name
                                       "site"
                                       ::g/arguments
@@ -456,7 +456,7 @@
           (fn [[k v]]
             (let [validation-schema (some-> directive
                                             (get k)
-                                            (selmer/render validation-template)
+                                            (selmer/render (selmer-args opts))
                                             edn/read-string)
                   invalid? (when (seq validation-schema)
                              (not (m/validate validation-schema v)))]
