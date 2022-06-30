@@ -291,132 +291,92 @@ type Mutation {
 }
 ")
 
+(defn put-schema [schema]
+  (*handler*
+   (-> {:ring.request/method :put
+        :ring.request/path "/graphql"}
+       (add-body schema "application/graphql"))))
 
-(defn mutation []
-  (let [schema straight-mutation-schema
-        query straight-query]
+(defn post-mutation [query]
+  (*handler*
+   (-> {:ring.request/method :post
+        :ring.request/path "/graphql"}
+       (add-body query "application/graphql"))))
 
-    (submit-and-await!
-     [[:xtdb.api/put access-all-areas]
+(defn mutation-base [schema query expected-response]
+  (submit-and-await!
+   [[:xtdb.api/put access-all-areas]
 
-      [:xtdb.api/put
-       {:xt/id "https://example.org/graphql"
-        :doc "A GraphQL endpoint"
-        :juxt.http.alpha/methods #{:post :put :options}
-        :juxt.http.alpha/acceptable "application/graphql"
-        :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/put-handler
-        :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/post-handler}]])
+    [:xtdb.api/put
+     {:xt/id "https://example.org/graphql"
+      :doc "A GraphQL endpoint"
+      :juxt.http.alpha/methods #{:post :put :options}
+      :juxt.http.alpha/acceptable "application/graphql"
+      :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/put-handler
+      :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/post-handler}]])
 
-    ;; Install a GraphQL schema at /graphql
-    (let [response (*handler*
-                    (-> {:ring.request/method :put
-                         :ring.request/path "/graphql"}
-                        (add-body schema "application/graphql")))]
-      (is (= 204 (:ring.response/status response))))
+  ;; Install a GraphQL schema at /graphql
+  (is (= 204 (:ring.response/status (put-schema schema))))
 
-    ;; POST a mutation to that endpoint
-    (let [response
-          (*handler*
-           (-> {:ring.request/method :post
-                :ring.request/path "/graphql"}
-               (add-body query "application/graphql")))]
+  ;; POST a mutation to that endpoint
+  (let [response (post-mutation query)]
 
-      (when (= (get-in response [:ring.response/status]) 500)
-        (throw (ex-info "Unexpected error" {:response response})))
+    (when (= (get-in response [:ring.response/status]) 500)
+      (throw (ex-info "Unexpected error" {:response response})))
 
-      (is (= 200 (:ring.response/status response)))
+    (is (= 200 (:ring.response/status response)))
 
-      response
+    response
 
-      (when-not (= (get-in response [:ring.response/headers "content-type"])
-                   "application/json")
-        (throw (ex-info "Unexpected content-type"
-                        {:content-type (get-in response [:ring.response/headers "content-type"])})))
+    (when-not (= (get-in response [:ring.response/headers "content-type"])
+                 "application/json")
+      (throw (ex-info "Unexpected content-type"
+                      {:content-type (get-in response [:ring.response/headers "content-type"])})))
 
-      ;; Ensure mutation worked
-      (let [db (xt/db *xt-node*)]
-        (is (= {:xt/id "https://example.org/persons/mal"
-                :juxt.site/type "Person"
-                :name "Malcolm Sparks"}
-               (-> (xt/entity db "https://example.org/persons/mal")
-                   (dissoc :_siteCreatedAt)))))
+    ;; Ensure mutation worked
+    (let [db (xt/db *xt-node*)]
+      (is (= {:xt/id "https://example.org/persons/mal"
+              :juxt.site/type "Person"
+              :name "Malcolm Sparks"}
+             (-> (xt/entity db "https://example.org/persons/mal")
+                 (dissoc :_siteCreatedAt)))))
 
-      (let [body (json/read-value (:ring.response/body response))]
-        (is (= {"data"
-                {"addPerson"
-                 {"id" "https://example.org/persons/mal"
-                  "name" "Malcolm Sparks"}}}
-               body))
-        ;;body
-        ))
-
-    ))
+    (let [body (json/read-value (:ring.response/body response))]
+      (is (= expected-response body)))))
 
 #_((t/join-fixtures [with-xt with-handler])
    mutation
  )
 
 (deftest mutation-test
-  (mutation))
+  (mutation-base
 
-(defn mutation-with-validation-directive []
-  (let [schema valid-mutation-schema
-        query query-with-input]
+   ;; schema
+   straight-mutation-schema
 
-    (submit-and-await!
-     [[:xtdb.api/put access-all-areas]
+   ;; query
+   straight-query
 
-      [:xtdb.api/put
-       {:xt/id "https://example.org/graphql"
-        :doc "A GraphQL endpoint"
-        :juxt.http.alpha/methods #{:post :put :options}
-        :juxt.http.alpha/acceptable "application/graphql"
-        :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/put-handler
-        :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/post-handler}]])
-
-    ;; Install a GraphQL schema at /graphql
-    (let [response (*handler*
-                    (-> {:ring.request/method :put
-                         :ring.request/path "/graphql"}
-                        (add-body schema "application/graphql")))]
-      (is (= 204 (:ring.response/status response))))
-
-    ;; POST a mutation to that endpoint
-    (let [response
-          (*handler*
-           (-> {:ring.request/method :post
-                :ring.request/path "/graphql"}
-               (add-body query "application/graphql")))]
-
-      (when (= (get-in response [:ring.response/status]) 500)
-        (throw (ex-info "Unexpected error" {:response response})))
-
-      (is (= 200 (:ring.response/status response)))
-
-      response
-
-      (when-not (= (get-in response [:ring.response/headers "content-type"])
-                   "application/json")
-        (throw (ex-info "Unexpected content-type"
-                        {:content-type (get-in response [:ring.response/headers "content-type"])})))
-
-      ;; Ensure mutation worked
-      (let [db (xt/db *xt-node*)]
-        (is (= {:xt/id "https://example.org/persons/mal"
-                :juxt.site/type "Person"
-                :name "Malcolm Sparks"}
-               (-> (xt/entity db "https://example.org/persons/mal")
-                   (dissoc :_siteCreatedAt)))))
-
-      (let [body (json/read-value (:ring.response/body response))]
-        (is (= {"data"
-                {"addPerson"
-                 {"id" "https://example.org/persons/mal"
-                  "name" "Malcolm Sparks"}}}
-               body))))))
+   ;; expected-response
+   {"data"
+    {"addPerson"
+     {"id" "https://example.org/persons/mal"
+      "name" "Malcolm Sparks"}}}))
 
 (deftest mutation-with-validation-directive-test
-  (mutation-with-validation-directive))
+  (mutation-base
+
+   ;; schema
+   valid-mutation-schema
+
+   ;; query
+   query-with-input
+
+   ;; expected-response
+   {"data"
+    {"addPerson"
+     {"id" "https://example.org/persons/mal"
+      "name" "Malcolm Sparks"}}}))
 
 (defn invalid-mutation-with-validation-directive []
   (let [schema invalid-mutation-schema
