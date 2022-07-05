@@ -187,9 +187,8 @@
 (let [kg-url-base (or (System/getenv "KG_URL_BASE") "http://localhost:5509")]
   (defn- set-kg-url-base
     [rec]
-    (-> rec
-        (clojure.string/replace #"\{\{KG_URL_BASE\}\}" kg-url-base)
-        (edn/read-string))))
+    (->> (clojure.string/replace rec #"\{\{KG_URL_BASE\}\}" kg-url-base)
+         (edn/read-string {:eof :eof :readers edn-readers}))))
 
 (defn import-resources
   ([] (import-resources "import/resources.edn"))
@@ -198,11 +197,12 @@
          in (java.io.PushbackReader. (io/reader (io/input-stream (io/file filename))))]
      (doseq [rec (resources-from-stream in)]
        (when (:xt/id rec)
-         (if (xt/entity (xt/db node) (:xt/id rec))
-           (println "Skipping existing resource: " (:xt/id rec))
-           (do
-             (submit-and-wait-tx node [[:xtdb.api/put (set-kg-url-base rec)]])
-             (println "Imported resource: " (:xt/id rec)))))))))
+         (let [rec (set-kg-url-base rec)]
+           (if (xt/entity (xt/db node) (:xt/id rec))
+             (println "Skipping existing resource: " (:xt/id rec))
+             (do
+               (submit-and-wait-tx node [[:xtdb.api/put rec]])
+               (println "Imported resource: " (:xt/id rec))))))))))
 
 (defn validate-resource-line [s]
   (edn/read-string
