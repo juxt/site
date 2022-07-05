@@ -18,8 +18,8 @@
         (str uri (hash (select-keys request-instance [::pass/target ::pass/effect])))]
 
     (->> (x/submit-tx
-          xt-node
-          [[:xtdb.api/put (merge {:xt/id location} request-instance)]])
+           xt-node
+           [[:xtdb.api/put (merge {:xt/id location} request-instance)]])
          (x/await-tx xt-node))
 
     (-> req
@@ -28,9 +28,9 @@
 
 (defn match-targets [db rules request-context]
   (let [temp-id-map (reduce-kv
-                     ;; Preserve any existing xt/id - e.g. the resource will have one
-                     (fn [acc k v] (assoc acc k (merge {:xt/id (java.util.UUID/randomUUID)} v)))
-                     {} request-context)
+                      ;; Preserve any existing xt/id - e.g. the resource will have one
+                      (fn [acc k v] (assoc acc k (merge {:xt/id (java.util.UUID/randomUUID)} v)))
+                      {} request-context)
         ;; Speculatively put each entry of the request context into the
         ;; database. This new database is only in scope for this authorization.
         db (x/with-tx db (->> temp-id-map
@@ -63,20 +63,20 @@
 
 (defn eval-triggers [db triggers request-context]
   (let [temp-id-map (reduce-kv
-                     ;; Preserve any existing xt/id - e.g. the resource will have one
-                     (fn [acc k v] (assoc acc k (merge {:xt/id (java.util.UUID/randomUUID)} v)))
-                     {} request-context)
+                      ;; Preserve any existing xt/id - e.g. the resource will have one
+                      (fn [acc k v] (assoc acc k (merge {:xt/id (java.util.UUID/randomUUID)} v)))
+                      {} request-context)
         ;; Speculatively put each entry of the request context into the
         ;; database. This new database is only in scope for this authorization.
         db (x/with-tx db (mapv (fn [e] [:xtdb.api/put e]) (vals temp-id-map)))]
 
     (keep
-     (fn [trigger-id]
-       (let [trigger (x/entity db trigger-id)
-             q (merge (::site/query trigger)
-                      {:in (vec (keys temp-id-map))})
-             action-data (apply x/q db q (map :xt/id (vals temp-id-map)))]
-         (when (seq action-data)
-           {:trigger trigger
-            :action-data action-data})))
-     triggers)))
+      (fn [trigger-id]
+        (let [trigger (x/entity db trigger-id)
+              q (merge (::site/query trigger)
+                       {:in (vec (keys temp-id-map))})
+              action-data (apply x/q db q (map :xt/id (vals temp-id-map)))]
+          (when (seq action-data)
+            {:trigger trigger
+             :action-data action-data})))
+      triggers)))

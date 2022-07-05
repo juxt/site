@@ -62,16 +62,16 @@
 
 (defn e [id]
   (postwalk
-   (fn [x] (if (and (vector? x)
-                    (#{::http/content ::http/body} (first x))
-                    (> (count (second x)) 1024))
+    (fn [x] (if (and (vector? x)
+                     (#{::http/content ::http/body} (first x))
+                     (> (count (second x)) 1024))
 
-             [(first x)
-              (cond
-                (= ::http/content (first x)) (str (subs (second x) 0 80) "…")
-                :else (format "(%d bytes)" (count (second x))))]
-             x))
-   (xt/entity (db) id)))
+              [(first x)
+               (cond
+                 (= ::http/content (first x)) (str (subs (second x) 0 80) "…")
+                 :else (format "(%d bytes)" (count (second x))))]
+              x))
+    (xt/entity (db) id)))
 
 (defn hist [id]
   (xt/entity-history (db) id :asc {:with-docs? true}))
@@ -80,44 +80,44 @@
 
 (defn put! [& ms]
   (->>
-   (xt/submit-tx
-    (xt-node)
-    (for [m ms]
-      (let [vt (:xtdb.api/valid-time m)]
-        [:xtdb.api/put (dissoc m :xtdb.api/valid-time) vt])))
-   (xt/await-tx (xt-node))))
+    (xt/submit-tx
+      (xt-node)
+      (for [m ms]
+        (let [vt (:xtdb.api/valid-time m)]
+          [:xtdb.api/put (dissoc m :xtdb.api/valid-time) vt])))
+    (xt/await-tx (xt-node))))
 
 (defn grep [re coll]
   (filter #(re-matches (re-pattern re) %) coll))
 
 (defn rm! [& ids]
   (->>
-   (xt/submit-tx
-    (xt-node)
-    (for [id ids]
-      [:xtdb.api/delete id]))
-   (xt/await-tx (xt-node))))
+    (xt/submit-tx
+      (xt-node)
+      (for [id ids]
+        [:xtdb.api/delete id]))
+    (xt/await-tx (xt-node))))
 
 (defn evict! [& ids]
   (->>
-   (xt/submit-tx
-    (xt-node)
-    (for [id ids]
-      [:xtdb.api/evict id]))
-   (xt/await-tx (xt-node))))
+    (xt/submit-tx
+      (xt-node)
+      (for [id ids]
+        [:xtdb.api/evict id]))
+    (xt/await-tx (xt-node))))
 
 (defn q [query & args]
   (apply xt/q (db) query args))
 
 (defn t [t]
   (map
-   first
-   (xt/q (db) '{:find [e] :where [[e ::site/type t]] :in [t]} t)))
+    first
+    (xt/q (db) '{:find [e] :where [[e ::site/type t]] :in [t]} t)))
 
 (defn t* [t]
   (map
-   first
-   (xt/q (db) '{:find [e] :where [[e :type t]] :in [t]} t)))
+    first
+    (xt/q (db) '{:find [e] :where [[e :type t]] :in [t]} t)))
 
 (defn types []
   (->> (q '{:find [t]
@@ -156,18 +156,18 @@
 
 (defn now-id []
   (.format
-   (.withZone
-    (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd-HHmmss")
-    (java.time.ZoneId/systemDefault))
-   (java.time.Instant/now)))
+    (.withZone
+      (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd-HHmmss")
+      (java.time.ZoneId/systemDefault))
+    (java.time.Instant/now)))
 
 ;; Start import at 00:35
 
 (defn resources-from-stream [in]
   (let [record (try
                  (edn/read
-                  {:eof :eof :readers edn-readers}
-                  in)
+                   {:eof :eof :readers edn-readers}
+                   in)
                  (catch Exception e
                    (def in in)
                    (prn (.getMessage e))))]
@@ -214,8 +214,8 @@
 
 (defn validate-resource-line [s]
   (edn/read-string
-   {:eof :eof :readers edn-readers}
-   s))
+    {:eof :eof :readers edn-readers}
+    s))
 
 (defn get-zipped-output-stream []
   (let [zos (doto
@@ -231,18 +231,18 @@
     ;; Create a regex pattern which detects anything as a mapping key
     (let [pat (re-pattern (str/join "|" (map #(format "\\Q%s\\E" %) (keys mapping))))]
       (postwalk
-       (fn [s]
-         (cond-> s
-           (string? s)
-           (str/replace pat (fn [x] (get mapping x)))))
-       ent))))
+        (fn [s]
+          (cond-> s
+            (string? s)
+            (str/replace pat (fn [x] (get mapping x)))))
+        ent))))
 
 (comment
   (export-resources
-   {:pred (fn [x] (or (= (:juxt.home/type x) "Person")))
-    :filename "/home/mal/Sync/persons.edn"
-    :uri-mapping {"http://localhost:2021"
-                  "https://home.juxt.site"}}))
+    {:pred (fn [x] (or (= (:juxt.home/type x) "Person")))
+     :filename "/home/mal/Sync/persons.edn"
+     :uri-mapping {"http://localhost:2021"
+                   "https://home.juxt.site"}}))
 
 (defn export-resources
   "Export all resources to a file."
@@ -273,12 +273,12 @@
            (let [line (pr-str ent)]
              ;; Test the line can be read
              #_(try
-               (validate-resource-line line)
-               (catch Exception e
-                 (throw
-                  (ex-info
-                   (format "Serialization of entity '%s' will not be readable" (:xt/id ent))
-                   {:xt/id (:xt/id ent)} e))))
+                 (validate-resource-line line)
+                 (catch Exception e
+                   (throw
+                     (ex-info
+                       (format "Serialization of entity '%s' will not be readable" (:xt/id ent))
+                       {:xt/id (:xt/id ent)} e))))
              (.write w line)
              (.write w (System/lineSeparator))))
          (let [n (inc (first (last batch)))
@@ -301,9 +301,9 @@
 
 (defn rules []
   (sort-by
-   str
-   (map first
-        (q '{:find [(pull e [*])] :where [[e ::site/type "Rule"]]}))))
+    str
+    (map first
+         (q '{:find [(pull e [*])] :where [[e ::site/type "Rule"]]}))))
 
 (defn uuid
   ([] (str (java.util.UUID/randomUUID)))
@@ -314,10 +314,10 @@
 
 (defn req [s]
   (into
-   (sorted-map)
-   (cache/find
-    cache/requests-cache
-    (re-pattern (str "/_site/requests/" s)))))
+    (sorted-map)
+    (cache/find
+      cache/requests-cache
+      (re-pattern (str "/_site/requests/" s)))))
 
 (defn recent
   ([] (recent 5))
@@ -356,12 +356,12 @@
   ([{::site/keys [base-uri]}]
    (map first
         (xt/q (db) '{:find [user]
-                    :where [[user ::site/type "User"]
-                            [mapping ::site/type "UserRoleMapping"]
-                            [mapping ::pass/assignee user]
-                            [mapping ::pass/role superuser]]
-                    :in [superuser]}
-             (str base-uri "/_site/roles/superuser")))))
+                     :where [[user ::site/type "User"]
+                             [mapping ::site/type "UserRoleMapping"]
+                             [mapping ::pass/assignee user]
+                             [mapping ::pass/role superuser]]
+                     :in [superuser]}
+              (str base-uri "/_site/roles/superuser")))))
 
 (defn steps
   ([] (steps (config)))
@@ -371,11 +371,11 @@
          db (xt/db (xt-node))]
      [;; Awaiting a fix to https://github.com/juxt/xtdb/issues/1480
       #_{:complete? (and
-                   (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
-                   (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
-       :happy-message "Site transaction functions installed."
-       :sad-message "Site transaction functions not installed. "
-       :fix "Enter (put-site-txfns!) to fix this."}
+                      (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
+                      (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
+         :happy-message "Site transaction functions installed."
+         :sad-message "Site transaction functions not installed. "
+         :fix "Enter (put-site-txfns!) to fix this."}
 
       {:complete? (xt/entity db (str base-uri "/_site/apis/site/openapi.json"))
        :happy-message "Site API resources installed."
@@ -405,9 +405,9 @@
      (if complete?
        (println "[✔] " (ansi/green happy-message))
        (println
-        "[ ] "
-        (ansi/red sad-message)
-        (ansi/yellow fix))))
+         "[ ] "
+         (ansi/red sad-message)
+         (ansi/yellow fix))))
    (println)
    (if (every? :complete? steps) :ok :incomplete)))
 
@@ -447,11 +447,11 @@
    (let [config (config)
          xt-node (xt-node)]
      (init/put-superuser!
-      xt-node
-      {:username username
-       :fullname fullname
-       :password password}
-      config)
+       xt-node
+       {:username username
+        :fullname fullname
+        :password password}
+       config)
      (status (steps config)))))
 
 (defn update-site-graphql
@@ -484,12 +484,12 @@
 (defn reset-password! [username password]
   (let [user (str (::site/base-uri (config))  "/_site/users/" username)]
     (put!
-     {:xt/id (str user "/password")
-      ::site/type "Password"
-      ::http/methods #{:post}
-      ::pass/user user
-      ::pass/password-hash (password/encrypt password)
-      ::pass/classification "RESTRICTED"})))
+      {:xt/id (str user "/password")
+       ::site/type "Password"
+       ::http/methods #{:post}
+       ::pass/user user
+       ::pass/password-hash (password/encrypt password)
+       ::pass/classification "RESTRICTED"})))
 
 (defn user [username]
   (e (format "%s/_site/users/%s" (::site/base-uri (config)) username)))
