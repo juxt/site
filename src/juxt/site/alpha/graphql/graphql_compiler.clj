@@ -19,9 +19,8 @@
 
 
 (defn build-where-clause
-  [compiled-schema action-ids action-rules-map subquery-data incoming-resources?]
+  [compiled-schema action-ids action-rules-map subquery-data incoming-resources? arguments]
   (let [entity-selection-clause (if incoming-resources? ['e :xt/id 'input-id] ['e :xt/id '_])
-        has-subquery-data? (seq subquery-data)
         actions-ids-as-single-or-set (if (vector? action-ids)
                                        (set action-ids)
                                        action-ids)
@@ -32,43 +31,50 @@
                       ['permission :juxt.pass.alpha/action actions-ids-as-single-or-set]
                       '[permission :juxt.pass.alpha/purpose purpose]
                       '(allowed? permission subject action e)
-                      '(include? action e)
-                      ]]
-    (if has-subquery-data?
-      (-> where-clause
-          ;; Add the clause to pull the key into the query
-          (into (map #(vector 'e (keyword (:juxt.grab.alpha.graphql/name %)) (symbol (:juxt.grab.alpha.graphql/name %))) subquery-data))
-          ;; Add a clause for the subquery
-          (into (map #(vector (list 'q
-                                    (build-query-for-selection-set % compiled-schema action-rules-map true)
-                                    'subject 'purpose (symbol (:juxt.grab.alpha.graphql/name %)))
-                              (symbol (str "inner-"(:juxt.grab.alpha.graphql/name %))))
+                      '(include? action e)]]
+    (cond-> where-clause
+      (seq subquery-data) (-> ;; Add the clause to pull the key into the query
+                           (into (map #(vector
+                                        'e
+                                        (keyword (:juxt.grab.alpha.graphql/name %))
+                                        (symbol (:juxt.grab.alpha.graphql/name %)))
+                                      subquery-data))
+                           ;; Add a clause for the subquery
+                           (into (map #(vector (list 'q
+                                                     (build-query-for-selection-set % compiled-schema action-rules-map true)
+                                                     'subject 'purpose (symbol (:juxt.grab.alpha.graphql/name %)))
+                                               (symbol (str "inner-"(:juxt.grab.alpha.graphql/name %))))
 
-                     subquery-data)))
-      where-clause)))
+                                      subquery-data)))
+      (seq arguments) (conj (list 'arguments-match? 'e 'action arguments)))))
 
 (defn build-find-clause
   [pull-fields subquery-data]
-  (let [has-subquery-data? (seq subquery-data)
-        find-clause (if (seq pull-fields)
+  (let [find-clause (if (seq pull-fields)
                       ['e (list 'pull 'e pull-fields)]
                       ['e {}])]
-    (if has-subquery-data?
-      (->> subquery-data
-           (reduce (fn [acc n]
-                     (assoc acc
-                            (keyword (:juxt.grab.alpha.graphql/name n))
-                            (symbol (str "inner-" (:juxt.grab.alpha.graphql/name n)))))
-                   {})
-           (conj find-clause))
-      find-clause)))
+    (cond-> find-clause
+      (seq subquery-data) (conj
+                           (reduce
+                            (fn [acc n]
+                              (assoc acc
+                                     (keyword (:juxt.grab.alpha.graphql/name n))
+                                     (symbol (str "inner-" (:juxt.grab.alpha.graphql/name n)))))
+                            {}
+                            subquery-data)))))
+
+(defn build-in-clause
+  [incoming-resources?]
+  (let [in-clause '[subject purpose]]
+    (cond-> in-clause
+      incoming-resources? (conj 'input-id))))
 
 (defn build-query-xtdb
-  [compiled-schema action-ids fields-to-pull action-rules-map subquery-data incoming-resources?]
+  [compiled-schema action-ids fields-to-pull action-rules-map subquery-data incoming-resources? arguments]
   (let [pull-fields (vec fields-to-pull)
-        where-clause (build-where-clause compiled-schema action-ids action-rules-map subquery-data incoming-resources?)
+        where-clause (build-where-clause compiled-schema action-ids action-rules-map subquery-data incoming-resources? arguments)
         find-clause (build-find-clause pull-fields subquery-data)
-        in-clause (if incoming-resources? '[subject purpose input-id] '[subject purpose])]
+        in-clause (build-in-clause incoming-resources?)]
     {:find find-clause
      :where where-clause
      :rules action-rules-map
@@ -98,7 +104,10 @@
      (map (comp keyword :juxt.grab.alpha.graphql/name) (get grouped-by-inners false))
      action-rules
      (get grouped-by-inners true)
-     incoming-resources?)))
+     incoming-resources?
+     (update-keys
+      (get selection-set :juxt.grab.alpha.graphql/arguments {})
+      keyword))))
 
 (defn selection-set->name-scoped-name-pair
   [schema selection-set]

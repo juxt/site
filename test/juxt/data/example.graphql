@@ -9,6 +9,7 @@ type Query {
   contractor: [Contractor] @site(action: "https://test.example.com/actions/getContractor")
   project: [Project] @site(action: "https://test.example.com/actions/getProject")
   client: [Client] @site(action: "https://test.example.com/actions/getClient")
+  repository: [Repository!] @site(action: "https://test.example.com/actions/getRepository")
 }
 
 interface StaffMember {

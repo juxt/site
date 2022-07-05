@@ -63,7 +63,8 @@
   {:xt/id (str site-prefix "/repository/" repository-name)
    :juxt.site.alpha/type (str site-prefix "/repository")
    :name repository-name
-   :url (str site-prefix "/git/" repository-name)})
+   :url (str site-prefix "/git/" repository-name)
+   :type :git})
 
 (defn make-project
   [prj-code]
@@ -101,7 +102,7 @@
 
 (defn setup-db
   []
-  (let [repository-a (make-repository "repository-a")
+  (let [repository-a (assoc (make-repository "repository-a") :type :hg)
         repository-b (make-repository "repository-b")
         prj-alpha (assoc (make-project "alpha")
                          :repositories #{(:xt/id repository-a)
@@ -138,8 +139,14 @@
                        :juxt.pass.alpha/rules conj ['(include? action e)
                                                     ['e :juxt.site.alpha/type "https://test.example.com/project"]]))
     (repl/put! (update (make-action "getRepository")
-                       :juxt.pass.alpha/rules conj ['(include? action e)
-                                                    ['e :juxt.site.alpha/type "https://test.example.com/repository"]]))
+                       :juxt.pass.alpha/rules #(conj %
+                                                ['(include? action e)
+                                                 ['e :juxt.site.alpha/type "https://test.example.com/repository"]]
+                                                ['(arguments-match? e action arguments)
+                                                 '[(get arguments :type) type-arg]
+                                                 '[(keyword type-arg) type-arg-k]
+                                                 '(or [e :type type-arg-k]
+                                                      [(nil? type-arg)])])))
     (repl/put! (update (make-action "getClient")
                        :juxt.pass.alpha/rules conj ['(include? action e)
                                                     ['e :juxt.site.alpha/type "https://test.example.com/client"]]))
@@ -222,4 +229,62 @@
              (repl/db)
              example-compiled-schema
              "subject"
-             nil)))))
+             nil))))
+
+  (testing "Can return single-layer result with arguments"
+    (is (= #{{:name "repository-a"}}
+           (graphql-proc/run
+             "query findEmployeePhoneNumbers { repository(type: hg) { name } }"
+             (repl/db)
+             example-compiled-schema
+             "subject"
+             nil)))
+    (is (= #{{:name "repository-b"}}
+           (graphql-proc/run
+             "query findEmployeePhoneNumbers { repository(type: git) { name } }"
+             (repl/db)
+             example-compiled-schema
+             "subject"
+             nil))))
+
+  (testing "Can specify arguments in a way to make them optional"
+    (is (= #{{:name "repository-a"} {:name "repository-b"}}
+           (graphql-proc/run
+             "query findEmployeePhoneNumbers { repository(not_type: git) { name } }"
+             (repl/db)
+             example-compiled-schema
+             "subject"
+             nil)))
+
+    (testing "If arguments are not provided, does not do the arguments tests"
+      (is (= #{{:name "repository-a"} {:name "repository-b"}}
+             (graphql-proc/run
+               "query findEmployeePhoneNumbers { repository { name } }"
+               (repl/db)
+               example-compiled-schema
+               "subject"
+               nil))))
+
+    (testing "Can get result from a multi-level query with arguments"
+      (is (= #{{:name "alpha" :repositories #{{:name "repository-a"}
+                                              {:name "repository-b"}}}}
+             (graphql-proc/run
+               "query findEmployeePhoneNumbers { project { name, repositories { name } } }"
+               (repl/db)
+               example-compiled-schema
+               "subject"
+               nil)))
+      (is (= #{{:name "alpha" :repositories #{{:name "repository-a"}}}}
+             (graphql-proc/run
+               "query findEmployeePhoneNumbers { project { name, repositories(type: hg) { name } } }"
+               (repl/db)
+               example-compiled-schema
+               "subject"
+               nil)))
+      (is (= #{{:name "alpha" :repositories #{{:name "repository-b"}}}}
+             (graphql-proc/run
+               "query findEmployeePhoneNumbers { project { name, repositories(type: git) { name } } }"
+               (repl/db)
+               example-compiled-schema
+               "subject"
+               nil))))))
