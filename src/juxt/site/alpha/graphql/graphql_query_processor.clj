@@ -3,7 +3,6 @@
             [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]
             [juxt.pass.alpha.authorization :as authz]))
 
-
 (defn graphql-query->xtdb-query
   "Transforms a graphql query string into an xtdb query
 
@@ -59,8 +58,10 @@
   Note:
     Currently only supports where there is a single query as the
     first element of the query string"
-  [query-string db schema subject purpose]
+  [query-string db schema & query-args]
   (-> query-string
       (graphql-query->xtdb-query schema db)
-      ((partial xt/q db) subject purpose)
+      vector
+      (into query-args)
+      ((partial apply (partial xt/q db)))
       site-graphql-xtdb-result->graphql-result))
