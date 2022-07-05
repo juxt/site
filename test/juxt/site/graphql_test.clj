@@ -421,20 +421,18 @@ type Mutation {
 
       ;; Ensure mutation worked
       (let [db (xt/db *xt-node*)]
-        (is (= {:xt/id "https://example.org/persons/mal"
-                :juxt.site/type "Person"
-                :name "Malcolm Sparks"}
-               (-> (xt/entity db "https://example.org/persons/mal")
-                   (select-keys [:xt/id :juxt.site/type :name])))))
+        (is (= nil
+               (xt/entity db "https://example.org/persons/mal"))))
 
-      (let [body (json/read-value (:ring.response/body response))]
-        (is (= {"data"
-                {"addPerson"
-                 {"id" "https://example.org/persons/mal"
-                  "name" "Malcolm Sparks"}}}
-               body))
-        ;;body
-        ))))
+      (let [error-message (-> response
+                              :ring.response/body
+                              json/read-value
+                              (get "errors")
+                              first
+                              (get "message"))]
+
+        (is (= error-message
+               "({:name [\"should be between 1 and 5 characters\"]})"))))))
 
 (deftest invalid-mutation-with-validation-directive-test
   (invalid-mutation-with-validation-directive))
