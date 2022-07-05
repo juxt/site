@@ -1496,13 +1496,13 @@
   (testing "When a multiple actions are specified for lookup, returns multiple results, each with an action rule appended"
     (is (= '[[(allowed? subject resource permission)
               [permission :xt/id]
+              [action :xt/id "https://test.example.com/actions/employee"]]
+             [(allowed? subject resource permission)
+              [permission :xt/id]
               [action :xt/id "https://test.example.com/actions/contractor"]]
              [(include? e action)
               [e :type :contractor]
-              [action :xt/id "https://test.example.com/actions/contractor"]]
-             [(allowed? subject resource permission)
-              [permission :xt/id]
-              [action :xt/id "https://test.example.com/actions/employee"]]]
+              [action :xt/id "https://test.example.com/actions/contractor"]]]
            (authz/actions->rules (xt/db *xt-node*) #{"https://test.example.com/actions/employee"
                                                      "https://test.example.com/actions/contractor"}))))
 
