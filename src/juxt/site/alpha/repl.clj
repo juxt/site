@@ -184,6 +184,12 @@
   (let [tx-id (xt/submit-tx node tx)]
     (xt/await-tx node tx-id)))
 
+
+(let [kg-url-base (or (System/getenv "KG_URL_BASE") "http://localhost:5509")]
+  (defn- set-kg-url-base
+    [^String rec]
+    (clojure.string/replace rec #"\{\{KG_URL_BASE\}\}" kg-url-base)))
+
 (defn import-resources
   ([] (import-resources "import/resources.edn"))
   ([filename]
@@ -194,7 +200,7 @@
          (if (xt/entity (xt/db node) (:xt/id rec))
            (println "Skipping existing resource: " (:xt/id rec))
            (do
-             (submit-and-wait-tx node [[:xtdb.api/put rec]])
+             (submit-and-wait-tx node [[:xtdb.api/put (set-kg-url-base rec)]])
              (println "Imported resource: " (:xt/id rec)))))))))
 
 (defn validate-resource-line [s]
