@@ -16,10 +16,11 @@
   "Determine rules for the given action ids. Each rule is bound to the given
   action."
   [db actions]
-  (vec (for [action actions
-             :let [e (xt/entity db action)]
-             rule (::pass/rules e)]
-         (conj rule ['action :xt/id action]))))
+  (mapv
+   #(conj (second %) ['action :xt/id (first %)])
+   (xt/q db {:find ['e 'rules]
+             :where [['e :xt/id actions]
+                     ['e ::pass/rules 'rules]]})))
 
 ;; This is broken out into its own function to assist debugging when
 ;; authorization is denied and we don't know why. A better authorization
