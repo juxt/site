@@ -5,7 +5,7 @@
 (ns juxt.pass.authorization-test
   (:require
    [clojure.set :as set]
-   [clojure.test :refer [deftest is are use-fixtures] :as t]
+   [clojure.test :refer [deftest is are use-fixtures testing] :as t]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.malli :as-alias pass.malli]
    [juxt.pass.alpha.process :as-alias pass.process]
@@ -1456,3 +1456,60 @@
 #_((t/join-fixtures [with-xt])
  (fn []
    ))
+
+
+(def site-prefix "https://test.example.com")
+
+(defn make-action
+  [action-id]
+  {:xt/id (str site-prefix "/actions/" action-id)
+   :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
+   :juxt.pass.alpha/scope "read:resource"
+   :juxt.pass.alpha/rules
+   [['(allowed? subject resource permission)
+     ['permission :xt/id]]]})
+
+(deftest actions->rules-test
+  (testing "When there are no actions in the db for lookup, returns empty result"
+    (is (empty? (authz/actions->rules (xt/db *xt-node*) #{"https://test.example.com/actions/employee"}))))
+
+  (submit-and-await! [[::xt/put (make-action "employee")]])
+  (submit-and-await! [[::xt/put (update (make-action "contractor") :juxt.pass.alpha/rules conj '[(include? e action)
+                                                                                                 [e :type :contractor]])]])
+
+  (testing "When there are no actions specified for lookup, returns empty result"
+    (is (empty? (authz/actions->rules (xt/db *xt-node*) #{}))))
+
+  (testing "When a single action is specified for lookup, returns the single result, with an action rule appended"
+    (is (= '[[(allowed? subject resource permission)
+              [permission :xt/id]
+              [action :xt/id "https://test.example.com/actions/employee"]]]
+           (authz/actions->rules (xt/db *xt-node*) #{"https://test.example.com/actions/employee"})))
+    (is (= '[[(allowed? subject resource permission)
+              [permission :xt/id]
+              [action :xt/id "https://test.example.com/actions/contractor"]]
+             [(include? e action)
+              [e :type :contractor]
+              [action :xt/id "https://test.example.com/actions/contractor"]]]
+           (authz/actions->rules (xt/db *xt-node*) #{"https://test.example.com/actions/contractor"}))))
+
+  (testing "When a multiple actions are specified for lookup, returns multiple results, each with an action rule appended"
+    (is (= '[[(allowed? subject resource permission)
+              [permission :xt/id]
+              [action :xt/id "https://test.example.com/actions/contractor"]]
+             [(include? e action)
+              [e :type :contractor]
+              [action :xt/id "https://test.example.com/actions/contractor"]]
+             [(allowed? subject resource permission)
+              [permission :xt/id]
+              [action :xt/id "https://test.example.com/actions/employee"]]]
+           (authz/actions->rules (xt/db *xt-node*) #{"https://test.example.com/actions/employee"
+                                                     "https://test.example.com/actions/contractor"}))))
+
+  (testing "When an action is specified that does not exist in the db ignores that entry"
+    (is (empty? (authz/actions->rules (xt/db *xt-node*) #{"https://test.example.com/actions/project"})))
+    (is (= '[[(allowed? subject resource permission)
+              [permission :xt/id]
+             [action :xt/id "https://test.example.com/actions/employee"]]]
+           (authz/actions->rules (xt/db *xt-node*) #{"https://test.example.com/actions/project"
+                                                        "https://test.example.com/actions/employee"})))))
