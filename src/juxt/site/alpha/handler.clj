@@ -809,6 +809,10 @@
 ;; itself should be ignorant of such policies. Additionally, this is more
 ;; aligned to OpenAPI's declaration of per-resource errors.
 
+(defn- q
+  [db query args]
+  (xt/q db query args))
+
 (defn error-resource
   "Locate an error resource. Currently only uses a simple database lookup of an
   'ErrorResource' entity matching the status. In future this could use rules to
@@ -820,6 +824,7 @@
                               :where [[er ::site/type "ErrorResource"]
                                       [er :ring.response/status status]]
                               :in [status]} status))]
+
     (log/tracef "ErrorResource found for status %d: %s" status res)
     res))
 
@@ -1169,13 +1174,36 @@
                (assoc-in [:ring.response/headers "retry-after"] "120"))})))
     (h req)))
 
+(def cors-headers
+  "Generic CORS headers"
+  {"Access-Control-Allow-Origin"  "*"
+   "Access-Control-Allow-Headers" "*"
+   "Access-Control-Allow-Methods" "GET"})
+
+(defn preflight?
+  "Returns true if the request is a preflight request"
+  [request]
+  (= (request :request-method) :options))
+
+(defn all-cors
+  "Allow requests from all origins - also check preflight"
+  [handler]
+  (fn [request]
+    (if (preflight? request)
+      {:status 200
+       :headers cors-headers
+       :body "preflight complete"}
+      (let [response (handler request)]
+        (update-in response [:headers]
+                   merge cors-headers )))))
+
 (defn make-pipeline
   "Make a pipeline of Ring middleware. Note, that each Ring middleware designates
   a processing stage. An interceptor chain (perhaps using Pedestal (pedestal.io)
   or Sieppari (https://github.com/metosin/sieppari) could be used. This is
   currently a synchronous chain but async could be supported in the future."
   [opts]
-  [
+  [all-cors
    ;; Switch Ring requests/responses to Ring 2 namespaced keywords
    wrap-ring-1-adapter
 
