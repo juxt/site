@@ -190,19 +190,34 @@
     (->> (clojure.string/replace rec #"\{\{KG_URL_BASE\}\}" kg-url-base)
          (edn/read-string {:eof :eof :readers edn-readers}))))
 
-(defn import-resources
-  ([] (import-resources "import/resources.edn"))
-  ([filename]
-   (let [node (xt-node)
-         in (java.io.PushbackReader. (io/reader (io/input-stream (io/file filename))))]
-     (doseq [rec (resources-from-stream in)]
-       (when (:xt/id rec)
-         (let [rec (set-kg-url-base rec)]
-           (if (xt/entity (xt/db node) (:xt/id rec))
-             (println "Skipping existing resource: " (:xt/id rec))
-             (do
-               (submit-and-wait-tx node [[:xtdb.api/put rec]])
-               (println "Imported resource: " (:xt/id rec))))))))))
+(defn apply-uri-mappings
+  [mapping]
+  (fn [ent]
+    ;; Create a regex pattern which detects anything as a mapping key
+    (let [pat (re-pattern (str/join "|" (map #(format "\\Q%s\\E" %) (keys mapping))))]
+      (postwalk
+       (fn [s]
+         (cond-> s
+           (string? s)
+           (str/replace pat (fn [x] (get mapping x)))))
+       ent))))
+
+(let [url-mapping {"{{KG_URL_BASE}}"
+                   (or (System/getenv "KG_URL_BASE") "http://localhost:5509")}
+      set-kg-url-base (apply-uri-mappings url-mapping)]
+  (defn import-resources
+    ([] (import-resources "import/resources.edn"))
+    ([filename]
+     (let [node (xt-node)
+           in (java.io.PushbackReader. (io/reader (io/input-stream (io/file filename))))]
+       (doseq [rec (resources-from-stream in)]
+         (when (:xt/id rec)
+           (let [rec (set-kg-url-base rec)]
+             (if (xt/entity (xt/db node) (:xt/id rec))
+               (println "Skipping existing resource: " (:xt/id rec))
+               (do
+                 (submit-and-wait-tx node [[:xtdb.api/put rec]])
+                 (println "Imported resource: " (:xt/id rec)))))))))))
 
 (defn validate-resource-line [s]
   (edn/read-string
@@ -218,16 +233,7 @@
               (.putNextEntry (java.util.zip.ZipEntry. "resources.edn")))]
     (java.io.OutputStreamWriter. zos)))
 
-(defn apply-uri-mappings [mapping]
-  (fn [ent]
-    ;; Create a regex pattern which detects anything as a mapping key
-    (let [pat (re-pattern (str/join "|" (map #(format "\\Q%s\\E" %) (keys mapping))))]
-      (postwalk
-       (fn [s]
-         (cond-> s
-           (string? s)
-           (str/replace pat (fn [x] (get mapping x)))))
-       ent))))
+
 
 (comment
   (export-resources
