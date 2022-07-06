@@ -408,4 +408,97 @@
            ['(include? action e)]]
           false))))
 
+  (testing "Returns simple result when an alias is in use"
+    (is (= '{:find
+             [e {} {:repositories inner-repositories, :myalias inner-myalias}],
+             :where
+             [[e :xt/id _]
+              [action :juxt.site.alpha/type "https://meta.juxt.site/pass/action"]
+              [action :xt/id "https://test.example.com/actions/getProject"]
+              [permission
+               :juxt.site.alpha/type
+               "https://meta.juxt.site/pass/permission"]
+              [permission
+               :juxt.pass.alpha/action
+               "https://test.example.com/actions/getProject"]
+              [permission :juxt.pass.alpha/purpose purpose]
+              (allowed? permission subject action e)
+              (include? action e)
+              [e :repositories repositories]
+              [e :repositories myalias]
+              [(q
+                {:find [e (pull e [:name])],
+                 :where
+                 [[e :xt/id input-id]
+                  [action
+                   :juxt.site.alpha/type
+                   "https://meta.juxt.site/pass/action"]
+                  [action :xt/id "https://test.example.com/actions/getRepository"]
+                  [permission
+                   :juxt.site.alpha/type
+                   "https://meta.juxt.site/pass/permission"]
+                  [permission
+                   :juxt.pass.alpha/action
+                   "https://test.example.com/actions/getRepository"]
+                  [permission :juxt.pass.alpha/purpose purpose]
+                  (allowed? permission subject action e)
+                  (include? action e)
+                  (arguments-match? e action {:type "hg"})],
+                 :rules
+                 [[(allowed? permission subject action e)] [(include? action e)]],
+                 :in [subject purpose input-id]}
+                subject
+                purpose
+                repositories)
+               inner-repositories]
+              [(q
+                {:find [e (pull e [:name])],
+                 :where
+                 [[e :xt/id input-id]
+                  [action
+                   :juxt.site.alpha/type
+                   "https://meta.juxt.site/pass/action"]
+                  [action :xt/id "https://test.example.com/actions/getRepository"]
+                  [permission
+                   :juxt.site.alpha/type
+                   "https://meta.juxt.site/pass/permission"]
+                  [permission
+                   :juxt.pass.alpha/action
+                   "https://test.example.com/actions/getRepository"]
+                  [permission :juxt.pass.alpha/purpose purpose]
+                  (allowed? permission subject action e)
+                  (include? action e)
+                  (arguments-match? e action {:type "git"})],
+                 :rules
+                 [[(allowed? permission subject action e)] [(include? action e)]],
+                 :in [subject purpose input-id]}
+                subject
+                purpose
+                myalias)
+               inner-myalias]],
+             :rules
+             [[(allowed? permission subject action e)] [(include? action e)]],
+             :in [subject purpose]}
+
+           (sut/build-query-for-selection-set
+            {::document/scoped-type-name "Query"
+             ::graphql/name "project"
+             ::graphql/selection-set [{::document/scoped-type-name "Project"
+                                       ::graphql/name "repositories"
+                                       ::graphql/arguments {"type" "hg"}
+                                       ::graphql/selection-set [{::document/scoped-type-name "Repository"
+                                                                 ::graphql/name "name"
+                                                                 }]}
+                                      {::document/scoped-type-name "Project"
+                                       ::graphql/name "repositories"
+                                       ::graphql/alias "myalias"
+                                       ::graphql/arguments {"type" "git"}
+                                       ::graphql/selection-set [{::document/scoped-type-name "Repository"
+                                                                 ::graphql/name "name"
+                                                                 }]}]}
+            example-schema
+            [['(allowed? permission subject action e)]
+             ['(include? action e)]]
+            false))))
+
   )

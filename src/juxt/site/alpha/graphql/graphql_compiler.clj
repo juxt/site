@@ -17,6 +17,10 @@
 
 (declare build-query-for-selection-set)
 
+(defn get-alias-or-name-from-selection-set
+  [selection-set]
+  (or (get selection-set :juxt.grab.alpha.graphql/alias)
+      (get selection-set :juxt.grab.alpha.graphql/name)))
 
 (defn build-where-clause
   [compiled-schema action-ids action-rules-map subquery-data incoming-resources? arguments]
@@ -37,13 +41,13 @@
                            (into (map #(vector
                                         'e
                                         (keyword (:juxt.grab.alpha.graphql/name %))
-                                        (symbol (:juxt.grab.alpha.graphql/name %)))
+                                        (symbol (get-alias-or-name-from-selection-set %)))
                                       subquery-data))
                            ;; Add a clause for the subquery
                            (into (map #(vector (list 'q
                                                      (build-query-for-selection-set % compiled-schema action-rules-map true)
-                                                     'subject 'purpose (symbol (:juxt.grab.alpha.graphql/name %)))
-                                               (symbol (str "inner-"(:juxt.grab.alpha.graphql/name %))))
+                                                     'subject 'purpose (symbol (get-alias-or-name-from-selection-set %)))
+                                               (symbol (str "inner-"(get-alias-or-name-from-selection-set %))))
 
                                       subquery-data)))
       (seq arguments) (conj (list 'arguments-match? 'e 'action arguments)))))
@@ -58,8 +62,8 @@
                            (reduce
                             (fn [acc n]
                               (assoc acc
-                                     (keyword (:juxt.grab.alpha.graphql/name n))
-                                     (symbol (str "inner-" (:juxt.grab.alpha.graphql/name n)))))
+                                     (keyword (get-alias-or-name-from-selection-set n))
+                                     (symbol (str "inner-" (get-alias-or-name-from-selection-set n)))))
                             {}
                             subquery-data)))))
 
