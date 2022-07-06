@@ -287,4 +287,16 @@
                (repl/db)
                example-compiled-schema
                "subject"
-               nil))))))
+               nil)))))
+
+  (testing "Can return a result when aliases are in use"
+    (is (=
+         #{{:name "alpha"
+            :myalias #{{:name "repository-b"}}
+            :repositories #{{:name "repository-a"}}}}
+         (graphql-proc/run
+           "query findEmployeephonenumbers { project {name, repositories(type: hg) { name }, myalias : repositories(type: git) { name } } }"
+           (repl/db)
+           example-compiled-schema
+           "subject"
+           nil)))))
