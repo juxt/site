@@ -184,12 +184,6 @@
   (let [tx-id (xt/submit-tx node tx)]
     (xt/await-tx node tx-id)))
 
-(let [kg-url-base (or (System/getenv "KG_URL_BASE") "http://localhost:5509")]
-  (defn- set-kg-url-base
-    [rec]
-    (->> (clojure.string/replace rec #"\{\{KG_URL_BASE\}\}" kg-url-base)
-         (edn/read-string {:eof :eof :readers edn-readers}))))
-
 (defn apply-uri-mappings
   [mapping]
   (fn [ent]
@@ -218,6 +212,9 @@
                (do
                  (submit-and-wait-tx node [[:xtdb.api/put rec]])
                  (println "Imported resource: " (:xt/id rec)))))))))))
+
+
+
 
 (defn validate-resource-line [s]
   (edn/read-string
