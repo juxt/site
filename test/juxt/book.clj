@@ -1448,10 +1448,12 @@ Password: <input name=password type=password>
   (put-basic-user-identity-alice!)
 
   (session-scopes-preliminaries!)
-
   (create-resource-protected-by-session-scope!)
   (grant-permission-to-resource-protected-by-session-scope!)
   (create-session-scope!)
+
+  (create-action-create-login-resource!)
+  (grant-permission-to-create-login-resource!)
   (create-login-resource!)
   (create-action-login!)
   (grant-permission-to-invoke-action-login!)
