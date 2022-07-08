@@ -6,84 +6,74 @@
 Actions are invoked when users make direct requests to an API. However, APIs are
 primarily designed to be used by applications acting on a user's behalf.
 
-Applications must first be registered with Site. Then a User must authorize an
+Applications must first be registered with Site. Then a user must authorize an
 application to access an API on their behalf. Only then can an application
 request a time-limited access token-from Site which it can present when making
 API requests.
 
 === Scope
 
-Actions can be grouped together into access ranges. For example, the actions
-required for user administration might be grouped into an access range named
-`user:admin`.
+Actions can be grouped together into access ranges. For example, the actions required for user administration might be grouped into an access range named `user:admin`.
 
-Applications might only need a limited set of these access ranges in order to
-function. The allowed access ranges might be restricted during application
-registration. This set of access ranges is called a 'scope'. An example scope
-might be "`user:admin resources:read resources:write`"
+Applications might only need a limited set of these access ranges in order to function.
+The allowed access ranges might be restricted during application registration.
 
-During the application authorization step, the authorizing User might choose to
-restrict the scope of access ranges an application can acquire.
+A set of these access ranges is called a *scope*.
 
-Furthermore, applications might unilaterally request a restricted scope upon
-requesting an access token.
+An example scope might be `"user:admin resources:read resources:write"`.
 
-No matter the ultimate scope of the access-token that is issued, an application
-cannot use an access-token to invoke an action that would otherwise be
-unavailable to a User.
+During the application authorization step, the authorizing user might choose to restrict the scope of access ranges an application can acquire.
+
+Furthermore, applications might unilaterally request a restricted scope upon requesting an access token.
+
+No matter the ultimate scope of the access-token that is issued, an application cannot use an access-token to invoke an action that would otherwise be unavailable to a user.
 
 == Create the action to create an application
 
-.Creating the action
 [[example-create-action-put-application]]
-====
+.Creating the action
+[example]
+--
 [source,clojure]
 ----
 include::../../test/juxt/book.clj[tag=create-action-put-application!,indent=0]
 ----
-====
-
-== Grant permission to create an application
-
-.Granting permission
-[[example-grant-permission-put-application]]
-====
-[source,clojure]
-----
-include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-put-application!,indent=0]
-----
-====
+--
 
 == Create the action to authorize an application
 
-====
+[example]
+--
 [source,clojure]
 ----
 include::../../test/juxt/book.clj[tag=create-action-authorize-application!,indent=0]
 ----
-====
+--
 
 == Grant permission to authorize an application
 
-====
+[example]
+--
 [source,clojure]
 ----
 include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-authorize-application!,indent=0]
 ----
-====
+--
 
 == Create the action to issue an access token
 
-====
+[example]
+--
 [source,clojure]
 ----
 include::../../test/juxt/book.clj[tag=create-action-issue-access-token!,indent=0]
 ----
-====
+--
 
 == Grant permission to issue an access token
 
-====
+[example]
+--
 [source,clojure]
 ----
 include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-issue-access-token!,indent=0]
@@ -91,5 +81,9 @@ include::../../test/juxt/book.clj[tag=grant-permission-to-invoke-action-issue-ac
 
 <1> All users are permitted to issue access tokens to applications that have
 authorized to access resources on their behalf.
+--
 
-====
+// Local Variables:
+// mode: outline
+// outline-regexp: "[=]+"
+// End:

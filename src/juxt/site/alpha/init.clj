@@ -2,52 +2,297 @@
 
 (ns juxt.site.alpha.init
   (:require
-   [clojure.edn :as edn]
-   [clojure.java.io :as io]
-   [clojure.tools.logging :as log]
+   [clojure.string :as str]
    [clojure.walk :refer [postwalk]]
-   [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
-   [juxt.apex.alpha :as-alias apex]
-   [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.authorization :as authz]
+   [juxt.flip.alpha.core :as f]
+   [juxt.flip.clojure.core :as-alias fc]
    [juxt.reap.alpha.combinators :as p]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.site.alpha :as-alias site]
-   [juxt.site.alpha.graphql :as graphql]
-   [selmer.parser :as selmer]
-   [xtdb.api :as xt]))
+   [juxt.site.alpha.main :as main]
+   [xtdb.api :as xt]
 
-(defn put! [xt-node & ms]
+   ;; These are kept around just for the commented code sections
+   [juxt.apex.alpha :as-alias apex]
+   [juxt.http.alpha :as-alias http]
+))
+
+(defn system [] main/*system*)
+
+(defn xt-node []
+  (:juxt.site.alpha.db/xt-node (system)))
+
+(defn put! [& ms]
   (->>
    (xt/submit-tx
-    xt-node
+    (xt-node)
     (for [m ms]
-      [:xtdb.api/put m]))
-   (xt/await-tx xt-node)))
+      (let [vt (:xtdb.api/valid-time m)]
+        [:xtdb.api/put (dissoc m :xtdb.api/valid-time) vt])))
+   (xt/await-tx (xt-node))))
+
+(defn config []
+  (main/config))
+
+(defn base-uri []
+  (::site/base-uri (config)))
+
+(defn substitute-actual-base-uri [form]
+  (postwalk
+   (fn [s]
+     (cond-> s
+       (string? s) (str/replace "https://example.org" (base-uri))))
+   form))
+
+(defn install-system-subject! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/put!
+      ;; tag::install-system-subject![]
+      {:xt/id "https://example.org/subjects/system"
+       :juxt.site.alpha/description "The system subject"
+       :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}
+      ;; end::install-system-subject![]
+      )))))
+
+(defn install-create-action! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/put!
+      ;; tag::install-create-action![]
+      {:xt/id "https://example.org/actions/create-action"
+       :juxt.site.alpha/description "The action to create all other actions"
+       :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
+       :juxt.pass.alpha/scope "write:admin"
+
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission) ; <1>
+          [permission :juxt.pass.alpha/subject subject]]]
+
+       :juxt.flip.alpha/quotation
+       `(
+         (site/with-fx-acc
+           [(site/push-fx
+             (f/dip
+              [juxt.site.alpha/request-body-as-edn
+
+               (site/validate
+                [:map
+                 [:xt/id [:re "https://example.org/actions/(.+)"]]
+                 [:juxt.pass.alpha/rules [:vector [:vector :any]]]])
+
+               (juxt.flip.clojure.core/assoc :juxt.site.alpha/type "https://meta.juxt.site/pass/action")
+
+               xtdb.api/put]))]))}
+      ;; end::install-create-action![]
+      )))))
+
+(defn install-system-permissions! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/put!
+      ;; tag::install-system-permissions![]
+      {:xt/id "https://example.org/permissions/system/bootstrap"
+       :juxt.site.alpha/type "https://meta.juxt.site/pass/permission" ; <1>
+       :juxt.pass.alpha/action #{"https://example.org/actions/create-action"
+                                 "https://example.org/actions/grant-permission"} ; <2>
+       :juxt.pass.alpha/purpose nil      ; <3>
+       :juxt.pass.alpha/subject "https://example.org/subjects/system" ; <4>
+       }
+      ;; end::install-system-permissions![]
+      )))))
+
+(defn install-do-action-fn! []
+  (put! (authz/install-do-action-fn (base-uri))))
+
+(defn bootstrap-primordials!
+  "Add just enough for the REPL to call actions for everything else"
+  []
+  (install-system-subject!)
+  (install-create-action!)
+  (install-system-permissions!)
+  (install-do-action-fn!))
+
+(defn make-repl-request-context [subject action edn-arg]
+  (let [xt-node (xt-node)]
+    {::site/xt-node xt-node
+     ::site/db (xt/db xt-node)
+     ::pass/subject subject
+     ::pass/action action
+     ::site/base-uri (base-uri)
+     ::site/received-representation
+     {::http/content-type "application/edn"
+      ::http/body (.getBytes (pr-str edn-arg))}}))
+
+(defn do-action [subject action edn-arg]
+  (::pass/action-result
+   (authz/do-action
+    (make-repl-request-context subject action edn-arg))))
+
+(defn create-grant-permission-action! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     ;; tag::create-grant-permission-action![]
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/grant-permission"
+       :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
+       :juxt.pass.alpha/scope "write:admin"
+
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
+
+         [(allowed? subject resource permission)
+          [subject :juxt.pass.alpha/user-identity id]
+          [id :juxt.pass.alpha/user user]
+          [user :role role]
+          [permission :role role]]]
+
+       :juxt.flip.alpha/quotation
+       `(
+         (site/with-fx-acc
+           [(site/push-fx
+             (f/dip
+              [juxt.site.alpha/request-body-as-edn
+               (juxt.site.alpha/validate
+                [:map
+                 [:xt/id [:re "https://example.org/permissions/(.+)"]]
+                 [:juxt.pass.alpha/action [:re "https://example.org/actions/(.+)"]]
+                 [:juxt.pass.alpha/purpose [:maybe :string]]])
+               (juxt.flip.clojure.core/assoc :juxt.site.alpha/type "https://meta.juxt.site/pass/permission")
+               xtdb.api/put]))]))})
+     ;; end::create-grant-permission-action![]
+     ))))
+
+(defn install-not-found
+  "Install an action to perform on '404'."
+  []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (do
+       (juxt.site.alpha.init/do-action
+        "https://example.org/subjects/system"
+        "https://example.org/actions/create-action"
+        {:xt/id "https://example.org/actions/get-not-found"
+         :juxt.pass.alpha/scope "read:resource"
+         :juxt.pass.alpha/rules
+         [
+          ['(allowed? subject resource permission)
+           ['permission :xt/id]]]})
+
+       (juxt.site.alpha.init/do-action
+        "https://example.org/subjects/system"
+        "https://example.org/actions/grant-permission"
+        {:xt/id "https://example.org/permissions/get-not-found"
+         :juxt.pass.alpha/action "https://example.org/actions/get-not-found"
+         :juxt.pass.alpha/purpose nil})
+
+       (juxt.site.alpha.init/put!
+        {:xt/id "urn:site:resources:not-found"
+         :juxt.site.alpha/methods
+         {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}
+          :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}}}))))))
+
+;; TODO: In the context of an application, rename 'put' to 'register'
+(defn create-action-register-application!
+  "Install an action to register an application"
+  []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/register-application"
+       :juxt.pass.alpha/scope "write:application"
+
+       :juxt.flip.alpha/quotation
+       `(
+         (site/with-fx-acc
+           [(site/push-fx
+             (f/dip
+              [site/request-body-as-edn
+               (site/validate
+                [:map
+                 [::pass/client-id [:re "[a-z-]{3,}"]]
+                 [::pass/redirect-uri [:re "https://"]]
+                 [::pass/scope [:re "[a-z:\\s]+"]]])
+
+               (fc/assoc ::site/type "https://meta.juxt.site/pass/application")
+               (fc/assoc ::pass/client-secret (pass/as-hex-str (pass/random-bytes 20)))
+
+               (f/set-at
+                (f/keep
+                 [(f/of ::pass/client-id) "/applications/" f/str (f/env ::site/base-uri) f/str
+                  :xt/id]))
+
+               xtdb.api/put]))]))
+
+       :juxt.pass.alpha/rules
+       '[[(allowed? subject resource permission)
+          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
+
+         [(allowed? subject resource permission)
+          [id :juxt.pass.alpha/user user]
+          [subject :juxt.pass.alpha/user-identity id]
+          [user :role role]
+          [permission :role role]]]})))))
+
+(defn grant-permission-to-invoke-action-register-application! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/system/register-application"
+       :juxt.pass.alpha/subject "https://example.org/subjects/system"
+       :juxt.pass.alpha/action "https://example.org/actions/register-application"
+       :juxt.pass.alpha/purpose nil})))))
+
+(defn bootstrap! []
+  (bootstrap-primordials!)
+  (create-grant-permission-action!)
+  (install-not-found)
+  (create-action-register-application!)
+  (grant-permission-to-invoke-action-register-application!))
+
+#_(defn make-application-doc [& options]
+  (apply application/make-application-doc options))
 
 #_(defn put-graphql-schema-endpoint!
-  "Initialise the resource that will host Site's GraphQL schema, as well as the
+    "Initialise the resource that will host Site's GraphQL schema, as well as the
   endpoint to post queries pertaining to the schema."
-  ;; TODO: The 'and' above indicates this resource is conflating two concerns.
-  [xt-node {::site/keys [base-uri]}]
-  (log/info "Initialising GraphQL schema endpoint")
-  ;; TODO: Establish some consistency with readers specified at various
-  ;; call-sites!
-  (put! xt-node
+    ;; TODO: The 'and' above indicates this resource is conflating two concerns.
+    [xt-node {::site/keys [base-uri]}]
+    (log/info "Initialising GraphQL schema endpoint")
+    ;; TODO: Establish some consistency with readers specified at various
+    ;; call-sites!
+    (put! xt-node
 
-        (as-> (io/resource "juxt/site/alpha/graphql-resources.edn") %
-          (slurp %)
-          (edn/read-string {:readers {'regex re-pattern}} %)
-          (postwalk
-           (fn [x] (cond-> x
-                     (string? x)
-                     ;; expand {{base-uri}}
-                     (selmer/render {:base-uri base-uri})))
-           %)
-          ;; TODO:
-          (graphql/schema-resource % (slurp (io/resource "juxt/site/alpha/site-schema.graphql"))))))
+          (as-> (io/resource "juxt/site/alpha/graphql-resources.edn") %
+            (slurp %)
+            (edn/read-string {:readers {'regex re-pattern}} %)
+            (postwalk
+             (fn [x] (cond-> x
+                       (string? x)
+                       ;; expand {{base-uri}}
+                       (selmer/render {:base-uri base-uri})))
+             %)
+            ;; TODO:
+            (graphql/schema-resource % (slurp (io/resource "juxt/site/alpha/site-schema.graphql"))))))
 
 #_(defn put-graphql-operations!
   "Add GraphQL operations that provide idiomatic requests to Site's GraphQL endpoint."
@@ -144,9 +389,6 @@
     ::pass/identity (repl-identity)
     ::pass/action (str base-uri "/actions/create-action")
     ::pass/purpose nil}))
-
-(defn do-action [ctx]
-  (::pass/action-result (authz/do-action ctx)))
 
 #_(defn do-action-with-purpose [xt-node action purpose & args]
   (apply

@@ -3,16 +3,19 @@
 (ns juxt.flip.alpha.core
   ;; When promoting this ns, move the defmethods that require all these
   ;; dependencies:
+  (:refer-clojure :exclude [+ first second symbol drop keep when str ex-info])
   (:require
-   [juxt.site.alpha.util :refer [random-bytes as-hex-str]]
-   [juxt.pass.alpha.util :refer [make-nonce]]
-   [ring.util.codec :as codec]
+   [clojure.edn :as edn]
+   [clojure.string :as str]
+   jsonista.core
+   juxt.pass.alpha.util
    [juxt.site.alpha :as-alias site]
+   [juxt.site.alpha.util :refer [random-bytes as-hex-str]]
+   [crypto.password.bcrypt :as bcrypt]
    [malli.core :as m]
    [malli.error :a me]
-   [xtdb.api :as xt]
-   [clojure.edn :as edn]
-   [clojure.string :as str]))
+   [ring.util.codec :as codec]
+   [xtdb.api :as xt]))
 
 ;; See Factor, https://factorcode.org/
 ;; See K's XY language, https://www.nsl.com/k/xy/xy.htm
@@ -21,108 +24,152 @@
   (fn [stack [word & queue] env]
     ;; A word can be a symbol, or a vector containing a symbol and any
     ;; arguments.
-    (if (symbol? word) word (first word))))
+    (if (symbol? word)
+      word
+      (clojure.core/first word))))
 
 (defmethod word :default [stack [name & queue] env]
   (if-let [quotation (get-in env [:definitions name])]
+    ;;(throw (clojure.core/ex-info "lookup definition" {:quotation quotation}))
     [stack (concat quotation queue) env]
     ;; Don't apply, simply treat as a symbol. We might be in the process of
     ;; defining a word.
     [(cons name stack) queue env]))
 
-(defmethod word 'break [stack [_ & queue] env]
-  (throw (ex-info "BREAK" {:stack stack
-                           :queue queue
-                           :env env
-                           })))
+(def break 'juxt.flip.alpha.core/break)
+(defmethod word 'juxt.flip.alpha.core/break [stack [_ & queue] env]
+  (throw
+   (clojure.core/ex-info
+    "BREAK"
+    {:juxt.flip.alpha/stack stack
+     :juxt.flip.alpha/queue queue})))
 
 ;; no-op is identity
-(defmethod word 'no-op [stack [_ & queue] env]
+(def no-op 'juxt.flip.alpha.core/no-op)
+(defmethod word 'juxt.flip.alpha.core/no-op
+  [stack [_ & queue] env]
   [stack queue env])
 
 ;; TODO: What is the Factor equivalent name?
-(defmethod word 'env [[el & stack] [_ & queue] env]
+(def env 'juxt.flip.alpha.core/env)
+(defmethod word 'juxt.flip.alpha.core/env
+  [[el & stack] [_ & queue] env]
   [(cons (get env el) stack) queue env])
 
 ;; TODO: What is the Factor equivalent name?
-(defmethod word 'juxt.flip.alpha.xtdb/entity [[id & stack] [_ & queue] {::site/keys [db] :as env}]
+(defmethod word 'juxt.flip.alpha.xtdb/entity
+  [[id & stack] [_ & queue] {::site/keys [db] :as env}]
   (if-let [e (xt/entity db id)]
     [(cons e stack) queue env]
     ;; TODO: Arguably the developer's decision - add a word that throws if
     ;; there's a nil at the top of the stack
-    (throw (ex-info "No such entity" {:id id}))))
+    (throw (clojure.core/ex-info "No such entity" {:id id}))))
 
 ;; TODO: What is the Factor equivalent name?
-(defmethod word 'call [[quotation & stack] [_ & queue] env]
+(def call 'juxt.flip.alpha.core/call)
+(defmethod word 'juxt.flip.alpha.core/call
+  [[quotation & stack] [_ & queue] env]
   (assert list? quotation)
   [stack (concat quotation queue) env])
 
 ;; TODO: What is the Factor equivalent name, if any?
-(defmethod word 'bytes-to-string [[bytes & stack] [_ & queue] env]
+(def bytes-to-string 'juxt.flip.alpha.core/bytes-to-string)
+(defmethod word 'juxt.flip.alpha.core/bytes-to-string
+  [[bytes & stack] [_ & queue] env]
   [(cons (String. bytes) stack) queue env])
 
 ;; TODO: What is the Factor equivalent name, if any?
-(defmethod word 'juxt.flip.alpha.edn/read-string [[el & stack] [_ & queue] env]
+(defmethod word 'juxt.flip.alpha.edn/read-string
+  [[el & stack] [_ & queue] env]
   [(cons (edn/read-string el) stack) queue env])
 
-(defmethod word 'juxt.flip.alpha.hashtables/associate [[k v & stack] [_ & queue] env]
+(defmethod word 'juxt.flip.alpha.hashtables/associate
+  [[k v & stack] [_ & queue] env]
   [(cons {k v} stack) queue env])
 
-(defmethod word 'first [[coll & stack] [_ & queue] env]
-  [(cons (first coll) stack) queue env])
+(def first 'juxt.flip.alpha.core/first)
+(defmethod word 'juxt.flip.alpha.core/first
+  [[coll & stack] [_ & queue] env]
+  [(cons (clojure.core/first coll) stack) queue env])
 
-(defmethod word 'second [[coll & stack] [_ & queue] env]
-  [(cons (second coll) stack) queue env])
+(def second 'juxt.flip.alpha.core/second)
+(defmethod word 'juxt.flip.alpha.core/second
+  [[coll & stack] [_ & queue] env]
+  [(cons (clojure.core/second coll) stack) queue env])
 
-(defmethod word 'symbol [[coll & stack] [_ & queue] env]
-  [(cons (symbol coll) stack) queue env])
+(def symbol 'juxt.flip.alpha.core/symbol)
+(defmethod word 'juxt.flip.alpha.core/symbol
+  [[coll & stack] [_ & queue] env]
+  [(cons (clojure.core/symbol coll) stack) queue env])
 
-(defmethod word '_3vector [[z y x & stack] [_ & queue] env]
+(def _3vector 'juxt.flip.alpha.core/_3vector)
+(defmethod word 'juxt.flip.alpha.core/_3vector
+  [[z y x & stack] [_ & queue] env]
   [(cons (vector x y z) stack) queue env])
 
-(defmethod word '_2vector [[y x & stack] [_ & queue] env]
+(def _2vector 'juxt.flip.alpha.core/_2vector)
+(defmethod word 'juxt.flip.alpha.core/_2vector
+  [[y x & stack] [_ & queue] env]
   [(cons (vector x y) stack) queue env])
 
-(defmethod word '_1vector [[x & stack] [_ & queue] env]
+(def _1vector 'juxt.flip.alpha.core/_1vector)
+(defmethod word 'juxt.flip.alpha.core/_1vector
+  [[x & stack] [_ & queue] env]
   [(cons (vector x) stack) queue env])
 
-(defmethod word '<vector> [[_ & stack] [_ & queue] env]
+(def <vector> 'juxt.flip.alpha.core/<vector>)
+(defmethod word 'juxt.flip.alpha.core/<vector>
+  [[_ & stack] [_ & queue] env]
   [(cons (vector) stack) queue env])
 
-(defmethod word 'append [[seq2 seq1 & stack] [_ & queue] env]
+(def append 'juxt.flip.alpha.core/append)
+(defmethod word 'juxt.flip.alpha.core/append
+  [[seq2 seq1 & stack] [_ & queue] env]
   [(cons (cond->> (concat seq1 seq2)
            (vector? seq1) vec) stack) queue env])
 
-(defmethod word 'push [[seq elt & stack] [_ & queue] env]
+(def push 'juxt.flip.alpha.core/push)
+(defmethod word 'juxt.flip.alpha.core/push
+  [[seq elt & stack] [_ & queue] env]
   [(cons (cond (vector? seq) (conj seq elt)
-               (list? seq) (concat seq [elt])) stack) queue env])
+               (list? seq) (concat seq [elt])) stack)
+   queue env])
 
-(defmethod word '>list [[sequence & stack] [_ & queue] env]
+(def >list 'juxt.flip.alpha.core/>list)
+(defmethod word 'juxt.flip.alpha.core/>list
+  [[sequence & stack] [_ & queue] env]
   [(cons (apply list sequence) stack) queue env])
 
-(defmethod word '>vector [[sequence & stack] [_ & queue] env]
+(def >vector 'juxt.flip.alpha.core/>vector)
+(defmethod word 'juxt.flip.alpha.core/>vector
+  [[sequence & stack] [_ & queue] env]
   [(cons (apply vector sequence) stack) queue env])
 
-(defmethod word '>lower [[s & stack] [_ & queue] env]
-  [(cons (str/lower-case s) stack) queue env])
+(def >lower 'juxt.flip.alpha.core/>lower)
+(defmethod word 'juxt.flip.alpha.core/>lower
+  [[s & stack] [_ & queue] env]
+  [(cons (clojure.string/lower-case s) stack) queue env])
 
-(defmethod word 'validate [[schema & stack] [_ & queue] env]
+(defmethod word 'juxt.site.alpha/validate
+  [[schema & stack] [_ & queue] env]
   (let [schema (m/schema schema)]
-    (if-not (m/validate schema (first stack))
+    (if-not (m/validate schema (clojure.core/first stack))
       ;; Not sure why Malli throws this error here: No implementation of
       ;; method: :-form of protocol: #'malli.core/Schema found for class: clojure.lang.PersistentVector
       ;;
       ;; Workaround is to pr-str and read-string
       (throw
-       (ex-info
+       (clojure.core/ex-info
         "Failed validation check"
-        (read-string (pr-str (m/explain schema (first stack))))))
+        (read-string (pr-str (m/explain schema (clojure.core/first stack))))))
       [stack queue env])))
 
 ;; Shuffle words - see
 ;; https://docs.factorcode.org/content/article-shuffle-words.html
 
-(defmethod word 'drop [[el & stack] [_ & queue] env]
+(def drop 'juxt.flip.alpha.core/drop)
+(defmethod word 'juxt.flip.alpha.core/drop
+  [[_ & stack] [_ & queue] env]
   [stack queue env])
 
 ;; 2drop
@@ -130,42 +177,70 @@
 ;; nip
 ;; 2nip
 
-(defmethod word 'dup [[el & stack] [_ & queue] env]
+(def dup 'juxt.flip.alpha.core/dup)
+(defmethod word 'juxt.flip.alpha.core/dup
+  [[el & stack] [_ & queue] env]
   [(cons el (cons el stack)) queue env])
 
 ;; 2dup
 ;; 3dup
 
-(defmethod word 'over [[y x & stack] [_ & queue] env]
+(def over 'juxt.flip.alpha.core/over)
+(defmethod word 'juxt.flip.alpha.core/over
+  [[y x & stack] [_ & queue] env]
   [(cons x (cons y (cons x stack))) queue env])
 
 ;; 2over
 
-(defmethod word 'pick [[z y x & stack] [_ & queue] env]
+(def pick 'juxt.flip.alpha.core/pick)
+(defmethod word 'juxt.flip.alpha.core/pick
+  [[z y x & stack] [_ & queue] env]
   [(cons x (cons z (cons y (cons x stack)))) queue env])
 
-(defmethod word 'swap [[x y & stack] [_ & queue] env]
+(def swap 'juxt.flip.alpha.core/swap)
+(defmethod word 'juxt.flip.alpha.core/swap
+  [[x y & stack] [_ & queue] env]
   [(cons y (cons x stack)) queue env])
 
-(defmethod word 'of [[k m & stack] [_ & queue] env]
+(def of 'juxt.flip.alpha.core/of)
+(defmethod word 'juxt.flip.alpha.core/of
+  [[k m & stack] [_ & queue] env]
   [(cons (get m k) stack) queue env])
 
-(defmethod word 'rot [[z y x & stack] [_ & queue] env]
+(def rot 'juxt.flip.alpha.core/rot)
+(defmethod word 'juxt.flip.alpha.core/rot
+  [[z y x & stack] [_ & queue] env]
   [(cons x (cons z (cons y stack))) queue env])
 
 (declare eval-quotation)
 
-(defmethod word 'dip [[x & stack] [[_ quotation] & queue] env]
-  (let [stack (eval-quotation stack quotation env)]
+(def dip 'juxt.flip.alpha.core/dip)
+(defmethod word 'juxt.flip.alpha.core/dip
+  [[quot x & stack] [_ & queue] env]
+  (let [stack (eval-quotation stack quot env)]
     [(cons x stack) queue env]))
 
-(defmethod word 'if [[f t ? & stack] [_ & queue] env]
+(def _2dip 'juxt.flip.alpha.core/_2dip)
+(defmethod word 'juxt.flip.alpha.core/_2dip
+  [[quot y x & stack] [_ & queue] env]
+  (let [stack (eval-quotation stack quot env)]
+    [(cons y (cons x stack)) queue env]))
+
+(def keep 'juxt.flip.alpha.core/keep)
+(defmethod word 'juxt.flip.alpha.core/keep
+  [[quot x & stack] [_ & queue] env]
+  [(cons x (eval-quotation (cons x stack) quot env)) queue env])
+
+(def if 'juxt.flip.alpha.core/if)
+(defmethod word 'juxt.flip.alpha.core/if
+  [[f t ? & stack] [_ & queue] env]
   (assert (vector? t) "Expecting t to be a quotation")
   (assert (vector? f) "Expecting f to be a quotation")
   [stack (concat (if ? t f) queue) env])
 
 ;; "Alternative conditional form that preserves the cond value if it is true."
-(defmethod word 'if*
+(def if* 'juxt.flip.alpha.core/if*)
+(defmethod word 'juxt.flip.alpha.core/if*
   [[f t ? & stack] [_ & queue] env]
   (assert (vector? t) "Expecting t to be a quotation")
   (assert (vector? f) "Expecting f to be a quotation")
@@ -173,33 +248,143 @@
     [(cons ? stack) (concat t queue) env]
     [stack (concat f queue) env]))
 
-(defmethod word 'when [[t ? & stack] [_ & queue] env]
+(def when 'juxt.flip.alpha.core/when)
+(defmethod word 'juxt.flip.alpha.core/when
+  [[t ? & stack] [_ & queue] env]
   (assert (vector? t) "Expecting t to be a quotation")
-  [stack (concat (when ? t) queue) env])
+  [stack (concat (clojure.core/when ? t) queue) env])
 
-(defmethod word 'when*
+(def when* 'juxt.flip.alpha.core/when*)
+(defmethod word 'juxt.flip.alpha.core/when*
   [[t ? & stack] [_ & queue] env]
   (assert (vector? t) "Expecting t to be a quotation")
   (if ?
     [(cons ? stack) (concat t queue) env]
     [stack queue env]))
 
-(defmethod word 'unless [[f ? & stack] [_ & queue] env]
-  [stack (concat (when-not ? f) queue) env])
+(def unless 'juxt.flip.alpha.core/unless)
+(defmethod word 'juxt.flip.alpha.core/unless
+  [[f ? & stack] [_ & queue] env]
+  [stack (concat (clojure.core/when-not ? f) queue) env])
 
-(defmethod word 'unless*
+(def unless* 'juxt.flip.alpha.core/unless*)
+(defmethod word 'juxt.flip.alpha.core/unless*
   [[f ? & stack] [_ & queue] env]
   (assert (vector? f) "Expecting f to be a quotation")
   (if-not ?
     [(cons ? stack) (concat f queue) env]
-    [stack queue env]))
+    [(cons ? stack) queue env]))
 
-(defmethod word '+
+(def + 'juxt.flip.alpha.core/+)
+(defmethod word 'juxt.flip.alpha.core/+
   [[y x & stack] [_ & queue] env]
-  [(cons (+ x y) stack) queue env])
+  [(cons (clojure.core/+ x y) stack) queue env])
 
-(defmethod word '<array-map> [stack [_ & queue] env]
+(def <array-map> 'juxt.flip.alpha.core/<array-map>)
+(defmethod word 'juxt.flip.alpha.core/<array-map>
+  [stack [_ & queue] env]
   [(cons (array-map) stack) queue env])
+
+(def <sorted-map> 'juxt.flip.alpha.core/<sorted-map>)
+(defmethod word 'juxt.flip.alpha.core/<sorted-map>
+  [stack [_ & queue] env]
+  [(cons (sorted-map) stack) queue env])
+
+(def set-at 'juxt.flip.alpha.core/set-at)
+(defmethod word 'juxt.flip.alpha.core/set-at
+  [[m k v & stack] [_ & queue] env]
+  [(cons (assoc m k v) stack) queue env])
+
+(def delete-at 'juxt.flip.alpha.core/delete-at)
+(defmethod word 'juxt.flip.alpha.core/delete-at
+  [[m k & stack] [_ & queue] env]
+  [(cons (dissoc m k) stack) queue env])
+
+#_(defmethod word 'juxt.flip.alpha.core/assoc [[k v m & stack] [_ & queue] env]
+  [(cons (assoc m k v) stack) queue env])
+
+(defmethod word 'juxt.pass.alpha/random-bytes
+  [[size & stack] [_ & queue] env]
+  [(cons (random-bytes size) stack) queue env])
+
+(defmethod word 'juxt.pass.alpha/as-hex-str
+  [[bytes & stack] [_ & queue] env]
+  [(cons (as-hex-str bytes) stack) queue env])
+
+(def str 'juxt.flip.alpha.core/str)
+(defmethod word 'juxt.flip.alpha.core/str
+  [[s1 s2 & stack] [_ & queue] env]
+  [(cons (clojure.core/str s1 s2) stack) queue env])
+
+(defmethod word 'juxt.flip.alpha.core/form-decode
+  [[encoded & stack] [_ & queue] env]
+  [(cons (codec/form-decode encoded) stack)
+   queue
+   env])
+
+(defmethod word 'juxt.flip.alpha.core/form-encode
+  [[m & stack] [_ & queue] env]
+  [(cons (codec/form-encode m) stack)
+   queue
+   env])
+
+(def in 'juxt.flip.alpha.core/in?)
+(defmethod word 'juxt.flip.alpha.core/in?
+  [[set elt & stack] [_ & queue] env]
+  [(cons (contains? (clojure.core/set set) elt) stack) queue env])
+
+(defmethod word 'juxt.flip.alpha.core/assoc-filter
+  [[quot assoc & stack] [_ & queue] env]
+  (let [subassoc (clojure.core/into
+                  {}
+                  (clojure.core/filter
+                   (fn [[k v]]
+                     (clojure.core/first
+                      (eval-quotation
+                       (clojure.core/cons v (clojure.core/cons k stack)) quot env)))
+                   assoc))]
+    [(cons subassoc stack) queue env]))
+
+(def push-at 'juxt.flip.alpha.core/push-at)
+;; I think the documentation is wrong here: https://docs.factorcode.org/content/word-push-at%2Cassocs.html
+;; I think there must be an output of the modified assoc.
+(defmethod word 'juxt.flip.alpha.core/push-at
+  [[assoc key value & stack] [_ & queue] env]
+  [(clojure.core/cons (clojure.core/update assoc key (clojure.core/fnil conj []) value) stack)
+   queue env])
+
+#_(defmethod word 'juxt.pass.alpha/find-matching-identity-on-password-query
+  [[{:keys [username-in-identity-key password-hash-in-identity-key]} & stack]
+   [_ & queue] env]
+  [(cons {:find '[e]
+          :where [
+                  ['e username-in-identity-key 'username]
+                  ['e password-hash-in-identity-key 'password-hash]
+                  ['(crypto.password.bcrypt/check password password-hash)]]
+          :in '[username password]} stack) queue env])
+
+(defmethod word 'juxt.pass.alpha/encrypt-password
+  [[password & stack] [_ & queue] env]
+  [(cons (bcrypt/encrypt password) stack) queue env])
+
+(def make-nonce 'juxt.pass.alpha/make-nonce)
+(defmethod word 'juxt.pass.alpha/make-nonce
+  [[size & stack] [_ & queue] env]
+  [(cons (juxt.pass.alpha.util/make-nonce size) stack) queue env])
+
+;; Errors
+
+(def ex-info 'juxt.flip.alpha.core/ex-info)
+(defmethod word 'juxt.flip.alpha.core/ex-info
+    [[ex-data msg & stack] [_ & queue] env]
+    [(cons (clojure.core/ex-info msg ex-data) stack) queue env])
+
+(def throw 'juxt.flip.alpha.core/throw)
+(defmethod word 'juxt.flip.alpha.core/throw
+  [[err & stack] [_ & queue] env]
+  (throw err))
+
+;; XTDB
 
 (defmethod word 'juxt.flip.alpha.xtdb/q
   [[q & stack] [_ & queue] env]
@@ -210,91 +395,170 @@
         results (apply xt/q db q in)]
     [(cons results stack) queue env]))
 
-(defmethod word 'set-at
-  [[m k v & stack] [_ & queue] env]
-  [(cons (assoc m k v) stack) queue env])
-
-(defmethod word 'juxt.flip.alpha/assoc [[k v m & stack] [_ & queue] env]
-  [(cons (assoc m k v) stack) queue env])
-
-(defmethod word 'random-bytes
-  [[size & stack] [_ & queue] env]
-  [(cons (random-bytes size) stack) queue env])
-
-(defmethod word 'as-hex-string
-  [[bytes & stack] [_ & queue] env]
-  [(cons (as-hex-str bytes) stack) queue env])
-
-(defmethod word 'str
-  [[s1 s2 & stack] [_ & queue] env]
-  [(cons (str s1 s2) stack) queue env])
-
-(defmethod word 'juxt.flip.alpha/form-decode
-  [[encoded & stack] [_ & queue] env]
-  [(cons (codec/form-decode encoded) stack)
-   queue
-   env])
-
-;; This could be in another ns
-;; TODO: Rewrite with args on stack
-(defmethod word 'find-matching-identity-on-password-query
-  [[{:keys [username-in-identity-key password-hash-in-identity-key]} & stack]
-   [_ & queue] env]
-  [(cons {:find '[e]
-          :where [
-                  ['e username-in-identity-key 'username]
-                  ['e password-hash-in-identity-key 'password-hash]
-                  ['(crypto.password.bcrypt/check password password-hash)]]
-          :in '[username password]} stack) queue env])
-
-(defmethod word 'make-nonce
-  [[size & stack] [_ & queue] env]
-  [(cons (make-nonce size) stack) queue env])
-
 (defmethod word 'xtdb.api/put
   [[doc & stack] [_ & queue] env]
   [(cons [:xtdb.api/put doc] stack) queue env])
 
-(defmethod word 'ex-info
-  [[ex-data msg & stack] [_ & queue] env]
-  [(cons (ex-info msg ex-data) stack) queue env])
+(defmethod word 'juxt.site.alpha/fx
+  [[fx doc & stack] [_ & queue] env]
+  [(cons [fx doc] stack) queue env])
 
-(defmethod word 'throw
-  [[err & stack] [_ & queue] env]
-  (throw err))
+;; Site
+
+(defmethod word 'juxt.site.alpha/lookup
+  [[val attr typ & stack] [_ & queue] env]
+  [(cons {:find '[(pull e [*])]
+          :where [['e :juxt.site.alpha/type typ]
+                  ['e attr val]]
+          } stack) queue env])
+
+(defmethod word 'jsonista.core/read-string
+  [[s & stack] [_ & queue] env]
+  [(cons (jsonista.core/read-value s) stack) queue env])
+
+;; Some friends from Clojure
+
+(defmethod word 'juxt.flip.clojure.core/assoc
+  [[v k m & stack] [_ & queue] env]
+  [(cons (clojure.core/assoc m k v) stack) queue env])
 
 ;; Convenience words
 
 (defmethod word 'juxt.site.alpha/request-body-as-edn
   [stack [_ & queue] env]
-  [stack (concat '(:juxt.site.alpha/received-representation
+  [stack (concat `(:juxt.site.alpha/received-representation
                    env :juxt.http.alpha/body
                    of
                    bytes-to-string
                    juxt.flip.alpha.edn/read-string) queue) env])
 
-(defmethod word 'define [[quotation name & stack] [_ & queue] env]
-  [stack queue (assoc-in env [:definitions name] quotation)])
+(defmethod word 'juxt.site.alpha/request-body-as-json
+  [stack [_ & queue] env]
+  [stack (concat `(:juxt.site.alpha/received-representation
+                   env :juxt.http.alpha/body
+                   of
+                   bytes-to-string
+                   jsonista.core/read-string) queue) env])
+
+(defmethod word 'juxt.site.alpha/apply-to-request-context
+  [stack [_ & queue] env]
+  [stack
+   (concat
+    `[:juxt.site.alpha/apply-to-request-context
+      swap _2vector] queue)
+   env])
+
+(defmethod word 'juxt.site.alpha/push-fx
+  [stack [_ & queue] env]
+  [stack
+   (concat
+    `[::site/fx juxt.flip.alpha.core/swap juxt.flip.alpha.core/push-at] queue)
+   env])
+
+(defmethod word 'juxt.site.alpha/with-fx-acc
+  [[quot & stack] [_ & queue] env]
+  [stack
+   (concat `[[] ::site/fx <sorted-map> set-at ~quot call] queue)
+   env])
+
+;; Create an apply-to-request-context operation that sets a header
+;; (header-name value -- op)
+(defmethod word 'juxt.site.alpha/set-header
+  [stack [_ & queue] env]
+  [stack
+   (concat
+    `[(symbol "juxt.flip.alpha.core/dup")
+      _1vector
+
+      (symbol "juxt.flip.alpha.core/of")
+      :ring.response/headers
+      _2vector >list
+      swap push
+
+      (symbol "juxt.flip.alpha.core/if*")
+      _1vector
+      0
+      <vector>
+      swap push
+
+      (symbol "juxt.flip.alpha.core/<array-map>")
+      _1vector
+      swap push
+      >list
+      swap push
+
+      push                              ; the value on the stack
+      push                              ; the header name
+      (symbol "juxt.flip.alpha.core/rot")
+      swap push
+      (symbol "juxt.flip.alpha.core/set-at")
+      swap push
+
+      :ring.response/headers
+      swap push
+      (symbol "juxt.flip.alpha.core/rot")
+      swap push
+      (symbol "juxt.flip.alpha.core/set-at")
+      swap push
+
+      juxt.site.alpha/apply-to-request-context] queue)
+   env])
+
+(defmethod word 'juxt.site.alpha/set-status
+  [stack [_ & queue] env]
+  [stack
+   (concat
+    `[_1vector
+      :ring.response/status
+      swap push
+      (symbol "juxt.flip.alpha.core/rot")
+      swap push
+      (symbol "juxt.flip.alpha.core/set-at")
+      swap push
+      juxt.site.alpha/apply-to-request-context]
+    queue)
+   env])
+
+(defmethod word 'juxt.flip.alpha.core/define
+  [[quotation n & stack] [_ & queue] env]
+  [stack queue (clojure.core/assoc-in env [:definitions n] quotation)])
 
 (defn word* [stack [w & queue] env]
   (cond
     (symbol? w)
-    (word stack (cons w queue) env)
-    (list? w)                           ; switch from postfix to prefix notation
-    [stack (concat (rest w) (cons (first w) queue)) env]
+    (word stack (clojure.core/cons w queue) env)
+    (seq? w)                            ; switch from postfix to prefix notation
+    (if (= (clojure.core/first w) 'quote)
+      ;; Allow quotation
+      [(cons (clojure.core/first (rest w)) stack) queue env]
+      [stack (clojure.core/concat
+              (clojure.core/rest w)
+              (clojure.core/cons (clojure.core/first w) queue)) env])
     :else
     [(cons w stack) queue env]))
 
-(defn eval-quotation
-   ;; Naiive implementation. A production implementation would put an upper limit
-   ;; on the number of iterations to prevent overly long running transactions.
+(defn try-word*
+  [stack queue env]
+  (try
+    (word* stack queue env)
+    (catch Throwable t
+      (throw
+       (clojure.core/ex-info
+        (format "Failure in quotation: %s" (.getMessage t))
+        {:juxt.flip.alpha/stack stack
+         :juxt.flip.alpha/queue queue}
+        t)))))
 
-   ;; For performance optimization, consider using a transient or a
-   ;; java.util.Deque for both stack and queue. Since neither the stack nor queue
-   ;; escape, and is run in a single-thread, the data structures can be
-   ;; transient. However, see https://clojure.org/reference/transients that
-   ;; claims that lists cannot be made transient "as there is no benefit to be
-   ;; had.". So lists may be already fast enough.
+(defn eval-quotation
+  ;; Naiive implementation. A production implementation would put an upper limit
+  ;; on the number of iterations to prevent overly long running transactions.
+
+  ;; For performance optimization, consider using a transient or a
+  ;; java.util.Deque for both stack and queue. Since neither the stack nor queue
+  ;; escape, and is run in a single-thread, the data structures can be
+  ;; transient. However, see https://clojure.org/reference/transients that
+  ;; claims that lists cannot be made transient "as there is no benefit to be
+  ;; had.". So lists may be already fast enough.
 
   ([stack queue]
    (eval-quotation stack queue {}))
@@ -304,5 +568,5 @@
      (assert list? queue)
      (assert map? env)
      (if (seq queue)
-       (recur (word* stack queue env))
+       (recur (try-word* stack queue env))
        stack))))

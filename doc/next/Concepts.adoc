@@ -196,8 +196,6 @@ Actions govern _who_ has access to documents. Actions also govern _how_ document
 (((action, definition)))
 Actions are the verbs of the domain _language_ used to tailor Site to a given business problem.
 
-Naturally, actions are represented by documents.
-
 <<ex-some-actions>> illustrates some possible actions in a system:
 
 [[ex-some-actions]]
@@ -214,6 +212,7 @@ Naturally, actions are represented by documents.
 |Logout|https://example.org/actions/logout
 |===
 
+Naturally, actions are represented by documents.
 An example document is shown in <<ex-concept-action>>.
 
 [[ex-concept-action]]
@@ -228,6 +227,8 @@ include::../../test/juxt/book.clj[tag=example-action,indent=0]
 <2> Access control rules which govern whether this action can be used
 <3> A program which computes the effects of performing this action.
 --
+
+Actions are covered in depth in <<ch-actions>>.
 
 == Rules
 
@@ -308,25 +309,35 @@ Site provides a built-in stack-based language called *Flip* for writing these pr
 [[concept-resources]]
 == Resources
 
+A resource is a document, an image, a piece of information, a data set, a collection of other resources—anything that you might want to create a hyperlink to.
+
+A resource is identified by a Uniform Resource Identifier (URI) and represented by a document in the database.
+The document's `:xt/id` is the URI.
+
+The document contains the configuration and state of the resource, and any information required to format the resource such that it can be communicated via HTTP.
+
 Resources are covered in depth in <<ch-resources>>.
-
-// TODO: Write something short
-
-== Representations
-
-NOTE: TODO
 
 == Authentication
 
-NOTE: TODO
+Authentication is the process of establishing the *subject* of a request.
+
+Site supports both standard HTTP Authentication and sessions created when a user provides credentials, via a login-form perhaps.
 
 == APIs
 
-NOTE: TODO
+An API is made up of a set of resources which are designed to be accessed programatically.
+
+Resources which are part of an API can be given extra information to help supply documentation to programmers who are creating applications that accesses these API resources.
+<<ch-openapi>> explains how https://www.openapis.org/[OpenAPI] documentation can be generated from a set of resources making up an API.
 
 == Applications
 
-NOTE: TODO
+An application is a piece of software that is trusted by a resource, or set of resources making up an API.
+Applications are covered in depth in <<ch-applications>>.
+
+An application can be authorized by a user in order to make APIs calls on the user's behalf.
+This is the topic of <<ch-authorization-server>>.
 
 // Local Variables:
 // mode: outline

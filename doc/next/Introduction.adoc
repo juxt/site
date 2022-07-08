@@ -69,7 +69,7 @@ NOTE: TODO, we're not done here
 
 === What is the relationship between Site and OAuth?
 
-In https://datatracker.ietf.org/doc/html/rfc6749#section-1.1[RFC 6749], OAuth defines four roles:
+In cite:[rfc6749(5)], OAuth defines four roles:
 
 [quote]
 ____

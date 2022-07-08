@@ -4,14 +4,9 @@
 
 == Introduction
 
-HTTP Authentication is specified in https://www.rfc-editor.org/rfc/rfc7235[RFC
-7235] and provides the overall authentication framework for a number of
-authentication 'schemes'.
+HTTP Authentication is specified in cite:[rfc7235] and provides the overall authentication framework for a number of authentication 'schemes'.
 
-Besides the 'Basic' HTTP Authentication Scheme (supported more for the sake of
-completeness and discussed in <<ch-basic-authentication>>), the 'Bearer'
-Authentication Scheme is important for securing APIs using OAuth2, covered in
-<<ch-applications>> and beyond.
+Besides the 'Basic' HTTP Authentication Scheme (supported more for the sake of completeness and discussed in <<ch-basic-authentication>>), the 'Bearer' Authentication Scheme is important for securing APIs using OAuth2, covered in <<ch-applications>> and beyond.
 
 [[protection-spaces]]
 == Protection Spaces

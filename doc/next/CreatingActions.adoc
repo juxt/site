@@ -20,7 +20,7 @@ The actual call to `do-action` is shown below:
 
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=create-grant-permission-action!,indent=0]
+include::../../src/juxt/site/alpha/init.clj[tag=create-grant-permission-action!,indent=0]
 ----
 
 NOTE: We would usually have to grant permission to our system subject for this action.

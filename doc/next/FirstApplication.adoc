@@ -8,14 +8,14 @@ We'll also be able to control exactly which resources this application can
 access.
 
 
-== Create the application
+== Register the application
 
-.Creating the application
-[[example-create-application]]
+.Registering the application
+[[example-register-application]]
 ====
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=invoke-put-application!,indent=0]
+include::../../test/juxt/book.clj[tag=register-example-application!,indent=0]
 ----
 ====
 

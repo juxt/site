@@ -75,7 +75,7 @@
             (query-permissions
              {:db db :rules rules
               :subject subject :actions actions :resource resource :purpose purpose})]
-        (log/debugf "Returning %s permissions" (pr-str permissions))
+        ;;(log/debugf "Returning permissions: %s" (pr-str permissions))
         permissions))))
 
 (defn allowed-resources
@@ -232,7 +232,6 @@
     :as ctx} args]
   (let [db (xt/db xt-ctx)
         tx (xt/indexing-tx xt-ctx)]
-
     (try
       ;; Check that we /can/ call the action
       (let [check-permissions-result
@@ -248,7 +247,7 @@
         (when-not (seq check-permissions-result)
           (throw (ex-info "Action denied" ctx)))
 
-        (let [ops
+        (let [[{::site/keys [fx]}]
               (cond
                 (::flip/quotation action-doc)
                 (eval-quotation
@@ -262,14 +261,20 @@
                                 {:action action-doc})))
 
               ;; Validate
-              _ (doseq [op ops]
-                  (when-not (and (vector? op) (keyword? (first op)))
-                    (throw (ex-info "Invalid op" {::pass/action action :op op}))))
+              _ (doseq [effect fx]
+                  (when-not (and (vector? effect)
+                                 (keyword? (first effect))
+                                 (if (= :xtdb.api/put (first effect))
+                                   (map? (second effect))
+                                   true))
+                    (throw (ex-info "Invalid effect" {::pass/action action :effect effect}))))
 
-              xtdb-ops (filter (fn [[op]] (= (namespace op) "xtdb.api")) ops)
-              apply-to-request-context-ops (filter (fn [[op]]  (= op :juxt.site.alpha/apply-to-request-context)) ops)
+              xtdb-ops (filter (fn [[effect]] (= (namespace effect) "xtdb.api")) fx)
+              apply-to-request-context-fx (filter (fn [[effect]]  (= effect :juxt.site.alpha/apply-to-request-context)) fx)
 
-              result-ops
+              _ (log/infof "xtdb ops is %s" (pr-str xtdb-ops))
+
+              result-fx
               (conj
                xtdb-ops
                ;; Add an action log entry for this transaction
@@ -294,15 +299,13 @@
                      tx (into tx)
 
                      ;; Any quotations that we want to apply to the request context?
-                     (seq apply-to-request-context-ops)
-                     (assoc :juxt.site.alpha/apply-to-request-context-ops apply-to-request-context-ops)
-
-                     ))])]
+                     (seq apply-to-request-context-fx)
+                     (assoc :juxt.site.alpha/apply-to-request-context-ops apply-to-request-context-fx)))])]
 
           ;; This isn't the best debugger :( - need a better one!
           ;;(log/tracef "XXXX Result is: %s" result-ops)
 
-          result-ops))
+          result-fx))
 
       (catch Throwable e
         (log/errorf e "Error when doing action: %s %s" action (format "urn:site:action-log:%s" (::xt/tx-id tx)))
@@ -382,6 +385,7 @@
              (:ex-data error))))
 
           (let [apply-to-request-context-ops (:juxt.site.alpha/apply-to-request-context-ops result)]
+            (log/infof "result is %s" result)
             (cond-> ctx
               result (assoc ::pass/action-result result)
 

@@ -261,7 +261,7 @@ Ensure that the database is empty. Now install the entities:
 From the REPL, install the four primordial entities with the following:
 
 ----
-user> (book/bootstrap!)
+user> (bootstrap!)
 ----
 
 If this is successful, run `(ls)` to check the four entities have been installed.

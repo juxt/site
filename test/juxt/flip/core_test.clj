@@ -5,7 +5,7 @@
    [clojure.test :refer [deftest is use-fixtures testing] :as t]
    [crypto.password.bcrypt :as password]
    [juxt.flip.alpha.core :as flip]
-   [juxt.site.alpha.repl :as repl]
+   [juxt.site.alpha.init :as init]
    [juxt.test.util :refer [with-system-xt *xt-node*]]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.authorization :as authz]
@@ -35,7 +35,7 @@
 (comment
   ((t/join-fixtures [with-system-xt])
    (fn []
-     (repl/put!
+     (init/put!
       {:xt/id "https://site.test/user-identities/alice"
        ::pass/username "alice"
        ::pass/password-hash (password/encrypt "garden")})
@@ -65,7 +65,7 @@
                 [(juxt.flip.alpha.hashtables/associate ::pass/user-identity)
                  (assoc :juxt.site.alpha/type "https://meta.juxt.site/pass/subject")
                  ;; The subject has a random id
-                 (as-hex-string (random-bytes 10))
+                 (as-hex-str (random-bytes 10))
                  (str "https://site.test/subjects/")
                  (assoc* :xt/id)
                  (xtdb.api/put)])
@@ -95,58 +95,7 @@
 
               ;; Wrap quotation in a apply-to-request-context operation
               ;; (quotation -- op)
-              (define apply-to-request-context
-                [:juxt.site.alpha/apply-to-request-context
-                 swap _2vector])
 
-              (define set-status
-                [_1vector
-                 :ring.response/status
-                 swap push
-                 (symbol "rot")
-                 swap push
-                 (symbol "set-at")
-                 swap push
-                 apply-to-request-context])
-
-              ;; Create an apply-to-request-context operation that sets a header
-              ;; (header-name value -- op)
-              (define set-header
-                [(symbol "dup")
-                 _1vector
-
-                 (symbol "of")
-                 :ring.response/headers
-                 _2vector >list
-                 swap push
-
-                 (symbol "if*")
-                 _1vector
-                 0
-                 <vector>
-                 swap push
-
-                 (symbol "<array-map>")
-                 _1vector
-                 swap push
-                 >list
-                 swap push
-
-                 push                   ; the value on the stack
-                 push                   ; the header name
-                 (symbol "rot")
-                 swap push
-                 (symbol "set-at")
-                 swap push
-
-                 :ring.response/headers
-                 swap push
-                 (symbol "rot")
-                 swap push
-                 (symbol "set-at")
-                 swap push
-
-                 apply-to-request-context])
 
               ;; Start of program
 
@@ -204,7 +153,7 @@
                                )
 
                            ;; A quotation that will set a status 302 on the request context
-                           (set-status 302)])]
+                           (juxt.site.alpha/set-status 302)])]
 
                 ;; else
                 [(throw (ex-info "Login failed" {:ring.response/status 400}))]))
@@ -221,9 +170,7 @@
               ::http/content-type "application/x-www-form-urlencoded"
               }
              :ring.request/query "return-to=/document.html"
-             :ring.response/headers {"server" "jetty"}}
-
-            )]
+             :ring.response/headers {"server" "jetty"}})]
 
        eval-quotation-results
 
@@ -233,26 +180,58 @@
          eval-quotation-results
          (filter (fn [[op]]  (= op :juxt.site.alpha/apply-to-request-context)))))))))
 
+;; Create authz server
+(flip/eval-quotation
+ '[]
+ '[juxt.site.alpha/request-body-as-edn
 
-(authz/apply-request-context-operations
- {:ring.response/headers {"foo" "bar"}}
- '[[:juxt.site.alpha/apply-to-request-context
-    [dup
-     (of :ring.response/headers)
-     [drop <array-map>]
-     unless*
-     break
-     "id=165882feeb5f2e1de3ea06ae28bc1755; Path=/; Secure; HttpOnly; SameSite=Lax"
-     "set-cookie"
-     break
-     rot
-     set-at
-     :ring.response/headers
-     rot
-     set-at]]]
+   ;; Create the /authorize endpoint
+
+   (env ::site/base-uri)
+   "/authorize"
+   swap
+   str
+   :xt/id
+   {}
+   set-at
+
+   #_{:xt/id "https://example.com/oauth/authorize"}
+   #_xtdb.api/put
+
+   ]
+ (let [edn-arg {:foo "bar"}]
+   { ;;::site/xt-node xt-node
+    ;;   ::site/db (xt/db xt-node)
+    ;;   ::pass/subject subject
+    ;;   ::pass/action action
+    ::site/base-uri "https://example.org"
+    ::site/received-representation
+    {::http/content-type "application/edn"
+     ::http/body (.getBytes (pr-str edn-arg))}})
  )
 
 
+;; Authorization server should generate a code that can be exchanged later for
+;; an access token.
+;; Means we should generate a code, save it to the database
+
+;; Implicit flow - let's just issue the access token and return it
+
 (flip/eval-quotation
- (list {})
- '([1 1 +] when*))
+ '[]
+ '[juxt.site.alpha/request-body-as-edn
+
+   ;; read OAuth spec
+   ;; generate a code document, return the
+
+   ]
+ (let [edn-arg {:foo "bar"}]
+   { ;;::site/xt-node xt-node
+    ;;   ::site/db (xt/db xt-node)
+    ;;   ::pass/subject subject
+    ;;   ::pass/action action
+    ::site/base-uri "https://example.org"
+    ::site/received-representation
+    {::http/content-type "application/edn"
+     ::http/body (.getBytes (pr-str edn-arg))}})
+ )

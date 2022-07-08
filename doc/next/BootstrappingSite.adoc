@@ -1,4 +1,4 @@
-= Understanding the Bootstrap
+= Bootstrapping
 :toc: left
 :experimental:
 
@@ -28,7 +28,7 @@ It is similar to the Unix `root` user.
 
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=install-system-subject!,indent=0]
+include::../../src/juxt/site/alpha/init.clj[tag=install-system-subject!,indent=0]
 ----
 
 [[bootstrap-install-create-action]]
@@ -42,7 +42,7 @@ Let's examine the document that represents this action:
 .The create-action action
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=install-create-action!,indent=0]
+include::../../src/juxt/site/alpha/init.clj[tag=install-create-action!,indent=0]
 ----
 <1> This rule allows our system subject to call this action, if an explicit permission exists.
 
@@ -61,7 +61,7 @@ The permission document
 .The initial system permissions
 [source,clojure]
 ----
-include::../../test/juxt/book.clj[tag=install-system-permissions!,indent=0]
+include::../../src/juxt/site/alpha/init.clj[tag=install-system-permissions!,indent=0]
 ----
 <1> This attribute tells Site this is a permission document
 <2> This is the set of actions which the permission allows
@@ -75,23 +75,6 @@ include::../../test/juxt/book.clj[tag=install-system-permissions!,indent=0]
 When actions are performed which modify the database, they run in a transaction function.
 
 XTDB requires that we register this transaction function before we call it.
-
-<<ex-do-action-transaction-function>> shows the document that represents this transaction function in the database.
-
-[[ex-do-action-transaction-function]]
-.The do-action transaction function
-[example]
---
-[source,clojure]
-----
-{:xt/id "https://site.test/_site/do-action"
- :xt/fn (fn [xt-ctx ctx & args]
-          (juxt.pass.alpha.authorization/do-action* xt-ctx ctx args))}
-----
---
-
-NOTE: It is not necessary to understand this step in detail, only that it is required.
-
 
 // Local Variables:
 // mode: outline

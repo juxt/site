@@ -4,31 +4,30 @@
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
-   [clojure.walk :refer [postwalk]]
-   [xtdb.api :as xt]
-   [crypto.password.bcrypt :as password]
-   [jsonista.core :as json]
    [clojure.java.shell :as sh]
+   [clojure.string :as str]
+   [clojure.walk :refer [postwalk]]
+   [crypto.password.bcrypt :as password]
    [io.aviso.ansi :as ansi]
-   [juxt.pass.alpha.application :as application]
-   [juxt.pass.alpha.authorization :as authz]
-   [juxt.site.alpha.graphql :as graphql]
-   [juxt.grab.alpha.schema :as graphql.schema]
+   [jsonista.core :as json]
+   [juxt.dave.alpha :as-alias dave]
    [juxt.grab.alpha.document :as graphql.document]
    [juxt.grab.alpha.parser :as graphql.parser]
-   [selmer.parser :as selmer]
-   [juxt.site.alpha.main :as main]
-   [juxt.site.alpha.handler :as handler]
-   [juxt.site.alpha.cache :as cache]
-   [juxt.site.alpha.init :as init]
-   [clojure.string :as str]
    [juxt.grab.alpha.parser :as parser]
-   [juxt.dave.alpha :as-alias dave]
+   [juxt.grab.alpha.schema :as graphql.schema]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
+   [juxt.pass.alpha.authorization :as authz]
    [juxt.site.alpha :as-alias site]
+   [juxt.site.alpha.cache :as cache]
+   [juxt.site.alpha.graphql :as graphql]
+   [juxt.site.alpha.handler :as handler]
+   [juxt.site.alpha.init :as init :refer [config base-uri xt-node system put! do-action bootstrap!]]
+   [juxt.site.alpha.main :as main]
+   [juxt.site.alpha.repl :as repl]
    [juxt.site.alpha.util :as util]
-   [juxt.site.alpha.repl :as repl])
+   [selmer.parser :as selmer]
+   [xtdb.api :as xt])
   (:import (java.util Date)))
 
 (defn base64-reader [form]
@@ -40,24 +39,12 @@
   {'juxt.site/base64 base64-reader
    'regex #(re-pattern %)})
 
-(defn config []
-  (main/config))
-
-(defn system []
-  main/*system*)
-
-(defn base-uri []
-  (::site/base-uri (config)))
-
 (defn help []
   (doseq [[_ v] (sort (ns-publics 'juxt.site.alpha.repl))
           :let [m (meta v)]]
     (println (format "%s %s: %s"
                      (:name m) (:arglists m) (:doc m))))
   :ok)
-
-(defn xt-node []
-  (:juxt.site.alpha.db/xt-node (system)))
 
 (defn db []
   (xt/db (xt-node)))
@@ -79,15 +66,6 @@
   (xt/entity-history (db) id :asc {:with-docs? true}))
 
 (defn valid-time [id] (:xtdb.api/valid-time (xt/entity-tx (db) id)))
-
-(defn put! [& ms]
-  (->>
-   (xt/submit-tx
-    (xt-node)
-    (for [m ms]
-      (let [vt (:xtdb.api/valid-time m)]
-        [:xtdb.api/put (dissoc m :xtdb.api/valid-time) vt])))
-   (xt/await-tx (xt-node))))
 
 (defn grep [re coll]
   (filter #(re-matches (re-pattern re) %) coll))
@@ -532,25 +510,10 @@
 ;; The REPL is having to construct the more usual network representation of a
 ;; request context.
 
-(defn make-repl-request-context [subject action edn-arg]
-  (let [xt-node (xt-node)]
-    {::site/xt-node xt-node
-     ::site/db (xt/db xt-node)
-     ::pass/subject subject
-     ::pass/action action
-     ::site/base-uri (base-uri)
-     ::site/received-representation
-     {::http/content-type "application/edn"
-      ::http/body (.getBytes (pr-str edn-arg))}}))
 
-(defn do-action [subject action edn-arg]
-  (init/do-action (make-repl-request-context subject action edn-arg)))
 
 #_(defn do-action-with-purpose [action purpose & args]
   (apply init/do-action-with-purpose (xt-node) action purpose args))
-
-(defn install-do-action-fn! []
-  (put! (authz/install-do-action-fn (base-uri))))
 
 #_(defn install-repl-user! []
   (put! {:xt/id (repl-subject)
@@ -710,15 +673,6 @@
        (remove nil? [tok session-id subject]))
      (mapcat seq)
      (apply evict!))))
-
-(defn make-application-doc [& options]
-  (apply application/make-application-doc options))
-
-(defn make-application-authorization-doc [& options]
-  (apply application/make-application-authorization-doc options))
-
-(defn make-access-token-doc [& options]
-  (apply application/make-access-token-doc options))
 
 (defn random-bytes [size]
   (util/random-bytes size))

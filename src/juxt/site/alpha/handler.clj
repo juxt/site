@@ -257,9 +257,9 @@
       (authz/do-action
        (-> req
            (assoc ::pass/action (:xt/id permitted-action))
-           ;; A java.io.BufferedInputStream in the request is sufficient to
-           ;; provoke a "invalid tx-op: Unfreezable type: class
-           ;; java.io.BufferedInputStream" error.
+           ;; A java.io.BufferedInputStream in the request can provke this
+           ;; error: "invalid tx-op: Unfreezable type: class
+           ;; java.io.BufferedInputStream".
            (dissoc :ring.request/body)))
       (catch Exception e
         (throw
@@ -686,7 +686,7 @@
     :as req}]
 
   (assert req)
-  (assert start-date)
+  (assert start-date "this is a guard to make sure we aren't receiving back a corrupt request context")
 
   (let [end-date (java.util.Date.)
         req (assoc req

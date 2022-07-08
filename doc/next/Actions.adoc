@@ -1,4 +1,4 @@
-= Understanding Actions
+= Actions
 :toc: left
 :experimental:
 

@@ -45,7 +45,7 @@ include::Concepts.adoc[leveloffset=+1]
 
 include::Installation.adoc[leveloffset=+1]
 
-include::Genesis.adoc[leveloffset=+1]
+include::BootstrappingSite.adoc[leveloffset=+1]
 
 include::CreatingActions.adoc[leveloffset=+2]
 
@@ -54,7 +54,7 @@ include::CreatingActions.adoc[leveloffset=+2]
 // TODO: Include a chapter on Flip
 
 [[ch-actions]]
-include::UnderstandingActions.adoc[leveloffset=+1]
+include::Actions.adoc[leveloffset=+1]
 
 ////
 include::Permissions.adoc[leveloffset=+0]
@@ -88,17 +88,12 @@ Subject, we need to authenticate each request.
 
 Site supports two types of user authentication:
 
-(((authentication,HTTP))) *HTTP Authentication*, which introduces the concept of
-_protection spaces_, specified in https://www.rfc-editor.org/rfc/rfc7235[RFC
-7235], is described in <<ch-http-authentication>>. An example of HTTP
-Authentication is the 'Basic' authentication scheme, which is covered in
-<<ch-basic-authentication>>.
+(((authentication,HTTP))) *HTTP Authentication*, which introduces the concept of _protection spaces_, specified in cite:[rfc7235], is described in <<ch-http-authentication>>.
+An example of HTTP Authentication is the 'Basic' authentication scheme, which is covered in <<ch-basic-authentication>>.
 
-(((authentication,session-based))) *Session-based Authentication*, which we
-describe in <<ch-session-authentication>>, opens up numerous additional options
-for authentication. One such option is authenticating via an HTML form, which is
-covered in <<ch-form-based-authentication>>. Another is with the OpenID Connect
-protocol, which is covered in <<ch-openid>> with a worked example.
+(((authentication,session-based))) *Session-based Authentication*, which we describe in <<ch-session-authentication>>, opens up numerous additional options for authentication.
+One such option is authenticating via an HTML form, which is covered in <<ch-form-based-authentication>>.
+Another is with the OpenID Connect protocol, which is covered in <<ch-openid>> with a worked example.
 
 include::ProtectingResources.adoc[leveloffset=+1]
 
@@ -119,13 +114,11 @@ include::OpenIdAuthentication.adoc[leveloffset=+1]
 
 = Applications and APIs
 
+First, in <<ch-applications>>, we introduce applications and create the required actions.
 
-First, in <<ch-applications>>, we introduce Applications and create the required
-Actions.
+We start by configuring our authorization server in <<ch-authorization-server>>.
 
-We start by configuring our Authorization Server in <<ch-authorization-server>>.
-
-Then, in <<ch-first-application>>, we create an example Application.
+Then, in <<ch-first-application>>, we create an example application.
 
 [[ch-applications]]
 include::Applications.adoc[leveloffset=+1]
@@ -171,3 +164,8 @@ bibliography::[]
 
 [index]
 == Index
+
+// Local Variables:
+// mode: outline
+// outline-regexp: "[=]+"
+// End:

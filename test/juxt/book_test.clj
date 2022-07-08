@@ -3,16 +3,19 @@
 (ns juxt.book-test
   (:require
    [clojure.java.io :as io]
-   [juxt.site.alpha.repl :as repl]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [juxt.book :as book]
-   [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
-   [xtdb.api :as xt]
-   [juxt.pass.alpha.session-scope :as session-scope]
-   [juxt.site.alpha :as-alias site]
+   [juxt.flip.alpha.core :as f]
+   [juxt.flip.clojure.core :as-alias fc]
+   [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.http-authentication :as authn]
-   [ring.util.codec :as codec]))
+   [juxt.pass.alpha.session-scope :as session-scope]
+   [juxt.site.alpha :as-alias site]
+   [juxt.site.alpha.init :refer [put! do-action bootstrap!]]
+   [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
+   [ring.util.codec :as codec]
+   [xtdb.api :as xt]))
 
 (defn with-handler [f]
   (binding [*handler*
@@ -25,14 +28,14 @@
 (use-fixtures :each with-system-xt with-handler)
 
 (deftest not-found-test
-  (book/preliminaries!)
+  (bootstrap!)
   (let [req {:ring.request/method :get
              :ring.request/path "/hello"}
         invalid-req (assoc req :ring.request/path "/not-hello")]
     (is (= 404 (:ring.response/status (*handler* invalid-req))))))
 
 (deftest public-resource-test
-  (book/preliminaries!)
+  (bootstrap!)
   (book/setup-hello-world!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/hello")) ;; Assert the entity exists in the db
@@ -60,7 +63,7 @@
   (format "Basic %s" (String. (.encode (java.util.Base64/getEncoder) (.getBytes (format "%s:%s" user password))))))
 
 (deftest protected-resource-with-http-basic-auth-test
-  (book/preliminaries!)
+  (bootstrap!)
   (book/protected-resource-preliminaries!)
   (book/protection-spaces-preliminaries!)
 
@@ -99,7 +102,7 @@
       (is (nil? (get-in response [:ring.response/headers "www-authenticate"]))))))
 
 (deftest session-scope-test
-  (book/preliminaries!)
+  (bootstrap!)
   (book/protected-resource-preliminaries!)
 
   (book/session-scopes-preliminaries!)
@@ -122,120 +125,133 @@
              "https://site.test/login?return-to="))))))
 
 (deftest protected-resource-with-http-bearer-auth-test
-  (book/preliminaries!)
+  (bootstrap!)
   (book/protected-resource-preliminaries!)
   (book/protection-spaces-preliminaries!)
 
   (book/applications-preliminaries!)
-  (book/setup-application!)
 
-  (book/create-resource-protected-by-bearer-auth!)
-  (book/grant-permission-to-resource-protected-by-bearer-auth!)
-  (book/put-bearer-protection-space!)
+  (let [log-entry (book/setup-application!)
+        db (xt/db *xt-node*)
+        lookup (fn [id] (xt/entity db id))
+        bearer-token (-> log-entry ::pass/puts (get 0) lookup ::pass/token)]
 
-  (is (xt/entity (xt/db *xt-node*) "https://site.test/protected-by-bearer-auth/document.html"))
+    (book/create-resource-protected-by-bearer-auth!)
+    (book/grant-permission-to-resource-protected-by-bearer-auth!)
+    (book/put-bearer-protection-space!)
 
-  (let [request {:ring.request/method :get
-                 :ring.request/path "/protected-by-bearer-auth/document.html"}]
+    (is (xt/entity (xt/db *xt-node*) "https://site.test/protected-by-bearer-auth/document.html"))
 
-    (testing "Cannot be accessed without a bearer token"
-      (let [response (*handler* request)]
-        response
-        (is (= 401 (:ring.response/status response)))
-        (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"])))
-        ))
+    (let [request {:ring.request/method :get
+                   :ring.request/path "/protected-by-bearer-auth/document.html"}]
 
-    (testing "Can be accessed with a valid bearer token"
-      (let [response (*handler*
-                      (assoc
-                       request
-                       :ring.request/headers
-                       {"authorization" "Bearer test-access-token"}))]
-        (is (= 200 (:ring.response/status response)))
-        (is (nil? (get-in response [:ring.response/headers "www-authenticate"])))))
+      (testing "Cannot be accessed without a bearer token"
+        (let [response (*handler* request)]
+          response
+          (is (= 401 (:ring.response/status response)))
+          (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"])))
+          ))
 
-    (testing "Cannot be accessed with an invalid bearer token"
-      (let [response (*handler*
-                      (assoc
-                       request
-                       :ring.request/headers
-                       {"authorization" "Bearer not-test-access-token"}))]
-        (is (= 401 (:ring.response/status response)))
-        (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"])))))))
+      (testing "Can be accessed with a valid bearer token"
+        (let [response (*handler*
+                        (assoc
+                         request
+                         :ring.request/headers
+                         {"authorization" (format "Bearer %s" bearer-token)}))]
+          (is (= 200 (:ring.response/status response)))
+          (is (nil? (get-in response [:ring.response/headers "www-authenticate"])))))
+
+      (testing "Cannot be accessed with an invalid bearer token"
+        (let [response (*handler*
+                        (assoc
+                         request
+                         :ring.request/headers
+                         {"authorization" "Bearer not-test-access-token"}))]
+          (is (= 401 (:ring.response/status response)))
+          (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"]))))))))
 
 (deftest user-directory-test
-  (book/preliminaries!)
+  (bootstrap!)
   (book/protected-resource-preliminaries!)
   (book/applications-preliminaries!)
-  (book/setup-application!)
-  (repl/do-action
-   "https://site.test/subjects/system"
-   "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/put-user-owned-content"
-    :juxt.pass.alpha/scope "write:user-content"
-    :juxt.pass.alpha/rules
-    [
-     '[(allowed? subject resource permission)
-       [permission ::pass/user user]
-       [subject ::pass/user-identity id]
-       [id ::pass/user user]
-       [resource :owner user]]]})
 
-  (repl/do-action
-   "https://site.test/subjects/system"
-   "https://site.test/actions/grant-permission"
-   {:xt/id "https://site.test/permissions/put-user-owned-content"
-    :juxt.pass.alpha/action "https://site.test/actions/put-user-owned-content"
-    :juxt.pass.alpha/user "https://site.test/users/alice"
-    :juxt.pass.alpha/purpose nil})
+  (let [log-entry (book/setup-application!)
+        db (xt/db *xt-node*)
+        lookup (fn [id] (xt/entity db id))
+        bearer-token (-> log-entry ::pass/puts (get 0) lookup ::pass/token)]
 
-  ;; Both bob and alice have user directories
-  (doseq [user #{"bob" "alice"}]
-    (repl/put!
-     {:xt/id (format "https://site.test/~%s/{path}" user)
-      ;; This needs to return a resource 'owned' by the user, then the action can
-      ;; unify on the subject's user and the resource's owner.
-      :owner (format "https://site.test/users/%s" user)
-      ::site/uri-template true
-      ::site/methods
-      {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}
-       :put {::pass/actions #{"https://site.test/actions/put-user-owned-content"}}}}))
+    (do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/create-action"
+     {:xt/id "https://site.test/actions/put-user-owned-content"
+      :juxt.pass.alpha/scope "write:user-content"
+      :juxt.pass.alpha/rules
+      [
+       '[(allowed? subject resource permission)
+         [permission ::pass/user user]
+         [subject ::pass/user-identity id]
+         [id ::pass/user user]
+         [resource :owner user]]]})
 
-  ;; 404 on GET, doesn't exist yet!
-  (let [req {:ring.request/method :get
-             :ring.request/path "/~bob/index.html"}]
-    (is (= 404 (:ring.response/status (*handler* req)))))
+    (do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/grant-permission"
+     {:xt/id "https://site.test/permissions/put-user-owned-content"
+      :juxt.pass.alpha/action "https://site.test/actions/put-user-owned-content"
+      :juxt.pass.alpha/user "https://site.test/users/alice"
+      :juxt.pass.alpha/purpose nil})
 
-  ;; Alice can't write to Bob's area
-  (let [req {:ring.request/method :put
-             :ring.request/path "/~bob/index.html"
-             :ring.request/headers
-             {"authorization" "Bearer test-access-token"}}]
-    (is (= 403 (:ring.response/status (*handler* req)))))
+    ;; Both bob and alice have user directories
+    (doseq [user #{"bob" "alice"}]
+      (juxt.site.alpha.init/put!
+       {:xt/id (format "https://site.test/~%s/{path}" user)
+        ;; This needs to return a resource 'owned' by the user, then the action can
+        ;; unify on the subject's user and the resource's owner.
+        :owner (format "https://site.test/users/%s" user)
+        ::site/uri-template true
+        ::site/methods
+        {:get {::pass/actions #{"https://site.test/actions/get-not-found"}}
+         :put {::pass/actions #{"https://site.test/actions/put-user-owned-content"}}}}))
 
-  ;; When Alice writing to Alice's user directory, we get through security.
-  (let [req {:ring.request/method :put
-             :ring.request/path "/~alice/index.html"
-             :ring.request/headers
-             {"authorization" "Bearer test-access-token"}}]
-    (is (= 411 (:ring.response/status (*handler* req))))))
+    ;; 404 on GET, doesn't exist yet!
+    (let [req {:ring.request/method :get
+               :ring.request/path "/~bob/index.html"}]
+      (is (= 404 (:ring.response/status (*handler* req)))))
+
+    ;; Alice can't write to Bob's area
+    (let [req {:ring.request/method :put
+               :ring.request/path "/~bob/index.html"
+               :ring.request/headers
+               {"authorization" (format "Bearer %s" bearer-token)}}]
+      (is (= 403 (:ring.response/status (*handler* req)))))
+
+    ;; When Alice writing to Alice's user directory, we get through security.
+    (let [req {:ring.request/method :put
+               :ring.request/path "/~alice/index.html"
+               :ring.request/headers
+               {"authorization" (format "Bearer %s" bearer-token)}}]
+      (is (= 411 (:ring.response/status (*handler* req)))))))
 
 (deftest login-test
-  (book/preliminaries!)
+  (is (= 2 (+ 1 1)))
+  (bootstrap!)
   (book/protected-resource-preliminaries!)
-
-  (book/session-scopes-preliminaries!)
-
   (book/create-resource-protected-by-session-scope!)
+  (book/session-scopes-preliminaries!)
   (book/grant-permission-to-resource-protected-by-session-scope!)
   (book/create-session-scope!)
+
+  (book/create-action-create-login-resource!)
+  (book/grant-permission-to-create-login-resource!)
   (book/create-login-resource!)
   (book/create-action-login!)
   (book/grant-permission-to-invoke-action-login!)
 
   (book/users-preliminaries!)
+
   (book/create-action-put-basic-user-identity!)
   (book/grant-permission-to-invoke-action-put-basic-user-identity!)
+
   (book/put-user-alice!)
   (book/put-basic-user-identity-alice!)
 
@@ -265,6 +281,7 @@
 
     ;; POST to the /login handler, which call the login action.
     ;; After this there should be a set-cookie escalation
+
     (let [body (.getBytes
                 (codec/form-encode
                  ;; usernames are case-insensitive - testing this
@@ -315,7 +332,7 @@
 ;; https://site.test/actions/put-immutable-protected-resource functions
 ;; properly.
 (deftest put-protected-resource-test
-  (book/preliminaries!)
+  (bootstrap!)
   (book/protected-resource-preliminaries!)
   (is (=
        {:juxt.pass.alpha/subject "https://site.test/subjects/system"
@@ -332,3 +349,98 @@
          :juxt.pass.alpha/action
          :juxt.pass.alpha/puts
          :juxt.pass.alpha/deletes]))))
+
+
+;; Register an application action
+
+#_((t/join-fixtures [with-system-xt])
+ (fn []
+
+   (flip/eval-quotation
+    '[]
+    '[
+      ;; (ctx -- tx-ops)
+      juxt.site.alpha/request-body-as-edn
+
+      (validate
+       [:map
+        [:juxt.pass.alpha/client-id [:re "[a-z-]{3,}"]]
+        [:juxt.pass.alpha/redirect-uri [:re "https://"]]
+        [:juxt.pass.alpha/scope [:re "[a-z:\\s]+"]]])
+
+      ;; Add :xt/id as a function of the client-id
+      dup (of ::pass/client-id)
+      "/applications/"
+      str
+      (env ::site/base-uri)
+      str
+      :xt/id
+      rot
+      set-at
+
+      ;; Add client secret
+      (random-bytes 20) as-hex-str
+      :juxt.pass.alpha/client-secret
+      rot
+      set-at
+
+      xtdb.api/put
+      ]
+
+    (let [edn-arg {::pass/client-id "local-terminal"
+                   ::pass/redirect-uri "https://site.test/terminal/callback"
+                   ::pass/scope "user:admin foo:bar"}]
+      { ;;::site/xt-node xt-node
+       ::site/db (xt/db *xt-node*)
+       ::site/base-uri "https://example.org"
+       ::pass/subject "https://site.test/subjects/alice"
+       ::site/received-representation
+       {::http/content-type "application/edn"
+        ::http/body (.getBytes (pr-str edn-arg))}}))))
+
+
+;; Issue an access token -- implicit flow
+((t/join-fixtures [with-system-xt])
+ (fn []
+   (bootstrap!)
+   (book/protected-resource-preliminaries!)
+
+   (book/session-scopes-preliminaries!)
+
+   ;; (book/create-resource-protected-by-session-scope!)
+
+   ;; Implicit grant (4.2)
+
+   (f/eval-quotation
+    '[]
+    `(
+      (site/with-fx-acc
+        [(site/push-fx
+          (f/dip
+           [juxt.site.alpha/request-body-as-edn
+
+            (fc/assoc :juxt.site.alpha/type "https://meta.juxt.site/pass/action")
+
+            (site/validate
+             [:map
+              [:xt/id [:re "https://site.test/.*"]]])
+
+            (xtdb.api/put
+             (fc/assoc
+              :juxt.site.alpha/methods
+              {:get {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
+               :head {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
+               :options {::pass/actions #{"https://site.test/actions/get-options"}}}))]))
+         ]))
+
+
+    (let [edn-arg {:xt/id "https://site.test/protected-by-session-scope/document.html"
+                   :juxt.http.alpha/content-type "text/html;charset=utf-8"
+                   :juxt.http.alpha/content "<p>This is a protected message that is only visible when sending the correct session header.</p>"
+                   }]
+      {::site/db (xt/db *xt-node*)
+       ::site/base-uri "https://example.org"
+       ::pass/subject "https://site.test/subjects/alice"
+       ::site/received-representation
+       {::http/content-type "application/edn"
+        ::http/body (.getBytes (pr-str edn-arg))}}))))
