@@ -15,7 +15,9 @@
    [juxt.site.alpha.init :refer [put! do-action bootstrap!]]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
    [ring.util.codec :as codec]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   [juxt.site.alpha.repl :as repl]
+   [juxt.site.alpha.init :as init]))
 
 (defn with-handler [f]
   (binding [*handler*
@@ -351,96 +353,24 @@
          :juxt.pass.alpha/deletes]))))
 
 
-;; Register an application action
-
-#_((t/join-fixtures [with-system-xt])
- (fn []
-
-   (flip/eval-quotation
-    '[]
-    '[
-      ;; (ctx -- tx-ops)
-      juxt.site.alpha/request-body-as-edn
-
-      (validate
-       [:map
-        [:juxt.pass.alpha/client-id [:re "[a-z-]{3,}"]]
-        [:juxt.pass.alpha/redirect-uri [:re "https://"]]
-        [:juxt.pass.alpha/scope [:re "[a-z:\\s]+"]]])
-
-      ;; Add :xt/id as a function of the client-id
-      dup (of ::pass/client-id)
-      "/applications/"
-      str
-      (env ::site/base-uri)
-      str
-      :xt/id
-      rot
-      set-at
-
-      ;; Add client secret
-      (random-bytes 20) as-hex-str
-      :juxt.pass.alpha/client-secret
-      rot
-      set-at
-
-      xtdb.api/put
-      ]
-
-    (let [edn-arg {::pass/client-id "local-terminal"
-                   ::pass/redirect-uri "https://site.test/terminal/callback"
-                   ::pass/scope "user:admin foo:bar"}]
-      { ;;::site/xt-node xt-node
-       ::site/db (xt/db *xt-node*)
-       ::site/base-uri "https://example.org"
-       ::pass/subject "https://site.test/subjects/alice"
-       ::site/received-representation
-       {::http/content-type "application/edn"
-        ::http/body (.getBytes (pr-str edn-arg))}}))))
-
-
 ;; Issue an access token -- implicit flow
 ((t/join-fixtures [with-system-xt])
  (fn []
    (bootstrap!)
-   (book/protected-resource-preliminaries!)
+
+   ;; We assume a protected resource exists, and that the application has either
+   ;; made a request to it and received a 401, or has been coded to understand
+   ;; that a bearer token is required.
+
 
    (book/session-scopes-preliminaries!)
 
-   ;; (book/create-resource-protected-by-session-scope!)
+   (book/applications-preliminaries!)
+   (book/setup-application!)
+
+   (repl/ls)
+
 
    ;; Implicit grant (4.2)
 
-   (f/eval-quotation
-    '[]
-    `(
-      (site/with-fx-acc
-        [(site/push-fx
-          (f/dip
-           [juxt.site.alpha/request-body-as-edn
-
-            (fc/assoc :juxt.site.alpha/type "https://meta.juxt.site/pass/action")
-
-            (site/validate
-             [:map
-              [:xt/id [:re "https://site.test/.*"]]])
-
-            (xtdb.api/put
-             (fc/assoc
-              :juxt.site.alpha/methods
-              {:get {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
-               :head {::pass/actions #{"https://site.test/actions/get-protected-resource"}}
-               :options {::pass/actions #{"https://site.test/actions/get-options"}}}))]))
-         ]))
-
-
-    (let [edn-arg {:xt/id "https://site.test/protected-by-session-scope/document.html"
-                   :juxt.http.alpha/content-type "text/html;charset=utf-8"
-                   :juxt.http.alpha/content "<p>This is a protected message that is only visible when sending the correct session header.</p>"
-                   }]
-      {::site/db (xt/db *xt-node*)
-       ::site/base-uri "https://example.org"
-       ::pass/subject "https://site.test/subjects/alice"
-       ::site/received-representation
-       {::http/content-type "application/edn"
-        ::http/body (.getBytes (pr-str edn-arg))}}))))
+   ))

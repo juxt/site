@@ -199,6 +199,10 @@
          :juxt.pass.alpha/action "https://example.org/actions/get-not-found"
          :juxt.pass.alpha/purpose nil})
 
+       ;; TODO: This violates the rule that, after primordial documents have
+       ;; been put into XTDB, all further transactions must be audited. We could
+       ;; resolve this by creating an action that creates the not-found
+       ;; resource.
        (juxt.site.alpha.init/put!
         {:xt/id "urn:site:resources:not-found"
          :juxt.site.alpha/methods

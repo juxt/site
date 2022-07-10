@@ -163,14 +163,15 @@
    (flip/eval-quotation
     '[]
     `[
+      ;; TODO: Look how login now creates sessions and copy that
       (flip/define make-access-token
-        [(of :xt/id) ::pass/application {} set-at
+        [(f/of :xt/id) ::pass/application {} f/set-at
          (juxt.pass.alpha.core/as-hex-str
           (juxt.pass.alpha.core/random-bytes 16))
-         ::pass/token rot set-at
-         (env ::pass/subject) ::pass/subject rot set-at
-         "https://meta.juxt.site/pass/access-token" ::site/type rot set-at
-         dup (of ::pass/token) "/access-tokens/" (env ::site/base-uri) str str :xt/id rot set-at])
+         ::pass/token f/rot f/set-at
+         (f/env ::pass/subject) ::pass/subject f/rot f/set-at
+         "https://meta.juxt.site/pass/access-token" ::site/type f/rot f/set-at
+         f/dup (f/of ::pass/token) "/access-tokens/" (f/env ::site/base-uri) f/str f/str :xt/id f/rot f/set-at])
 
       (flip/define locate-application
         [(set-at
@@ -217,13 +218,13 @@
       site/request-body-as-json
       locate-application
       assoc-access-token
-      (site/push-fx (keep [(of :access-token) xtdb.api/put]))
-      (set-at (keep [(of :access-token) (of ::pass/token) "access_token"]))
-      (set-token-type "bearer")
-      (set-email )
-      create-response-params
-      create-location-header
-      (of :fx)]
+;;      (site/push-fx (keep [(of :access-token) xtdb.api/put]))
+;;      (set-at (keep [(of :access-token) (of ::pass/token) "access_token"]))
+;;      (set-token-type "bearer")
+;;      (set-email )
+;;      create-response-params
+;;      create-location-header
+      ]
 
     ;; implicit
     ;;    /authorize?response_type=token&client_id=blah&state=my-state
@@ -242,7 +243,7 @@
 
 
 ;; All done, ready for another test
-((t/join-fixtures [with-system-xt])
+#_((t/join-fixtures [with-system-xt])
  (fn []
    (bootstrap!)
 
