@@ -1418,6 +1418,7 @@ Password: <input name=password type=password>
   (create-action-issue-access-token!)
   (grant-permission-to-invoke-action-issue-access-token!))
 
+;; TODO: Too coarse, find usages and break up
 (defn setup-application! []
   (register-example-application!)
   (users-preliminaries!)

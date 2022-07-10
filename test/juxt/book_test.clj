@@ -9,15 +9,15 @@
    [juxt.flip.clojure.core :as-alias fc]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
+   [juxt.pass.alpha.authorization :as authz]
    [juxt.pass.alpha.http-authentication :as authn]
    [juxt.pass.alpha.session-scope :as session-scope]
    [juxt.site.alpha :as-alias site]
-   [juxt.site.alpha.init :refer [put! do-action bootstrap!]]
+   [juxt.site.alpha.init :as init :refer [put! do-action]]
+   [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
    [ring.util.codec :as codec]
-   [xtdb.api :as xt]
-   [juxt.site.alpha.repl :as repl]
-   [juxt.site.alpha.init :as init]))
+   [xtdb.api :as xt]))
 
 (defn with-handler [f]
   (binding [*handler*
@@ -30,14 +30,14 @@
 (use-fixtures :each with-system-xt with-handler)
 
 (deftest not-found-test
-  (bootstrap!)
+  (init/bootstrap!)
   (let [req {:ring.request/method :get
              :ring.request/path "/hello"}
         invalid-req (assoc req :ring.request/path "/not-hello")]
     (is (= 404 (:ring.response/status (*handler* invalid-req))))))
 
 (deftest public-resource-test
-  (bootstrap!)
+  (init/bootstrap!)
   (book/setup-hello-world!)
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/hello")) ;; Assert the entity exists in the db
@@ -65,7 +65,7 @@
   (format "Basic %s" (String. (.encode (java.util.Base64/getEncoder) (.getBytes (format "%s:%s" user password))))))
 
 (deftest protected-resource-with-http-basic-auth-test
-  (bootstrap!)
+  (init/bootstrap!)
   (book/protected-resource-preliminaries!)
   (book/protection-spaces-preliminaries!)
 
@@ -104,7 +104,7 @@
       (is (nil? (get-in response [:ring.response/headers "www-authenticate"]))))))
 
 (deftest session-scope-test
-  (bootstrap!)
+  (init/bootstrap!)
   (book/protected-resource-preliminaries!)
 
   (book/session-scopes-preliminaries!)
@@ -127,7 +127,7 @@
              "https://site.test/login?return-to="))))))
 
 (deftest protected-resource-with-http-bearer-auth-test
-  (bootstrap!)
+  (init/bootstrap!)
   (book/protected-resource-preliminaries!)
   (book/protection-spaces-preliminaries!)
 
@@ -173,7 +173,7 @@
           (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"]))))))))
 
 (deftest user-directory-test
-  (bootstrap!)
+  (init/bootstrap!)
   (book/protected-resource-preliminaries!)
   (book/applications-preliminaries!)
 
@@ -234,9 +234,30 @@
                {"authorization" (format "Bearer %s" bearer-token)}}]
       (is (= 411 (:ring.response/status (*handler* req)))))))
 
+;; This is a test just to check that
+;; https://site.test/actions/put-immutable-protected-resource functions
+;; properly.
+(deftest put-protected-resource-test
+  (init/bootstrap!)
+  (book/protected-resource-preliminaries!)
+  (is (=
+       {:juxt.pass.alpha/subject "https://site.test/subjects/system"
+        :juxt.site.alpha/type "https://meta.juxt.site/site/action-log-entry"
+        :juxt.pass.alpha/action
+        "https://site.test/actions/put-immutable-protected-resource"
+        :juxt.pass.alpha/puts
+        ["https://site.test/protected-by-session-scope/document.html"]
+        :juxt.pass.alpha/deletes []}
+       (select-keys
+        (book/create-resource-protected-by-session-scope!)
+        [:juxt.pass.alpha/subject
+         :juxt.site.alpha/type
+         :juxt.pass.alpha/action
+         :juxt.pass.alpha/puts
+         :juxt.pass.alpha/deletes]))))
+
 (deftest login-test
-  (is (= 2 (+ 1 1)))
-  (bootstrap!)
+  (init/bootstrap!)
   (book/protected-resource-preliminaries!)
   (book/create-resource-protected-by-session-scope!)
   (book/session-scopes-preliminaries!)
@@ -330,47 +351,70 @@
             (is (= "<p>This is a protected message that is only visible when sending the correct session header.</p>"
                    (:ring.response/body response)))))))))
 
-;; This is a test just to check that
-;; https://site.test/actions/put-immutable-protected-resource functions
-;; properly.
-(deftest put-protected-resource-test
-  (bootstrap!)
-  (book/protected-resource-preliminaries!)
-  (is (=
-       {:juxt.pass.alpha/subject "https://site.test/subjects/system"
-        :juxt.site.alpha/type "https://meta.juxt.site/site/action-log-entry"
-        :juxt.pass.alpha/action
-        "https://site.test/actions/put-immutable-protected-resource"
-        :juxt.pass.alpha/puts
-        ["https://site.test/protected-by-session-scope/document.html"]
-        :juxt.pass.alpha/deletes []}
-       (select-keys
-        (book/create-resource-protected-by-session-scope!)
-        [:juxt.pass.alpha/subject
-         :juxt.site.alpha/type
-         :juxt.pass.alpha/action
-         :juxt.pass.alpha/puts
-         :juxt.pass.alpha/deletes]))))
+;;deftest acquire-access-token-test
 
-
-;; Issue an access token -- implicit flow
-((t/join-fixtures [with-system-xt])
+((t/join-fixtures [with-system-xt with-handler])
  (fn []
-   (bootstrap!)
+   (init/bootstrap!)
 
-   ;; We assume a protected resource exists, and that the application has either
-   ;; made a request to it and received a 401, or has been coded to understand
-   ;; that a bearer token is required.
-
-
-   (book/session-scopes-preliminaries!)
-
-   (book/applications-preliminaries!)
-   (book/setup-application!)
-
-   (repl/ls)
+   ;; Create an authorize server (this can be promoted later)
+   (book/protected-resource-preliminaries!)
+   (init/do-action
+    "https://site.test/subjects/system"
+    "https://site.test/actions/put-immutable-protected-resource"
+    {:xt/id "https://site.test/authorize"
+     :juxt.http.alpha/content-type "text/html;charset=utf-8"
+     :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"})
 
 
-   ;; Implicit grant (4.2)
+   ;; Create a user Alice, with her identity
+   (book/users-preliminaries!)
+   (book/put-user-alice!)
+   (book/create-action-put-basic-user-identity!)
+   (book/grant-permission-to-invoke-action-put-basic-user-identity!)
+   (book/put-basic-user-identity-alice!)
 
-   ))
+   ;; Log her in
+   (book/create-action-login!)
+   (book/grant-permission-to-invoke-action-login!)
+   (let [login-log-entry (authz/do-action
+                          (let [xt-node *xt-node*
+                                body (.getBytes
+                                      (codec/form-encode
+                                       ;; usernames are case-insensitive - testing this
+                                       {"username" "aliCe"
+                                        "password" "garden"}))]
+                            {::site/xt-node xt-node
+                             ::site/db (xt/db xt-node)
+                             ::pass/subject nil ; there is no subject at the point of login
+                             ::pass/action "https://site.test/actions/login"
+                             ::site/base-uri "https://site.test"
+                             ::site/received-representation
+                             {::http/content-type "application/x-www-form-urlencoded"
+                              ::http/body body}})
+
+                          )
+         match (some #(re-matches #"id=.*" %) (tree-seq login-log-entry))
+         ]
+     )
+
+
+
+
+   ;;(repl/ls)
+
+   ;; TODO: Establish a session for Alice
+   ;; (Perhaps we can do this by creating the login action and calling it directly?)
+
+   #_(:ring.response/status
+      (*handler*
+       {:ring.request/method :get
+        :ring.request/path "/authorize"
+        ;;:ring.request/query "return-to=/document.html"
+        }))
+
+
+   ;;   (repl/e "https://site.test/user-identities/alice/basic")
+
+   )
+ )
