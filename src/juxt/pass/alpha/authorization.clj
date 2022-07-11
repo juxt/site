@@ -355,6 +355,7 @@
 
 (defn do-action [{::site/keys [xt-node db base-uri] ::pass/keys [action] :as ctx}]
   (assert (:juxt.site.alpha/xt-node ctx) "xt-node must be present")
+  (assert (:juxt.site.alpha/db ctx) "db must be present")
   (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
   ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed
   ;; by an anonymous user.
