@@ -660,10 +660,14 @@
 
              (get site-args "itemForId")
              (let [item-key (keyword (get site-args "itemForId"))
+                   id-value (get argument-values "id")
+                   id-or-ids (if (string? id-value)
+                               id-value
+                               (set id-value))
                    query {:find ['e '_siteCreatedAt]
                           :where [['e type-k (field->type field)]
                                   ['e :_siteCreatedAt '_siteCreatedAt]
-                                  ['e item-key (get argument-values "id")]]}
+                                  ['e item-key id-or-ids]]}
 
                    query (to-xt-query (assoc opts :custom-xt-query query))
                    results (xt/q db query)
