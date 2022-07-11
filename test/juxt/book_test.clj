@@ -394,8 +394,9 @@
 
          cookies
          (as-> {} %
-           (authz/apply-request-context-operations %
-                                                   (-> login-log-entry ::pass/action-result ::site/apply-to-request-context-ops))
+           (authz/apply-request-context-operations
+            %
+            (-> login-log-entry ::pass/action-result ::site/apply-to-request-context-ops))
            (:ring.response/headers %)
            (keep (fn [[k v]] (when (= k "set-cookie") (next (re-matches #"([a-z]+?)=(.*?);.*" v)))) %)
            (map vec %)
@@ -431,9 +432,4 @@
          response-post-grant (*handler* req)]
 
      (is (not= 200 (:ring.response/status response-pre-grant)))
-     (is (= 200 (:ring.response/status response-post-grant)))
-
-     )
-
-   )
- )
+     (is (= 200 (:ring.response/status response-post-grant))))))
