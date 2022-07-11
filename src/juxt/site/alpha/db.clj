@@ -42,7 +42,8 @@
 
 (defmethod ig/init-key ::xt-node [_ xtdb-opts]
   (log/info "Starting XT node ...")
-
+  (log/info (System/getenv "MYSQL_USER"))
+  (log/info (System/getenv "MYSQL_PASSWORD"))
   (let [config (update-in xtdb-opts
                           [:xtdb/index-store :kv-store :checkpointer :store]
                           assoc :configurator (constantly s3-configurator))
