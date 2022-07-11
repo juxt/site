@@ -366,7 +366,8 @@
      :juxt.flip.alpha/quotation
      `(
        (site/with-fx-acc
-         [(juxt.site.alpha/set-status 302)]))
+         [(site/push-fx
+           (f/dip [(site/set-status 201)]))]))
      :juxt.pass.alpha/rules
      '[
        [(allowed? subject resource permission)
@@ -453,8 +454,6 @@
 
      response-post-grant
 
-     ;;(*handler* req)
-
-     ;;(repl/e "https://site.test/permissions/alice-can-access-authorization-server")
+     ;;(repl/e "https://site.test/authorize")
 
      )))

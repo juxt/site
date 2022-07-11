@@ -63,7 +63,9 @@
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
   [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose}]
 
-  (log/debugf "check-permissions: subject %s, resource: %s, purpose: %s, actions: %s, subject: %s" subject resource purpose actions
+  (assert (or (nil? subject) (string? subject)) "Subject expected to be an id, or null")
+
+  (log/debugf "check-permissions: subject %s, resource: %s, purpose: %s, actions: %s, whole subject: %s" subject resource purpose actions
               (xt/pull db '[*] subject))
 
   (log/debugf "Actions: %s" actions)
@@ -233,6 +235,8 @@
   (let [db (xt/db xt-ctx)
         tx (xt/indexing-tx xt-ctx)]
     (try
+      (assert (or (nil? subject) (string? subject)) "Subject to do-action* expected to be an id, or null")
+
       ;; Check that we /can/ call the action
       (let [check-permissions-result
             (check-permissions db #{action} ctx)
@@ -259,6 +263,8 @@
                 :else
                 (throw (ex-info "All actions must have some processing steps"
                                 {:action action-doc})))
+
+              _ (log/infof "FX are %s" (pr-str fx))
 
               ;; Validate
               _ (doseq [effect fx]
@@ -353,10 +359,11 @@
          ops)]
     res))
 
-(defn do-action [{::site/keys [xt-node db base-uri] ::pass/keys [action] :as ctx}]
+(defn do-action [{::site/keys [xt-node db base-uri] ::pass/keys [subject action] :as ctx}]
   (assert (:juxt.site.alpha/xt-node ctx) "xt-node must be present")
   (assert (:juxt.site.alpha/db ctx) "db must be present")
   (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
+  (assert (or (nil? subject) (string? subject)) "Subject to do-action expected to be an id, or null")
   ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed
   ;; by an anonymous user.
   (let [tx-fn (str base-uri "/_site/do-action")]
@@ -387,6 +394,7 @@
 
           (let [apply-to-request-context-ops (:juxt.site.alpha/apply-to-request-context-ops result)]
             (log/infof "result is %s" result)
+            (log/infof "apply-to-request-context-ops is %s" (pr-str apply-to-request-context-ops))
             (cond-> ctx
               result (assoc ::pass/action-result result)
 

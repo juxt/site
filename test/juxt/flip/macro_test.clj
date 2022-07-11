@@ -240,6 +240,15 @@
        {::http/content-type "application/edn"
         ::http/body (jsonista/write-value-as-bytes json-arg)}}))))
 
+(flip/eval-quotation
+ '[]
+ `(
+   (site/with-fx-acc
+     [(site/push-fx
+       (f/dip [(site/set-status 201)]))]
+
+     ))
+ {})
 
 
 ;; All done, ready for another test
