@@ -352,7 +352,6 @@
                    (:ring.response/body response)))))))))
 
 ;;deftest acquire-access-token-test
-
 ((t/join-fixtures [with-system-xt with-handler])
  (fn []
    (init/bootstrap!)
@@ -366,7 +365,6 @@
      :juxt.http.alpha/content-type "text/html;charset=utf-8"
      :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"})
 
-
    ;; Create a user Alice, with her identity
    (book/users-preliminaries!)
    (book/put-user-alice!)
@@ -377,44 +375,65 @@
    ;; Log her in
    (book/create-action-login!)
    (book/grant-permission-to-invoke-action-login!)
-   (let [login-log-entry (authz/do-action
-                          (let [xt-node *xt-node*
-                                body (.getBytes
-                                      (codec/form-encode
-                                       ;; usernames are case-insensitive - testing this
-                                       {"username" "aliCe"
-                                        "password" "garden"}))]
-                            {::site/xt-node xt-node
-                             ::site/db (xt/db xt-node)
-                             ::pass/subject nil ; there is no subject at the point of login
-                             ::pass/action "https://site.test/actions/login"
-                             ::site/base-uri "https://site.test"
-                             ::site/received-representation
-                             {::http/content-type "application/x-www-form-urlencoded"
-                              ::http/body body}})
+   (let [login-log-entry
+         (authz/do-action
+          (let [xt-node *xt-node*
+                body (.getBytes
+                      (codec/form-encode
+                       ;; usernames are case-insensitive - testing this
+                       {"username" "aliCe"
+                        "password" "garden"}))]
+            {::site/xt-node xt-node
+             ::site/db (xt/db xt-node)
+             ::pass/subject nil      ; there is no subject at the point of login
+             ::pass/action "https://site.test/actions/login"
+             ::site/base-uri "https://site.test"
+             ::site/received-representation
+             {::http/content-type "application/x-www-form-urlencoded"
+              ::http/body body}}))
 
-                          )
-         match (some #(re-matches #"id=.*" %) (tree-seq login-log-entry))
-         ]
+         cookies
+         (as-> {} %
+           (authz/apply-request-context-operations %
+                                                   (-> login-log-entry ::pass/action-result ::site/apply-to-request-context-ops))
+           (:ring.response/headers %)
+           (keep (fn [[k v]] (when (= k "set-cookie") (next (re-matches #"([a-z]+?)=(.*?);.*" v)))) %)
+           (map vec %)
+           (into {} %))
+
+         ;; GET on https://site.test/authorize
+         req {:ring.request/method :get
+              :ring.request/path "/authorize"
+              :ring.request/headers {"cookie" (apply str (interpose ";" (map (fn [[id v]] (format "%s=%s" id v)) cookies)))}
+              ;;:ring.request/query "return-to=/document.html"
+              }
+
+         response-pre-grant (*handler* req)
+
+         _ (authz/do-action
+            (let [xt-node *xt-node*]
+              {::site/xt-node xt-node
+               ::site/db (xt/db xt-node)
+               ::pass/subject "https://site.test/subjects/system"
+               ::pass/action "https://site.test/actions/grant-permission"
+               ::site/base-uri "https://site.test"
+               ::site/received-representation
+               {::http/content-type "application/edn"
+                ::http/body
+                (.getBytes
+                 (pr-str
+                  {:xt/id "https://site.test/permissions/alice-can-access-authorization-server"
+                   ::pass/action "https://site.test/actions/get-protected-resource"
+                   ::site/uri "https://site.test/authorize"
+                   ::pass/user "https://site.test/users/alice"
+                   ::pass/purpose nil}))}}))
+
+         response-post-grant (*handler* req)]
+
+     (is (not= 200 (:ring.response/status response-pre-grant)))
+     (is (= 200 (:ring.response/status response-post-grant)))
+
      )
-
-
-
-
-   ;;(repl/ls)
-
-   ;; TODO: Establish a session for Alice
-   ;; (Perhaps we can do this by creating the login action and calling it directly?)
-
-   #_(:ring.response/status
-      (*handler*
-       {:ring.request/method :get
-        :ring.request/path "/authorize"
-        ;;:ring.request/query "return-to=/document.html"
-        }))
-
-
-   ;;   (repl/e "https://site.test/user-identities/alice/basic")
 
    )
  )
