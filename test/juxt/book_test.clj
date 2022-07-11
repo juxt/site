@@ -356,14 +356,30 @@
  (fn []
    (init/bootstrap!)
 
-   ;; Create an authorize server (this can be promoted later)
+   ;; Create an authorization server (this can be promoted later)
    (book/protected-resource-preliminaries!)
-   (init/do-action
-    "https://site.test/subjects/system"
-    "https://site.test/actions/put-immutable-protected-resource"
-    {:xt/id "https://site.test/authorize"
-     :juxt.http.alpha/content-type "text/html;charset=utf-8"
-     :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"})
+
+   ;; Here's the authorize action
+   (init/put!
+    {:xt/id "https://site.test/actions/oauth/authorize"
+     :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
+     :juxt.flip.alpha/quotation
+     `(
+       (site/with-fx-acc
+         [(juxt.site.alpha/set-status 302)]))
+     :juxt.pass.alpha/rules
+     '[
+       [(allowed? subject resource permission)
+        [subject :juxt.pass.alpha/user-identity id]
+        [id :juxt.pass.alpha/user user]
+        [permission :juxt.pass.alpha/user user]]]})
+
+   (init/put!
+    {:juxt.http.alpha/content-type "text/html;charset=utf-8",
+     :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>",
+     :juxt.site.alpha/methods
+     {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/oauth/authorize"}}}
+     :xt/id "https://site.test/authorize"})
 
    ;; Create a user Alice, with her identity
    (book/users-preliminaries!)
@@ -423,13 +439,22 @@
                 ::http/body
                 (.getBytes
                  (pr-str
-                  {:xt/id "https://site.test/permissions/alice-can-access-authorization-server"
-                   ::pass/action "https://site.test/actions/get-protected-resource"
-                   ::site/uri "https://site.test/authorize"
+                  {:xt/id "https://site.test/permissions/alice-can-authorize"
+                   ::pass/action "https://site.test/actions/oauth/authorize"
                    ::pass/user "https://site.test/users/alice"
                    ::pass/purpose nil}))}}))
 
          response-post-grant (*handler* req)]
 
      (is (not= 200 (:ring.response/status response-pre-grant)))
-     (is (= 200 (:ring.response/status response-post-grant))))))
+     (is (= 200 (:ring.response/status response-post-grant)))
+
+     ;; Now, run the implicit grant
+
+     response-post-grant
+
+     ;;(*handler* req)
+
+     ;;(repl/e "https://site.test/permissions/alice-can-access-authorization-server")
+
+     )))

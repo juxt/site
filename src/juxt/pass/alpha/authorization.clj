@@ -410,6 +410,12 @@
         :as req}]
 
     (let [actions (get-in resource [::site/methods method ::pass/actions])
+
+          _ (doseq [action actions]
+              (when-not (xt/entity db action)
+                (throw (ex-info (format "No such action: %s" action) {::site/request-context req
+                                                                      :missing-action action}))))
+
           permitted-actions
           (check-permissions
            db
