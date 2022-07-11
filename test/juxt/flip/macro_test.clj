@@ -164,7 +164,7 @@
     '[]
     `[
       ;; TODO: Look how login now creates sessions and copy that
-      (flip/define make-access-token
+      #_(flip/define make-access-token
         [(f/of :xt/id) ::pass/application {} f/set-at
          (juxt.pass.alpha.core/as-hex-str
           (juxt.pass.alpha.core/random-bytes 16))
@@ -173,7 +173,7 @@
          "https://meta.juxt.site/pass/access-token" ::site/type f/rot f/set-at
          f/dup (f/of ::pass/token) "/access-tokens/" (f/env ::site/base-uri) f/str f/str :xt/id f/rot f/set-at])
 
-      (flip/define locate-application
+      #_(flip/define locate-application
         [(set-at
           (keep
            [(site/lookup
@@ -184,7 +184,7 @@
             juxt.flip.alpha.xtdb/q first first
             :application]))])
 
-      (flip/define assoc-access-token
+      #_(flip/define assoc-access-token
         [(set-at
           (keep
            [(of :application)
@@ -193,7 +193,7 @@
               ["No such client" {} flip/ex-info flip/throw])
             :access-token]))])
 
-      (flip/define create-response-params
+      #_(flip/define create-response-params
         [(set-at
           ;; TODO: This can be implemented in a better way (I think) with
           ;; assoc-intersect
@@ -203,7 +203,7 @@
                    #{"token_type" "access_token" "state"}
                    flip/in?]) :response-params]))])
 
-      (flip/define create-location-header
+      #_(flip/define create-location-header
         [(site/push-fx
           (keep [(site/set-header
                   (of :response-params)
@@ -211,13 +211,14 @@
                   "redirect-uri#" str
                   "location")]))])
 
-      (flip/define set-token-type
+      #_(flip/define set-token-type
         ["token_type" flip/rot flip/set-at])
 
 
       site/request-body-as-json
-      locate-application
-      assoc-access-token
+;;      locate-application
+;;      assoc-access-token
+
 ;;      (site/push-fx (keep [(of :access-token) xtdb.api/put]))
 ;;      (set-at (keep [(of :access-token) (of ::pass/token) "access_token"]))
 ;;      (set-token-type "bearer")

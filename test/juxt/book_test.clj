@@ -365,9 +365,11 @@
      :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
      :juxt.flip.alpha/quotation
      `(
+       ;; Do the implicit grant
        (site/with-fx-acc
          [(site/push-fx
            (f/dip [(site/set-status 201)]))]))
+
      :juxt.pass.alpha/rules
      '[
        [(allowed? subject resource permission)
