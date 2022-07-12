@@ -227,12 +227,15 @@
          lookup-application-from-database
          fail-if-no-application
 
-         ;; TODO: Get subject (it's in the environment, fail if missing subject)
+         ;; Get subject (it's in the environment, fail if missing subject)
          extract-subject
          assert-subject
 
-
          ;; TODO: Create access-token tied to subject, scope and application
+         ;; https://docs.factorcode.org/content/vocab-strings.html
+         (f/dip [{} (env ::site/base-uri) "/subjects/" f/str])
+
+
          ;; TODO: Construct fragment containing token, state and place in :fragment
          (f/set-at (f/dip ["foobar" :fragment]))
          redirect-to-application-redirect-uri
@@ -240,7 +243,7 @@
          ])]
 
     {::site/db (xt/db *xt-node*)
-     ::site/base-uri "https://example.org"
+     ::site/base-uri "https://site.test"
      ::pass/subject "https://site.test/subjects/alice"
      :ring.request/method :get
      :ring.request/query "response_type=token&client_id=local-terminal&state=abc123vcb"
@@ -380,3 +383,11 @@
        ::site/received-representation
        {::http/content-type "application/edn"
         ::http/body (.getBytes (pr-str edn-arg))}}))))
+
+
+
+(flip/eval-quotation
+    '[]
+    `["a" "b" f/str]
+
+    {})
