@@ -47,7 +47,7 @@
   (let [config (-> xtdb-opts
                    (update-in [:xtdb/index-store :kv-store :checkpointer :store]
                               assoc :configurator (constantly s3-configurator))
-                   (update-in [:xtdb.jdbc/connection-pool :db-spec :pasword]
+                   (update-in [:xtdb.jdbc/connection-pool :db-spec :password]
                               #(URLEncoder/encode % "UTF-8")))
         _       (log/info config)
         node (start-node config)]
