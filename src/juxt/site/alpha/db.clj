@@ -7,21 +7,20 @@
    [clojure.tools.logging :as log]
    [diehard.core :as dh])
   (:import
+   java.net.URLEncoder
    java.time.Duration
    software.amazon.awssdk.services.s3.S3AsyncClient
    software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient))
-
-
 
 (def s3-configurator
   (reify xtdb.s3.S3Configurator
     (makeClient [_this]
       (.. (S3AsyncClient/builder)
           (httpClientBuilder
-            (.. (NettyNioAsyncHttpClient/builder)
-                (connectionAcquisitionTimeout (Duration/ofSeconds 600))
-                (maxConcurrency (Integer. 100))
-                (maxPendingConnectionAcquires (Integer. 10000))))
+           (.. (NettyNioAsyncHttpClient/builder)
+               (connectionAcquisitionTimeout (Duration/ofSeconds 600))
+               (maxConcurrency (Integer. 100))
+               (maxPendingConnectionAcquires (Integer. 10000))))
           (build)))))
 
 (defn- start-node
@@ -40,13 +39,16 @@
        (log/error ex "Checkpoint restore failed"))}
     (xt/start-node config)))
 
+;; MySQL requires URL parts to be URL encoded.
+;; the lambda rotating passwords often  generates special characters.
+
 (defmethod ig/init-key ::xt-node [_ xtdb-opts]
   (log/info "Starting XT node ...")
-  (log/info (System/getenv "MYSQL_USER"))
-  (log/info (System/getenv "MYSQL_PASSWORD"))
-  (let [config (update-in xtdb-opts
-                          [:xtdb/index-store :kv-store :checkpointer :store]
-                          assoc :configurator (constantly s3-configurator))
+  (let [config (-> xtdb-opts
+                   (update-in [:xtdb/index-store :kv-store :checkpointer :store]
+                              assoc :configurator (constantly s3-configurator))
+                   (update-in [:xtdb.jdbc/connection-pool :db-spec :pasword]
+                              #(URLEncoder/encode % "UTF-8")))
         _       (log/info config)
         node (start-node config)]
     ;; we need to make sure the tx-ingester has caught up before
