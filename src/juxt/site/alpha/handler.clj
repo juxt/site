@@ -34,6 +34,7 @@
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]
+   [juxt.flip.alpha :as-alias flip]
    [juxt.reap.alpha.rfc7230 :as-alias rfc7230]
    [ring.util.codec :as codec])
   (:import (java.net URI)))
@@ -208,7 +209,7 @@
     (cond
       ;; It's rare but sometimes a GET will call an action. For example, the
       ;; Authorization Request (RFC 6749 Section 4.2.1).
-      permitted-action
+      (and permitted-action (::flip/quotation permitted-action))
       (try
         (authz/do-action
          (-> req

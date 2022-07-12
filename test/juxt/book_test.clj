@@ -36,34 +36,31 @@
         invalid-req (assoc req :ring.request/path "/not-hello")]
     (is (= 404 (:ring.response/status (*handler* invalid-req))))))
 
-;;ndeftest public-resource-test
+(deftest public-resource-test
+  (init/bootstrap!)
+  (book/setup-hello-world!)
 
-((t/join-fixtures [with-system-xt with-handler])
- (fn []
-   (init/bootstrap!)
-   (book/setup-hello-world!)
+  (is (xt/entity (xt/db *xt-node*) "https://site.test/hello")) ;; Assert the entity exists in the db
+  (is (not (xt/entity (xt/db *xt-node*) "https://site.test/not-hello"))) ;; Assert that out 404 entity is not in the db
 
-   (is (xt/entity (xt/db *xt-node*) "https://site.test/hello")) ;; Assert the entity exists in the db
-   (is (not (xt/entity (xt/db *xt-node*) "https://site.test/not-hello"))) ;; Assert that out 404 entity is not in the db
+  (let [req {:ring.request/method :get
+             :ring.request/path "/hello"}]
 
-   (let [req {:ring.request/method :get
-              :ring.request/path "/hello"}]
+    (testing "Can retrieve a public immutable resource"
+      (let [{:ring.response/keys [status body] :as response} (*handler* req)]
+        response
+        #_(is (= 200 status))
+        #_(is (= "Hello World!\r\n" body))))
 
-     (testing "Can retrieve a public immutable resource"
-       (let [{:ring.response/keys [status body] :as response} (*handler* req)]
-         response
-         #_(is (= 200 status))
-         #_(is (= "Hello World!\r\n" body))))
+    #_(testing "Receive 405 when method not allowed"
+        (let [invalid-req (assoc req :ring.request/method :put)
+              {:ring.response/keys [status]} (*handler* invalid-req)]
+          (is (= 405 status))))
 
-     #_(testing "Receive 405 when method not allowed"
-       (let [invalid-req (assoc req :ring.request/method :put)
-             {:ring.response/keys [status]} (*handler* invalid-req)]
-         (is (= 405 status))))
-
-     #_(testing "Receive 404 when resource does not exist"
-       (let [invalid-req (assoc req :ring.request/path "/not-hello")
-             {:ring.response/keys [status]} (*handler* invalid-req)]
-         (is (= 404 status))))))
+    #_(testing "Receive 404 when resource does not exist"
+        (let [invalid-req (assoc req :ring.request/path "/not-hello")
+              {:ring.response/keys [status]} (*handler* invalid-req)]
+          (is (= 404 status)))))
  )
 
 
