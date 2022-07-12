@@ -160,10 +160,95 @@
 
    ;; Implicit grant (4.2)
 
+   ;; (Assume Alice is authenticated)
+   ;; Alice sends a request to
+
+   ;; in: /authorize?response_type=token&client_id=local-terminal&state=joh123&redirect_uri=https://my.tv/callback
+   ;; out: Return 302 with Location header set to https://my.tv/callback#access_token=bobtail123&token_type=bearer&state=joh123
    (flip/eval-quotation
     '[]
     `[
-      ;; TODO: Look how login now creates sessions and copy that
+      (site/with-fx-acc
+        [
+         ;; Extract query string from environment, decode it and store it at
+         ;; keyword :query
+         (f/define extract-and-decode-query-string
+           [(f/set-at
+             (f/dip
+              [:ring.request/query
+               f/env
+               f/form-decode
+               :query]))])
+
+         (f/define lookup-application-from-database
+           [(f/set-at
+             (f/keep
+              [(of :query)
+               (of "client_id")
+               (juxt.flip.alpha.xtdb/q
+                ~'{:find [(pull e [*])]
+                   :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                           [e ::pass/client-id client-id]]
+                   :in [client-id]})
+               f/first
+               f/first
+               :application]))])
+
+         (f/define redirect-to-application-redirect-uri
+           [(site/push-fx (f/dip [(site/set-status 302)]))
+            (site/push-fx
+             (f/keep
+              [dup (of :application) (of ::pass/redirect-uri)
+               "#" swap str
+               swap (of :fragment)
+               (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
+               swap str
+               (site/set-header "location" swap)]))])
+
+         (f/define fail-if-no-application
+           [(f/keep
+             [
+              ;; Grab the client-id for error reporting
+              dup (of :query) (of "client_id") swap
+              (of :application)
+              ;; If no application entry, drop the client_id (to clean up the
+              ;; stack)
+              (f/if [f/drop]
+                ;; else throw the error
+                [:client-id {} f/set-at (f/throw (f/ex-info "No such app" f/swap))])])])
+
+         (f/define extract-subject
+           [(f/set-at (f/dip [(env ::pass/subject) :subject]))])
+
+         (f/define assert-subject
+           [(f/keep [(of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
+
+         extract-and-decode-query-string
+         lookup-application-from-database
+         fail-if-no-application
+
+         ;; TODO: Get subject (it's in the environment, fail if missing subject)
+         extract-subject
+         assert-subject
+
+
+         ;; TODO: Create access-token tied to subject, scope and application
+         ;; TODO: Construct fragment containing token, state and place in :fragment
+         (f/set-at (f/dip ["foobar" :fragment]))
+         redirect-to-application-redirect-uri
+
+         ])]
+
+    {::site/db (xt/db *xt-node*)
+     ::site/base-uri "https://example.org"
+     ::pass/subject "https://site.test/subjects/alice"
+     :ring.request/method :get
+     :ring.request/query "response_type=token&client_id=local-terminal&state=abc123vcb"
+
+     })))
+
+
+;; TODO: Look how login now creates sessions and copy that
       #_(flip/define make-access-token
           [(f/of :xt/id) ::pass/application {} f/set-at
            (juxt.pass.alpha.core/as-hex-str
@@ -189,6 +274,7 @@
             (keep
              [(of :application)
               ;; If the :application entry exists, add an access-token
+
               (if* [make-access-token]
                 ["No such client" {} flip/ex-info flip/throw])
               :access-token]))])
@@ -214,33 +300,7 @@
       #_(flip/define set-token-type
           ["token_type" flip/rot flip/set-at])
 
-
-      (site/with-fx-acc
-        [
-
-         ;; Decode query string
-         (set-at
-          (f/dip
-           [(f/form-decode
-             (f/env :ring.request/query))
-            :query]))
-
-         ;; Find application
-         (f/keep
-          [(of :query) (of "client_id") dup
-           (juxt.flip.alpha.xtdb/q
-              ~'{:find [(pull e [*])]
-                 :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
-                         [e ::pass/client-id client-id]]
-                 :in [client-id]})
-           f/first
-           ;; TODO: Fill out ex-info
-           (f/unless* [(f/throw (f/ex-info "No such app" {}))])
-           :application])])
-
-
-
-      ;;locate-application
+;;locate-application
       ;;      assoc-access-token
 
       ;;      (site/push-fx (keep [(of :access-token) xtdb.api/put]))
@@ -249,18 +309,6 @@
       ;;      (set-email )
       ;;      create-response-params
       ;;      create-location-header
-      ]
-
-    ;; implicit
-    ;;    /authorize?response_type=token&client_id=blah&state=my-state
-    ;;    cwi-app/callback#access_token=asfualskefhalksefhalskeh&token_type=bearer&state=my-state
-
-    {::site/db (xt/db *xt-node*)
-     ::site/base-uri "https://example.org"
-     ::pass/subject "https://site.test/subjects/alice"
-     :ring.request/query "response_type=token&client_id=local-terminalh&state=abc123vcb"
-
-     })))
 
 
 ;; All done, ready for another test

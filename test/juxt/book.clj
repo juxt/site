@@ -982,8 +982,7 @@ Password: <input name=password type=password>
             commit-subject])
 
          (f/define make-session
-           [
-            (f/set-at
+           [(f/set-at
              (f/dip
               [f/<sorted-map>
                (f/set-at
@@ -1174,7 +1173,9 @@ Password: <input name=password type=password>
            [(site/push-fx
              (f/dip
               [site/request-body-as-edn
-               (site/validate
+               ;; This assumes EDN input, where subject and application are
+               ;; given. This is wrong.
+             (site/validate
                 [:map
                  [:juxt.pass.alpha/subject [:re "https://example.org/subjects/(.+)"]]
                  [:juxt.pass.alpha/application [:re "https://example.org/applications/(.+)"]]
