@@ -44,12 +44,14 @@
 
 (defmethod ig/init-key ::xt-node [_ xtdb-opts]
   (log/info "Starting XT node ...")
-  (let [config (-> xtdb-opts
-                   (update-in [:xtdb/index-store :kv-store :checkpointer :store]
-                              assoc :configurator (constantly s3-configurator))
-                   (update-in [:xtdb.jdbc/connection-pool :db-spec :password]
-                              #(URLEncoder/encode % "UTF-8")))
-        _       (log/info config)
+  (let [config (if (:xtdb.jdbc/connection-pool xtdb-opts)
+                 (-> xtdb-opts
+                     (update-in [:xtdb/index-store :kv-store :checkpointer :store]
+                                assoc :configurator (constantly s3-configurator))
+                     (update-in [:xtdb.jdbc/connection-pool :db-spec :password]
+                                #(URLEncoder/encode % "UTF-8")))
+                 xtdb-opts)
+        _ (log/info config)
         node (start-node config)]
     ;; we need to make sure the tx-ingester has caught up before
     ;; declaring the node up

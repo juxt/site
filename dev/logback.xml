@@ -6,9 +6,9 @@
    <!-- Console (STDOUT) output. -->
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
 
-    <!-- Only print log messages at level WARN or higher. -->
+    <!-- Only print log messages at level INFO or higher. -->
     <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-      <level>WARN</level>
+      <level>INFO</level>
     </filter>
 
     <!-- Default encoder is ch.qos.logback.classic.encoder.PatternLayoutEncoder -->

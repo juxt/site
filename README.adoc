@@ -1,280 +1,84 @@
-= Site
+= Knowledge Graph (AKA Site)
 
 image:https://circleci.com/gh/juxt/site/tree/master.svg?style=svg["CircleCI", link="https://circleci.com/gh/juxt/site/tree/master"]
 
-Site is a project from https://juxt.pro[JUXT] to build a Resource Server out of
-our open-source https://xtdb.com[XTDB] database.
+This repository contains the codebase for the backend Clojure application known as Site, 'The Knowledge Graph' or less formally 'KG'.
 
-Site supports web content, and https://www.openapis.org/[OpenAPI]. You can use
-Site as a versioned
-https://en.wikipedia.org/wiki/Content_management_system[Content Management
-System].
+This codebase is forked from a JUXT project called Site (all JUXT projects are 4 letter words for some reason) but contains some Thirdbridge specific changes (such as authn setup) and should be thought of as a Thirdbridge codebase that happened to begin life as an opensource project.
 
-An official (work in progress) documentation website can be found https://juxtsite.netlify.app/[here].
+The general idea behind Site is that APIs (queries/mutations/types etc) should be defined as a schema and not defined in code.
+Currently supported schema formats are Graphql and OpenAPI, but almost all Thirdbridge projects will use GraphQL so this document will focus on that.
 
-== What is Site?
+This schema should follow the GraphQL specification (for compatibility with other tooling) and Site should be able to transform GraphQL queries and mutations into backend (SQL/Datalog) queries, either implicitly (for common CRUD use cases) or using an explicitly defined function (written in Clojure, or deployed in a lambda).
 
-Site is a Resource Server, built on the XTDB database.
+Detailed documentation on how to install and use Site can be found https://juxtsite.netlify.app/[here], but the section below will be more tailored to Thirdbridge (assumes macOS).
 
-You can put things into Site with (HTTP) PUT requests. When you do this, Site
-will put (the representation of) your thing (document, image, video, data…) into
-the database. You can get these later with a (HTTP) GET request with the same
-URI. In this way, Site behaves like a web server, with an immutable bitemporal
-content store.
+== Installation
 
-=== APIs
-
-If you PUT a JSON document with a `Content-Type` of
-`application/vnd.oai.openapi+json;version=3.0.2`, Site will treat this as an
-https://www.openapis.org/[OpenAPI] API definition, and serve that API for
-you. This OpenAPI API definition will contain the API endpoints, and provide
-schemas for the data transferred by the API. This tells the server how to
-validate data coming in to the API, and how to construct data on the way out.
-
-APIs served from Site are good web citizens. They implement HTTP method
-semantics properly, with support for content negotiation, conditional requests,
-range requests and authentication.
-
-APIs are also able to benefit from Site's authorization module, Pass, providing
-Policy-Based Access Control, loosely based on XACML.
-
-== Test drive
-
-=== Requirements
+=== Prerequisites
 
 Before you start, you'll need to have the following installed:
 
-* Java 9+ (Site is not compatible with Java 8 and below!)
-* https://clojure.org/guides/getting_started[Clojure] and
-* https://github.com/babashka/babashka[Babashka] installed on your system.
+* Homebrew (you probably already have this, type `brew` to see if it's installed)
+- `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
+* Java (using SDKMan for easy updates/version switches):
+``` bash
+curl -s "https://get.sdkman.io" | bash
+source "$HOME/.sdkman/bin/sdkman-init.sh"
+sdk install java
+sdk current # should be java 17, though any version of Java after 9 will work with Site
+```
+* Clojure
+- `brew install clojure/tools/clojure`
+* https://github.com/babashka/babashka[Babashka]
+- `brew install borkdude/brew/babashka`
+* https://github.com/eradman/entr[entr]
+- `brew install entr`
+* https://github.com/hanslub42/rlwrap[rlwrap]
+- `brew install rlwrap`
 
 === Clone this repo
 
 ----
-$ git clone https://github.com/juxt/site
+git clone https://github.com/third-bridge/site
 ----
-
-====  macOS (>= 10.15)
-It is recommended to install `openssl` and `openjdk` and make sure `JAVA_HOME`
-is set correctly. At the time of writing brew installs openjdk 17.02 and openssl
-3.0.1:
-----
-$ brew install openssl
-$ echo export JAVA_HOME=/usr/local/Cellar/openjdk/17.0.2/libexec/openjdk.jdk/Contents/Home >> ~/.zshrc
-$ exec zsh -l
-----
-
-Check that Java can find `libcrypto`:
-----
-$ cd site # (if needed)
-$ clojure -A:dev -M:test -m kaocha.runner --focus juxt.site.authz-test
-----
-
-The test should run just fine. If instead $JAVA_HOME/bin/java aborts (signal 6)
-with the message:
-----
-$ ...
-$ ... WARNING: ${JAVA_HOME}/bin/java is loading libcrypto in an unsafe way
-----
-
-you need to make libcrypto visible to $JAVA_HOME/bin/java by running e.g.:
-----
-$ ln -s  /usr/local/Cellar/openssl@3/3.0.1/lib/libcrypto.dylib $JAVA_HOME/lib
-----
-
-=== Configure
-
-There's a sample configuration in `etc` you should copy to `$HOME/.config/site/config.edn`.
-
-----
-$ mkdir -p $HOME/.config/site
-$ cp site/etc/config.edn $HOME/.config/site/config.edn
-----
-
-=== Configure a password
-
-[TIP]
---
-If you have `pass` installed, this is a good time to configure a password for
-your superuser. We'll assume the superuser will be named `admin`, but feel free
-to choose your own username here.
-
-----
-$ pass generate -n site/local/admin
-----
---
 
 === Start the server
 
-Start the Site server:
-
-----
-$ site/bin/site-server
-----
-
-NOTE: Alternatively, if you're familiar with Clojure development, you can start
-the server via the `deps.edn` file and simply 'jack-in' with your editor or IDE
-as normal.
-
-=== Start multiple instances of the server
-
-If you require multiple Site servers to coexist on the same machine, you can start site passing a different configuration file as follows:
-
-----
-$ SITE_CONFIG=/absolute/path/custom-site-config.edn site/bin/site-server
-----
-
-In this case please be sure to change the configuration so ports are different and XTDB files are stored in a separate folder than the ones specified in the example configuration file. You'll also need to specify Site host:port when using site commands, for example:
-
-----
-$ SITE_BASE_URI=http://localhost:5509 site/bin/site get-token -u admin
-----
-
-=== Start the server from the provided Docker image
-
-Optionally, you can also get Site up and running using the provided Docker image. You need Docker installed in your system, then execute the following from the command line (`sudo` might not be necessary depending on your installation):
-
-```
-sudo docker build -t juxt/site:latest .
-sudo docker run -p 2021:2021 -p 50505:50505 -d juxt/site:latest
+```bash
+cd site
+./bin/site-dev
 ```
 
-=== The REPL
+The first time you run this Clojure will download some dependencies which could take a while depending on your internet speed.
+If everything goes as planned, you should soon see 'System started and ready' in the terminal.
 
-If you've run Site via your development environment and 'jacked-in' you'll
-already have a REPL. Proceed to the next step.
+Leave this process running, and check back if you get any 500 errors, this is where you will find logs related to Site (or XTDB).
 
-If you're running Site with `site/bin/site-server`, you'll need to connect a
-terminal to Site to access the REPL. You can do this via port 50505, which is a
-socket REPL that Site starts by default.
+=== Connecting to the REPL
 
-How you connect to this port is up to you. One way is via `ncat`, but you can replace `ncat` with `telnet`, or `netcat`, depending on what's available for your system.
+A Clojure REPL is an interactive console into the running Clojure process, much like the console tab in a browsers developer tools.
 
-[NOTE]
---
-Arch users can install `ncat` by installing the `nmap` package:
+To connect, we will use a socket connection with netcat, though you if you are familiar with Clojure tooling, you may wish to use an nREPL through your IDE/editor.
 
-----
-$ sudo pacman -Sy nmap
-----
---
+Run this in a terminal (a different terminal to the site server you ran above, make sure that is still running or the following command will not work)
 
-----
-$ ncat localhost 50505
-----
+`rlwrap nc localhost 50505`
 
-[TIP]
---
-Prefix the command with `rlwrap` if you have it installed.
+You should now be 'logged in' to the Site repl, you can now run any Clojure code such as `(inc 1)`.
 
-----
-$ rlwrap ncat localhost 50505
-----
---
+Site also has several helper functions already available for use on first startup, you can see the code for these in src/juxt/site/alpha/repl.clj, but for this guide we will ignore the details and just run the one command that we need to set everything up.
 
-=== Bootstrap
+`(init!)`
 
-Bootstrap the new system by adding the minimum resources that are required to allow remote access.
+This command will 'install' an admin REST and GraphQL API, a console frontend, and some other things Site needs to function.
 
-----
-Site by JUXT. Copyright (c) 2021, JUXT LTD.
-Type :repl/quit to exit
+To check if it worked, visit http://localhost:5509/_site/insite/app/apis[this page].
 
-[ ]  Site API not installed.  Enter (put-site-api!) to fix this.
-[ ]  Authentication resources not installed.  Enter (put-auth-resources!) to fix this.
-[ ]  Role of superuser not yet created. Enter (put-superuser-role!) to fix this.
-[ ]  No superusers exist. Enter (put-superuser! <username> <fullname>)
-     or (put-superuser! <username> <fullname> <password>) to fix this.
-site>
-----
+You will see a very basic looking login form, this is a placeholder to mock out Thirdbridges authentication layer, enter "admin" for both the username and password to log in. You can add more users if you need to using the `put-superuser!` function available from the REPL.
 
-Install the Site API:
+You should see the two admin APIs, you can click the links to see a Swagger or GraphiqL playground containing documentation and interactive queries for those APIs.
 
-----
-site> (put-site-api!)
-----
+=== Next Steps
 
-Install the authentication rules:
-
-----
-site> (put-auth-resources!)
-----
-
-Install the superuser role:
-
-----
-site> (put-superuser-role!)
-----
-
-Finally, create a superuser. If you have `pass` installed, this will fetch the password directly:
-
-----
-site> (put-superuser! "admin" "Administrator")
-----
-
-NOTE: We recommend that you generate a password with `pass`.
-
-If you don't have `pass` installed, you can add a password as a final argument to `put-superuser!`.
-
-----
-site> (put-superuser! "admin" "Administrator" "admin")
-----
-
-Replace `"admin"`, `"Administrator"` and `"admin"` with your own username, full name and password respectively.
-
-Quit the REPL, for example, with `Ctrl-C` or by typing `:repl/quit`.
-
-=== Run the site tool
-
-The site tool is a command-line utility that allows you to remotely administer site.
-
-If you're on MacOS, you will need to install the gnu version of `readlink`. You can do so with brew:
-```
-brew install coreutils
-ln -s /usr/local/bin/greadlink /usr/local/bin/readlink
-```
-
-We must first get a token that we can use for API access. This process authenticates to the site server using your password.
-
-.Here, replace `admin` with your username (or let it default to your OS username)
-----
-$ site/bin/site get-token -u admin
-----
-
-Now we can use the site tool for remote administration. Try the following:
-
-----
-$ site/bin/site list-users
-----
-
-== Configure the expiry time for tokens
-
-By default, tokens last for an hour. That can sometimes mean they expire during
-work sessions. You can set the expiry time of new tokens via the REPL.
-
-----
-(put! (assoc (e "http://localhost:2021/_site/token")  ::pass/expires-in (* 24 3600)))
-----
-
-== License
-
-The MIT License (MIT)
-
-Copyright © 2020-2021 JUXT LTD.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+And that's it! you now have a fully functioning Knowledge Graph running locally. You can now run a next-gen frontend project like the https://github.com/third-bridge/specialist-extranet-ng[Specialist Extranet]

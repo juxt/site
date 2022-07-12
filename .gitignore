@@ -7,6 +7,7 @@ opt/graphiql/target
 .lsp
 .vscode
 /import
+/target
 *.dylib
 .clj-kondo
 **/generated/*

@@ -1,0 +1,44 @@
+{
+ ;; Used by bin/site to know where to send HTTP API requests.
+ :juxt.site.alpha/base-uri "http://localhost:5509"
+
+ ;; If specified, this is used to source passwords from Unix pass.
+ :juxt.site.alpha.unix-pass/password-prefix "site/local/"
+
+
+ :ig/system
+ {:juxt.site.alpha.db/xt-node
+  {
+   :xtdb.http-server/server {:port 5511}
+   :xtdb.rocksdb/block-cache {:xtdb/module xtdb.rocksdb/->lru-block-cache
+                              :cache-size 1600000000}
+   :xtdb/tx-log
+   {:kv-store {:xtdb/module xtdb.rocksdb/->kv-store
+               :db-dir "db/txes"}}
+
+   :xtdb/document-store
+   {:kv-store {:xtdb/module xtdb.rocksdb/->kv-store
+               :db-dir "db/docs"}}
+
+   :xtdb/index-store
+   {:kv-store {:xtdb/module xtdb.rocksdb/->kv-store
+               :db-dir "db/idxs"}}}
+
+  :juxt.site.alpha.server/server
+  {:juxt.site.alpha/xt-node #ig/ref :juxt.site.alpha.db/xt-node
+   :juxt.site.alpha/port 5509
+
+   ;; Really, this is the canoncial-uri prefix where /_site exists.
+   :juxt.site.alpha/base-uri #ref [:juxt.site.alpha/base-uri]
+
+   ;; If specified, inbound URLs will be uri-prefix + path. If not
+   ;; specified, will default to concatenating the request's proto (or
+   ;; X-Forwarded-Proto header) and Host (or X-Forwarded-Host) request header.
+   :juxt.site.alpha/uri-prefix "http://localhost:5509"
+
+   :juxt.site.alpha/dynamic? #profile {:dev true :prod false}}
+
+  :juxt.site.alpha.nrepl/server
+  {:juxt.site.alpha/port 5510}
+}
+}

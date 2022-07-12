@@ -38,11 +38,12 @@
     (log/debug "Loading configuration from" (.getAbsolutePath config-file))
     (aero/read-config config-file {:profile profile})))
 
+(def config-map (config))
+
 (defn system-config
   "Construct a new system, configured with the given profile"
   []
-  (let [config (config)
-        system-config (:ig/system config)]
+  (let [system-config (:ig/system config-map)]
     (load-namespaces system-config)
     (ig/prep system-config)))
 

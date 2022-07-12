@@ -21,13 +21,14 @@
    [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.init :as init]
    [clojure.string :as str]
-   [juxt.grab.alpha.parser :as parser])
-  (:import (java.util Date)))
+   [juxt.grab.alpha.parser :as parser]
+   [clojure.tools.logging :as log]
 
-(alias 'dave (create-ns 'juxt.dave.alpha))
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
+   [juxt.dave.alpha :as-alias dave]
+   [juxt.http.alpha :as-alias http]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.site.alpha :as-alias site])
+  (:import (java.util Date)))
 
 (defn base64-reader [form]
   {:pre [(string? form)]}
@@ -214,22 +215,22 @@
            (str/replace pat (fn [x] (get mapping x)))))
        ent))))
 
-(let [url-mapping {"{{KG_URL_BASE}}"
-                   (or (System/getenv "KG_URL_BASE") "http://localhost:5509")}
-      set-kg-url-base (apply-uri-mappings url-mapping)]
-  (defn import-resources
-    ([] (import-resources "import/resources.edn"))
-    ([filename]
-     (let [node (xt-node)
-           in (java.io.PushbackReader. (io/reader (io/input-stream (io/file filename))))]
-       (doseq [rec (resources-from-stream in)]
-         (when (:xt/id rec)
-           (let [rec (set-kg-url-base rec)]
-             (if (xt/entity (xt/db node) (:xt/id rec))
-               (println "Skipping existing resource: " (:xt/id rec))
-               (do
-                 (submit-and-wait-tx node [[:xtdb.api/put rec]])
-                 (println "Imported resource: " (:xt/id rec)))))))))))
+(defn import-resources
+  ([] (import-resources {:filename "import/resources.edn"
+                         :uri-mapping
+                         {"{{KG_URL_BASE}}"
+                          (or (System/getenv "KG_URL_BASE")
+                              "http://localhost:5509")}}))
+  ([{:keys [filename uri-mapping]}]
+   (let [node (xt-node)
+         in (java.io.PushbackReader. (io/reader (io/input-stream (io/file filename))))]
+     (doseq [rec ((apply-uri-mappings uri-mapping) (resources-from-stream in))
+             :when rec]
+       (if (e (:xt/id rec))
+         (println "Skipping existing resource: " (:xt/id rec))
+         (do
+           (submit-and-wait-tx node [[:xtdb.api/put rec]])
+           (println "Imported resource: " (:xt/id rec))))))))
 
 
 
@@ -469,18 +470,6 @@
   []
   (init/put-graphql-schema-endpoint! (xt-node) (config)))
 
-(defn init!
-  [username password]
-  (let [xt-node (xt-node)
-        config (config)]
-    (put-site-api!)
-    (put-auth-resources!)
-    (put-superuser-role!)
-    (put-superuser! username "Administrator" password)
-    (init/put-graphql-operations! xt-node config)
-    (init/put-graphql-schema-endpoint! xt-node config)
-    (init/put-request-template! xt-node config)))
-
 (defn allow-public-access-to-public-resources! []
   (let [config (config)
         xt-node (xt-node)]
@@ -545,3 +534,42 @@
          :ring.response/body
          (json/write-value-as-string results))
         (update :ring.response/headers assoc "content-type" "application/json"))))
+
+(def site-endpoint (::site/base-uri main/config-map))
+(def site-seed-zip "dev/seeds.edn.zip" )
+
+(defn is-site-initialized?
+  "Returns true if insite console page is in the DB"
+  []
+  (log/info "Checking if site is ready")
+  (some? (e (str site-endpoint "/_site/insite/index.html"))))
+
+(defn ensure-init!
+  "Initialize Site by loading resources such as insite console
+  available in the seed folder. If the schema is already loaded and
+  available it assumes Site is already initialized and skip seeding."
+  []
+  (if (is-site-initialized?)
+    (println "### Site already initialised, skipping seeding")
+    (let [output "target/seeds.edn"]
+      (println "### Site missing console, running seeding process")
+      (sh/sh "mkdir" "-p" "target") ; make sure target exists
+      (with-open [zinput (-> site-seed-zip io/input-stream java.util.zip.ZipInputStream.)]
+        (.getNextEntry zinput)
+        (io/copy zinput (io/file output)))
+      (import-resources {:filename output
+                         :uri-mapping {"http://localhost:2021" site-endpoint}}))))
+
+(defn init!
+  ([] (init! "admin" "admin"))
+  ([username password]
+   (let [xt-node (xt-node)
+         config (config)]
+     (ensure-init!)
+     (put-site-api!)
+     (put-auth-resources!)
+     (put-superuser-role!)
+     (put-superuser! username "Administrator" password)
+     (init/put-graphql-operations! xt-node config)
+     (init/put-graphql-schema-endpoint! xt-node config)
+     (init/put-request-template! xt-node config))))

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+echo "Site by JUXT. Copyright (c) 2022, JUXT LTD."
+
+cd $(dirname $0)/..;
+clojure \
+  -J-Djava.awt.headless=true \
+  -J-XX:-OmitStackTraceInFastThrow \
+  -J-Dclojure.server.site="{:port,50505,:accept,juxt.site.alpha.repl-server/repl,:address,\"localhost\"}" \
+  -J-Dlogback.configurationFile="dev/logback.xml" \
+  -J-Dsite.config="dev/config.edn" \
+  -J-Xms256m \
+  -J-Xmx2400m \
+  -Mprod \
+  -m juxt.site.alpha.main
