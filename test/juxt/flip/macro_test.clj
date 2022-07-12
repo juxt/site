@@ -165,91 +165,102 @@
     `[
       ;; TODO: Look how login now creates sessions and copy that
       #_(flip/define make-access-token
-        [(f/of :xt/id) ::pass/application {} f/set-at
-         (juxt.pass.alpha.core/as-hex-str
-          (juxt.pass.alpha.core/random-bytes 16))
-         ::pass/token f/rot f/set-at
-         (f/env ::pass/subject) ::pass/subject f/rot f/set-at
-         "https://meta.juxt.site/pass/access-token" ::site/type f/rot f/set-at
-         f/dup (f/of ::pass/token) "/access-tokens/" (f/env ::site/base-uri) f/str f/str :xt/id f/rot f/set-at])
+          [(f/of :xt/id) ::pass/application {} f/set-at
+           (juxt.pass.alpha.core/as-hex-str
+            (juxt.pass.alpha.core/random-bytes 16))
+           ::pass/token f/rot f/set-at
+           (f/env ::pass/subject) ::pass/subject f/rot f/set-at
+           "https://meta.juxt.site/pass/access-token" ::site/type f/rot f/set-at
+           f/dup (f/of ::pass/token) "/access-tokens/" (f/env ::site/base-uri) f/str f/str :xt/id f/rot f/set-at])
 
       #_(flip/define locate-application
-        [(set-at
-          (keep
-           [(site/lookup
-             (of "client_id")
-             "https://meta.juxt.site/pass/application"
-             ::pass/client-id
-             rot)
-            juxt.flip.alpha.xtdb/q first first
-            :application]))])
+          [(set-at
+            (keep
+             [(site/lookup
+               (of "client_id")
+               "https://meta.juxt.site/pass/application"
+               ::pass/client-id
+               rot)
+              juxt.flip.alpha.xtdb/q first first
+              :application]))])
 
       #_(flip/define assoc-access-token
-        [(set-at
-          (keep
-           [(of :application)
-            ;; If the :application entry exists, add an access-token
-            (if* [make-access-token]
-              ["No such client" {} flip/ex-info flip/throw])
-            :access-token]))])
+          [(set-at
+            (keep
+             [(of :application)
+              ;; If the :application entry exists, add an access-token
+              (if* [make-access-token]
+                ["No such client" {} flip/ex-info flip/throw])
+              :access-token]))])
 
       #_(flip/define create-response-params
-        [(set-at
-          ;; TODO: This can be implemented in a better way (I think) with
-          ;; assoc-intersect
-          ;; https://docs.factorcode.org/content/word-assoc-intersect%2Cassocs.html
-          (keep [(flip/assoc-filter
-                  [flip/drop
-                   #{"token_type" "access_token" "state"}
-                   flip/in?]) :response-params]))])
+          [(set-at
+            ;; TODO: This can be implemented in a better way (I think) with
+            ;; assoc-intersect
+            ;; https://docs.factorcode.org/content/word-assoc-intersect%2Cassocs.html
+            (keep [(flip/assoc-filter
+                    [flip/drop
+                     #{"token_type" "access_token" "state"}
+                     flip/in?]) :response-params]))])
 
       #_(flip/define create-location-header
-        [(site/push-fx
-          (keep [(site/set-header
-                  (of :response-params)
-                  flip/form-encode
-                  "redirect-uri#" str
-                  "location")]))])
+          [(site/push-fx
+            (keep [(site/set-header
+                    (of :response-params)
+                    flip/form-encode
+                    "redirect-uri#" str
+                    "location")]))])
 
       #_(flip/define set-token-type
-        ["token_type" flip/rot flip/set-at])
+          ["token_type" flip/rot flip/set-at])
 
 
-      site/request-body-as-json
-;;      locate-application
-;;      assoc-access-token
+      (site/with-fx-acc
+        [
 
-;;      (site/push-fx (keep [(of :access-token) xtdb.api/put]))
-;;      (set-at (keep [(of :access-token) (of ::pass/token) "access_token"]))
-;;      (set-token-type "bearer")
-;;      (set-email )
-;;      create-response-params
-;;      create-location-header
+         ;; Decode query string
+         (set-at
+          (f/dip
+           [(f/form-decode
+             (f/env :ring.request/query))
+            :query]))
+
+         ;; Find application
+         (f/keep
+          [(of :query) (of "client_id") dup
+           (juxt.flip.alpha.xtdb/q
+              ~'{:find [(pull e [*])]
+                 :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                         [e ::pass/client-id client-id]]
+                 :in [client-id]})
+           f/first
+           ;; TODO: Fill out ex-info
+           (f/unless* [(f/throw (f/ex-info "No such app" {}))])
+           :application])])
+
+
+
+      ;;locate-application
+      ;;      assoc-access-token
+
+      ;;      (site/push-fx (keep [(of :access-token) xtdb.api/put]))
+      ;;      (set-at (keep [(of :access-token) (of ::pass/token) "access_token"]))
+      ;;      (set-token-type "bearer")
+      ;;      (set-email )
+      ;;      create-response-params
+      ;;      create-location-header
       ]
 
     ;; implicit
     ;;    /authorize?response_type=token&client_id=blah&state=my-state
     ;;    cwi-app/callback#access_token=asfualskefhalksefhalskeh&token_type=bearer&state=my-state
 
-    (let [json-arg {"response_type" "token"
-                    "client_id" "local-terminal"
-                    "state" "abc123vcb"}]
-      {::site/db (xt/db *xt-node*)
-       ::site/base-uri "https://example.org"
-       ::pass/subject "https://site.test/subjects/alice"
-       ::site/received-representation
-       {::http/content-type "application/edn"
-        ::http/body (jsonista/write-value-as-bytes json-arg)}}))))
+    {::site/db (xt/db *xt-node*)
+     ::site/base-uri "https://example.org"
+     ::pass/subject "https://site.test/subjects/alice"
+     :ring.request/query "response_type=token&client_id=local-terminalh&state=abc123vcb"
 
-(flip/eval-quotation
- '[]
- `(
-   (site/with-fx-acc
-     [(site/push-fx
-       (f/dip [(site/set-status 201)]))]
-
-     ))
- {})
+     })))
 
 
 ;; All done, ready for another test
