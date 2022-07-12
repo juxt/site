@@ -98,13 +98,31 @@
       [:xtdb.api/delete id]))
    (xt/await-tx (xt-node))))
 
+(defn ids-for-type-k
+  [type-k]
+  (map
+    first
+    (xt/q (db) {:find ['e]
+                :where [['e type-k]]
+                :timeout (* 1 1000 60 10)})))
+
+(defn count-type
+  [type-k]
+  (count (ids-for-type-k type-k)))
+
 (defn evict! [& ids]
   (->>
-   (xt/submit-tx
-    (xt-node)
-    (for [id ids]
-      [:xtdb.api/evict id]))
-   (xt/await-tx (xt-node))))
+    (xt/submit-tx
+      (xt-node)
+      (for [id ids]
+        [:xtdb.api/evict id]))
+    (xt/await-tx (xt-node))))
+
+(defn rm-r!
+  "Does xtdb.api/delete on all entities containing an attribute with the given key"
+  [type-k]
+  (let [entities (ids-for-type-k type-k)]
+    (apply evict! entities)))
 
 (defn q [query & args]
   (apply xt/q (db) query args))
