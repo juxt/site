@@ -205,8 +205,10 @@
         (map first
              (crux/q db '{:find [i]
                           :where [[i :juxt.site.alpha/type "User"]
-                                  [i :juxt.pass.jwt/iss iss]
-                                  [i :juxt.pass.jwt/sub sub]]
+                                  [oc :juxt.site.alpha/type "OAuthCredentials"]
+                                  [oc :juxt.pass.alpha/user i]
+                                  [oc :juxt.pass.jwt/iss iss]
+                                  [oc :juxt.pass.jwt/sub sub]]
                           :in [iss sub]}
                      (get id-token-claims "iss")
                      (get id-token-claims "sub")))]
