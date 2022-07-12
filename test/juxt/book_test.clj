@@ -36,30 +36,37 @@
         invalid-req (assoc req :ring.request/path "/not-hello")]
     (is (= 404 (:ring.response/status (*handler* invalid-req))))))
 
-(deftest public-resource-test
-  (init/bootstrap!)
-  (book/setup-hello-world!)
+;;ndeftest public-resource-test
 
-  (is (xt/entity (xt/db *xt-node*) "https://site.test/hello")) ;; Assert the entity exists in the db
-  (is (not (xt/entity (xt/db *xt-node*) "https://site.test/not-hello"))) ;; Assert that out 404 entity is not in the db
+((t/join-fixtures [with-system-xt with-handler])
+ (fn []
+   (init/bootstrap!)
+   (book/setup-hello-world!)
 
-  (let [req {:ring.request/method :get
-             :ring.request/path "/hello"}]
+   (is (xt/entity (xt/db *xt-node*) "https://site.test/hello")) ;; Assert the entity exists in the db
+   (is (not (xt/entity (xt/db *xt-node*) "https://site.test/not-hello"))) ;; Assert that out 404 entity is not in the db
 
-    (testing "Can retrieve a public immutable resource"
-      (let [{:ring.response/keys [status body]} (*handler* req)]
-        (is (= 200 status))
-        (is (= "Hello World!\r\n" body))))
+   (let [req {:ring.request/method :get
+              :ring.request/path "/hello"}]
 
-    (testing "Receive 405 when method not allowed"
-      (let [invalid-req (assoc req :ring.request/method :put)
-            {:ring.response/keys [status]} (*handler* invalid-req)]
-        (is (= 405 status))))
+     (testing "Can retrieve a public immutable resource"
+       (let [{:ring.response/keys [status body] :as response} (*handler* req)]
+         response
+         #_(is (= 200 status))
+         #_(is (= "Hello World!\r\n" body))))
 
-    (testing "Receive 404 when resource does not exist"
-      (let [invalid-req (assoc req :ring.request/path "/not-hello")
-            {:ring.response/keys [status]} (*handler* invalid-req)]
-        (is (= 404 status))))))
+     #_(testing "Receive 405 when method not allowed"
+       (let [invalid-req (assoc req :ring.request/method :put)
+             {:ring.response/keys [status]} (*handler* invalid-req)]
+         (is (= 405 status))))
+
+     #_(testing "Receive 404 when resource does not exist"
+       (let [invalid-req (assoc req :ring.request/path "/not-hello")
+             {:ring.response/keys [status]} (*handler* invalid-req)]
+         (is (= 404 status))))))
+ )
+
+
 
 (defn encode-basic-authorization [user password]
   (format "Basic %s" (String. (.encode (java.util.Base64/getEncoder) (.getBytes (format "%s:%s" user password))))))
