@@ -47,6 +47,7 @@
   (let [config (update-in xtdb-opts
                           [:xtdb/index-store :kv-store :checkpointer :store]
                           assoc :configurator (constantly s3-configurator))
+        _       (log/info config)
         node (start-node config)]
     ;; we need to make sure the tx-ingester has caught up before
     ;; declaring the node up
