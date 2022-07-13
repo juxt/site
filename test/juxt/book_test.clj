@@ -260,103 +260,102 @@
          :juxt.pass.alpha/puts
          :juxt.pass.alpha/deletes]))))
 
-;;deftest login-test
+;;(t/join-fixtures [with-system-xt with-handler])
 
-((t/join-fixtures [with-system-xt with-handler])
- (fn []
-   (init/bootstrap!)
-   (book/protected-resource-preliminaries!)
-   (book/create-resource-protected-by-session-scope!)
-   (book/session-scopes-preliminaries!)
-   (book/grant-permission-to-resource-protected-by-session-scope!)
-   (book/create-session-scope!)
+(deftest login-test
+  (init/bootstrap!)
+  (book/protected-resource-preliminaries!)
+  (book/create-resource-protected-by-session-scope!)
+  (book/session-scopes-preliminaries!)
+  (book/grant-permission-to-resource-protected-by-session-scope!)
+  (book/create-session-scope!)
 
-   (book/create-action-create-login-resource!)
-   (book/grant-permission-to-create-login-resource!)
-   (book/create-login-resource!)
-   (book/create-action-login!)
-   (book/grant-permission-to-invoke-action-login!)
+  (book/create-action-create-login-resource!)
+  (book/grant-permission-to-create-login-resource!)
+  (book/create-login-resource!)
+  (book/create-action-login!)
+  (book/grant-permission-to-invoke-action-login!)
 
-   (book/users-preliminaries!)
+  (book/users-preliminaries!)
 
-   (book/create-action-put-basic-user-identity!)
-   (book/grant-permission-to-invoke-action-put-basic-user-identity!)
+  (book/create-action-put-basic-user-identity!)
+  (book/grant-permission-to-invoke-action-put-basic-user-identity!)
 
-   (book/put-user-alice!)
-   (book/put-basic-user-identity-alice!)
+  (book/put-user-alice!)
+  (book/put-basic-user-identity-alice!)
 
-   (let [uri (some :juxt.pass.alpha/login-uri
-                   (session-scope/session-scopes (xt/db *xt-node*) "https://site.test/protected-by-session-scope/document.html"))]
-     (is (string? uri)))
+  (let [uri (some :juxt.pass.alpha/login-uri
+                  (session-scope/session-scopes (xt/db *xt-node*) "https://site.test/protected-by-session-scope/document.html"))]
+    (is (string? uri)))
 
-   ;; Test that session scope exists
-   (let [uri (some
-              :juxt.pass.alpha/login-uri
-              (session-scope/session-scopes
-               (xt/db *xt-node*)
-               "https://site.test/protected-by-session-scope/document.html"))]
-     (is (string? uri)))
+  ;; Test that session scope exists
+  (let [uri (some
+             :juxt.pass.alpha/login-uri
+             (session-scope/session-scopes
+              (xt/db *xt-node*)
+              "https://site.test/protected-by-session-scope/document.html"))]
+    (is (string? uri)))
 
-   ;; There is no cookie at present, so no session, so we're expecting a
-   ;; redirect to a login form.
-   (let [request {:ring.request/method :get
-                  :ring.request/path "/protected-by-session-scope/document.html"}]
+  ;; There is no cookie at present, so no session, so we're expecting a
+  ;; redirect to a login form.
+  (let [request {:ring.request/method :get
+                 :ring.request/path "/protected-by-session-scope/document.html"}]
 
-     (testing "Redirect"
-       (let [response (*handler* request)]
-         (is (= 302 (:ring.response/status response)))
-         (is (.startsWith
-              (get-in response [:ring.response/headers "location"])
-              "https://site.test/login"))))
+    (testing "Redirect"
+      (let [response (*handler* request)]
+        (is (= 302 (:ring.response/status response)))
+        (is (.startsWith
+             (get-in response [:ring.response/headers "location"])
+             "https://site.test/login"))))
 
-     ;; POST to the /login handler, which call the login action.
-     ;; After this there should be a set-cookie escalation
+    ;; POST to the /login handler, which call the login action.
+    ;; After this there should be a set-cookie escalation
 
-     (let [body (.getBytes
-                 (codec/form-encode
-                  ;; usernames are case-insensitive - testing this
-                  {"username" "aliCe"
-                   "password" "garden"}))
-           login-request
-           {:ring.request/method :post
-            :ring.request/path "/login"
-            :ring.request/headers
-            {"content-length" (str (count body))
-             "content-type" "application/x-www-form-urlencoded"}
-            :ring.request/query "return-to=/document.html"
-            :ring.request/body (io/input-stream body)}
-           response (time (*handler* login-request))
-           session-token (get-in response [:ring.response/headers "set-cookie"])]
+    (let [body (.getBytes
+                (codec/form-encode
+                 ;; usernames are case-insensitive - testing this
+                 {"username" "aliCe"
+                  "password" "garden"}))
+          login-request
+          {:ring.request/method :post
+           :ring.request/path "/login"
+           :ring.request/headers
+           {"content-length" (str (count body))
+            "content-type" "application/x-www-form-urlencoded"}
+           :ring.request/query "return-to=/document.html"
+           :ring.request/body (io/input-stream body)}
+          response (time (*handler* login-request))
+          session-token (get-in response [:ring.response/headers "set-cookie"])]
 
-       (is (string? session-token)) ;; TODO: Check for a correct set-cookie header
-       #_(is (= 302 (:ring.response/status response)))
+      (is (string? session-token)) ;; TODO: Check for a correct set-cookie header
+      #_(is (= 302 (:ring.response/status response)))
 
-       (let [cookie-value (get-in response [:ring.response/headers "set-cookie"])
-             location (get-in response [:ring.response/headers "location"])
-             token (when cookie-value (second (re-matches #"id=(.*?);.*" cookie-value)))
-             db (xt/db *xt-node*)
-             ;; Check the database for evidence a session has been created
-             [e]
-             (first (when token
-                      (xt/q db '{:find [(pull e [*])]
-                                 :where [[e ::site/type "https://meta.juxt.site/pass/session-token"]
-                                         [e ::pass/session-token tok]]
-                                 :in [tok]}
-                            token)))]
-         (is cookie-value)
-         (is token "Cookie value doesn't contain an id")
-         (is (> (count token) 20))
-         (is e)
-         (is (= "https://meta.juxt.site/pass/session-token" (:juxt.site.alpha/type e)))
+      (let [cookie-value (get-in response [:ring.response/headers "set-cookie"])
+            location (get-in response [:ring.response/headers "location"])
+            token (when cookie-value (second (re-matches #"id=(.*?);.*" cookie-value)))
+            db (xt/db *xt-node*)
+            ;; Check the database for evidence a session has been created
+            [e]
+            (first (when token
+                     (xt/q db '{:find [(pull e [*])]
+                                :where [[e ::site/type "https://meta.juxt.site/pass/session-token"]
+                                        [e ::pass/session-token tok]]
+                                :in [tok]}
+                           token)))]
+        (is cookie-value)
+        (is token "Cookie value doesn't contain an id")
+        (is (> (count token) 20))
+        (is e)
+        (is (= "https://meta.juxt.site/pass/session-token" (:juxt.site.alpha/type e)))
 
-         (is (= "/document.html" location))
+        (is (= "/document.html" location))
 
-         (testing "Access protected document with cookie"
-           (let [request (assoc-in request [:ring.request/headers "cookie"] (format "id=%s" token))
-                 response (*handler* request)]
-             (is (= 200 (:ring.response/status response)))
-             (is (= "<p>This is a protected message that is only visible when sending the correct session header.</p>"
-                    (:ring.response/body response))))))))))
+        (testing "Access protected document with cookie"
+          (let [request (assoc-in request [:ring.request/headers "cookie"] (format "id=%s" token))
+                response (*handler* request)]
+            (is (= 200 (:ring.response/status response)))
+            (is (= "<p>This is a protected message that is only visible when sending the correct session header.</p>"
+                   (:ring.response/body response)))))))))
 
 ;;deftest acquire-access-token-test
 ((t/join-fixtures [with-system-xt with-handler])
