@@ -217,24 +217,33 @@
                 ;; else throw the error
                 [:client-id {} f/set-at (f/throw (f/ex-info "No such app" f/swap))])])])
 
+         ;; Get subject (it's in the environment, fail if missing subject)
          (f/define extract-subject
            [(f/set-at (f/dip [(env ::pass/subject) :subject]))])
 
          (f/define assert-subject
            [(f/keep [(of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
 
+         (f/define access-token-length [16])
+
+         ;; Create access-token tied to subject, scope and application
+         (f/define make-access-token
+           [(f/set-at
+             (f/keep
+              [dup (f/of :subject) ::pass/subject {} f/set-at swap
+               (f/of :application) (f/of :xt/id) ::pass/application f/rot f/set-at
+               ;; TODO: Add scope
+               (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
+               (f/set-at (f/keep [(of ::pass/token) (env ::site/base-uri) "/access-tokens/" f/swap f/str f/str ::xt/id]))
+               (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
+               :access-token]))])
+
          extract-and-decode-query-string
          lookup-application-from-database
          fail-if-no-application
-
-         ;; Get subject (it's in the environment, fail if missing subject)
          extract-subject
          assert-subject
-
-         ;; TODO: Create access-token tied to subject, scope and application
-         ;; https://docs.factorcode.org/content/vocab-strings.html
-         (f/dip [{} (env ::site/base-uri) "/subjects/" f/swap f/str])
-
+         make-access-token
 
          ;; TODO: Construct fragment containing token, state and place in :fragment
          ;;(f/set-at (f/dip ["foobar" :fragment]))
