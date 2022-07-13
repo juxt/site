@@ -580,9 +580,9 @@
 
      response-post-grant
 
-     (repl/ls)
+     ;;(repl/ls)
 
-     (repl/e "https://site.test/applications/local-terminal")
+     ;;(repl/e "https://site.test/applications/local-terminal")
 
      ;;(repl/e "https://site.test/authorize")
 

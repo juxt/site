@@ -387,14 +387,17 @@
         (if-let [error (::site/error result)]
           (do
             (log/errorf "Transaction error: %s" (pr-str error))
-            (throw
-             (ex-info
-              (format "Transaction error performing action %s: %s" action (:message error))
-              (merge
-               {::site/request-context
-                (merge ctx
-                       (dissoc result ::site/type :xt/id ::site/error)
-                       (:ex-data error))}))))
+            (let [status (:ring.response/status (:ex-data error))]
+              (throw
+               (ex-info
+                (format "Transaction error performing action %s: %s" action (:message error))
+                (into
+                 {::site/request-context
+                  (cond-> ctx
+                    status (assoc :ring.response/status status))}
+                 (merge
+                  (dissoc result ::site/type :xt/id ::site/error)
+                  (:ex-data error)))))))
 
           (let [apply-to-request-context-ops (:juxt.site.alpha/apply-to-request-context-ops result)]
             (cond-> ctx

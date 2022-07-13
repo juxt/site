@@ -378,8 +378,15 @@
 
 (def ex-info 'juxt.flip.alpha.core/ex-info)
 (defmethod word 'juxt.flip.alpha.core/ex-info
-    [[ex-data msg & stack] [_ & queue] env]
-    [(cons (clojure.core/ex-info msg ex-data) stack) queue env])
+  [[ex-data msg & stack] [_ & queue] env]
+  [(cons (clojure.core/ex-info
+          msg
+          (assoc
+           ex-data
+           :juxt.flip.alpha/stack stack
+           :juxt.flip.alpha/queue queue))
+         stack)
+   queue env])
 
 (def throw 'juxt.flip.alpha.core/throw)
 (defmethod word 'juxt.flip.alpha.core/throw
@@ -553,10 +560,7 @@
       (throw
        (clojure.core/ex-info
         (format "Failure in quotation: %s" (.getMessage t))
-        (into
-         {:juxt.flip.alpha/stack stack
-          :juxt.flip.alpha/queue queue}
-         (ex-data t))
+        (ex-data t)
         t)))))
 
 (defn eval-quotation
