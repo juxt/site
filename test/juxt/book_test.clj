@@ -353,239 +353,228 @@
             (is (= "<p>This is a protected message that is only visible when sending the correct session header.</p>"
                    (:ring.response/body response)))))))))
 
-;;deftest acquire-access-token-test
-((t/join-fixtures [with-system-xt with-handler])
- (fn []
-   (init/bootstrap!)
+(deftest acquire-access-token-test
+  (init/bootstrap!)
 
-   ;; Create an authorization server (this can be promoted later)
-   (book/protected-resource-preliminaries!)
+  ;; Create an authorization server (this can be promoted later)
+  (book/protected-resource-preliminaries!)
 
-   (init/put!
-    {:xt/id "https://site.test/actions/oauth/authorize"
-     :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
+  (init/put!
+   {:xt/id "https://site.test/actions/oauth/authorize"
+    :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
 
-     ;; Eventually we should look up if there's a resource-owner decision in
-     ;; place to cover the application and scopes requested.  The decision
-     ;; should include details of what scope was requested by the application,
-     ;; and what scope was approved by the resource-owner (which may be the
-     ;; same). If additional scope is requested in a subsequent authorization
-     ;; request, then a new approval decision will then be sought from the
-     ;; resource-owner.
-     ;;
-     ;; If we can't find a decision, we create a new pending decision document
-     ;; containing the state, application and scope. We redirect to a trusted
-     ;; resource, within the same protection space or session scope,
-     ;; e.g. /approve. This is given the id of a pending approval as a request
-     ;; parameter, from which it can look up the pending approval document and
-     ;; render the form appropriately given the attributes therein.
-     ;;
-     :juxt.flip.alpha/quotation
-     `(
-       (site/with-fx-acc
-         [
-          ;; Extract query string from environment, decode it and store it at
-          ;; keyword :query
-          (f/define extract-and-decode-query-string
-            [(f/set-at
-              (f/dip
-               [:ring.request/query
-                f/env
-                (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
-                f/form-decode
-                :query]))])
+    ;; Eventually we should look up if there's a resource-owner decision in
+    ;; place to cover the application and scopes requested.  The decision
+    ;; should include details of what scope was requested by the application,
+    ;; and what scope was approved by the resource-owner (which may be the
+    ;; same). If additional scope is requested in a subsequent authorization
+    ;; request, then a new approval decision will then be sought from the
+    ;; resource-owner.
+    ;;
+    ;; If we can't find a decision, we create a new pending decision document
+    ;; containing the state, application and scope. We redirect to a trusted
+    ;; resource, within the same protection space or session scope,
+    ;; e.g. /approve. This is given the id of a pending approval as a request
+    ;; parameter, from which it can look up the pending approval document and
+    ;; render the form appropriately given the attributes therein.
+    ;;
+    :juxt.flip.alpha/quotation
+    `(
+      (site/with-fx-acc
+        [
+         ;; Extract query string from environment, decode it and store it at
+         ;; keyword :query
+         (f/define extract-and-decode-query-string
+           [(f/set-at
+             (f/dip
+              [:ring.request/query
+               f/env
+               (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
+               f/form-decode
+               :query]))])
 
-          (f/define lookup-application-from-database
-            [(f/set-at
-              (f/keep
-               [
-                (f/of :query)
-                (f/of "client_id")
-                (juxt.flip.alpha.xtdb/q
-                 ~'{:find [(pull e [*])]
-                    :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
-                            [e ::pass/client-id client-id]]
-                    :in [client-id]})
-                f/first
-                f/first
-                :application]))])
-
-          (f/define fail-if-no-application
-            [(f/keep
+         (f/define lookup-application-from-database
+           [(f/set-at
+             (f/keep
               [
-               ;; Grab the client-id for error reporting
-               f/dup (f/of :query) (f/of "client_id") f/swap
-               (f/of :application)
-               ;; If no application entry, drop the client_id (to clean up the
-               ;; stack)
-               (f/if [f/drop]
-                 ;; else throw the error
-                 [:client-id {:ring.response/status 400} f/set-at
-                  (f/throw (f/ex-info "No such app" f/swap))])])])
+               (f/of :query)
+               (f/of "client_id")
+               (juxt.flip.alpha.xtdb/q
+                ~'{:find [(pull e [*])]
+                   :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                           [e ::pass/client-id client-id]]
+                   :in [client-id]})
+               f/first
+               f/first
+               :application]))])
 
-          ;; Get subject (it's in the environment, fail if missing subject)
-          (f/define extract-subject
-            [(f/set-at (f/dip [(f/env ::pass/subject) :subject]))])
+         (f/define fail-if-no-application
+           [(f/keep
+             [
+              ;; Grab the client-id for error reporting
+              f/dup (f/of :query) (f/of "client_id") f/swap
+              (f/of :application)
+              ;; If no application entry, drop the client_id (to clean up the
+              ;; stack)
+              (f/if [f/drop]
+                ;; else throw the error
+                [:client-id {:ring.response/status 400} f/set-at
+                 (f/throw (f/ex-info "No such app" f/swap))])])])
 
-          (f/define assert-subject
-            [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
+         ;; Get subject (it's in the environment, fail if missing subject)
+         (f/define extract-subject
+           [(f/set-at (f/dip [(f/env ::pass/subject) :subject]))])
 
-          ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
-          (f/define access-token-length [16])
+         (f/define assert-subject
+           [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
 
-          ;; Create access-token tied to subject, scope and application
-          (f/define make-access-token
-            [(f/set-at
-              (f/keep
-               [f/dup (f/of :subject) ::pass/subject {} f/set-at f/swap
-                (f/of :application) (f/of :xt/id) ::pass/application f/rot f/set-at
-                ;; ::pass/token
-                (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
-                ;; :xt/id (as a function of ::pass/token)
-                (f/set-at (f/keep [(f/of ::pass/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str ::xt/id]))
-                ;; ::site/type
-                (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
-                ;; TODO: Add scope
-                ;; key in map
-                :access-token]))])
+         ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
+         (f/define access-token-length [16])
 
-          (f/define collate-response
-            [(f/set-at
-              (f/keep
-               [ ;; access_token
-                f/dup (f/of :access-token) (f/of ::pass/token) "access_token" {} f/set-at
-                ;; token_token
-                "bearer" "token_type" f/rot f/set-at
-                ;; state
-                f/swap (f/of :query) (f/of "state") "state" f/rot f/set-at
-                ;; key in map
-                :response]))])
+         ;; Create access-token tied to subject, scope and application
+         (f/define make-access-token
+           [(f/set-at
+             (f/keep
+              [f/dup (f/of :subject) ::pass/subject {} f/set-at f/swap
+               (f/of :application) (f/of :xt/id) ::pass/application f/rot f/set-at
+               ;; ::pass/token
+               (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
+               ;; :xt/id (as a function of ::pass/token)
+               (f/set-at (f/keep [(f/of ::pass/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str ::xt/id]))
+               ;; ::site/type
+               (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
+               ;; TODO: Add scope
+               ;; key in map
+               :access-token]))])
 
-          (f/define encode-fragment
-            [(f/set-at
-              (f/keep
-               [(f/of :response) f/form-encode :fragment]))])
+         (f/define collate-response
+           [(f/set-at
+             (f/keep
+              [ ;; access_token
+               f/dup (f/of :access-token) (f/of ::pass/token) "access_token" {} f/set-at
+               ;; token_token
+               "bearer" "token_type" f/rot f/set-at
+               ;; state
+               f/swap (f/of :query) (f/of "state") "state" f/rot f/set-at
+               ;; key in map
+               :response]))])
 
-          (f/define redirect-to-application-redirect-uri
-            [(site/push-fx (f/dip [(site/set-status 302)]))
-             (site/push-fx
-              (f/keep
-               [f/dup (f/of :application) (f/of ::pass/redirect-uri)
-                "#" f/swap f/str
-                f/swap (f/of :fragment)
-                (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
-                f/swap f/str
-                (site/set-header "location" f/swap)]))])
+         (f/define encode-fragment
+           [(f/set-at
+             (f/keep
+              [(f/of :response) f/form-encode :fragment]))])
 
-          extract-and-decode-query-string
-          lookup-application-from-database
-          fail-if-no-application
-          extract-subject
-          assert-subject
-          make-access-token
-          collate-response
-          encode-fragment
-          redirect-to-application-redirect-uri
-          ]))
+         (f/define redirect-to-application-redirect-uri
+           [(site/push-fx (f/dip [(site/set-status 302)]))
+            (site/push-fx
+             (f/keep
+              [f/dup (f/of :application) (f/of ::pass/redirect-uri)
+               "#" f/swap f/str
+               f/swap (f/of :fragment)
+               (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
+               f/swap f/str
+               (site/set-header "location" f/swap)]))])
 
-     :juxt.pass.alpha/rules
-     '[
-       [(allowed? subject resource permission)
-        [subject :juxt.pass.alpha/user-identity id]
-        [id :juxt.pass.alpha/user user]
-        [permission :juxt.pass.alpha/user user]]]})
+         extract-and-decode-query-string
+         lookup-application-from-database
+         fail-if-no-application
+         extract-subject
+         assert-subject
+         make-access-token
+         collate-response
+         encode-fragment
+         redirect-to-application-redirect-uri
+         ]))
 
-   (init/put!
-    {:xt/id "https://site.test/authorize"
-     :juxt.http.alpha/content-type "text/html;charset=utf-8"
-     :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"
-     :juxt.site.alpha/methods
-     {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/oauth/authorize"}}}})
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? subject resource permission)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]]]})
 
-   ;; Create a user Alice, with her identity
-   (book/users-preliminaries!)
-   (book/put-user-alice!)
-   (book/create-action-put-basic-user-identity!)
-   (book/grant-permission-to-invoke-action-put-basic-user-identity!)
-   (book/put-basic-user-identity-alice!)
+  (init/put!
+   {:xt/id "https://site.test/authorize"
+    :juxt.http.alpha/content-type "text/html;charset=utf-8"
+    :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"
+    :juxt.site.alpha/methods
+    {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/oauth/authorize"}}}})
 
-   ;; Log her in
-   (book/create-action-login!)
-   (book/grant-permission-to-invoke-action-login!)
-   (let [login-log-entry
-         (authz/do-action
-          (let [xt-node *xt-node*
-                body (.getBytes
-                      (codec/form-encode
-                       ;; usernames are case-insensitive - testing this
-                       {"username" "aliCe"
-                        "password" "garden"}))]
-            {::site/xt-node xt-node
-             ::site/db (xt/db xt-node)
-             ::pass/subject nil      ; there is no subject at the point of login
-             ::pass/action "https://site.test/actions/login"
-             ::site/base-uri "https://site.test"
-             ::site/received-representation
-             {::http/content-type "application/x-www-form-urlencoded"
-              ::http/body body}}))
+  ;; Create a user Alice, with her identity
+  (book/users-preliminaries!)
+  (book/put-user-alice!)
+  (book/create-action-put-basic-user-identity!)
+  (book/grant-permission-to-invoke-action-put-basic-user-identity!)
+  (book/put-basic-user-identity-alice!)
 
-         cookies
-         (as-> {} %
-           (authz/apply-request-context-operations
-            %
-            (-> login-log-entry ::pass/action-result ::site/apply-to-request-context-ops))
-           (:ring.response/headers %)
-           (keep (fn [[k v]] (when (= k "set-cookie") (next (re-matches #"([a-z]+?)=(.*?);.*" v)))) %)
-           (map vec %)
-           (into {} %))
+  ;; Log her in
+  (book/create-action-login!)
+  (book/grant-permission-to-invoke-action-login!)
+  (let [login-log-entry
+        (authz/do-action
+         (let [xt-node *xt-node*
+               body (.getBytes
+                     (codec/form-encode
+                      ;; usernames are case-insensitive - testing this
+                      {"username" "aliCe"
+                       "password" "garden"}))]
+           {::site/xt-node xt-node
+            ::site/db (xt/db xt-node)
+            ::pass/subject nil      ; there is no subject at the point of login
+            ::pass/action "https://site.test/actions/login"
+            ::site/base-uri "https://site.test"
+            ::site/received-representation
+            {::http/content-type "application/x-www-form-urlencoded"
+             ::http/body body}}))
 
-         ;; Set up an application
-         _ (book/applications-preliminaries!)
-         _ (book/register-example-application!)
+        cookies
+        (as-> {} %
+          (authz/apply-request-context-operations
+           %
+           (-> login-log-entry ::pass/action-result ::site/apply-to-request-context-ops))
+          (:ring.response/headers %)
+          (keep (fn [[k v]] (when (= k "set-cookie") (next (re-matches #"([a-z]+?)=(.*?);.*" v)))) %)
+          (map vec %)
+          (into {} %))
 
-         ;; GET on https://site.test/authorize
-         req {:ring.request/method :get
-              :ring.request/path "/authorize"
-              :ring.request/headers {"cookie" (apply str (interpose ";" (map (fn [[id v]] (format "%s=%s" id v)) cookies)))}
-              :ring.request/query
-              (codec/form-encode
-               {"response_type" "token"
-                "client_id" "local-terminal"
-                "state" "abc123vcb"})}
+        ;; Set up an application
+        _ (book/applications-preliminaries!)
+        _ (book/register-example-application!)
 
-         response-pre-grant (*handler* req)
+        ;; GET on https://site.test/authorize
+        req {:ring.request/method :get
+             :ring.request/path "/authorize"
+             :ring.request/headers {"cookie" (apply str (interpose ";" (map (fn [[id v]] (format "%s=%s" id v)) cookies)))}
+             :ring.request/query
+             (codec/form-encode
+              {"response_type" "token"
+               "client_id" "local-terminal"
+               "state" "abc123vcb"})}
 
-         _ (authz/do-action
-            (let [xt-node *xt-node*]
-              {::site/xt-node xt-node
-               ::site/db (xt/db xt-node)
-               ::pass/subject "https://site.test/subjects/system"
-               ::pass/action "https://site.test/actions/grant-permission"
-               ::site/base-uri "https://site.test"
-               ::site/received-representation
-               {::http/content-type "application/edn"
-                ::http/body
-                (.getBytes
-                 (pr-str
-                  {:xt/id "https://site.test/permissions/alice-can-authorize"
-                   ::pass/action "https://site.test/actions/oauth/authorize"
-                   ::pass/user "https://site.test/users/alice"
-                   ::pass/purpose nil}))}}))
+        response-pre-grant (*handler* req)
 
-         response-post-grant (*handler* req)]
+        _ (authz/do-action
+           (let [xt-node *xt-node*]
+             {::site/xt-node xt-node
+              ::site/db (xt/db xt-node)
+              ::pass/subject "https://site.test/subjects/system"
+              ::pass/action "https://site.test/actions/grant-permission"
+              ::site/base-uri "https://site.test"
+              ::site/received-representation
+              {::http/content-type "application/edn"
+               ::http/body
+               (.getBytes
+                (pr-str
+                 {:xt/id "https://site.test/permissions/alice-can-authorize"
+                  ::pass/action "https://site.test/actions/oauth/authorize"
+                  ::pass/user "https://site.test/users/alice"
+                  ::pass/purpose nil}))}}))
 
-     (is (not= 200 (:ring.response/status response-pre-grant)))
-     (is (= 200 (:ring.response/status response-post-grant)))
+        response-post-grant (*handler* req)]
 
-     ;; Now, run the implicit grant
+    (is (= 403 (:ring.response/status response-pre-grant)))
+    (is (= 302 (:ring.response/status response-post-grant)))
 
-     response-post-grant
+    (is (re-matches #"https://site.test/terminal/callback#access_token=(.*?)\&token_type=bearer\&state=abc123vcb" (-> response-post-grant :ring.response/headers (get "location"))))
 
-;;     (repl/ls)
-;;     (repl/e "https://site.test/actions/oauth/authorize")
-
-     ;;(repl/e "https://site.test/applications/local-terminal")
-
-     ;;(repl/e "https://site.test/authorize")
-
-     )))
+    ))
