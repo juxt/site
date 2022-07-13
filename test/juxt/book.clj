@@ -1100,7 +1100,7 @@ Password: <input name=password type=password>
 
 ;; Applications
 
-(defn create-action-authorize-application! []
+#_(defn create-action-authorize-application! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1142,7 +1142,7 @@ Password: <input name=password type=password>
      ))))
 
 ;; TODO: Rename function to indicate this permission is granted to those in the role 'user'
-(defn grant-permission-to-invoke-action-authorize-application! []
+#_(defn grant-permission-to-invoke-action-authorize-application! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1157,7 +1157,7 @@ Password: <input name=password type=password>
      ;; end::grant-permission-to-invoke-action-authorize-application![]
      ))))
 
-(defn create-action-issue-access-token! []
+#_(defn create-action-issue-access-token! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1206,7 +1206,7 @@ Password: <input name=password type=password>
      ;; end::create-action-issue-access-token![]
      ))))
 
-(defn grant-permission-to-invoke-action-issue-access-token! []
+#_(defn grant-permission-to-invoke-action-issue-access-token! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1226,7 +1226,7 @@ Password: <input name=password type=password>
 #_(defn create-action-put-authorization-server []
     )
 
-(defn install-authorization-server! []
+#_(defn install-authorization-server! []
   ;; tag::install-authorization-server![]
   (juxt.site.alpha.init/put!
    {:xt/id "https://auth.example.org/oauth/authorize"
@@ -1413,14 +1413,14 @@ Password: <input name=password type=password>
   (create-action-put-session-scope!)
   (grant-permission-to-put-session-scope!))
 
-(defn applications-preliminaries! []
+#_(defn applications-preliminaries! []
   (create-action-authorize-application!)
   (grant-permission-to-invoke-action-authorize-application!)
   (create-action-issue-access-token!)
   (grant-permission-to-invoke-action-issue-access-token!))
 
 ;; TODO: Too coarse, find usages and break up
-(defn setup-application! []
+#_(defn setup-application! []
   (register-example-application!)
   (users-preliminaries!)
   (put-user-alice!)
@@ -1460,8 +1460,8 @@ Password: <input name=password type=password>
   (create-action-login!)
   (grant-permission-to-invoke-action-login!)
 
-  (applications-preliminaries!)
-  (setup-application!)
+  #_(applications-preliminaries!)
+  #_(setup-application!)
 
   (create-resource-protected-by-bearer-auth!)
   (grant-permission-to-resource-protected-by-bearer-auth!)
