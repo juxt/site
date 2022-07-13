@@ -105,7 +105,7 @@
 
          ]))
 
-      break
+      ;;break
 
       ;; Compose 'effects'
 
@@ -233,12 +233,12 @@
 
          ;; TODO: Create access-token tied to subject, scope and application
          ;; https://docs.factorcode.org/content/vocab-strings.html
-         (f/dip [{} (env ::site/base-uri) "/subjects/" f/str])
+         (f/dip [{} (env ::site/base-uri) "/subjects/" f/swap f/str])
 
 
          ;; TODO: Construct fragment containing token, state and place in :fragment
-         (f/set-at (f/dip ["foobar" :fragment]))
-         redirect-to-application-redirect-uri
+         ;;(f/set-at (f/dip ["foobar" :fragment]))
+         ;;redirect-to-application-redirect-uri
 
          ])]
 
