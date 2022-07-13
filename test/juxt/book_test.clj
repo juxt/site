@@ -126,52 +126,61 @@
              (get-in response [:ring.response/headers "location"])
              "https://site.test/login?return-to="))))))
 
+;; Fastest way for Alice to get a bearer token...
+#_((t/join-fixtures [with-system-xt with-handler])
+ (fn []
+   (init/bootstrap!)
+   (book/protected-resource-preliminaries!)
+   (book/protection-spaces-preliminaries!)
+
+   (book/register-example-application!)))
+
 ;; Reinstate when refactored setup-application
 #_(deftest protected-resource-with-http-bearer-auth-test
-  (init/bootstrap!)
-  (book/protected-resource-preliminaries!)
-  (book/protection-spaces-preliminaries!)
+    (init/bootstrap!)
+    (book/protected-resource-preliminaries!)
+    (book/protection-spaces-preliminaries!)
 
-  #_(book/applications-preliminaries!)
+    #_(book/applications-preliminaries!)
 
-  (let [log-entry (book/setup-application!)
-        db (xt/db *xt-node*)
-        lookup (fn [id] (xt/entity db id))
-        bearer-token (-> log-entry ::pass/puts (get 0) lookup ::pass/token)]
+    (let [log-entry (book/setup-application!)
+          db (xt/db *xt-node*)
+          lookup (fn [id] (xt/entity db id))
+          bearer-token (-> log-entry ::pass/puts (get 0) lookup ::pass/token)]
 
-    (book/create-resource-protected-by-bearer-auth!)
-    (book/grant-permission-to-resource-protected-by-bearer-auth!)
-    (book/put-bearer-protection-space!)
+      (book/create-resource-protected-by-bearer-auth!)
+      (book/grant-permission-to-resource-protected-by-bearer-auth!)
+      (book/put-bearer-protection-space!)
 
-    (is (xt/entity (xt/db *xt-node*) "https://site.test/protected-by-bearer-auth/document.html"))
+      (is (xt/entity (xt/db *xt-node*) "https://site.test/protected-by-bearer-auth/document.html"))
 
-    (let [request {:ring.request/method :get
-                   :ring.request/path "/protected-by-bearer-auth/document.html"}]
+      (let [request {:ring.request/method :get
+                     :ring.request/path "/protected-by-bearer-auth/document.html"}]
 
-      (testing "Cannot be accessed without a bearer token"
-        (let [response (*handler* request)]
-          response
-          (is (= 401 (:ring.response/status response)))
-          (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"])))
-          ))
+        (testing "Cannot be accessed without a bearer token"
+          (let [response (*handler* request)]
+            response
+            (is (= 401 (:ring.response/status response)))
+            (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"])))
+            ))
 
-      (testing "Can be accessed with a valid bearer token"
-        (let [response (*handler*
-                        (assoc
-                         request
-                         :ring.request/headers
-                         {"authorization" (format "Bearer %s" bearer-token)}))]
-          (is (= 200 (:ring.response/status response)))
-          (is (nil? (get-in response [:ring.response/headers "www-authenticate"])))))
+        (testing "Can be accessed with a valid bearer token"
+          (let [response (*handler*
+                          (assoc
+                           request
+                           :ring.request/headers
+                           {"authorization" (format "Bearer %s" bearer-token)}))]
+            (is (= 200 (:ring.response/status response)))
+            (is (nil? (get-in response [:ring.response/headers "www-authenticate"])))))
 
-      (testing "Cannot be accessed with an invalid bearer token"
-        (let [response (*handler*
-                        (assoc
-                         request
-                         :ring.request/headers
-                         {"authorization" "Bearer not-test-access-token"}))]
-          (is (= 401 (:ring.response/status response)))
-          (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"]))))))))
+        (testing "Cannot be accessed with an invalid bearer token"
+          (let [response (*handler*
+                          (assoc
+                           request
+                           :ring.request/headers
+                           {"authorization" "Bearer not-test-access-token"}))]
+            (is (= 401 (:ring.response/status response)))
+            (is (= "Bearer realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"]))))))))
 
 ;; Reinstate when refactored setup-application
 #_(deftest user-directory-test
