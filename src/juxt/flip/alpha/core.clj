@@ -553,8 +553,10 @@
       (throw
        (clojure.core/ex-info
         (format "Failure in quotation: %s" (.getMessage t))
-        {:juxt.flip.alpha/stack stack
-         :juxt.flip.alpha/queue queue}
+        (into
+         {:juxt.flip.alpha/stack stack
+          :juxt.flip.alpha/queue queue}
+         (ex-data t))
         t)))))
 
 (defn eval-quotation

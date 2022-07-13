@@ -361,7 +361,6 @@
    ;; Create an authorization server (this can be promoted later)
    (book/protected-resource-preliminaries!)
 
-   ;; Here's the authorize action
    (init/put!
     {:xt/id "https://site.test/actions/oauth/authorize"
      :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
@@ -383,109 +382,110 @@
      ;;
      :juxt.flip.alpha/quotation
      `(
-      (site/with-fx-acc
-        [
-         ;; Extract query string from environment, decode it and store it at
-         ;; keyword :query
-         (f/define extract-and-decode-query-string
-           [(f/set-at
-             (f/dip
-              [:ring.request/query
-               f/env
-               (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
-               f/form-decode
-               :query]))])
+       (site/with-fx-acc
+         [
+          ;; Extract query string from environment, decode it and store it at
+          ;; keyword :query
+          (f/define extract-and-decode-query-string
+            [(f/set-at
+              (f/dip
+               [:ring.request/query
+                f/env
+                (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
+                f/form-decode
+                :query]))])
 
-         (f/define lookup-application-from-database
-           [(f/set-at
-             (f/keep
-              [(of :query)
-               (of "client_id")
-               (juxt.flip.alpha.xtdb/q
-                ~'{:find [(pull e [*])]
-                   :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
-                           [e ::pass/client-id client-id]]
-                   :in [client-id]})
-               f/first
-               f/first
-               :application]))])
+          (f/define lookup-application-from-database
+            [(f/set-at
+              (f/keep
+               [(of :query)
+                (of "client_id")
+                (juxt.flip.alpha.xtdb/q
+                 ~'{:find [(pull e [*])]
+                    :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                            [e ::pass/client-id client-id]]
+                    :in [client-id]})
+                f/first
+                f/first
+                :application]))])
 
-         (f/define fail-if-no-application
-           [(f/keep
-             [
-              ;; Grab the client-id for error reporting
-              f/dup (f/of :query) (f/of "client_id") f/swap
-              (f/of :application)
-              ;; If no application entry, drop the client_id (to clean up the
-              ;; stack)
-              (f/if [f/drop]
-                ;; else throw the error
-                [:client-id {} f/set-at (f/throw (f/ex-info "No such app" f/swap))])])])
+          (f/define fail-if-no-application
+            [(f/keep
+              [
+               ;; Grab the client-id for error reporting
+               f/dup (f/of :query) (f/of "client_id") f/swap
+               (f/of :application)
+               ;; If no application entry, drop the client_id (to clean up the
+               ;; stack)
+               (f/if [f/drop]
+                 ;; else throw the error
+                 [:client-id {:ring.response/status 400} f/set-at
+                  (f/throw (f/ex-info "No such app" f/swap))])])])
 
-         ;; Get subject (it's in the environment, fail if missing subject)
-         (f/define extract-subject
-           [(f/set-at (f/dip [(env ::pass/subject) :subject]))])
+          ;; Get subject (it's in the environment, fail if missing subject)
+          (f/define extract-subject
+            [(f/set-at (f/dip [(env ::pass/subject) :subject]))])
 
-         (f/define assert-subject
-           [(f/keep [(of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
+          (f/define assert-subject
+            [(f/keep [(of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
 
-         ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
-         (f/define access-token-length [16])
+          ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
+          (f/define access-token-length [16])
 
-         ;; Create access-token tied to subject, scope and application
-         (f/define make-access-token
-           [(f/set-at
-             (f/keep
-              [f/dup (f/of :subject) ::pass/subject {} f/set-at f/swap
-               (f/of :application) (f/of :xt/id) ::pass/application f/rot f/set-at
-               ;; ::pass/token
-               (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
-               ;; :xt/id (as a function of ::pass/token)
-               (f/set-at (f/keep [(of ::pass/token) (env ::site/base-uri) "/access-tokens/" f/swap f/str f/str ::xt/id]))
-               ;; ::site/type
-               (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
-               ;; TODO: Add scope
-               ;; key in map
-               :access-token]))])
+          ;; Create access-token tied to subject, scope and application
+          (f/define make-access-token
+            [(f/set-at
+              (f/keep
+               [f/dup (f/of :subject) ::pass/subject {} f/set-at f/swap
+                (f/of :application) (f/of :xt/id) ::pass/application f/rot f/set-at
+                ;; ::pass/token
+                (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
+                ;; :xt/id (as a function of ::pass/token)
+                (f/set-at (f/keep [(of ::pass/token) (env ::site/base-uri) "/access-tokens/" f/swap f/str f/str ::xt/id]))
+                ;; ::site/type
+                (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
+                ;; TODO: Add scope
+                ;; key in map
+                :access-token]))])
 
-         (f/define collate-response
-           [(f/set-at
-             (f/keep
-              [ ;; access_token
-               f/dup (f/of :access-token) (f/of ::pass/token) "access_token" {} f/set-at
-               ;; token_token
-               "bearer" "token_type" f/rot f/set-at
-               ;; state
-               f/swap (f/of :query) (f/of "state") "state" f/rot f/set-at
-               ;; key in map
-               :response]))])
+          (f/define collate-response
+            [(f/set-at
+              (f/keep
+               [ ;; access_token
+                f/dup (f/of :access-token) (f/of ::pass/token) "access_token" {} f/set-at
+                ;; token_token
+                "bearer" "token_type" f/rot f/set-at
+                ;; state
+                f/swap (f/of :query) (f/of "state") "state" f/rot f/set-at
+                ;; key in map
+                :response]))])
 
-         (f/define encode-fragment
-           [(f/set-at
-             (f/keep
-              [(f/of :response) f/form-encode :fragment]))])
+          (f/define encode-fragment
+            [(f/set-at
+              (f/keep
+               [(f/of :response) f/form-encode :fragment]))])
 
-         (f/define redirect-to-application-redirect-uri
-           [(site/push-fx (f/dip [(site/set-status 302)]))
-            (site/push-fx
-             (f/keep
-              [f/dup (f/of :application) (f/of ::pass/redirect-uri)
-               "#" f/swap f/str
-               f/swap (f/of :fragment)
-               (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
-               f/swap f/str
-               (site/set-header "location" f/swap)]))])
+          (f/define redirect-to-application-redirect-uri
+            [(site/push-fx (f/dip [(site/set-status 302)]))
+             (site/push-fx
+              (f/keep
+               [f/dup (f/of :application) (f/of ::pass/redirect-uri)
+                "#" f/swap f/str
+                f/swap (f/of :fragment)
+                (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
+                f/swap f/str
+                (site/set-header "location" f/swap)]))])
 
-         extract-and-decode-query-string
-         lookup-application-from-database
-         fail-if-no-application
-         extract-subject
-         assert-subject
-         make-access-token
-         collate-response
-         encode-fragment
-         redirect-to-application-redirect-uri
-         ]))
+          extract-and-decode-query-string
+          lookup-application-from-database
+          fail-if-no-application
+          extract-subject
+          assert-subject
+          make-access-token
+          collate-response
+          encode-fragment
+          redirect-to-application-redirect-uri
+          ]))
 
      :juxt.pass.alpha/rules
      '[
@@ -495,11 +495,11 @@
         [permission :juxt.pass.alpha/user user]]]})
 
    (init/put!
-    {:juxt.http.alpha/content-type "text/html;charset=utf-8",
-     :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>",
+    {:xt/id "https://site.test/authorize"
+     :juxt.http.alpha/content-type "text/html;charset=utf-8"
+     :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"
      :juxt.site.alpha/methods
-     {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/oauth/authorize"}}}
-     :xt/id "https://site.test/authorize"})
+     {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/oauth/authorize"}}}})
 
    ;; Create a user Alice, with her identity
    (book/users-preliminaries!)
@@ -538,11 +538,19 @@
            (map vec %)
            (into {} %))
 
+         ;; Set up an application
+         _ (book/applications-preliminaries!)
+         _ (book/register-example-application!)
+
          ;; GET on https://site.test/authorize
          req {:ring.request/method :get
               :ring.request/path "/authorize"
               :ring.request/headers {"cookie" (apply str (interpose ";" (map (fn [[id v]] (format "%s=%s" id v)) cookies)))}
-              :ring.request/query "response_type=token&client_id=local-terminal&state=abc123vcb"}
+              :ring.request/query
+              (codec/form-encode
+               {"response_type" "token"
+                "client_id" "local-terminal"
+                "state" "abc123vcb"})}
 
          response-pre-grant (*handler* req)
 
@@ -563,8 +571,7 @@
                    ::pass/user "https://site.test/users/alice"
                    ::pass/purpose nil}))}}))
 
-         response-post-grant (*handler* req)
-         ]
+         response-post-grant (*handler* req)]
 
      (is (not= 200 (:ring.response/status response-pre-grant)))
      (is (= 200 (:ring.response/status response-post-grant)))
@@ -572,6 +579,10 @@
      ;; Now, run the implicit grant
 
      response-post-grant
+
+     (repl/ls)
+
+     (repl/e "https://site.test/applications/local-terminal")
 
      ;;(repl/e "https://site.test/authorize")
 

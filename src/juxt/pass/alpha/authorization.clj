@@ -385,16 +385,18 @@
              (xt/db xt-node)
              (format "urn:site:action-log:%s" tx-id))]
         (if-let [error (::site/error result)]
-          (throw
-           (ex-info
-            (format "Transaction error performing action %s: %s" action (:message error))
-            (merge
-             (dissoc result ::site/type :xt/id ::site/error)
-             (:ex-data error))))
+          (do
+            (log/errorf "Transaction error: %s" (pr-str error))
+            (throw
+             (ex-info
+              (format "Transaction error performing action %s: %s" action (:message error))
+              (merge
+               {::site/request-context
+                (merge ctx
+                       (dissoc result ::site/type :xt/id ::site/error)
+                       (:ex-data error))}))))
 
           (let [apply-to-request-context-ops (:juxt.site.alpha/apply-to-request-context-ops result)]
-            (log/infof "result is %s" result)
-            (log/infof "apply-to-request-context-ops is %s" (pr-str apply-to-request-context-ops))
             (cond-> ctx
               result (assoc ::pass/action-result result)
 
