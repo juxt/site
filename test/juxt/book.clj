@@ -82,145 +82,6 @@
      ;; end::grant-permission-to-invoke-action-put-user![]
      ))))
 
-(defn create-action-oauth-authorize! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://site.test/actions/oauth/authorize"
-
-       ;; Eventually we should look up if there's a resource-owner decision in
-       ;; place to cover the application and scopes requested.  The decision
-       ;; should include details of what scope was requested by the application,
-       ;; and what scope was approved by the resource-owner (which may be the
-       ;; same). If additional scope is requested in a subsequent authorization
-       ;; request, then a new approval decision will then be sought from the
-       ;; resource-owner.
-       ;;
-       ;; If we can't find a decision, we create a new pending decision document
-       ;; containing the state, application and scope. We redirect to a trusted
-       ;; resource, within the same protection space or session scope,
-       ;; e.g. /approve. This is given the id of a pending approval as a request
-       ;; parameter, from which it can look up the pending approval document and
-       ;; render the form appropriately given the attributes therein.
-       ;;
-       :juxt.flip.alpha/quotation
-       `(
-         (site/with-fx-acc
-           [
-            ;; Extract query string from environment, decode it and store it at
-            ;; keyword :query
-            (f/define extract-and-decode-query-string
-              [(f/set-at
-                (f/dip
-                 [:ring.request/query
-                  f/env
-                  (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
-                  f/form-decode
-                  :query]))])
-
-            (f/define lookup-application-from-database
-              [(f/set-at
-                (f/keep
-                 [
-                  (f/of :query)
-                  (f/of "client_id")
-                  (juxt.flip.alpha.xtdb/q
-                   ~'{:find [(pull e [*])]
-                      :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
-                              [e ::pass/client-id client-id]]
-                      :in [client-id]})
-                  f/first
-                  f/first
-                  :application]))])
-
-            (f/define fail-if-no-application
-              [(f/keep
-                [
-                 ;; Grab the client-id for error reporting
-                 f/dup (f/of :query) (f/of "client_id") f/swap
-                 (f/of :application)
-                 ;; If no application entry, drop the client_id (to clean up the
-                 ;; stack)
-                 (f/if [f/drop]
-                   ;; else throw the error
-                   [:client-id {:ring.response/status 400} f/set-at
-                    (f/throw (f/ex-info "No such app" f/swap))])])])
-
-            ;; Get subject (it's in the environment, fail if missing subject)
-            (f/define extract-subject
-              [(f/set-at (f/dip [(f/env ::pass/subject) :subject]))])
-
-            (f/define assert-subject
-              [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
-
-            ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
-            (f/define access-token-length [16])
-
-            ;; Create access-token tied to subject, scope and application
-            (f/define make-access-token
-              [(f/set-at
-                (f/keep
-                 [f/dup (f/of :subject) ::pass/subject {} f/set-at f/swap
-                  (f/of :application) (f/of :xt/id) ::pass/application f/rot f/set-at
-                  ;; ::pass/token
-                  (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
-                  ;; :xt/id (as a function of ::pass/token)
-                  (f/set-at (f/keep [(f/of ::pass/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
-                  ;; ::site/type
-                  (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
-                  ;; TODO: Add scope
-                  ;; key in map
-                  :access-token]))])
-
-            (f/define collate-response
-              [(f/set-at
-                (f/keep
-                 [ ;; access_token
-                  f/dup (f/of :access-token) (f/of ::pass/token) "access_token" {} f/set-at
-                  ;; token_token
-                  "bearer" "token_type" f/rot f/set-at
-                  ;; state
-                  f/swap (f/of :query) (f/of "state") "state" f/rot f/set-at
-                  ;; key in map
-                  :response]))])
-
-            (f/define encode-fragment
-              [(f/set-at
-                (f/keep
-                 [(f/of :response) f/form-encode :fragment]))])
-
-            (f/define redirect-to-application-redirect-uri
-              [(site/push-fx (f/dip [(site/set-status 302)]))
-               (site/push-fx
-                (f/keep
-                 [f/dup (f/of :application) (f/of ::pass/redirect-uri)
-                  "#" f/swap f/str
-                  f/swap (f/of :fragment)
-                  (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
-                  f/swap f/str
-                  (site/set-header "location" f/swap)]))])
-
-            extract-and-decode-query-string
-            lookup-application-from-database
-            fail-if-no-application
-            extract-subject
-            assert-subject
-            make-access-token
-            collate-response
-            encode-fragment
-            redirect-to-application-redirect-uri
-            ]))
-
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})))))
-
 (defn create-action-put-basic-user-identity! []
   (eval
    (substitute-actual-base-uri
@@ -1238,6 +1099,145 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/purpose nil})))))
 
 ;; Applications
+
+(defn create-action-oauth-authorize! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://site.test/actions/oauth/authorize"
+
+       ;; Eventually we should look up if there's a resource-owner decision in
+       ;; place to cover the application and scopes requested.  The decision
+       ;; should include details of what scope was requested by the application,
+       ;; and what scope was approved by the resource-owner (which may be the
+       ;; same). If additional scope is requested in a subsequent authorization
+       ;; request, then a new approval decision will then be sought from the
+       ;; resource-owner.
+       ;;
+       ;; If we can't find a decision, we create a new pending decision document
+       ;; containing the state, application and scope. We redirect to a trusted
+       ;; resource, within the same protection space or session scope,
+       ;; e.g. /approve. This is given the id of a pending approval as a request
+       ;; parameter, from which it can look up the pending approval document and
+       ;; render the form appropriately given the attributes therein.
+       ;;
+       :juxt.flip.alpha/quotation
+       `(
+         (site/with-fx-acc
+           [
+            ;; Extract query string from environment, decode it and store it at
+            ;; keyword :query
+            (f/define extract-and-decode-query-string
+              [(f/set-at
+                (f/dip
+                 [:ring.request/query
+                  f/env
+                  (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
+                  f/form-decode
+                  :query]))])
+
+            (f/define lookup-application-from-database
+              [(f/set-at
+                (f/keep
+                 [
+                  (f/of :query)
+                  (f/of "client_id")
+                  (juxt.flip.alpha.xtdb/q
+                   ~'{:find [(pull e [*])]
+                      :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                              [e ::pass/client-id client-id]]
+                      :in [client-id]})
+                  f/first
+                  f/first
+                  :application]))])
+
+            (f/define fail-if-no-application
+              [(f/keep
+                [
+                 ;; Grab the client-id for error reporting
+                 f/dup (f/of :query) (f/of "client_id") f/swap
+                 (f/of :application)
+                 ;; If no application entry, drop the client_id (to clean up the
+                 ;; stack)
+                 (f/if [f/drop]
+                   ;; else throw the error
+                   [:client-id {:ring.response/status 400} f/set-at
+                    (f/throw (f/ex-info "No such app" f/swap))])])])
+
+            ;; Get subject (it's in the environment, fail if missing subject)
+            (f/define extract-subject
+              [(f/set-at (f/dip [(f/env ::pass/subject) :subject]))])
+
+            (f/define assert-subject
+              [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
+
+            ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
+            (f/define access-token-length [16])
+
+            ;; Create access-token tied to subject, scope and application
+            (f/define make-access-token
+              [(f/set-at
+                (f/keep
+                 [f/dup (f/of :subject) ::pass/subject {} f/set-at f/swap
+                  (f/of :application) (f/of :xt/id) ::pass/application f/rot f/set-at
+                  ;; ::pass/token
+                  (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
+                  ;; :xt/id (as a function of ::pass/token)
+                  (f/set-at (f/keep [(f/of ::pass/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
+                  ;; ::site/type
+                  (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
+                  ;; TODO: Add scope
+                  ;; key in map
+                  :access-token]))])
+
+            (f/define collate-response
+              [(f/set-at
+                (f/keep
+                 [ ;; access_token
+                  f/dup (f/of :access-token) (f/of ::pass/token) "access_token" {} f/set-at
+                  ;; token_token
+                  "bearer" "token_type" f/rot f/set-at
+                  ;; state
+                  f/swap (f/of :query) (f/of "state") "state" f/rot f/set-at
+                  ;; key in map
+                  :response]))])
+
+            (f/define encode-fragment
+              [(f/set-at
+                (f/keep
+                 [(f/of :response) f/form-encode :fragment]))])
+
+            (f/define redirect-to-application-redirect-uri
+              [(site/push-fx (f/dip [(site/set-status 302)]))
+               (site/push-fx
+                (f/keep
+                 [f/dup (f/of :application) (f/of ::pass/redirect-uri)
+                  "#" f/swap f/str
+                  f/swap (f/of :fragment)
+                  (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
+                  f/swap f/str
+                  (site/set-header "location" f/swap)]))])
+
+            extract-and-decode-query-string
+            lookup-application-from-database
+            fail-if-no-application
+            extract-subject
+            assert-subject
+            make-access-token
+            collate-response
+            encode-fragment
+            redirect-to-application-redirect-uri
+            ]))
+
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [subject :juxt.pass.alpha/user-identity id]
+          [id :juxt.pass.alpha/user user]
+          [permission :juxt.pass.alpha/user user]]]})))))
 
 #_(defn create-action-authorize-application! []
   (eval
