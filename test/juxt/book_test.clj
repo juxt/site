@@ -48,22 +48,18 @@
 
     (testing "Can retrieve a public immutable resource"
       (let [{:ring.response/keys [status body] :as response} (*handler* req)]
-        response
-        #_(is (= 200 status))
-        #_(is (= "Hello World!\r\n" body))))
+        (is (= 200 status))
+        (is (= "Hello World!\r\n" body))))
 
-    #_(testing "Receive 405 when method not allowed"
+    (testing "Receive 405 when method not allowed"
         (let [invalid-req (assoc req :ring.request/method :put)
               {:ring.response/keys [status]} (*handler* invalid-req)]
           (is (= 405 status))))
 
-    #_(testing "Receive 404 when resource does not exist"
+    (testing "Receive 404 when resource does not exist"
         (let [invalid-req (assoc req :ring.request/path "/not-hello")
               {:ring.response/keys [status]} (*handler* invalid-req)]
-          (is (= 404 status)))))
- )
-
-
+          (is (= 404 status))))))
 
 (defn encode-basic-authorization [user password]
   (format "Basic %s" (String. (.encode (java.util.Base64/getEncoder) (.getBytes (format "%s:%s" user password))))))
@@ -358,7 +354,7 @@
                    (:ring.response/body response)))))))))
 
 ;;deftest acquire-access-token-test
-((t/join-fixtures [with-system-xt with-handler])
+#_((t/join-fixtures [with-system-xt with-handler])
  (fn []
    (init/bootstrap!)
 
