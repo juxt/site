@@ -26,15 +26,20 @@
     ;; arguments.
     (if (symbol? word)
       word
-      (clojure.core/first word))))
+      (clojure.core/first word)))
+  :default ::default)
 
-(defmethod word :default [stack [name & queue] env]
+(defmethod word ::default [stack [name & queue] env]
   (if-let [quotation (get-in env [:definitions name])]
     ;;(throw (clojure.core/ex-info "lookup definition" {:quotation quotation}))
     [stack (concat quotation queue) env]
     ;; Don't apply, simply treat as a symbol. We might be in the process of
     ;; defining a word.
-    [(cons name stack) queue env]))
+    (if (and (clojure.core/vector? (clojure.core/first queue))
+              (= (clojure.core/second queue) 'juxt.flip.alpha.core/define))
+      [(cons name stack) queue env]
+
+      (throw (clojure.core/ex-info (format "Symbol not defined: %s" name) {:symbol name})))))
 
 (def break 'juxt.flip.alpha.core/break)
 (defmethod word 'juxt.flip.alpha.core/break [stack [_ & queue] env]

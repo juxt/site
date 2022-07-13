@@ -398,8 +398,9 @@
           (f/define lookup-application-from-database
             [(f/set-at
               (f/keep
-               [(of :query)
-                (of "client_id")
+               [
+                (f/of :query)
+                (f/of "client_id")
                 (juxt.flip.alpha.xtdb/q
                  ~'{:find [(pull e [*])]
                     :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
@@ -424,10 +425,10 @@
 
           ;; Get subject (it's in the environment, fail if missing subject)
           (f/define extract-subject
-            [(f/set-at (f/dip [(env ::pass/subject) :subject]))])
+            [(f/set-at (f/dip [(f/env ::pass/subject) :subject]))])
 
           (f/define assert-subject
-            [(f/keep [(of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
+            [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
 
           ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
           (f/define access-token-length [16])
@@ -441,7 +442,7 @@
                 ;; ::pass/token
                 (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
                 ;; :xt/id (as a function of ::pass/token)
-                (f/set-at (f/keep [(of ::pass/token) (env ::site/base-uri) "/access-tokens/" f/swap f/str f/str ::xt/id]))
+                (f/set-at (f/keep [(f/of ::pass/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str ::xt/id]))
                 ;; ::site/type
                 (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
                 ;; TODO: Add scope
@@ -580,7 +581,8 @@
 
      response-post-grant
 
-     ;;(repl/ls)
+;;     (repl/ls)
+;;     (repl/e "https://site.test/actions/oauth/authorize")
 
      ;;(repl/e "https://site.test/applications/local-terminal")
 
