@@ -167,7 +167,7 @@
    ;; out: Return 302 with Location header set to https://my.tv/callback#access_token=bobtail123&token_type=bearer&state=joh123
    (flip/eval-quotation
     '[]
-    `[
+    `(
       (site/with-fx-acc
         [
          ;; Extract query string from environment, decode it and store it at
@@ -194,17 +194,6 @@
                f/first
                :application]))])
 
-         (f/define redirect-to-application-redirect-uri
-           [(site/push-fx (f/dip [(site/set-status 302)]))
-            (site/push-fx
-             (f/keep
-              [dup (of :application) (of ::pass/redirect-uri)
-               "#" swap str
-               swap (of :fragment)
-               (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
-               swap str
-               (site/set-header "location" swap)]))])
-
          (f/define fail-if-no-application
            [(f/keep
              [
@@ -224,6 +213,7 @@
          (f/define assert-subject
            [(f/keep [(of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
 
+         ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
          (f/define access-token-length [16])
 
          ;; Create access-token tied to subject, scope and application
@@ -232,11 +222,43 @@
              (f/keep
               [dup (f/of :subject) ::pass/subject {} f/set-at swap
                (f/of :application) (f/of :xt/id) ::pass/application f/rot f/set-at
-               ;; TODO: Add scope
+               ;; ::pass/token
                (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
+               ;; :xt/id (as a function of ::pass/token)
                (f/set-at (f/keep [(of ::pass/token) (env ::site/base-uri) "/access-tokens/" f/swap f/str f/str ::xt/id]))
+               ;; ::site/type
                (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
+               ;; TODO: Add scope
+               ;; key in map
                :access-token]))])
+
+         (f/define collate-response
+           [(f/set-at
+             (f/keep
+              [ ;; access_token
+               dup (f/of :access-token) (f/of ::pass/token) "access_token" {} f/set-at
+               ;; token_token
+               "bearer" "token_type" f/rot f/set-at
+               ;; state
+               swap (f/of :query) (of "state") "state" f/rot f/set-at
+               ;; key in map
+               :response]))])
+
+         (f/define encode-fragment
+           [(f/set-at
+             (f/keep
+              [(f/of :response) f/form-encode :fragment]))])
+
+         (f/define redirect-to-application-redirect-uri
+           [(site/push-fx (f/dip [(site/set-status 302)]))
+            (site/push-fx
+             (f/keep
+              [dup (of :application) (of ::pass/redirect-uri)
+               "#" swap str
+               swap (of :fragment)
+               (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
+               swap str
+               (site/set-header "location" swap)]))])
 
          extract-and-decode-query-string
          lookup-application-from-database
@@ -244,159 +266,13 @@
          extract-subject
          assert-subject
          make-access-token
-
-         ;; TODO: Construct fragment containing token, state and place in :fragment
-         ;;(f/set-at (f/dip ["foobar" :fragment]))
-         ;;redirect-to-application-redirect-uri
-
-         ])]
+         collate-response
+         encode-fragment
+         redirect-to-application-redirect-uri
+         ]))
 
     {::site/db (xt/db *xt-node*)
      ::site/base-uri "https://site.test"
      ::pass/subject "https://site.test/subjects/alice"
      :ring.request/method :get
-     :ring.request/query "response_type=token&client_id=local-terminal&state=abc123vcb"
-
-     })))
-
-
-;; TODO: Look how login now creates sessions and copy that
-      #_(flip/define make-access-token
-          [(f/of :xt/id) ::pass/application {} f/set-at
-           (juxt.pass.alpha.core/as-hex-str
-            (juxt.pass.alpha.core/random-bytes 16))
-           ::pass/token f/rot f/set-at
-           (f/env ::pass/subject) ::pass/subject f/rot f/set-at
-           "https://meta.juxt.site/pass/access-token" ::site/type f/rot f/set-at
-           f/dup (f/of ::pass/token) "/access-tokens/" (f/env ::site/base-uri) f/str f/str :xt/id f/rot f/set-at])
-
-      #_(flip/define locate-application
-          [(set-at
-            (keep
-             [(site/lookup
-               (of "client_id")
-               "https://meta.juxt.site/pass/application"
-               ::pass/client-id
-               rot)
-              juxt.flip.alpha.xtdb/q first first
-              :application]))])
-
-      #_(flip/define assoc-access-token
-          [(set-at
-            (keep
-             [(of :application)
-              ;; If the :application entry exists, add an access-token
-
-              (if* [make-access-token]
-                ["No such client" {} flip/ex-info flip/throw])
-              :access-token]))])
-
-      #_(flip/define create-response-params
-          [(set-at
-            ;; TODO: This can be implemented in a better way (I think) with
-            ;; assoc-intersect
-            ;; https://docs.factorcode.org/content/word-assoc-intersect%2Cassocs.html
-            (keep [(flip/assoc-filter
-                    [flip/drop
-                     #{"token_type" "access_token" "state"}
-                     flip/in?]) :response-params]))])
-
-      #_(flip/define create-location-header
-          [(site/push-fx
-            (keep [(site/set-header
-                    (of :response-params)
-                    flip/form-encode
-                    "redirect-uri#" str
-                    "location")]))])
-
-      #_(flip/define set-token-type
-          ["token_type" flip/rot flip/set-at])
-
-;;locate-application
-      ;;      assoc-access-token
-
-      ;;      (site/push-fx (keep [(of :access-token) xtdb.api/put]))
-      ;;      (set-at (keep [(of :access-token) (of ::pass/token) "access_token"]))
-      ;;      (set-token-type "bearer")
-      ;;      (set-email )
-      ;;      create-response-params
-      ;;      create-location-header
-
-
-;; All done, ready for another test
-#_((t/join-fixtures [with-system-xt])
- (fn []
-   (bootstrap!)
-
-   #_(juxt.site.alpha.init/do-action
-      "https://site.test/subjects/system"
-      "https://site.test/actions/register-application"
-      {:juxt.pass.alpha/client-id "local-terminal"
-       :juxt.pass.alpha/redirect-uri "https://site.test/terminal/callback"
-       :juxt.pass.alpha/scope "user:admin"})
-
-   (xt/entity (xt/db *xt-node*) "https://site.test/applications/local-terminal")
-
-   ;; Implicit grant (4.2)
-
-   #_(flip/eval-quotation
-    '[]
-    `(
-      (site/with-fx-acc
-           [(site/push-fx
-             (f/dip
-              [site/request-body-as-edn
-               (site/validate
-                [:map
-                 [:xt/id [:re "https://example.org/.*"]]
-                 [:juxt.pass.alpha/user [:re "https://example.org/users/.+"]]
-
-                 ;; Required by basic-user-identity
-                 [:juxt.pass.alpha/username [:re "[A-Za-z0-9]{2,}"]]
-                 ;; NOTE: Can put in some password rules here
-                 [:juxt.pass.alpha/password [:string {:min 6}]]
-                 ;;[:juxt.pass.jwt/iss {:optional true} [:re "https://.+"]]
-                 ;;[:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]
-                 ])
-
-               (fc/assoc ::site/type #{"https://meta.juxt.site/pass/user-identity"
-                                       "https://meta.juxt.site/pass/basic-user-identity"})
-
-               ;; Lowercase username
-               (set-at
-                (f/keep
-                 [(of :juxt.pass.alpha/username) f/>lower :juxt.pass.alpha/username]))
-
-               ;; Hash password
-               (set-at
-                (f/keep
-                 [(of :juxt.pass.alpha/password) juxt.pass.alpha/encrypt-password :juxt.pass.alpha/password-hash]))
-               (delete-at (f/dip [:juxt.pass.alpha/password]))
-
-               (xtdb.api/put
-                (fc/assoc
-                 :juxt.site.alpha/methods
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-basic-user-identity"}}
-                  :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-basic-user-identity"}}
-                  :options {}}))]))]))
-
-    (let [edn-arg
-          {:xt/id "https://example.org/user-identities/alice"
-           :juxt.pass.alpha/user "https://example.org/users/alice"
-           :juxt.pass.alpha/username "ALICE"
-           :juxt.pass.alpha/password "garden"
-           }]
-      {::site/db (xt/db *xt-node*)
-       ::site/base-uri "https://example.org"
-       ::pass/subject "https://site.test/subjects/alice"
-       ::site/received-representation
-       {::http/content-type "application/edn"
-        ::http/body (.getBytes (pr-str edn-arg))}}))))
-
-
-
-(flip/eval-quotation
-    '[]
-    `["a" "b" f/str]
-
-    {})
+     :ring.request/query "response_type=token&client_id=local-terminal&state=abc123vcb"})))
