@@ -1297,7 +1297,7 @@ Password: <input name=password type=password>
      ))))
 
 #_(defn create-action-issue-access-token! []
-  (eval
+    (eval
    (substitute-actual-base-uri
     (quote
      ;; tag::create-action-issue-access-token![]
@@ -1362,30 +1362,69 @@ Password: <input name=password type=password>
 
 ;; Authorization Server
 
-#_(defn create-action-put-authorization-server []
-    )
+(defn create-action-install-authorization-server! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     ;; tag::create-action-issue-access-token![]
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/install-authorization-server"
+
+       :juxt.flip.alpha/quotation
+       `(
+         (site/with-fx-acc
+           [(site/push-fx
+             (f/dip
+              [site/request-body-as-edn
+               ;; TODO: Rewrite fc/assoc in terms of f/set-at - it turns out to
+               ;; be a poor idiom
+               (fc/assoc
+                :juxt.site.alpha/methods
+                {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/oauth/authorize"}}})
+               xtdb.api/put]))]))
+
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]]})))))
+
+(defn grant-permission-install-authorization-server! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/repl/put-user"
+       :juxt.pass.alpha/subject "https://example.org/subjects/system"
+       :juxt.pass.alpha/action "https://example.org/actions/install-authorization-server"
+       :juxt.pass.alpha/purpose nil})))))
+
+;;(defn install-authorization-server! [])
 
 #_(defn install-authorization-server! []
-  ;; tag::install-authorization-server![]
-  (juxt.site.alpha.init/put!
-   {:xt/id "https://auth.example.org/oauth/authorize"
-    :juxt.site.alpha/methods
-    {:get
-     {:juxt.site.alpha/handler 'juxt.pass.alpha.authorization-server/authorize
-      :juxt.pass.alpha/actions #{"https://example.org/actions/authorize-application"}
+    ;; tag::install-authorization-server![]
+    (juxt.site.alpha.init/put!
+     {:xt/id "https://auth.example.org/oauth/authorize"
+      :juxt.site.alpha/methods
+      {:get
+       {:juxt.site.alpha/handler 'juxt.pass.alpha.authorization-server/authorize
+        :juxt.pass.alpha/actions #{"https://example.org/actions/authorize-application"}
 
-      ;; Should we create a 'session space' which functions like a protection
-      ;; space?  Like a protection space, it will extract the ::pass/subject
-      ;; from the session and place into the request - see
-      ;; juxt.pass.alpha.session/wrap-associate-session
+        ;; Should we create a 'session space' which functions like a protection
+        ;; space?  Like a protection space, it will extract the ::pass/subject
+        ;; from the session and place into the request - see
+        ;; juxt.pass.alpha.session/wrap-associate-session
 
-      :juxt.pass.alpha/session-cookie "id"
-      ;; This will be called with query parameter return-to set to ::site/uri
-      ;; (effective URI) of request
-      :juxt.pass.alpha/redirect-when-no-session-session "https://example.org/_site/openid/auth0/login"
-      }}})
-  ;; end::install-authorization-server![]
-  )
+        :juxt.pass.alpha/session-cookie "id"
+        ;; This will be called with query parameter return-to set to ::site/uri
+        ;; (effective URI) of request
+        :juxt.pass.alpha/redirect-when-no-session-session "https://example.org/_site/openid/auth0/login"
+        }}})
+    ;; end::install-authorization-server![]
+    )
 
 ;; TODO: Put Authorization Server in a protection space
 
