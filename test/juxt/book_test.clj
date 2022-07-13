@@ -392,6 +392,11 @@
     ;; Register application
     (book/register-example-application!)
 
+    ;; TODO: Let's login remotely
+    (book/create-action-create-login-resource!)
+    (book/grant-permission-to-create-login-resource!)
+    (book/create-login-resource!)
+
     ;; Login
     (let [login-log-entry
           (authz/do-action
