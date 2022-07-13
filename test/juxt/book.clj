@@ -1402,7 +1402,16 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/action "https://example.org/actions/install-authorization-server"
        :juxt.pass.alpha/purpose nil})))))
 
-;;(defn install-authorization-server! [])
+(defn install-authorization-server! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/install-authorization-server"
+      {:xt/id "https://site.test/authorize"
+       :juxt.http.alpha/content-type "text/html;charset=utf-8"
+       :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"})))))
 
 #_(defn install-authorization-server! []
     ;; tag::install-authorization-server![]

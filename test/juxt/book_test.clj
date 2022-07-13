@@ -367,29 +367,7 @@
 
     (book/create-action-install-authorization-server!)
     (book/grant-permission-install-authorization-server!)
-
-    (authz/do-action
-     (let [xt-node *xt-node*
-           body (.getBytes
-                 (pr-str
-                  {:xt/id "https://site.test/authorize"
-                   :juxt.http.alpha/content-type "text/html;charset=utf-8"
-                   :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"}))]
-       {::site/xt-node xt-node
-        ::site/db (xt/db xt-node)
-        ::pass/subject nil           ; there is no subject at the point of login
-        ::pass/action "https://site.test/actions/install-authorization-server"
-        ::site/base-uri "https://site.test"
-        ::site/received-representation
-        {::http/content-type "application/edn"
-         ::http/body body}}))
-
-    #_(init/put!
-       {:xt/id "https://site.test/authorize"
-        :juxt.http.alpha/content-type "text/html;charset=utf-8"
-        :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"
-        :juxt.site.alpha/methods
-        {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/oauth/authorize"}}}})
+    (book/install-authorization-server!)
 
     ;; Create a user Alice, with her identity
     (book/users-preliminaries!)
