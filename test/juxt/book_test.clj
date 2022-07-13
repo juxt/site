@@ -392,6 +392,7 @@
              (f/dip
               [:ring.request/query
                f/env
+               (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
                f/form-decode
                :query]))])
 
@@ -413,8 +414,8 @@
            [(f/keep
              [
               ;; Grab the client-id for error reporting
-              dup (of :query) (of "client_id") swap
-              (of :application)
+              f/dup (f/of :query) (f/of "client_id") f/swap
+              (f/of :application)
               ;; If no application entry, drop the client_id (to clean up the
               ;; stack)
               (f/if [f/drop]
@@ -435,7 +436,7 @@
          (f/define make-access-token
            [(f/set-at
              (f/keep
-              [dup (f/of :subject) ::pass/subject {} f/set-at swap
+              [f/dup (f/of :subject) ::pass/subject {} f/set-at f/swap
                (f/of :application) (f/of :xt/id) ::pass/application f/rot f/set-at
                ;; ::pass/token
                (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
@@ -451,11 +452,11 @@
            [(f/set-at
              (f/keep
               [ ;; access_token
-               dup (f/of :access-token) (f/of ::pass/token) "access_token" {} f/set-at
+               f/dup (f/of :access-token) (f/of ::pass/token) "access_token" {} f/set-at
                ;; token_token
                "bearer" "token_type" f/rot f/set-at
                ;; state
-               swap (f/of :query) (of "state") "state" f/rot f/set-at
+               f/swap (f/of :query) (f/of "state") "state" f/rot f/set-at
                ;; key in map
                :response]))])
 
@@ -468,12 +469,12 @@
            [(site/push-fx (f/dip [(site/set-status 302)]))
             (site/push-fx
              (f/keep
-              [dup (of :application) (of ::pass/redirect-uri)
-               "#" swap str
-               swap (of :fragment)
+              [f/dup (f/of :application) (f/of ::pass/redirect-uri)
+               "#" f/swap f/str
+               f/swap (f/of :fragment)
                (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
-               swap str
-               (site/set-header "location" swap)]))])
+               f/swap f/str
+               (site/set-header "location" f/swap)]))])
 
          extract-and-decode-query-string
          lookup-application-from-database
@@ -541,8 +542,7 @@
          req {:ring.request/method :get
               :ring.request/path "/authorize"
               :ring.request/headers {"cookie" (apply str (interpose ";" (map (fn [[id v]] (format "%s=%s" id v)) cookies)))}
-              ;;:ring.request/query "return-to=/document.html"
-              }
+              :ring.request/query "response_type=token&client_id=local-terminal&state=abc123vcb"}
 
          response-pre-grant (*handler* req)
 
@@ -563,7 +563,8 @@
                    ::pass/user "https://site.test/users/alice"
                    ::pass/purpose nil}))}}))
 
-         response-post-grant (*handler* req)]
+         response-post-grant (*handler* req)
+         ]
 
      (is (not= 200 (:ring.response/status response-pre-grant)))
      (is (= 200 (:ring.response/status response-post-grant)))

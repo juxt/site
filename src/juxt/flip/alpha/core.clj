@@ -318,9 +318,11 @@
 
 (defmethod word 'juxt.flip.alpha.core/form-decode
   [[encoded & stack] [_ & queue] env]
-  [(cons (codec/form-decode encoded) stack)
-   queue
-   env])
+  (if encoded
+    [(cons (codec/form-decode encoded) stack)
+     queue
+     env]
+    (throw (clojure.core/ex-info "String to decode is null" {}))))
 
 (defmethod word 'juxt.flip.alpha.core/form-encode
   [[m & stack] [_ & queue] env]

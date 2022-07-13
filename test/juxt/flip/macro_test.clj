@@ -177,6 +177,7 @@
              (f/dip
               [:ring.request/query
                f/env
+               (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
                f/form-decode
                :query]))])
 
@@ -275,4 +276,5 @@
      ::site/base-uri "https://site.test"
      ::pass/subject "https://site.test/subjects/alice"
      :ring.request/method :get
-     :ring.request/query "response_type=token&client_id=local-terminal&state=abc123vcb"})))
+     :ring.request/query "response_type=token&client_id=local-terminal&state=abc123vcb"
+     })))
