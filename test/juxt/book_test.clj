@@ -381,7 +381,6 @@
     (book/grant-permission-to-invoke-action-login!)
 
     ;; Register application
-    #_(book/applications-preliminaries!)
     (book/register-example-application!)
 
     ;; Login
