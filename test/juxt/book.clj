@@ -208,6 +208,8 @@
 
 ;; Create Alice
 
+;; TODO: Consider reserving 'put' to indicate a direct database put. Everything
+;; that goes via an action is really a 'create' or similar.
 (defn put-user-alice! []
   (eval
    (substitute-actual-base-uri
@@ -236,18 +238,6 @@
        :juxt.pass.alpha/user "https://example.org/users/alice"})
      ;; end::install-user-identity-no-credentials-for-alice![]
      ))))
-
-(defn put-subject-no-credentials-for-alice!
-  "Put a subject document for Alice, pointing to the user identity with no credentials"
-  []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/put-subject"
-      {:xt/id "https://example.org/subjects/alice"
-       :juxt.pass.alpha/user-identity "https://example.org/user-identities/alice"})))))
 
 ;; Hello World!
 
@@ -1239,127 +1229,6 @@ Password: <input name=password type=password>
           [id :juxt.pass.alpha/user user]
           [permission :juxt.pass.alpha/user user]]]})))))
 
-#_(defn create-action-authorize-application! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-authorize-application![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/authorize-application"
-
-       :juxt.flip.alpha/quotation
-       `(
-         (site/with-fx-acc
-           [(site/push-fx
-             (f/dip
-              [site/request-body-as-edn
-               (site/validate
-                [:map
-                 [:juxt.pass.alpha/user [:re "https://example.org/users/(.+)"]]
-                 [:juxt.pass.alpha/application [:re "https://example.org/applications/(.+)"]]
-                 ;; A space-delimited list of permissions that the application requires.
-                 [:juxt.pass.alpha/scope {:optional true} :string]])
-
-               (fc/assoc ::site/type "https://meta.juxt.site/pass/authorization")
-
-               (f/set-at
-                (f/dip
-                 [(pass/as-hex-str (pass/random-bytes 20)) "/authorizations/" f/str (f/env ::site/base-uri) f/str
-                  :xt/id]))
-
-               xtdb.api/put]))]))
-
-       :juxt.pass.alpha/rules
-       '[[(allowed? subject resource permission)
-          [id :juxt.pass.alpha/user user]
-          [subject :juxt.pass.alpha/user-identity id]
-          [user :role role]
-          [permission :role role]]]})
-     ;; end::create-action-authorize-application![]
-     ))))
-
-;; TODO: Rename function to indicate this permission is granted to those in the role 'user'
-#_(defn grant-permission-to-invoke-action-authorize-application! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-invoke-action-authorize-application![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/users/authorize-application"
-       :role "User"
-       :juxt.pass.alpha/action "https://example.org/actions/authorize-application"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-invoke-action-authorize-application![]
-     ))))
-
-#_(defn create-action-issue-access-token! []
-    (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-issue-access-token![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/issue-access-token"
-
-       :juxt.flip.alpha/quotation
-       `(
-         (site/with-fx-acc
-           [(site/push-fx
-             (f/dip
-              [site/request-body-as-edn
-               ;; This assumes EDN input, where subject and application are
-               ;; given. This is wrong.
-             (site/validate
-                [:map
-                 [:juxt.pass.alpha/subject [:re "https://example.org/subjects/(.+)"]]
-                 [:juxt.pass.alpha/application [:re "https://example.org/applications/(.+)"]]
-                 [:juxt.pass.alpha/scope {:optional true} :string]])
-
-               (fc/assoc ::site/type "https://meta.juxt.site/pass/access-token")
-
-               (f/set-at
-                (f/dip
-                 [(pass/as-hex-str (pass/random-bytes 16))
-                  :juxt.pass.alpha/token]))
-
-               (f/set-at
-                (f/keep
-                 [(f/of :juxt.pass.alpha/token) "/access-tokens/" f/str (f/env ::site/base-uri) f/str
-                  :xt/id]))
-
-               ;; TODO: Add ::pass/expiry: (java.util.Date/from (.plusSeconds (.toInstant (java.util.Date.)) expires-in-seconds))
-
-               xtdb.api/put]))]))
-
-       :juxt.pass.alpha/rules
-       '[[(allowed? subject resource permission)
-          [id :juxt.pass.alpha/user user]
-          [subject :juxt.pass.alpha/user-identity id]
-          [permission :role role]
-          [user :role role]]]})
-     ;; end::create-action-issue-access-token![]
-     ))))
-
-#_(defn grant-permission-to-invoke-action-issue-access-token! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-invoke-action-issue-access-token![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/users/issue-access-token"
-       :role "User"                        ; <1>
-       :juxt.pass.alpha/action "https://example.org/actions/issue-access-token"
-       :juxt.pass.alpha/purpose nil})
-       ;; end::grant-permission-to-invoke-action-issue-access-token![]
-     ))))
-
 ;; Authorization Server
 
 (defn create-action-install-authorization-server! []
@@ -1599,22 +1468,6 @@ Password: <input name=password type=password>
 (defn session-scopes-preliminaries! []
   (create-action-put-session-scope!)
   (grant-permission-to-put-session-scope!))
-
-#_(defn applications-preliminaries! []
-  (create-action-authorize-application!)
-  (grant-permission-to-invoke-action-authorize-application!)
-  (create-action-issue-access-token!)
-  (grant-permission-to-invoke-action-issue-access-token!))
-
-;; TODO: Too coarse, find usages and break up
-#_(defn setup-application! []
-  (register-example-application!)
-  (users-preliminaries!)
-  (put-user-alice!)
-  (install-user-identity-no-credentials-for-alice!)
-  (put-subject-no-credentials-for-alice!)
-  (invoke-authorize-application!)
-  (invoke-issue-access-token!))
 
 ;; TODO: We could use a dependency graph here, to allow installation of a set of
 ;; documents where there are dependencies on other documents being created.

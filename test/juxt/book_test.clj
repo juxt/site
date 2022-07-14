@@ -390,7 +390,6 @@
     ;; Create an authorization server (this can be promoted later)
     (book/protected-resource-preliminaries!)
     (book/create-action-oauth-authorize!)
-
     (book/create-action-install-authorization-server!)
     (book/grant-permission-install-authorization-server!)
     (book/install-authorization-server!)
