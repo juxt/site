@@ -383,16 +383,25 @@
 
 ;; (t/join-fixtures [with-system-xt with-handler])
 
-(deftest acquire-access-token-test
-  (let [store (atom {})]
+;; TODO: Actions should eventually be promoted to 'site'.
+
+;; This is now the grant 'Site Integration Test'.
+
+;; Given the (performance, cognitive) cost of setting things up for each test,
+;; it feels better to focus attention on a single test that tells a whole story.
+
+(deftest grand-integration-test
+  (let [
+        ;; The lexical scoping of results causes numerous levels of unnecessary
+        ;; indentation. After all, this is just a test, not part of the system
+        ;; itself. We can store things like access tokens in this store.
+        store (atom {})]
+
     (init/bootstrap!)
 
     ;; Create an authorization server (this can be promoted later)
     (book/protected-resource-preliminaries!)
-    (book/create-action-oauth-authorize!)
-    (book/create-action-install-authorization-server!)
-    (book/grant-permission-install-authorization-server!)
-    (book/install-authorization-server!)
+    (book/authorization-server-preliminaries!)
 
     ;; Create a user Alice, with her identity
     (book/users-preliminaries!)

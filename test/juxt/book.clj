@@ -1469,6 +1469,12 @@ Password: <input name=password type=password>
   (create-action-put-session-scope!)
   (grant-permission-to-put-session-scope!))
 
+(defn authorization-server-preliminaries! []
+  (create-action-oauth-authorize!)
+  (create-action-install-authorization-server!)
+  (grant-permission-install-authorization-server!)
+  (install-authorization-server!))
+
 ;; TODO: We could use a dependency graph here, to allow installation of a set of
 ;; documents where there are dependencies on other documents being created.
 
