@@ -385,7 +385,7 @@
 
 ;; TODO: Actions should eventually be promoted to 'site'.
 
-;; This is now the grant 'Site Integration Test'.
+;; This is now the grand 'Site Integration Test'.
 
 ;; Given the (performance, cognitive) cost of setting things up for each test,
 ;; it feels better to focus attention on a single test that tells a whole story.
