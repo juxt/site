@@ -364,6 +364,23 @@
             (is (= "<p>This is a protected message that is only visible when sending the correct session header.</p>"
                    (:ring.response/body response)))))))))
 
+;; A helper function for logging in with a form
+(defn login-with-form!
+  "Returns a session id (or nil) given a map of fields."
+  [fields]
+  (let [form (codec/form-encode fields)
+        body (.getBytes form)
+        req {:ring.request/method :post
+             :ring.request/path "/login"
+             :ring.request/headers
+             {"content-length" (str (count body))
+              "content-type" "application/x-www-form-urlencoded"}
+             :ring.request/body (io/input-stream body)}
+        response (*handler* req)
+        {:strs [set-cookie]} (:ring.response/headers response)
+        [_ id] (when set-cookie (re-matches #"id=(.*?);.*" set-cookie))]
+    id))
+
 ;; (t/join-fixtures [with-system-xt with-handler])
 
 (deftest acquire-access-token-test
@@ -392,49 +409,20 @@
     ;; Register application
     (book/register-example-application!)
 
-    ;; TODO: Let's login remotely
     (book/create-action-create-login-resource!)
     (book/grant-permission-to-create-login-resource!)
     (book/create-login-resource!)
 
-    ;; Login
-    (let [login-log-entry
-          (authz/do-action
-           (let [xt-node *xt-node*
-                 body (.getBytes
-                       (codec/form-encode
-                        ;; usernames are case-insensitive - testing this
-                        {"username" "aliCe"
-                         "password" "garden"}))]
-             {::site/xt-node xt-node
-              ::site/db (xt/db xt-node)
-              ::pass/subject nil     ; there is no subject at the point of login
-              ::pass/action "https://site.test/actions/login"
-              ::site/base-uri "https://site.test"
-              ::site/received-representation
-              {::http/content-type "application/x-www-form-urlencoded"
-               ::http/body body}}))
-
-          cookies
-          (as-> {} %
-            (authz/apply-request-context-operations
-             %
-             (-> login-log-entry ::pass/action-result ::site/apply-to-request-context-ops))
-            (:ring.response/headers %)
-            (keep (fn [[k v]] (when (= k "set-cookie") (next (re-matches #"([a-z]+?)=(.*?);.*" v)))) %)
-            (map vec %)
-            (into {} %))]
-
-      (is (seq cookies))
-
-      (swap! store assoc :cookies cookies))
+    (let [sid (login-with-form! {"username" "ALICE" "password" "garden"})]
+      (is sid)
+      (swap! store assoc :sid sid))
 
     ;; GET on https://site.test/authorize
     (swap!
      store assoc :request
      {:ring.request/method :get
       :ring.request/path "/authorize"
-      :ring.request/headers {"cookie" (apply str (interpose ";" (map (fn [[id v]] (format "%s=%s" id v)) (:cookies @store))))}
+      :ring.request/headers {"cookie" (format "id=%s" (:sid @store))}
       :ring.request/query
       (codec/form-encode
        {"response_type" "token"
@@ -445,6 +433,7 @@
     (let [response (*handler* (:request @store))]
       (is (= 403 (:ring.response/status response))))
 
+    ;; Grant Alice permission to perform /actions/oauth/authorize
     (authz/do-action
      (let [xt-node *xt-node*]
        {::site/xt-node xt-node

@@ -1098,10 +1098,6 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/action "https://example.org/actions/login"
        :juxt.pass.alpha/purpose nil})))))
 
-#_(defn login! []
-
-  )
-
 ;; Applications
 
 (defn create-action-oauth-authorize! []
