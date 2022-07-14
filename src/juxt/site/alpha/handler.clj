@@ -13,7 +13,7 @@
    [juxt.dave.alpha.methods :as dave.methods]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha.http-authentication :as http-authn]
-   [juxt.pass.alpha.authorization :as authz]
+   [juxt.pass.alpha.actions :as authz]
    [juxt.pass.alpha.session-scope :as session-scope]
    [juxt.pass.alpha.session :as session]
    [juxt.pick.alpha.core :refer [rate-representation]]

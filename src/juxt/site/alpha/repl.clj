@@ -17,7 +17,7 @@
    [juxt.grab.alpha.schema :as graphql.schema]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.authorization :as authz]
+   [juxt.pass.alpha.actions :as authz]
    [juxt.site.alpha :as-alias site]
    [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.graphql :as graphql]

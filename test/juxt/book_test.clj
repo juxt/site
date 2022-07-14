@@ -9,7 +9,7 @@
    [juxt.flip.clojure.core :as-alias fc]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.authorization :as authz]
+   [juxt.pass.alpha.actions :as authz]
    [juxt.pass.alpha.http-authentication :as authn]
    [juxt.pass.alpha.session-scope :as session-scope]
    [juxt.site.alpha :as-alias site]

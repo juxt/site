@@ -475,7 +475,7 @@
                ;; An action can be called as a transaction function, to allow actions to compose
                #_:xt/fn
                #_(quote (fn [xt-ctx ctx & args]
-                          (juxt.pass.alpha.authorization/juxt.site.alpha.init/do-action* xt-ctx ctx args)))]))]))
+                          (juxt.pass.alpha.actions/do-action* xt-ctx ctx args)))]))]))
 
        :juxt.pass.alpha/rules
        '[

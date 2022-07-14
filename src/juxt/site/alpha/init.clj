@@ -6,7 +6,7 @@
    [clojure.walk :refer [postwalk]]
    [jsonista.core :as json]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.authorization :as authz]
+   [juxt.pass.alpha.actions :as authz]
    [juxt.flip.alpha.core :as f]
    [juxt.flip.clojure.core :as-alias fc]
    [juxt.reap.alpha.combinators :as p]

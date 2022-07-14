@@ -1,23 +1,16 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.alpha.authorization
+(ns juxt.pass.alpha.actions
   (:require
    [clojure.tools.logging :as log]
-   [clojure.walk :refer [postwalk]]
-   [juxt.site.alpha.util :refer [random-bytes as-hex-str]]
-   [malli.core :as m]
    [malli.error :a me]
    [ring.util.codec :as codec]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.session-scope :as session-scope]
-   [juxt.pass.alpha.malli :as-alias pass.malli]
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
-   [juxt.pass.alpha.process :as process]
    [juxt.flip.alpha.core :refer [eval-quotation]]
    [juxt.flip.alpha :as-alias flip]
-   [xtdb.api :as xt]
-   [clojure.walk :as walk]))
+   [xtdb.api :as xt]))
 
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
@@ -337,7 +330,7 @@
 (defn install-do-action-fn [uri]
   {:xt/id (str uri "/_site/do-action")
    :xt/fn '(fn [xt-ctx ctx & args]
-             (juxt.pass.alpha.authorization/do-action* xt-ctx ctx args))})
+             (juxt.pass.alpha.actions/do-action* xt-ctx ctx args))})
 
 ;; Remove anything in the ctx that will upset nippy. However, in the future
 ;; we'll definitely want to record all inputs to actions, so this is an
