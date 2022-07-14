@@ -402,7 +402,6 @@
     (init/bootstrap!)
 
     ;; Create an authorization server (this can be promoted later)
-    (book/protected-resource-preliminaries!)
     (book/authorization-server-preliminaries!)
 
     ;; Create a user Alice, with her identity
@@ -469,6 +468,7 @@
         (swap! store assoc :access-token access-token)))
 
     ;; We now have an access token, let's use it!
+;;    (book/protected-resource-preliminaries!)
 
 
     ))
