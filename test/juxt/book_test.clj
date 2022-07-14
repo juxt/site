@@ -389,7 +389,9 @@
 
 ;; Given the (performance, cognitive) cost of setting things up for each test,
 ;; it feels better to focus attention on a single test that tells a whole story.
+;;
 
+;;(t/join-fixtures [with-system-xt with-handler])
 (deftest grand-integration-test
   (let [
         ;; The lexical scoping of results causes numerous levels of unnecessary
@@ -426,47 +428,47 @@
       (swap! store assoc :sid sid))
 
     ;; GET on https://site.test/authorize
-    (swap!
-     store assoc :request
-     {:ring.request/method :get
-      :ring.request/path "/authorize"
-      :ring.request/headers {"cookie" (format "id=%s" (:sid @store))}
-      :ring.request/query
-      (codec/form-encode
-       {"response_type" "token"
-        "client_id" "local-terminal"
-        "state" "abc123vcb"})})
+    (let [request {:ring.request/method :get
+                   :ring.request/path "/authorize"
+                   :ring.request/headers {"cookie" (format "id=%s" (:sid @store))}
+                   :ring.request/query
+                   (codec/form-encode
+                    {"response_type" "token"
+                     "client_id" "local-terminal"
+                     "state" "abc123vcb"})}]
+      ;; Check response is a 403
+      (let [response (*handler* request)]
+        (is (= 403 (:ring.response/status response))))
 
-    ;; Check response is a 403
-    (let [response (*handler* (:request @store))]
-      (is (= 403 (:ring.response/status response))))
+      ;; Grant Alice permission to perform /actions/oauth/authorize
+      (authz/do-action
+       (let [xt-node *xt-node*]
+         {::site/xt-node xt-node
+          ::site/db (xt/db xt-node)
+          ::pass/subject "https://site.test/subjects/system"
+          ::pass/action "https://site.test/actions/grant-permission"
+          ::site/base-uri "https://site.test"
+          ::site/received-representation
+          {::http/content-type "application/edn"
+           ::http/body
+           (.getBytes
+            (pr-str
+             {:xt/id "https://site.test/permissions/alice-can-authorize"
+              ::pass/action "https://site.test/actions/oauth/authorize"
+              ::pass/user "https://site.test/users/alice"
+              ::pass/purpose nil}))}}))
 
-    ;; Grant Alice permission to perform /actions/oauth/authorize
-    (authz/do-action
-     (let [xt-node *xt-node*]
-       {::site/xt-node xt-node
-        ::site/db (xt/db xt-node)
-        ::pass/subject "https://site.test/subjects/system"
-        ::pass/action "https://site.test/actions/grant-permission"
-        ::site/base-uri "https://site.test"
-        ::site/received-representation
-        {::http/content-type "application/edn"
-         ::http/body
-         (.getBytes
-          (pr-str
-           {:xt/id "https://site.test/permissions/alice-can-authorize"
-            ::pass/action "https://site.test/actions/oauth/authorize"
-            ::pass/user "https://site.test/users/alice"
-            ::pass/purpose nil}))}}))
+      (let [response (*handler* request)
+            location (re-matches
+                      #"https://site.test/terminal/callback#access_token=(.*?)\&token_type=bearer\&state=abc123vcb"
+                      (-> response :ring.response/headers (get "location")))
+            access-token (second location)]
+        (is location)
+        (is (= 302 (:ring.response/status response)))
+        (is access-token)
+        (swap! store assoc :access-token access-token)))
 
-    (let [response (*handler* (:request @store))
-          location (re-matches
-                    #"https://site.test/terminal/callback#access_token=(.*?)\&token_type=bearer\&state=abc123vcb"
-                    (-> response :ring.response/headers (get "location")))
-          access-token (second location)]
-      (is location)
-      (is (= 302 (:ring.response/status response)))
-      (is access-token)
-      (swap! store assoc :access-token access-token))
+    ;; We now have an access token, let's use it!
+
 
     ))
