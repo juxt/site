@@ -252,6 +252,7 @@
      protection-space)))
 
 (defn authenticate-with-bearer-auth [req db token68 protection-spaces]
+  (log/debugf "token68 is %s" token68)
   (let [subject
         (:subject
          (first
@@ -262,6 +263,7 @@
                              [at ::pass/subject sub]
                              [sub ::site/type "https://meta.juxt.site/pass/subject"]]
                      :in [tok]} token68)))]
+    (log/debugf "subject found is %s" (pr-str subject))
     (cond-> req subject (assoc ::pass/subject subject))))
 
 ;; TODO (idea): Tie bearer token to other security aspects such as remote IP so that

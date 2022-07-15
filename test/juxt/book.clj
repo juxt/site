@@ -797,6 +797,7 @@
      ;; end::grant-permission-to-resource-protected-by-session-scope![]
      ))))
 
+;; TODO: Poorly named since it only creates a session scope around /protected-by-session-scope/
 (defn create-session-scope! []
   (eval
    (substitute-actual-base-uri
@@ -1183,6 +1184,11 @@ Password: <input name=password type=password>
                   ;; key in map
                   :access-token]))])
 
+            (f/define push-access-token-fx
+              [(site/push-fx
+                (f/keep
+                 [(f/of :access-token) xtdb.api/put]))])
+
             (f/define collate-response
               [(f/set-at
                 (f/keep
@@ -1217,6 +1223,7 @@ Password: <input name=password type=password>
             extract-subject
             assert-subject
             make-access-token
+            push-access-token-fx
             collate-response
             encode-fragment
             redirect-to-application-redirect-uri
@@ -1278,7 +1285,7 @@ Password: <input name=password type=password>
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/install-authorization-server"
-      {:xt/id "https://site.test/authorize"
+      {:xt/id "https://site.test/oauth/authorize"
        :juxt.http.alpha/content-type "text/html;charset=utf-8"
        :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"})))))
 

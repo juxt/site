@@ -391,129 +391,201 @@
 ;; it feels better to focus attention on a single test that tells a whole story.
 ;;
 
-;;deftest grand-integration-test
-((t/join-fixtures [with-system-xt with-handler])
- (fn []
-   (let [
-         ;; The lexical scoping of results causes numerous levels of unnecessary
-         ;; indentation. After all, this is just a test, not part of the system
-         ;; itself. We can store things like access tokens in this store.
-         store (atom {})]
+;;(t/join-fixtures [with-system-xt with-handler])
+(deftest grand-integration-test
+  (let [
+        ;; The lexical scoping of results causes numerous levels of unnecessary
+        ;; indentation. After all, this is just a test, not part of the system
+        ;; itself. We can store things like access tokens in this store.
+        store (atom {})]
 
-     (init/bootstrap!)
+    (init/bootstrap!)
 
-     ;; Create an authorization server (this can be promoted later)
-     (book/authorization-server-preliminaries!)
+    ;; Create a user Alice, with her identity
+    (book/users-preliminaries!)
+    (book/put-user-alice!)
+    (book/create-action-put-basic-user-identity!)
+    (book/grant-permission-to-invoke-action-put-basic-user-identity!)
+    (book/put-basic-user-identity-alice!)
 
-     ;; Create a user Alice, with her identity
-     (book/users-preliminaries!)
-     (book/put-user-alice!)
-     (book/create-action-put-basic-user-identity!)
-     (book/grant-permission-to-invoke-action-put-basic-user-identity!)
-     (book/put-basic-user-identity-alice!)
+    ;; Register application
+    (book/register-example-application!)
 
-     ;; Log her in
-     (book/create-action-login!)
-     (book/grant-permission-to-invoke-action-login!)
+    (book/protected-resource-preliminaries!)
 
-     ;; Register application
-     (book/register-example-application!)
+    ;; Let's create a protected resource
+    (juxt.site.alpha.init/do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/put-immutable-protected-resource"
+     {:xt/id "https://site.test/private/internal.html"
+      :juxt.http.alpha/content-type "text/plain"
+      :juxt.http.alpha/content "Internal message"
+      })
 
-     (book/create-action-create-login-resource!)
-     (book/grant-permission-to-create-login-resource!)
-     (book/create-login-resource!)
+    ;; Try to access /internal.html - there is no protection space so no
+    ;; WWW-Authenticate header. We simply can't perform
+    ;; /actions/get-protected-resource anonymously.
+    (is (= 403
+           (:ring.response/status
+            (*handler*
+             {:ring.request/method :get
+              :ring.request/path "/private/internal.html"}))))
 
-     (let [sid (login-with-form! {"username" "ALICE" "password" "garden"})]
-       (is sid)
-       (swap! store assoc :sid sid))
+    ;; Now let's layer over a protection space
+    (book/protection-spaces-preliminaries!)
 
-     ;; GET on https://site.test/authorize
-     (let [request {:ring.request/method :get
-                    :ring.request/path "/authorize"
-                    :ring.request/headers {"cookie" (format "id=%s" (:sid @store))}
-                    :ring.request/query
-                    (codec/form-encode
-                     {"response_type" "token"
-                      "client_id" "local-terminal"
-                      "state" "abc123vcb"})}]
-       ;; Check response is a 403
-       (let [response (*handler* request)]
-         (is (= 403 (:ring.response/status response))))
+    (juxt.site.alpha.init/do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/put-protection-space"
+     {:xt/id "https://site.test/protection-spaces/bearer"
 
-       ;; Grant Alice permission to perform /actions/oauth/authorize
-       (authz/do-action
-        (let [xt-node *xt-node*]
-          {::site/xt-node xt-node
-           ::site/db (xt/db xt-node)
-           ::pass/subject "https://site.test/subjects/system"
-           ::pass/action "https://site.test/actions/grant-permission"
-           ::site/base-uri "https://site.test"
-           ::site/received-representation
-           {::http/content-type "application/edn"
-            ::http/body
-            (.getBytes
-             (pr-str
-              {:xt/id "https://site.test/permissions/alice-can-authorize"
-               ::pass/action "https://site.test/actions/oauth/authorize"
-               ::pass/user "https://site.test/users/alice"
-               ::pass/purpose nil}))}}))
+      :juxt.pass.alpha/canonical-root-uri "https://site.test"
+      ;;:juxt.pass.alpha/realm "Wonderland" ; optional
 
-       (let [response (*handler* request)
-             location (re-matches
-                       #"https://site.test/terminal/callback#access_token=(.*?)\&token_type=bearer\&state=abc123vcb"
-                       (-> response :ring.response/headers (get "location")))
-             access-token (second location)]
-         (is location)
-         (is (= 302 (:ring.response/status response)))
-         (is access-token)
-         (swap! store assoc :access-token access-token)))
+      :juxt.pass.alpha/auth-scheme "Bearer"
+      :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
+      })
 
-     ;; We now have an access token, let's use it!
-     (book/protected-resource-preliminaries!)
+    ;; Now if we try to access /private/internal.html we'll at least be
+    ;; prompted to authenticate.
+    (is
+     (= 401
+        (:ring.response/status
+         (*handler*
+          {:ring.request/method :get
+           :ring.request/path "/private/internal.html"}))))
 
-     ;; Let's create a protected resource
-     (juxt.site.alpha.init/do-action
-      "https://site.test/subjects/system"
-      "https://site.test/actions/put-immutable-protected-resource"
-      {:xt/id "https://site.test/internal.html"
-       :juxt.http.alpha/content-type "text/plain"
-       :juxt.http.alpha/content "Internal message"
-       })
+    ;; We need to get an access token to access /private/internal.html
+    ;; For that, we'll need an authorization server
 
-     ;; Can we access it?
+    ;; Create an authorization server (this can be promoted later)
+    (book/authorization-server-preliminaries!)
 
-     ;; without an access token?
-     (is (= 403 (:ring.response/status
-                 (*handler*
-                  {:ring.request/method :get
-                   :ring.request/path "/internal.html"}))))
+    ;; Access to the authorization server will return 403. We need access to
+    ;; perform /actions/oauth/authorize. Permission is granted on a per-user
+    ;; basis.
+    (is (= 403 (:ring.response/status
+                (*handler*
+                 {:ring.request/method :get
+                  :ring.request/path "/oauth/authorize"}))))
 
-     ;; with access token?
-     (is (= 403 (:ring.response/status
-                 (*handler*
-                  {:ring.request/method :get
-                   :ring.request/headers {"authorization" (format "Bearer %s" (:access-token @store))}
-                   :ring.request/path "/internal.html"}))))
 
-     ;; Now let's layer over a protection space
+    ;; We'll need to wrap /authorize in a session-scope to trigger a redirect
+    ;; to somewhere we can login.
 
-     (book/protection-spaces-preliminaries!)
+    (book/session-scopes-preliminaries!)
 
-     (juxt.site.alpha.init/do-action
-      "https://site.test/subjects/system"
-      "https://site.test/actions/put-protection-space"
-      {:xt/id "https://site.test/protection-spaces/bearer"
+    (juxt.site.alpha.init/do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/put-session-scope"
+     {:xt/id "https://site.test/session-scopes/oauth"
+      :juxt.pass.alpha/cookie-name "id"
+      :juxt.pass.alpha/cookie-domain "https://site.test"
+      :juxt.pass.alpha/cookie-path "/oauth"
+      :juxt.pass.alpha/login-uri "https://site.test/login"})
 
-       :juxt.pass.alpha/canonical-root-uri "https://site.test"
-       ;;:juxt.pass.alpha/realm "Wonderland" ; optional
+    ;; Now we should get a 302
+    (let [response (*handler*
+                    {:ring.request/method :get
+                     :ring.request/path "/oauth/authorize"})
+          location (get-in response [:ring.response/headers "location"])]
+      (is (= 302 (:ring.response/status response)))
+      (let [[_ rel] (re-matches #"https://site.test(.*)" location)]
+        ;; But the login is not yet established, so we get a 404.
+        (is (= 404 (:ring.response/status
+                    (*handler*
+                     {:ring.request/method :get
+                      :ring.request/path rel}))))
 
-       :juxt.pass.alpha/auth-scheme "Bearer"
-       :juxt.pass.alpha/authentication-scope "/.*" ; regex pattern
-       })
+        ;; Prepare login
+        (book/create-action-login!)
+        (book/grant-permission-to-invoke-action-login!)
+        (book/create-action-create-login-resource!)
+        (book/grant-permission-to-create-login-resource!)
+        (book/create-login-resource!)
 
-     (*handler*
-      {:ring.request/method :get
-       :ring.request/headers {"authorization" (format "Bearer %s" (:access-token @store))}
-       :ring.request/path "/internal.html"})
+        ;; Let's authenticate via the login action (via the login form)
+        (let [sid (login-with-form! {"username" "ALICE" "password" "garden"})]
+          (is sid)
+          (swap! store assoc :sid sid))))
 
-     )))
+    ;; We now have a session id linked to Alice's session and subject
+
+    ;; GET on https://site.test/authorize
+    (let [request {:ring.request/method :get
+                   :ring.request/path "/oauth/authorize"
+                   :ring.request/headers {"cookie" (format "id=%s" (:sid @store))}
+                   :ring.request/query
+                   (codec/form-encode
+                    {"response_type" "token"
+                     "client_id" "local-terminal"
+                     "state" "abc123vcb"})}]
+
+      ;; TODO: Try a request to /oauth/authorize before we've created the resource
+
+      ;; Check response is a 403
+      (let [response (*handler* request)]
+        (is (= 403 (:ring.response/status response))))
+
+      ;; Grant Alice permission to perform /actions/oauth/authorize
+      (authz/do-action
+       (let [xt-node *xt-node*]
+         {::site/xt-node xt-node
+          ::site/db (xt/db xt-node)
+          ::pass/subject "https://site.test/subjects/system"
+          ::pass/action "https://site.test/actions/grant-permission"
+          ::site/base-uri "https://site.test"
+          ::site/received-representation
+          {::http/content-type "application/edn"
+           ::http/body
+           (.getBytes
+            (pr-str
+             {:xt/id "https://site.test/permissions/alice-can-authorize"
+              ::pass/action "https://site.test/actions/oauth/authorize"
+              ::pass/user "https://site.test/users/alice"
+              ::pass/purpose nil}))}}))
+
+      (let [response (*handler* request)
+            location-header (-> response :ring.response/headers (get "location"))
+            location (when location-header
+                       (re-matches
+                        #"https://site.test/terminal/callback#access_token=(.*?)\&token_type=bearer\&state=abc123vcb" location-header))
+            access-token (second location)]
+        (is location)
+        (is (= 302 (:ring.response/status response)))
+        (is access-token)
+        (swap! store assoc :access-token access-token)))
+    ;;
+
+    ;; without an access token?
+    (is (= 401 (:ring.response/status
+                (*handler*
+                 {:ring.request/method :get
+                  :ring.request/path "/private/internal.html"}))))
+
+    ;; with access token? No, because Alice doesn't have permission
+    (is (= 403 (:ring.response/status
+                (*handler*
+                 {:ring.request/method :get
+                  :ring.request/headers {"authorization" (format "Bearer %s" (:access-token @store))}
+                  :ring.request/path "/private/internal.html"}))))
+
+    ;; Give Alice get-protected-resource permission to /private/internal.html
+
+    (juxt.site.alpha.init/do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/grant-permission"
+     {:xt/id "https://site.test/permissions/alice/private/internal.html"
+      :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
+      :juxt.pass.alpha/user "https://site.test/users/alice"
+      :juxt.site.alpha/uri "https://site.test/private/internal.html"
+      :juxt.pass.alpha/purpose nil
+      })
+
+
+    (is (= 200
+           (:ring.response/status
+            (*handler*
+             {:ring.request/method :get
+              :ring.request/headers {"authorization" (format "Bearer %s" (:access-token @store))}
+              :ring.request/path "/private/internal.html"}))))))
