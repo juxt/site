@@ -5,7 +5,7 @@
    [juxt.site.alpha.handler :as h]
    [xtdb.api :as xt]
    [juxt.site.alpha.main :as main]
-   [juxt.pass.alpha.authorization :as authz]
+   [juxt.pass.alpha.actions :as authz]
    [juxt.apex.alpha :as-alias apex]
    [juxt.http.alpha :as-alias http]
    [juxt.mail.alpha :as-alias mail]

@@ -1,23 +1,16 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.alpha.authorization
+(ns juxt.pass.alpha.actions
   (:require
    [clojure.tools.logging :as log]
-   [clojure.walk :refer [postwalk]]
-   [juxt.site.alpha.util :refer [random-bytes as-hex-str]]
-   [malli.core :as m]
    [malli.error :a me]
    [ring.util.codec :as codec]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.session-scope :as session-scope]
-   [juxt.pass.alpha.malli :as-alias pass.malli]
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
-   [juxt.pass.alpha.process :as process]
    [juxt.flip.alpha.core :refer [eval-quotation]]
    [juxt.flip.alpha :as-alias flip]
-   [xtdb.api :as xt]
-   [clojure.walk :as walk]))
+   [xtdb.api :as xt]))
 
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
@@ -63,7 +56,9 @@
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
   [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose}]
 
-  (log/debugf "check-permissions: subject %s, resource: %s, purpose: %s, actions: %s, subject: %s" subject resource purpose actions
+  (assert (or (nil? subject) (string? subject)) "Subject expected to be an id, or null")
+
+  (log/debugf "check-permissions: subject %s, resource: %s, purpose: %s, actions: %s, whole subject: %s" subject resource purpose actions
               (xt/pull db '[*] subject))
 
   (log/debugf "Actions: %s" actions)
@@ -233,6 +228,8 @@
   (let [db (xt/db xt-ctx)
         tx (xt/indexing-tx xt-ctx)]
     (try
+      (assert (or (nil? subject) (string? subject)) "Subject to do-action* expected to be an id, or null")
+
       ;; Check that we /can/ call the action
       (let [check-permissions-result
             (check-permissions db #{action} ctx)
@@ -259,6 +256,8 @@
                 :else
                 (throw (ex-info "All actions must have some processing steps"
                                 {:action action-doc})))
+
+              _ (log/infof "FX are %s" (pr-str fx))
 
               ;; Validate
               _ (doseq [effect fx]
@@ -331,7 +330,7 @@
 (defn install-do-action-fn [uri]
   {:xt/id (str uri "/_site/do-action")
    :xt/fn '(fn [xt-ctx ctx & args]
-             (juxt.pass.alpha.authorization/do-action* xt-ctx ctx args))})
+             (juxt.pass.alpha.actions/do-action* xt-ctx ctx args))})
 
 ;; Remove anything in the ctx that will upset nippy. However, in the future
 ;; we'll definitely want to record all inputs to actions, so this is an
@@ -353,9 +352,11 @@
          ops)]
     res))
 
-(defn do-action [{::site/keys [xt-node db base-uri] ::pass/keys [action] :as ctx}]
+(defn do-action [{::site/keys [xt-node db base-uri] ::pass/keys [subject action] :as ctx}]
   (assert (:juxt.site.alpha/xt-node ctx) "xt-node must be present")
+  (assert (:juxt.site.alpha/db ctx) "db must be present")
   (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
+  (assert (or (nil? subject) (string? subject)) "Subject to do-action expected to be an id, or null")
   ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed
   ;; by an anonymous user.
   (let [tx-fn (str base-uri "/_site/do-action")]
@@ -377,15 +378,21 @@
              (xt/db xt-node)
              (format "urn:site:action-log:%s" tx-id))]
         (if-let [error (::site/error result)]
-          (throw
-           (ex-info
-            (format "Transaction error performing action %s: %s" action (:message error))
-            (merge
-             (dissoc result ::site/type :xt/id ::site/error)
-             (:ex-data error))))
+          (do
+            (log/errorf "Transaction error: %s" (pr-str error))
+            (let [status (:ring.response/status (:ex-data error))]
+              (throw
+               (ex-info
+                (format "Transaction error performing action %s: %s" action (:message error))
+                (into
+                 {::site/request-context
+                  (cond-> ctx
+                    status (assoc :ring.response/status status))}
+                 (merge
+                  (dissoc result ::site/type :xt/id ::site/error)
+                  (:ex-data error)))))))
 
           (let [apply-to-request-context-ops (:juxt.site.alpha/apply-to-request-context-ops result)]
-            (log/infof "result is %s" result)
             (cond-> ctx
               result (assoc ::pass/action-result result)
 
@@ -409,6 +416,12 @@
         :as req}]
 
     (let [actions (get-in resource [::site/methods method ::pass/actions])
+
+          _ (doseq [action actions]
+              (when-not (xt/entity db action)
+                (throw (ex-info (format "No such action: %s" action) {::site/request-context req
+                                                                      :missing-action action}))))
+
           permitted-actions
           (check-permissions
            db

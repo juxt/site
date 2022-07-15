@@ -6,7 +6,7 @@
    [clojure.walk :refer [postwalk]]
    [jsonista.core :as json]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.authorization :as authz]
+   [juxt.pass.alpha.actions :as actions]
    [juxt.flip.alpha.core :as f]
    [juxt.flip.clojure.core :as-alias fc]
    [juxt.reap.alpha.combinators :as p]
@@ -110,7 +110,7 @@
       )))))
 
 (defn install-do-action-fn! []
-  (put! (authz/install-do-action-fn (base-uri))))
+  (put! (actions/install-do-action-fn (base-uri))))
 
 (defn bootstrap-primordials!
   "Add just enough for the REPL to call actions for everything else"
@@ -133,7 +133,7 @@
 
 (defn do-action [subject action edn-arg]
   (::pass/action-result
-   (authz/do-action
+   (actions/do-action
     (make-repl-request-context subject action edn-arg))))
 
 (defn create-grant-permission-action! []

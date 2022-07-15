@@ -10,7 +10,7 @@
    [juxt.jinx.alpha.api :as jinx.api]
    [juxt.jinx.alpha.vocabularies.keyword-mapping :refer [process-keyword-mappings]]
    [juxt.jinx.alpha.vocabularies.transformation :refer [process-transformations]]
-   [juxt.pass.alpha.authorization :as authz]
+   [juxt.pass.alpha.actions :as actions]
    [juxt.reap.alpha.decoders :as reap.decoders]
    [juxt.site.alpha.perf :refer [fast-get-in]]
    [juxt.site.alpha.return :refer [return]]
@@ -220,7 +220,7 @@
                                    ::pass/resource
                                    ])
         action (get-in req [::site/resource ::apex/operation-action])
-        action-result (authz/do-action req pass-ctx action new-resource-state)
+        action-result (actions/do-action req pass-ctx action new-resource-state)
         _ (log/tracef "action result is %s" action-result)]
 
     ;; Since this resource is 'managed' by the locate-resource in this ns, we

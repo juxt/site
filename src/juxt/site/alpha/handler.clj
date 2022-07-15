@@ -13,7 +13,7 @@
    [juxt.dave.alpha.methods :as dave.methods]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha.http-authentication :as http-authn]
-   [juxt.pass.alpha.authorization :as authz]
+   [juxt.pass.alpha.actions :as actions]
    [juxt.pass.alpha.session-scope :as session-scope]
    [juxt.pass.alpha.session :as session]
    [juxt.pick.alpha.core :refer [rate-representation]]
@@ -254,7 +254,7 @@
         req (assoc req :ring.response/status 200)]
 
     (try
-      (authz/do-action
+      (actions/do-action
        (-> req
            (assoc ::pass/action (:xt/id permitted-action))
            ;; A java.io.BufferedInputStream in the request can provke this
@@ -472,7 +472,7 @@
       (h (cond-> req
            ;; Only authorize if not already authorized
            (not (::pass/authorization resource))
-           authz/authorize-resource))))
+           actions/authorize-resource))))
 
 #_(defn wrap-authorize-with-pdp
   ;; Do authorization as late as possible (in order to have as much data
@@ -1239,7 +1239,7 @@
    wrap-method-not-allowed?
 
    ;; We authorize the resource, prior to finding representations.
-   authz/wrap-authorize-with-actions
+   actions/wrap-authorize-with-actions
 
    ;; Find representations and possibly do content negotiation
    wrap-find-current-representations
