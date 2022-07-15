@@ -26,15 +26,20 @@
     ;; arguments.
     (if (symbol? word)
       word
-      (clojure.core/first word))))
+      (clojure.core/first word)))
+  :default ::default)
 
-(defmethod word :default [stack [name & queue] env]
+(defmethod word ::default [stack [name & queue] env]
   (if-let [quotation (get-in env [:definitions name])]
     ;;(throw (clojure.core/ex-info "lookup definition" {:quotation quotation}))
     [stack (concat quotation queue) env]
     ;; Don't apply, simply treat as a symbol. We might be in the process of
     ;; defining a word.
-    [(cons name stack) queue env]))
+    (if (and (clojure.core/vector? (clojure.core/first queue))
+              (= (clojure.core/second queue) 'juxt.flip.alpha.core/define))
+      [(cons name stack) queue env]
+
+      (throw (clojure.core/ex-info (format "Symbol not defined: %s" name) {:symbol name})))))
 
 (def break 'juxt.flip.alpha.core/break)
 (defmethod word 'juxt.flip.alpha.core/break [stack [_ & queue] env]
@@ -318,9 +323,11 @@
 
 (defmethod word 'juxt.flip.alpha.core/form-decode
   [[encoded & stack] [_ & queue] env]
-  [(cons (codec/form-decode encoded) stack)
-   queue
-   env])
+  (if encoded
+    [(cons (codec/form-decode encoded) stack)
+     queue
+     env]
+    (throw (clojure.core/ex-info "String to decode is null" {}))))
 
 (defmethod word 'juxt.flip.alpha.core/form-encode
   [[m & stack] [_ & queue] env]
@@ -376,8 +383,15 @@
 
 (def ex-info 'juxt.flip.alpha.core/ex-info)
 (defmethod word 'juxt.flip.alpha.core/ex-info
-    [[ex-data msg & stack] [_ & queue] env]
-    [(cons (clojure.core/ex-info msg ex-data) stack) queue env])
+  [[ex-data msg & stack] [_ & queue] env]
+  [(cons (clojure.core/ex-info
+          msg
+          (assoc
+           ex-data
+           :juxt.flip.alpha/stack stack
+           :juxt.flip.alpha/queue queue))
+         stack)
+   queue env])
 
 (def throw 'juxt.flip.alpha.core/throw)
 (defmethod word 'juxt.flip.alpha.core/throw
@@ -438,6 +452,12 @@
                    env :juxt.http.alpha/body
                    of
                    bytes-to-string
+                   jsonista.core/read-string) queue) env])
+
+#_(defmethod word 'juxt.site.alpha/request-query-string
+  [stack [_ & queue] env]
+  [stack (concat `( :ring.request/query env
+
                    jsonista.core/read-string) queue) env])
 
 (defmethod word 'juxt.site.alpha/apply-to-request-context
@@ -545,8 +565,7 @@
       (throw
        (clojure.core/ex-info
         (format "Failure in quotation: %s" (.getMessage t))
-        {:juxt.flip.alpha/stack stack
-         :juxt.flip.alpha/queue queue}
+        (ex-data t)
         t)))))
 
 (defn eval-quotation

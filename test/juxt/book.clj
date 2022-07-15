@@ -208,6 +208,8 @@
 
 ;; Create Alice
 
+;; TODO: Consider reserving 'put' to indicate a direct database put. Everything
+;; that goes via an action is really a 'create' or similar.
 (defn put-user-alice! []
   (eval
    (substitute-actual-base-uri
@@ -236,18 +238,6 @@
        :juxt.pass.alpha/user "https://example.org/users/alice"})
      ;; end::install-user-identity-no-credentials-for-alice![]
      ))))
-
-(defn put-subject-no-credentials-for-alice!
-  "Put a subject document for Alice, pointing to the user identity with no credentials"
-  []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/put-subject"
-      {:xt/id "https://example.org/subjects/alice"
-       :juxt.pass.alpha/user-identity "https://example.org/user-identities/alice"})))))
 
 ;; Hello World!
 
@@ -485,7 +475,7 @@
                ;; An action can be called as a transaction function, to allow actions to compose
                #_:xt/fn
                #_(quote (fn [xt-ctx ctx & args]
-                          (juxt.pass.alpha.authorization/juxt.site.alpha.init/do-action* xt-ctx ctx args)))]))]))
+                          (juxt.pass.alpha.actions/do-action* xt-ctx ctx args)))]))]))
 
        :juxt.pass.alpha/rules
        '[
@@ -807,6 +797,7 @@
      ;; end::grant-permission-to-resource-protected-by-session-scope![]
      ))))
 
+;; TODO: Poorly named since it only creates a session scope around /protected-by-session-scope/
 (defn create-session-scope! []
   (eval
    (substitute-actual-base-uri
@@ -982,8 +973,7 @@ Password: <input name=password type=password>
             commit-subject])
 
          (f/define make-session
-           [
-            (f/set-at
+           [(f/set-at
              (f/dip
               [f/<sorted-map>
                (f/set-at
@@ -1101,64 +1091,154 @@ Password: <input name=password type=password>
 
 ;; Applications
 
-(defn create-action-authorize-application! []
+(defn create-action-oauth-authorize! []
   (eval
    (substitute-actual-base-uri
     (quote
-     ;; tag::create-action-authorize-application![]
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/authorize-application"
+      {:xt/id "https://site.test/actions/oauth/authorize"
 
+       ;; Eventually we should look up if there's a resource-owner decision in
+       ;; place to cover the application and scopes requested.  The decision
+       ;; should include details of what scope was requested by the application,
+       ;; and what scope was approved by the resource-owner (which may be the
+       ;; same). If additional scope is requested in a subsequent authorization
+       ;; request, then a new approval decision will then be sought from the
+       ;; resource-owner.
+       ;;
+       ;; If we can't find a decision, we create a new pending decision document
+       ;; containing the state, application and scope. We redirect to a trusted
+       ;; resource, within the same protection space or session scope,
+       ;; e.g. /approve. This is given the id of a pending approval as a request
+       ;; parameter, from which it can look up the pending approval document and
+       ;; render the form appropriately given the attributes therein.
+       ;;
        :juxt.flip.alpha/quotation
        `(
          (site/with-fx-acc
-           [(site/push-fx
-             (f/dip
-              [site/request-body-as-edn
-               (site/validate
-                [:map
-                 [:juxt.pass.alpha/user [:re "https://example.org/users/(.+)"]]
-                 [:juxt.pass.alpha/application [:re "https://example.org/applications/(.+)"]]
-                 ;; A space-delimited list of permissions that the application requires.
-                 [:juxt.pass.alpha/scope {:optional true} :string]])
-
-               (fc/assoc ::site/type "https://meta.juxt.site/pass/authorization")
-
-               (f/set-at
+           [
+            ;; Extract query string from environment, decode it and store it at
+            ;; keyword :query
+            (f/define extract-and-decode-query-string
+              [(f/set-at
                 (f/dip
-                 [(pass/as-hex-str (pass/random-bytes 20)) "/authorizations/" f/str (f/env ::site/base-uri) f/str
-                  :xt/id]))
+                 [:ring.request/query
+                  f/env
+                  (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
+                  f/form-decode
+                  :query]))])
 
-               xtdb.api/put]))]))
+            (f/define lookup-application-from-database
+              [(f/set-at
+                (f/keep
+                 [
+                  (f/of :query)
+                  (f/of "client_id")
+                  (juxt.flip.alpha.xtdb/q
+                   ~'{:find [(pull e [*])]
+                      :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                              [e ::pass/client-id client-id]]
+                      :in [client-id]})
+                  f/first
+                  f/first
+                  :application]))])
+
+            (f/define fail-if-no-application
+              [(f/keep
+                [
+                 ;; Grab the client-id for error reporting
+                 f/dup (f/of :query) (f/of "client_id") f/swap
+                 (f/of :application)
+                 ;; If no application entry, drop the client_id (to clean up the
+                 ;; stack)
+                 (f/if [f/drop]
+                   ;; else throw the error
+                   [:client-id {:ring.response/status 400} f/set-at
+                    (f/throw (f/ex-info "No such app" f/swap))])])])
+
+            ;; Get subject (it's in the environment, fail if missing subject)
+            (f/define extract-subject
+              [(f/set-at (f/dip [(f/env ::pass/subject) :subject]))])
+
+            (f/define assert-subject
+              [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
+
+            ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
+            (f/define access-token-length [16])
+
+            ;; Create access-token tied to subject, scope and application
+            (f/define make-access-token
+              [(f/set-at
+                (f/keep
+                 [f/dup (f/of :subject) ::pass/subject {} f/set-at f/swap
+                  (f/of :application) (f/of :xt/id) ::pass/application f/rot f/set-at
+                  ;; ::pass/token
+                  (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
+                  ;; :xt/id (as a function of ::pass/token)
+                  (f/set-at (f/keep [(f/of ::pass/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
+                  ;; ::site/type
+                  (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
+                  ;; TODO: Add scope
+                  ;; key in map
+                  :access-token]))])
+
+            (f/define push-access-token-fx
+              [(site/push-fx
+                (f/keep
+                 [(f/of :access-token) xtdb.api/put]))])
+
+            (f/define collate-response
+              [(f/set-at
+                (f/keep
+                 [ ;; access_token
+                  f/dup (f/of :access-token) (f/of ::pass/token) "access_token" {} f/set-at
+                  ;; token_token
+                  "bearer" "token_type" f/rot f/set-at
+                  ;; state
+                  f/swap (f/of :query) (f/of "state") "state" f/rot f/set-at
+                  ;; key in map
+                  :response]))])
+
+            (f/define encode-fragment
+              [(f/set-at
+                (f/keep
+                 [(f/of :response) f/form-encode :fragment]))])
+
+            (f/define redirect-to-application-redirect-uri
+              [(site/push-fx (f/dip [(site/set-status 302)]))
+               (site/push-fx
+                (f/keep
+                 [f/dup (f/of :application) (f/of ::pass/redirect-uri)
+                  "#" f/swap f/str
+                  f/swap (f/of :fragment)
+                  (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
+                  f/swap f/str
+                  (site/set-header "location" f/swap)]))])
+
+            extract-and-decode-query-string
+            lookup-application-from-database
+            fail-if-no-application
+            extract-subject
+            assert-subject
+            make-access-token
+            push-access-token-fx
+            collate-response
+            encode-fragment
+            redirect-to-application-redirect-uri
+            ]))
 
        :juxt.pass.alpha/rules
-       '[[(allowed? subject resource permission)
-          [id :juxt.pass.alpha/user user]
+       '[
+         [(allowed? subject resource permission)
           [subject :juxt.pass.alpha/user-identity id]
-          [user :role role]
-          [permission :role role]]]})
-     ;; end::create-action-authorize-application![]
-     ))))
+          [id :juxt.pass.alpha/user user]
+          [permission :juxt.pass.alpha/user user]]]})))))
 
-;; TODO: Rename function to indicate this permission is granted to those in the role 'user'
-(defn grant-permission-to-invoke-action-authorize-application! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-invoke-action-authorize-application![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/users/authorize-application"
-       :role "User"
-       :juxt.pass.alpha/action "https://example.org/actions/authorize-application"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-invoke-action-authorize-application![]
-     ))))
+;; Authorization Server
 
-(defn create-action-issue-access-token! []
+(defn create-action-install-authorization-server! []
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1166,7 +1246,7 @@ Password: <input name=password type=password>
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/issue-access-token"
+      {:xt/id "https://example.org/actions/install-authorization-server"
 
        :juxt.flip.alpha/quotation
        `(
@@ -1174,78 +1254,62 @@ Password: <input name=password type=password>
            [(site/push-fx
              (f/dip
               [site/request-body-as-edn
-               (site/validate
-                [:map
-                 [:juxt.pass.alpha/subject [:re "https://example.org/subjects/(.+)"]]
-                 [:juxt.pass.alpha/application [:re "https://example.org/applications/(.+)"]]
-                 [:juxt.pass.alpha/scope {:optional true} :string]])
-
-               (fc/assoc ::site/type "https://meta.juxt.site/pass/access-token")
-
-               (f/set-at
-                (f/dip
-                 [(pass/as-hex-str (pass/random-bytes 16))
-                  :juxt.pass.alpha/token]))
-
-               (f/set-at
-                (f/keep
-                 [(f/of :juxt.pass.alpha/token) "/access-tokens/" f/str (f/env ::site/base-uri) f/str
-                  :xt/id]))
-
-               ;; TODO: Add ::pass/expiry: (java.util.Date/from (.plusSeconds (.toInstant (java.util.Date.)) expires-in-seconds))
-
+               ;; TODO: Rewrite fc/assoc in terms of f/set-at - it turns out to
+               ;; be a poor idiom
+               (fc/assoc
+                :juxt.site.alpha/methods
+                {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/oauth/authorize"}}})
                xtdb.api/put]))]))
 
        :juxt.pass.alpha/rules
-       '[[(allowed? subject resource permission)
-          [id :juxt.pass.alpha/user user]
-          [subject :juxt.pass.alpha/user-identity id]
-          [permission :role role]
-          [user :role role]]]})
-     ;; end::create-action-issue-access-token![]
-     ))))
+       '[
+         [(allowed? subject resource permission)
+          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]]})))))
 
-(defn grant-permission-to-invoke-action-issue-access-token! []
+(defn grant-permission-install-authorization-server! []
   (eval
    (substitute-actual-base-uri
     (quote
-     ;; tag::grant-permission-to-invoke-action-issue-access-token![]
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/users/issue-access-token"
-       :role "User"                        ; <1>
-       :juxt.pass.alpha/action "https://example.org/actions/issue-access-token"
-       :juxt.pass.alpha/purpose nil})
-       ;; end::grant-permission-to-invoke-action-issue-access-token![]
-     ))))
-
-;; Authorization Server
-
-#_(defn create-action-put-authorization-server []
-    )
+      {:xt/id "https://example.org/permissions/repl/put-user"
+       :juxt.pass.alpha/subject "https://example.org/subjects/system"
+       :juxt.pass.alpha/action "https://example.org/actions/install-authorization-server"
+       :juxt.pass.alpha/purpose nil})))))
 
 (defn install-authorization-server! []
-  ;; tag::install-authorization-server![]
-  (juxt.site.alpha.init/put!
-   {:xt/id "https://auth.example.org/oauth/authorize"
-    :juxt.site.alpha/methods
-    {:get
-     {:juxt.site.alpha/handler 'juxt.pass.alpha.authorization-server/authorize
-      :juxt.pass.alpha/actions #{"https://example.org/actions/authorize-application"}
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/install-authorization-server"
+      {:xt/id "https://example.org/oauth/authorize"
+       :juxt.http.alpha/content-type "text/html;charset=utf-8"
+       :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"})))))
 
-      ;; Should we create a 'session space' which functions like a protection
-      ;; space?  Like a protection space, it will extract the ::pass/subject
-      ;; from the session and place into the request - see
-      ;; juxt.pass.alpha.session/wrap-associate-session
+#_(defn install-authorization-server! []
+    ;; tag::install-authorization-server![]
+    (juxt.site.alpha.init/put!
+     {:xt/id "https://auth.example.org/oauth/authorize"
+      :juxt.site.alpha/methods
+      {:get
+       {:juxt.site.alpha/handler 'juxt.pass.alpha.authorization-server/authorize
+        :juxt.pass.alpha/actions #{"https://example.org/actions/authorize-application"}
 
-      :juxt.pass.alpha/session-cookie "id"
-      ;; This will be called with query parameter return-to set to ::site/uri
-      ;; (effective URI) of request
-      :juxt.pass.alpha/redirect-when-no-session-session "https://example.org/_site/openid/auth0/login"
-      }}})
-  ;; end::install-authorization-server![]
-  )
+        ;; Should we create a 'session space' which functions like a protection
+        ;; space?  Like a protection space, it will extract the ::pass/subject
+        ;; from the session and place into the request - see
+        ;; juxt.pass.alpha.session/wrap-associate-session
+
+        :juxt.pass.alpha/session-cookie "id"
+        ;; This will be called with query parameter return-to set to ::site/uri
+        ;; (effective URI) of request
+        :juxt.pass.alpha/redirect-when-no-session-session "https://example.org/_site/openid/auth0/login"
+        }}})
+    ;; end::install-authorization-server![]
+    )
 
 ;; TODO: Put Authorization Server in a protection space
 
@@ -1412,20 +1476,11 @@ Password: <input name=password type=password>
   (create-action-put-session-scope!)
   (grant-permission-to-put-session-scope!))
 
-(defn applications-preliminaries! []
-  (create-action-authorize-application!)
-  (grant-permission-to-invoke-action-authorize-application!)
-  (create-action-issue-access-token!)
-  (grant-permission-to-invoke-action-issue-access-token!))
-
-(defn setup-application! []
-  (register-example-application!)
-  (users-preliminaries!)
-  (put-user-alice!)
-  (install-user-identity-no-credentials-for-alice!)
-  (put-subject-no-credentials-for-alice!)
-  (invoke-authorize-application!)
-  (invoke-issue-access-token!))
+(defn authorization-server-preliminaries! []
+  (create-action-oauth-authorize!)
+  (create-action-install-authorization-server!)
+  (grant-permission-install-authorization-server!)
+  (install-authorization-server!))
 
 ;; TODO: We could use a dependency graph here, to allow installation of a set of
 ;; documents where there are dependencies on other documents being created.
@@ -1458,8 +1513,8 @@ Password: <input name=password type=password>
   (create-action-login!)
   (grant-permission-to-invoke-action-login!)
 
-  (applications-preliminaries!)
-  (setup-application!)
+  #_(applications-preliminaries!)
+  #_(setup-application!)
 
   (create-resource-protected-by-bearer-auth!)
   (grant-permission-to-resource-protected-by-bearer-auth!)
