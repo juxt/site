@@ -413,7 +413,8 @@
 
     (book/protected-resource-preliminaries!)
 
-    ;; Let's create a protected resource
+    ;; Let's create a protected resource that the application will access using
+    ;; an access-token.
     (juxt.site.alpha.init/do-action
      "https://site.test/subjects/system"
      "https://site.test/actions/put-immutable-protected-resource"
@@ -422,7 +423,7 @@
       :juxt.http.alpha/content "Internal message"
       })
 
-    ;; Try to access /internal.html - there is no protection space so no
+    ;; Try to access /private/internal.html - there is no protection space so no
     ;; WWW-Authenticate header. We simply can't perform
     ;; /actions/get-protected-resource anonymously.
     (is (= 403
@@ -430,6 +431,12 @@
             (*handler*
              {:ring.request/method :get
               :ring.request/path "/private/internal.html"}))))
+
+    #_(throw (ex-info "HI" {:response (*handler*
+                                     {:ring.request/method :get
+                                      :ring.request/path "/private/internal.html"})
+                          :resource (repl/e "https://site.test/private/internal.html")
+                          :action (repl/e "https://site.test/actions/get-protected-resource")}))
 
     ;; Now let's layer over a protection space
     (book/protection-spaces-preliminaries!)
@@ -448,17 +455,15 @@
 
     ;; Now if we try to access /private/internal.html we'll at least be
     ;; prompted to authenticate.
-    (is
-     (= 401
-        (:ring.response/status
-         (*handler*
+    (let [response (*handler*
           {:ring.request/method :get
-           :ring.request/path "/private/internal.html"}))))
+           :ring.request/path "/private/internal.html"})]
+      (is (= 401 (:ring.response/status response)))
+      (is (re-matches #"Bearer.*" (get-in response [:ring.response/headers "www-authenticate"]))))
 
-    ;; We need to get an access token to access /private/internal.html
-    ;; For that, we'll need an authorization server
-
-    ;; Create an authorization server (this can be promoted later)
+    ;; So we need to get a bearer token so that we can access /private/internal.html
+    ;; Bearer tokens are issued by an authorization server.
+    ;; We'll need to set one up first...
     (book/authorization-server-preliminaries!)
 
     ;; Access to the authorization server will return 403. We need access to
@@ -469,10 +474,10 @@
                  {:ring.request/method :get
                   :ring.request/path "/oauth/authorize"}))))
 
-
-    ;; We'll need to wrap /authorize in a session-scope to trigger a redirect
-    ;; to somewhere we can login.
-
+    ;; The authorization server doesn't serve anonymous users. Part of its job
+    ;; is to issue access tokens that are associated with subjects!  We'll need
+    ;; to wrap /oauth/authorize in a session-scope to trigger a redirect to
+    ;; somewhere we can login.
     (book/session-scopes-preliminaries!)
 
     (juxt.site.alpha.init/do-action
@@ -509,7 +514,8 @@
           (is sid)
           (swap! store assoc :sid sid))))
 
-    ;; We now have a session id linked to Alice's session and subject
+    ;; We now have a session id linked to Alice's session and subject. We can
+    ;; now request an access token from the authorization server.
 
     ;; GET on https://site.test/authorize
     (let [request {:ring.request/method :get
@@ -521,9 +527,8 @@
                      "client_id" "local-terminal"
                      "state" "abc123vcb"})}]
 
-      ;; TODO: Try a request to /oauth/authorize before we've created the resource
-
-      ;; Check response is a 403
+      ;; We have identified our subject, but this subject hasn't yet been
+      ;; granted access to the authorization server.
       (let [response (*handler* request)]
         (is (= 403 (:ring.response/status response))))
 
@@ -551,13 +556,16 @@
                        (re-matches
                         #"https://site.test/terminal/callback#access_token=(.*?)\&token_type=bearer\&state=abc123vcb" location-header))
             access-token (second location)]
-        (is location)
         (is (= 302 (:ring.response/status response)))
+        (is location)
+        ;; Test that the callback path is the same as the application
         (is access-token)
         (swap! store assoc :access-token access-token)))
-    ;;
 
-    ;; without an access token?
+    ;; We can now use the access-token to access a protected resource, using an application
+
+    ;; without an access token? (possibly this is repeating what we've done
+    ;; above, but let's check for clarity)
     (is (= 401 (:ring.response/status
                 (*handler*
                  {:ring.request/method :get
@@ -582,10 +590,14 @@
       :juxt.pass.alpha/purpose nil
       })
 
-
+    ;; Finally, now Alice has permission to access the resource, the application
+    ;; does too (via the Bearer token)
     (is (= 200
            (:ring.response/status
             (*handler*
              {:ring.request/method :get
               :ring.request/headers {"authorization" (format "Bearer %s" (:access-token @store))}
-              :ring.request/path "/private/internal.html"}))))))
+              :ring.request/path "/private/internal.html"}))))
+
+    ;; TODO: Test revocation
+    ))

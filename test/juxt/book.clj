@@ -1285,7 +1285,7 @@ Password: <input name=password type=password>
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/install-authorization-server"
-      {:xt/id "https://site.test/oauth/authorize"
+      {:xt/id "https://example.org/oauth/authorize"
        :juxt.http.alpha/content-type "text/html;charset=utf-8"
        :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"})))))
 
