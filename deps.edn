@@ -59,6 +59,9 @@
         ;; Required by a few components, including Slack and OpenID Connect
         java-http-clj/java-http-clj {:mvn/version "0.4.3"}
 
+        ;; Required by OpenID Connect for retry resilience
+        diehard/diehard {:mvn/version "0.11.3"}
+
         ;; Required for OAuth2, not necessarily only for Auth0 since it
         ;; implements the relevant standards so any OAuth2 provided should work.
         com.auth0/java-jwt {:mvn/version "3.18.3"}

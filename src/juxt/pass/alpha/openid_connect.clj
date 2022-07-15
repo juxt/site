@@ -11,6 +11,7 @@
    [clojure.string :as str]
    [clojure.tools.logging :as log]
    [crux.api :as crux]
+   [diehard.core :as dh]
    [java-http-clj.core :as hc]
    [jsonista.core :as json]
 
@@ -44,7 +45,6 @@
 
         query-params (some-> req :ring.request/query (codec/form-decode "US-ASCII"))
         return-to (get query-params "return-to")
-        fail-to (get query-params "fail-to")
 
         _ (when-not oauth-client-id
             (return req 500 "No oauth client id found" {}))
@@ -68,8 +68,7 @@
         _ (put-session!
            session-token-id!
            (cond-> {::pass/state state ::pass/nonce nonce}
-             return-to (assoc ::pass/return-to return-to)
-             fail-to (assoc ::pass/fail-to fail-to))
+             return-to (assoc ::pass/return-to return-to))
            (.plusSeconds (.toInstant start-date) expires-in))
 
         query-string
@@ -186,10 +185,19 @@
       (do
         (log/infof "Fetching JWKS from %s" uri)
         (let [{:keys [status body]}
-              (hc/send
-               {:method :get
-                :uri uri
-                :headers {"Accept" "application/json"}})
+              (dh/with-retry
+                {:retry-on Exception
+                 :max-retries 2
+                 :delay-ms 100
+                 :on-failed-attempt
+                 (fn [_ e] (log/warnf "OAuth JWKS call failed due to: %s" e))
+                 :on-failure
+                 (fn [_ e] (log/errorf "OAuth JWKS call failed 3 times: %s" e))}
+                (hc/send
+                 {:method :get
+                  :uri uri
+                  :headers {"Accept" "application/json"}}))
+
               _ (when-not (= status 200)
                   (return req 500 "Failed to fetch JWKS from %s" {} uri))
               result
@@ -229,102 +237,114 @@
     :ring.request/keys [query]
     :as req}]
 
-  (when-not session-token-id!
-    (return req 500 "No session token id" {}))
+  (try
+    (when-not session-token-id!
+      (return req 500 "No session token id" {}))
 
-  (when-not session
-    (return req 500 "No session found" {}))
+    (when-not session
+      (return req 500 "No session found" {}))
 
-  ;; Exchange code for JWT
-  (let [{::pass/keys [oauth-client]} resource
-        {::pass/keys [oauth-client-id oauth-client-secret redirect-uri openid-issuer-id]}
-        (crux/entity db oauth-client)
+    ;; Exchange code for JWT
+    (let [{::pass/keys [oauth-client]} resource
+          {::pass/keys [oauth-client-id oauth-client-secret redirect-uri openid-issuer-id]}
+          (crux/entity db oauth-client)
 
-        openid-configuration (some-> openid-issuer-id (lookup db) ::pass/openid-configuration)
+          openid-configuration (some-> openid-issuer-id (lookup db) ::pass/openid-configuration)
 
-        _ (when-not openid-configuration
-            (return req 500 "No openid configuration found" {:openid-issuer-id openid-issuer-id}))
+          _ (when-not openid-configuration
+              (return req 500 "No openid configuration found" {:openid-issuer-id openid-issuer-id}))
 
-        token-endpoint (get openid-configuration "token_endpoint")
+          token-endpoint (get openid-configuration "token_endpoint")
 
-        query-params (some-> query (codec/form-decode "US-ASCII"))
+          query-params (some-> query (codec/form-decode "US-ASCII"))
 
-        state-received (when (map? query-params) (get query-params "state"))
-        state-sent (::pass/state session)
+          state-received (when (map? query-params) (get query-params "state"))
+          state-sent (::pass/state session)
 
-        _ (when-not state-sent
-            (return req 500 "Expected to find state in session" {}))
+          _ (when-not state-sent
+              (return req 500 "Expected to find state in session" {}))
 
-        _ (when-not (= state-sent state-received)
-            ;; This could be a CSRF attack, we should log an alert
-            (return req 500 "State mismatch" {:state-received state-received
-                                              :session session}))
+          _ (when-not (= state-sent state-received)
+              ;; This could be a CSRF attack, we should log an alert
+              (return req 500 "State mismatch" {:state-received state-received
+                                                :session session}))
 
-        code (when (map? query-params) (get query-params "code"))
+          code (when (map? query-params) (get query-params "code"))
 
-        _ (when-not code
-            (return req 500 "No code returned from provider" {}))
+          _ (when-not code
+              (return req 500 "No code returned from provider" {}))
 
-        _ (when-not oauth-client-id
-            (return req 500 "The required OAuth client id was not found" {}))
+          _ (when-not oauth-client-id
+              (return req 500 "The required OAuth client id was not found" {}))
 
-        _ (when-not oauth-client-secret
-            (return req 500 "The required OAuth client secret was not found" {}))
+          _ (when-not oauth-client-secret
+              (return req 500 "The required OAuth client secret was not found" {}))
 
-        jwks-uri (get openid-configuration "jwks_uri")
-        _ (when-not jwks-uri
-            (return req 500 "No JWKS URI in configuration" {}))
+          jwks-uri (get openid-configuration "jwks_uri")
+          _ (when-not jwks-uri
+              (return req 500 "No JWKS URI in configuration" {}))
 
-        jwks (cached-jwks-fetch req jwks-uri (* 60 60 24))
-        _ (when-not jwks
-            (return req 500 "No JWKS found" {}))
+          jwks (cached-jwks-fetch req jwks-uri (* 60 60 24))
+          _ (when-not jwks
+              (return req 500 "No JWKS found" {}))
 
-        token-request
-        {:method :post
-         :uri token-endpoint
-         :headers {"Content-Type" "application/json" #_"application/x-www-form-urlencoded"
-                   "Accept" "application/json"}
-         :body (json/write-value-as-string
-                {"grant_type" "authorization_code"
-                 "client_id" oauth-client-id
-                 "client_secret" oauth-client-secret
-                 "code" code
-                 "redirect_uri" redirect-uri})}
+          token-request
+          {:method :post
+           :uri token-endpoint
+           :headers {"Content-Type" "application/json" #_"application/x-www-form-urlencoded"
+                     "Accept" "application/json"}
+           :body (json/write-value-as-string
+                  {"grant_type" "authorization_code"
+                   "client_id" oauth-client-id
+                   "client_secret" oauth-client-secret
+                   "code" code
+                   "redirect_uri" redirect-uri})}
 
-        {:keys [status headers body] :as response}
-        (hc/send
-         token-request
-         {:as :byte-array})
+          {:keys [status headers body] :as response}
+          (dh/with-retry
+            {:retry-on Exception
+             :max-retries 2
+             :delay-ms 100
+             :on-failed-attempt
+             (fn [_ e] (log/warnf "OAuth token call failed due to: %s" e))
+             :on-failure
+             (fn [_ e] (log/errorf "OAuth token call failed 3 times: %s" e))}
+            (hc/send
+             token-request
+             {:as :byte-array}))
 
-        json-body (json/read-value body)
+          _ (when-not (= status 200)
+              (return req 500 "Token request failed with response: " response))
 
-        id-token (decode-id-token req (get json-body "id_token") jwks openid-configuration oauth-client-id)
+          json-body (json/read-value body)
 
-        original-nonce (::pass/nonce session)
-        claimed-nonce (get-in id-token [:claims "nonce"])
+          id-token (decode-id-token req (get json-body "id_token") jwks openid-configuration oauth-client-id)
 
-        _ (when-not original-nonce
-            (return req 500 "Expected to find nonce in session" {}))
+          original-nonce (::pass/nonce session)
+          claimed-nonce (get-in id-token [:claims "nonce"])
 
-        _ (when-not (=  claimed-nonce original-nonce)
-            ;; This is possibly an attack, we should log an alert
-            (return req 500 "Nonce received does not match expected" {}))
+          _ (when-not original-nonce
+              (return req 500 "Expected to find nonce in session" {}))
 
-        ;; Does the id-token match any identities in our database?
-        matched-identity (match-identity db (:claims id-token))]
+          _ (when-not (=  claimed-nonce original-nonce)
+              ;; This is possibly an attack, we should log an alert
+              (return req 500 "Nonce received does not match expected" {}))
 
-    ;; Put the ID_TOKEN into the session, cycle the session id and redirect to
-    ;; the redirect URI stored in the original session.
+          ;; Does the id-token match any identities in our database?
+          matched-identity (match-identity db (:claims id-token))
+          iss-sub (pr-str (select-keys (:claims id-token) ["iss" "sub"]))]
 
-    (if matched-identity
+      (when-not matched-identity
+        (return req 500 "No known identity match for claims %s" {} iss-sub))
 
+      ;; If iss and sub match identity put the ID_TOKEN into the session and cycle the session id
+      ;; Always redirect to the redirect_uri stored in the session but only include code query
+      ;; parameter if matched identity was found to indicate success
+      (log/warnf "Successful login! %s matched claims %s" matched-identity iss-sub)
+      (-> req
+          (redirect 303 (get session ::pass/return-to "/"))
+          (session/escalate-session matched-identity)))
+    (catch Exception e
       (do
-        (log/warnf "Successful login! %s" (pr-str (select-keys (:claims id-token) ["iss" "sub"])))
-        (-> req
-            (redirect 303 (get session ::pass/return-to "/login-succeeded"))
-            (session/escalate-session matched-identity)))
-
-      ;; Login unsuccessful.
-      (do
-        (log/warnf "Unsuccessful login, no known identity match for claims %s" (pr-str (select-keys (:claims id-token) ["iss" "sub"])))
-        (redirect req 303 (get session ::pass/fail-to "/login-failed"))))))
+        (log/warnf "Unsuccessful login: %s" e)
+        (redirect req 303 (get session ::pass/return-to "/"))))))
