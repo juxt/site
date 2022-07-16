@@ -224,10 +224,12 @@
     action ::pass/action
     resource ::site/resource
     purpose ::pass/purpose
+    base-uri ::site/base-uri
     :as ctx} args]
   (let [db (xt/db xt-ctx)
         tx (xt/indexing-tx xt-ctx)]
     (try
+      (assert base-uri "The base-uri must be provided")
       (assert (or (nil? subject) (string? subject)) "Subject to do-action* expected to be an id, or null")
 
       ;; Check that we /can/ call the action
@@ -280,7 +282,7 @@
                [:xtdb.api/put
                 (into
                  (cond->
-                     {:xt/id (format "urn:site:action-log:%s" (::xt/tx-id tx))
+                     {:xt/id (format "%s/_site/action-log/%s" base-uri (::xt/tx-id tx))
                       ::site/type "https://meta.juxt.site/site/action-log-entry"
                       ::pass/subject subject
                       ::pass/action action
@@ -307,25 +309,26 @@
           result-fx))
 
       (catch Throwable e
-        (log/errorf e "Error when doing action: %s %s" action (format "urn:site:action-log:%s" (::xt/tx-id tx)))
-        [[::xt/put
-          {:xt/id (format "urn:site:action-log:%s" (::xt/tx-id tx))
-           ::site/type "https://meta.juxt.site/site/action-log-entry"
-           ::pass/subject subject
-           ::pass/action action
-           ::site/resource resource
-           ::pass/purpose purpose
-           ::site/error {:message (.getMessage e)
-                         :ex-data
-                         ;; The site db will not be nippyable
-                         (dissoc (ex-data e) :env)
-                         ;; TODO: Ideally we'd like the environment in the
-                         ;; action log for debugging purposes. But the below
-                         ;; stills fails with a nippy error, haven't
-                         ;; investigated thorougly enough.
-                         #_(let [ex-data (ex-data e)]
-                             (cond-> ex-data
-                               (:env ex-data) (dissoc :env)#_(update :env dissoc ::site/db ::site/xt-node)))}}]]))))
+        (let [action-log-entry-uri (format "%s/_site/action-log/%d" base-uri (::xt/tx-id tx))]
+          (log/errorf e "Error when doing action: %s %s" action action-log-entry-uri)
+          [[::xt/put
+            {:xt/id action-log-entry-uri
+             ::site/type "https://meta.juxt.site/site/action-log-entry"
+             ::pass/subject subject
+             ::pass/action action
+             ::site/resource resource
+             ::pass/purpose purpose
+             ::site/error {:message (.getMessage e)
+                           :ex-data
+                           ;; The site db will not be nippyable
+                           (dissoc (ex-data e) :env)
+                           ;; TODO: Ideally we'd like the environment in the
+                           ;; action log for debugging purposes. But the below
+                           ;; stills fails with a nippy error, haven't
+                           ;; investigated thorougly enough.
+                           #_(let [ex-data (ex-data e)]
+                               (cond-> ex-data
+                                 (:env ex-data) (dissoc :env)#_(update :env dissoc ::site/db ::site/xt-node)))}}]])))))
 
 (defn install-do-action-fn [uri]
   {:xt/id (str uri "/_site/do-action")
@@ -376,7 +379,7 @@
       (let [result
             (xt/entity
              (xt/db xt-node)
-             (format "urn:site:action-log:%s" tx-id))]
+             (format "%s/_site/action-log/%d" base-uri tx-id))]
         (if-let [error (::site/error result)]
           (do
             (log/errorf "Transaction error: %s" (pr-str error))

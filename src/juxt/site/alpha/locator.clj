@@ -157,7 +157,7 @@
 
    ;; This can be put into the database to override the ::default-empty-resource
    ;; default.
-   (xt/entity db "urn:site:resources:not-found")
+   (xt/entity db (str base-uri "/_site/not-found"))
 
    {::site/resource-provider ::default-empty-resource
     ::site/methods {:get {} :head {} :options {} :put {} :post {}}}))

@@ -7,7 +7,6 @@
    [clojure.tools.logging :as log]
    [crypto.password.bcrypt :as password]
    [xtdb.api :as x]
-   [juxt.pass.alpha.util :refer [new-subject-urn]]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.rfc7235 :as rfc7235]
    [juxt.http.alpha :as-alias http]
@@ -268,8 +267,9 @@
 ;; the bearer token is more difficult to use if intercepted.
 
 (defn find-or-create-basic-auth-subject [req user-identity protection-space]
+  (assert (::site/base-uri req))
   (let [xt-node (::site/xt-node req)
-        subject {:xt/id (new-subject-urn)
+        subject {:xt/id (format "%s/_site/subjects/%s" (::site/base-uri req) (random-uuid))
                  :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"
                  :juxt.pass.alpha/user-identity (:xt/id user-identity)
                  :juxt.pass.alpha/protection-space (:xt/id protection-space)}

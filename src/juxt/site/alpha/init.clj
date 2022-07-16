@@ -205,7 +205,7 @@
        ;; resolve this by creating an action that creates the not-found
        ;; resource.
        (juxt.site.alpha.init/put!
-        {:xt/id "urn:site:resources:not-found"
+        {:xt/id "https://example.org/_site/not-found"
          :juxt.site.alpha/methods
          {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}
           :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}}}))))))

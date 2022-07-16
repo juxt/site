@@ -11,7 +11,7 @@
    [xtdb.api :as xt]
    [java-http-clj.core :as hc]
    [juxt.site.alpha.return :refer [return]]
-   [juxt.pass.alpha.util :refer [make-nonce new-subject-urn]]
+   [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.pass.alpha.oldsession :as oldsession]
    [ring.util.codec :as codec]
    [juxt.site.alpha.response :refer [redirect]]
@@ -212,8 +212,8 @@
        [(keyword "juxt.pass.jwt" (str/replace c "_" "-")) v])
      (into {}))))
 
-(defn create-subject! [xt-node matched-identity id-token]
-  (let [subject (new-subject-urn)]
+(defn create-subject! [xt-node base-uri matched-identity id-token]
+  (let [subject (format "%s/_site/subjects/%s" base-uri (random-uuid))]
     (xt/submit-tx
      xt-node
      [[::xt/put
@@ -260,7 +260,7 @@
 
 (defn callback
   "OAuth2 callback"
-  [{::site/keys [resource db xt-node]
+  [{::site/keys [resource db xt-node base-uri]
     ::pass/keys [session session-token-id!]
     :ring.request/keys [query]
     :as req}]
@@ -354,7 +354,7 @@
         ;; TODO: Do as transaction function - can we write this in terms of an
         ;; action?
         (when-let [matched-identity (match-identity db (:claims id-token))]
-          (create-subject! xt-node matched-identity id-token))]
+          (create-subject! xt-node base-uri matched-identity id-token))]
 
     ;; Put the ID_TOKEN into the session, cycle the session id and redirect to
     ;; the redirect URI stored in the original session.
