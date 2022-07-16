@@ -118,7 +118,8 @@
   (install-system-subject!)
   (install-create-action!)
   (install-system-permissions!)
-  (install-do-action-fn!))
+  (install-do-action-fn!)
+  :ok)
 
 (defn make-repl-request-context [subject action edn-arg]
   (let [xt-node (xt-node)]
@@ -271,7 +272,8 @@
   (create-grant-permission-action!)
   (install-not-found)
   (create-action-register-application!)
-  (grant-permission-to-invoke-action-register-application!))
+  (grant-permission-to-invoke-action-register-application!)
+  :ok)
 
 #_(defn put-graphql-schema-endpoint!
     "Initialise the resource that will host Site's GraphQL schema, as well as the
