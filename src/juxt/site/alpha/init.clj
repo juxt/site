@@ -83,11 +83,12 @@
               [juxt.site.alpha/request-body-as-edn
 
                (site/validate
-                [:map
+                [:map ; <2>
                  [:xt/id [:re "https://example.org/actions/(.+)"]]
                  [:juxt.pass.alpha/rules [:vector [:vector :any]]]])
 
-               (juxt.flip.clojure.core/assoc :juxt.site.alpha/type "https://meta.juxt.site/pass/action")
+               (juxt.flip.clojure.core/assoc ; <3>
+                :juxt.site.alpha/type "https://meta.juxt.site/pass/action")
 
                xtdb.api/put]))]))}
       ;; end::install-create-action![]
