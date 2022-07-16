@@ -443,6 +443,10 @@
   [[typ m & stack] [_ & queue] env]
   [(cons (assoc m :juxt.site.alpha/type typ) stack) queue env])
 
+(defmethod word 'juxt.site.alpha/set-methods
+  [[methods m & stack] [_ & queue] env]
+  [(cons (assoc m :juxt.site.alpha/methods methods) stack) queue env])
+
 (defmethod word 'juxt.site.alpha/request-body-as-edn
   [stack [_ & queue] env]
   [stack (concat `(:juxt.site.alpha/received-representation

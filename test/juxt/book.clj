@@ -10,7 +10,8 @@
    [juxt.site.alpha.repl :refer [encrypt-password]]
    [juxt.site.alpha.init :as init :refer [do-action put! substitute-actual-base-uri]]
    [juxt.site.alpha.util :refer [as-hex-str random-bytes]]
-   [juxt.book :as book]))
+   [juxt.book :as book]
+   [clojure.set :as set]))
 
 (comment
   ;; tag::example-action[]
@@ -47,14 +48,14 @@
                 [:map
                  [:xt/id [:re "https://example.org/users/.*"]]])
 
-               (fc/assoc ::site/type "https://meta.juxt.site/pass/user")
+               (site/set-type "https://meta.juxt.site/pass/user")
 
-               (xtdb.api/put
-                (fc/assoc
-                 :juxt.site.alpha/methods
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user"}}
-                  :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user"}}
-                  :options {}}))]))]))
+               (site/set-methods
+                {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user"}}
+                 :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user"}}
+                 :options {}})
+
+               xtdb.api/put]))]))
 
        :juxt.pass.alpha/rules
        '[
@@ -112,8 +113,9 @@
                   ;;[:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]
                   ])
 
-                (fc/assoc ::site/type #{"https://meta.juxt.site/pass/user-identity"
-                                        "https://meta.juxt.site/pass/basic-user-identity"})
+                (site/set-type
+                 #{"https://meta.juxt.site/pass/user-identity"
+                   "https://meta.juxt.site/pass/basic-user-identity"})
 
                 ;; Lowercase username
                 (f/set-at
@@ -126,8 +128,7 @@
                   [(f/of :juxt.pass.alpha/password) juxt.pass.alpha/encrypt-password :juxt.pass.alpha/password-hash]))
                 (f/delete-at (f/dip [:juxt.pass.alpha/password]))
 
-                (fc/assoc
-                 :juxt.site.alpha/methods
+                (site/set-methods
                  {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-basic-user-identity"}}
                   :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-basic-user-identity"}}
                   :options {}}))
@@ -178,7 +179,7 @@
                 [:map
                  [:xt/id [:re "https://example.org/subjects/.*"]]
                  [:juxt.pass.alpha/user-identity [:re "https://example.org/user-identities/.+"]]])
-               (fc/assoc ::site/type "https://meta.juxt.site/pass/subject")
+               (site/set-type "https://meta.juxt.site/pass/subject")
                xtdb.api/put]))]))
 
        :juxt.pass.alpha/rules
@@ -263,12 +264,12 @@
                 [:map
                  [:xt/id [:re "https://example.org/(.+)"]]])
 
-               (xtdb.api/put
-                (fc/assoc
-                 :juxt.site.alpha/methods
-                 {:get {::pass/actions #{"https://example.org/actions/get-public-resource"}}
-                  :head {::pass/actions #{"https://example.org/actions/get-public-resource"}}
-                  :options {::pass/actions #{"https://example.org/actions/get-options"}}}))]))]))
+               (site/set-methods
+                {:get {::pass/actions #{"https://example.org/actions/get-public-resource"}}
+                 :head {::pass/actions #{"https://example.org/actions/get-public-resource"}}
+                 :options {::pass/actions #{"https://example.org/actions/get-options"}}})
+
+               xtdb.api/put]))]))
 
        :juxt.pass.alpha/rules
        '[
@@ -465,12 +466,12 @@
                 [:map
                  [:xt/id [:re "https://example.org/(.+)"]]])
 
-               (xtdb.api/put
-                (fc/assoc
-                 :juxt.site.alpha/methods
-                 {:get {::pass/actions #{"https://example.org/actions/get-protected-resource"}}
-                  :head {::pass/actions #{"https://example.org/actions/get-protected-resource"}}
-                  :options {::pass/actions #{"https://example.org/actions/get-options"}}}))
+               (site/set-methods
+                {:get {::pass/actions #{"https://example.org/actions/get-protected-resource"}}
+                 :head {::pass/actions #{"https://example.org/actions/get-protected-resource"}}
+                 :options {::pass/actions #{"https://example.org/actions/get-options"}}})
+
+               xtdb.api/put
 
                ;; An action can be called as a transaction function, to allow actions to compose
                #_:xt/fn
@@ -553,7 +554,7 @@
                  [:juxt.pass.alpha/realm {:optional true} [:string {:min 1}]]
                  [:juxt.pass.alpha/auth-scheme [:enum "Basic" "Bearer"]]
                  [:juxt.pass.alpha/authentication-scope [:string {:min 1}]]])
-               (fc/assoc ::site/type "https://meta.juxt.site/pass/protection-space")
+               (site/set-type "https://meta.juxt.site/pass/protection-space")
                xtdb.api/put]))]))
 
        :juxt.pass.alpha/rules
@@ -732,7 +733,7 @@
                  [::pass/cookie-domain [:re "https?://[^/]*"]]
                  [::pass/cookie-path [:re "/.*"]]
                  [::pass/login-uri [:re "https?://[^/]*"]]])
-               (fc/assoc ::site/type "https://meta.juxt.site/pass/session-scope")
+               (site/set-type "https://meta.juxt.site/pass/session-scope")
                xtdb.api/put]))]))
 
        :juxt.pass.alpha/rules
@@ -1254,10 +1255,7 @@ Password: <input name=password type=password>
            [(site/push-fx
              (f/dip
               [site/request-body-as-edn
-               ;; TODO: Rewrite fc/assoc in terms of f/set-at - it turns out to
-               ;; be a poor idiom
-               (fc/assoc
-                :juxt.site.alpha/methods
+               (site/set-methods
                 {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/oauth/authorize"}}})
                xtdb.api/put]))]))
 
