@@ -4,14 +4,11 @@
   (:require
    [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]
-   [juxt.flip.clojure.core :as-alias fc]
    [juxt.site.alpha :as-alias site]
    [juxt.flip.alpha :as-alias flip]
-   [juxt.site.alpha.repl :refer [encrypt-password]]
-   [juxt.site.alpha.init :as init :refer [do-action put! substitute-actual-base-uri]]
-   [juxt.site.alpha.util :refer [as-hex-str random-bytes]]
+   [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
    [juxt.book :as book]
-   [clojure.set :as set]))
+   ))
 
 (comment
   ;; tag::example-action[]
@@ -265,9 +262,9 @@
                  [:xt/id [:re "https://example.org/(.+)"]]])
 
                (site/set-methods
-                {:get {::pass/actions #{"https://example.org/actions/get-public-resource"}}
-                 :head {::pass/actions #{"https://example.org/actions/get-public-resource"}}
-                 :options {::pass/actions #{"https://example.org/actions/get-options"}}})
+                {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-public-resource"}}
+                 :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-public-resource"}}
+                 :options {:juxt.pass.alpha/actions #{"https://example.org/actions/get-options"}}})
 
                xtdb.api/put]))]))
 
@@ -467,9 +464,9 @@
                  [:xt/id [:re "https://example.org/(.+)"]]])
 
                (site/set-methods
-                {:get {::pass/actions #{"https://example.org/actions/get-protected-resource"}}
-                 :head {::pass/actions #{"https://example.org/actions/get-protected-resource"}}
-                 :options {::pass/actions #{"https://example.org/actions/get-options"}}})
+                {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-protected-resource"}}
+                 :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-protected-resource"}}
+                 :options {:juxt.pass.alpha/actions #{"https://example.org/actions/get-options"}}})
 
                xtdb.api/put
 
@@ -730,9 +727,9 @@
                (site/validate
                 [:map
                  [:xt/id [:re "https://example.org/session-scopes/(.+)"]]
-                 [::pass/cookie-domain [:re "https?://[^/]*"]]
-                 [::pass/cookie-path [:re "/.*"]]
-                 [::pass/login-uri [:re "https?://[^/]*"]]])
+                 [:juxt.pass.alpha/cookie-domain [:re "https?://[^/]*"]]
+                 [:juxt.pass.alpha/cookie-path [:re "/.*"]]
+                 [:juxt.pass.alpha/login-uri [:re "https?://[^/]*"]]])
                (site/set-type "https://meta.juxt.site/pass/session-scope")
                xtdb.api/put]))]))
 
@@ -934,9 +931,9 @@ Password: <input name=password type=password>
                 ~'{:find [(pull uid [*]) (pull user [*])]
                    :keys [uid user]
                    :where [
-                           [uid ::pass/user user]
-                           [uid ::pass/username username]
-                           [uid ::pass/password-hash password-hash]
+                           [uid :juxt.pass.alpha/user user]
+                           [uid :juxt.pass.alpha/username username]
+                           [uid :juxt.pass.alpha/password-hash password-hash]
                            [(crypto.password.bcrypt/check password password-hash)]]
                    ;; stack order
                    :in [password username]})
@@ -961,7 +958,7 @@ Password: <input name=password type=password>
            [
             (f/set-at
              (f/keep [(f/of :matched-user) (f/of :uid) (f/of :xt/id)
-                      ::pass/user-identity])
+                      :juxt.pass.alpha/user-identity])
              (f/keep [(f/of :subject)])
              (f/dip [f/set-at :subject]))])
 
@@ -989,7 +986,7 @@ Password: <input name=password type=password>
            [
             (f/set-at
              (f/keep [(f/of :subject) (f/of :xt/id)
-                      ::pass/subject])
+                      :juxt.pass.alpha/subject])
              (f/keep [(f/of :session)])
              (f/dip [f/set-at :session]))])
 
@@ -1009,10 +1006,10 @@ Password: <input name=password type=password>
                (f/set-at
                 (f/dip
                  [(pass/make-nonce 16)
-                  ::pass/session-token]))
+                  :juxt.pass.alpha/session-token]))
                (f/set-at
                 (f/keep
-                 [(f/of ::pass/session-token)
+                 [(f/of :juxt.pass.alpha/session-token)
                   (f/str "https://example.org/session-tokens/")
                   :xt/id]))
                (f/set-at (f/dip ["https://meta.juxt.site/pass/session-token" :juxt.site.alpha/type]))
@@ -1022,7 +1019,7 @@ Password: <input name=password type=password>
            [ ;; Link the session-token to the session
             (f/set-at
              (f/keep [(f/of :session) (f/of :xt/id)
-                      ::pass/session])
+                      :juxt.pass.alpha/session])
              (f/keep [(f/of :session-token)])
              (f/dip [f/set-at :session-token]))])
 
@@ -1037,7 +1034,7 @@ Password: <input name=password type=password>
          (f/define make-set-cookie-header
            [(f/set-at
              (f/keep
-              [(f/of :session-token) (f/of ::pass/session-token) "id=" f/str
+              [(f/of :session-token) (f/of :juxt.pass.alpha/session-token) "id=" f/str
                "; Path=/; Secure; HttpOnly; SameSite=Lax" f/swap f/str
                :session-cookie]))])
 
@@ -1140,7 +1137,7 @@ Password: <input name=password type=password>
                   (juxt.flip.alpha.xtdb/q
                    ~'{:find [(pull e [*])]
                       :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
-                              [e ::pass/client-id client-id]]
+                              [e :juxt.pass.alpha/client-id client-id]]
                       :in [client-id]})
                   f/first
                   f/first
@@ -1161,7 +1158,7 @@ Password: <input name=password type=password>
 
             ;; Get subject (it's in the environment, fail if missing subject)
             (f/define extract-subject
-              [(f/set-at (f/dip [(f/env ::pass/subject) :subject]))])
+              [(f/set-at (f/dip [(f/env :juxt.pass.alpha/subject) :subject]))])
 
             (f/define assert-subject
               [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
@@ -1173,12 +1170,12 @@ Password: <input name=password type=password>
             (f/define make-access-token
               [(f/set-at
                 (f/keep
-                 [f/dup (f/of :subject) ::pass/subject {} f/set-at f/swap
-                  (f/of :application) (f/of :xt/id) ::pass/application f/rot f/set-at
-                  ;; ::pass/token
-                  (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) ::pass/token]))
-                  ;; :xt/id (as a function of ::pass/token)
-                  (f/set-at (f/keep [(f/of ::pass/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
+                 [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
+                  (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
+                  ;; :juxt.pass.alpha/token
+                  (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
+                  ;; :xt/id (as a function of :juxt.pass.alpha/token)
+                  (f/set-at (f/keep [(f/of :juxt.pass.alpha/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
                   ;; ::site/type
                   (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
                   ;; TODO: Add scope
@@ -1194,7 +1191,7 @@ Password: <input name=password type=password>
               [(f/set-at
                 (f/keep
                  [ ;; access_token
-                  f/dup (f/of :access-token) (f/of ::pass/token) "access_token" {} f/set-at
+                  f/dup (f/of :access-token) (f/of :juxt.pass.alpha/token) "access_token" {} f/set-at
                   ;; token_token
                   "bearer" "token_type" f/rot f/set-at
                   ;; state
@@ -1211,7 +1208,7 @@ Password: <input name=password type=password>
               [(site/push-fx (f/dip [(site/set-status 302)]))
                (site/push-fx
                 (f/keep
-                 [f/dup (f/of :application) (f/of ::pass/redirect-uri)
+                 [f/dup (f/of :application) (f/of :juxt.pass.alpha/redirect-uri)
                   "#" f/swap f/str
                   f/swap (f/of :fragment)
                   (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
@@ -1297,7 +1294,7 @@ Password: <input name=password type=password>
         :juxt.pass.alpha/actions #{"https://example.org/actions/authorize-application"}
 
         ;; Should we create a 'session space' which functions like a protection
-        ;; space?  Like a protection space, it will extract the ::pass/subject
+        ;; space?  Like a protection space, it will extract the :juxt.pass.alpha/subject
         ;; from the session and place into the request - see
         ;; juxt.pass.alpha.session/wrap-associate-session
 
