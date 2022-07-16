@@ -52,7 +52,7 @@ An access token is granted for a *subject* and an *application*, so we'll need t
 But first, we need to install some preliminary resources into our REPL.
 ////
 
-=== Data consistency
+== Data consistency
 
 (((data consistency)))
 Actions that modify the database are run in a transaction function.
@@ -60,7 +60,7 @@ Actions that modify the database are run in a transaction function.
 This ensures that the authorization check is made at the latest possible point, just before the database is potentially modified.
 This avoids any potential for race-conditions, for example, if the authorization to perform an Action is revoked just before the Action is invoked.
 
-=== Audit logging
+== Audit logging
 
 (((audit logging)))
 (((do-action)))
