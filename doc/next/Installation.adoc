@@ -47,15 +47,21 @@ Edit /etc/hosts to direct requests for `site.test` and `auth.site.test` to 127.0
 
 // TODO: Explain why we are doing this
 
+[IMPORTANT]
+--
 Install mkcert
 
 ----
 sudo pacman -Sy mkcert
 ----
 
+Install the root certificate
+
 ----
 mkcert -install
 ----
+
+This should result in the following:
 
 ----
 Created a new local CA 💥
@@ -63,14 +69,23 @@ The local CA is now installed in the system trust store! ⚡️
 The local CA is now installed in the Firefox and/or Chrome/Chromium trust store (requires browser restart)! 🦊
 ----
 
+--
+
 === Install nginx
+
+[IMPORTANT]
+--
+Install nginx
 
 ----
 sudo pacman -Sy nginx-mainline
 ----
+--
 
 === Create private key and cert
 
+[IMPORTANT]
+--
 Create a new cert for the local development server, and move these into your nginx config directory.
 
 ----
@@ -78,9 +93,12 @@ mkcert site.test auth.site.test
 sudo mv site.test+1.pem /etc/nginx/site.test.pem
 sudo mv site.test+1-key.pem /etc/nginx/site.test-key.pem
 ----
+--
 
 === Configure nginx
 
+[IMPORTANT]
+--
 Configure nginx.
 Use `etc/dev/nginx.conf` as a guide to what to configure.
 You'll need to reference your private key and cert via the `ssl_certificate` and `ssl_certificate_key` parameters.
@@ -122,23 +140,32 @@ Test your final configuration before you start nginx and fix any errors.
 ----
 sudo nginx -t
 ----
+--
 
 === Start nginx
 
+[IMPORTANT]
+--
 Start nginx
 
 ----
 sudo systemctl enable nginx
 sudo systemctl start nginx
 ----
+--
 
 == Install Site
 
-=== Clone this repo
+=== Clone the Site repo
+
+[IMPORTANT]
+--
+Clone the Site git repo
 
 ----
 $ git clone https://github.com/juxt/site
 ----
+--
 
 == Configure the Site service
 
@@ -151,17 +178,20 @@ $ mkdir -p $HOME/.config/site
 $ cp site/etc/config.edn $HOME/.config/site/config.edn
 ----
 
-IMPORTANT: If you're aren't using `site.test` as a hostname, edit the configuration to replace `https://site.test` with the URI that corresponds to the hostname you have chosen.
+WARNING: If you're aren't using `site.test` as a hostname, edit the configuration to replace `https://site.test` with the URI that corresponds to the hostname you have chosen.
 
 == Start the Site server
 
+[IMPORTANT]
+--
 Start the Site server:
 
 ----
 $ site/bin/site-server
 ----
 
-NOTE: Alternatively, if you're familiar with Clojure development, you can start the server via the `deps.edn` file and simply 'jack-in' with your editor or IDE as normal.
+Alternatively, if you're familiar with Clojure development, you can start the server via the `deps.edn` file and simply 'jack-in' with your editor or IDE as normal.
+--
 
 ////
 
@@ -192,7 +222,7 @@ You can do this via port `50505`, which is a socket REPL that Site starts by def
 
 How you connect to this port is up to you. One way is via `ncat`, but you can replace `ncat` with `telnet`, or `netcat`, depending on what's available for your system.
 
-[NOTE]
+[IMPORTANT]
 --
 Arch users can install `ncat` by installing the `nmap` package:
 
@@ -201,13 +231,18 @@ $ sudo pacman -Sy nmap
 ----
 --
 
+[IMPORTANT]
+--
+Connect to Site's REPL:
+
 ----
 $ ncat localhost 50505
 ----
+--
 
 [TIP]
 --
-Prefix the command with `rlwrap` if you have it installed.
+Alternatively, prefix the command with `rlwrap` if you have it installed.
 
 ----
 $ rlwrap ncat localhost 50505
@@ -271,8 +306,19 @@ This will look similar to:
 ----
 ("https://site.test/_site/do-action"
  "https://site.test/actions/create-action"
+ "https://site.test/actions/get-not-found"
+ "https://site.test/actions/grant-permission"
+ "https://site.test/actions/register-application"
+ "https://site.test/permissions/get-not-found"
  "https://site.test/permissions/system/bootstrap"
- "https://site.test/subjects/system")
+ "https://site.test/permissions/system/register-application"
+ "https://site.test/subjects/system"
+ "urn:site:action-log:2629"
+ "urn:site:action-log:2630"
+ "urn:site:action-log:2631"
+ "urn:site:action-log:2633"
+ "urn:site:action-log:2634"
+ "urn:site:resources:not-found")
 ----
 --
 
