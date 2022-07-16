@@ -35,7 +35,7 @@ include::../../src/juxt/site/alpha/init.clj[tag=install-system-subject!,indent=0
 === The creator action
 
 (((create-action)))
-Next we install a single action that which allows us to create all other actions.
+Next we install a single action that enables the creation of all other actions.
 
 Let's examine the document that represents this action:
 
