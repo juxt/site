@@ -87,8 +87,8 @@
                  [:xt/id [:re "https://example.org/actions/(.+)"]]
                  [:juxt.pass.alpha/rules [:vector [:vector :any]]]])
 
-               (juxt.flip.clojure.core/assoc ; <3>
-                :juxt.site.alpha/type "https://meta.juxt.site/pass/action")
+               (f/set-at ; <3>
+                (f/dip ["https://meta.juxt.site/pass/action" :juxt.site.alpha/type]))
 
                xtdb.api/put]))]))}
       ;; end::install-create-action![]
