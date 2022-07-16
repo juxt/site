@@ -87,8 +87,7 @@
                  [:xt/id [:re "https://example.org/actions/(.+)"]]
                  [:juxt.pass.alpha/rules [:vector [:vector :any]]]])
 
-               (f/set-at ; <3>
-                (f/dip ["https://meta.juxt.site/pass/action" :juxt.site.alpha/type]))
+               (site/set-type "https://meta.juxt.site/pass/action") ; <3>
 
                xtdb.api/put]))]))}
       ;; end::install-create-action![]
@@ -172,7 +171,7 @@
                  [:xt/id [:re "https://example.org/permissions/(.+)"]]
                  [:juxt.pass.alpha/action [:re "https://example.org/actions/(.+)"]]
                  [:juxt.pass.alpha/purpose [:maybe :string]]])
-               (juxt.flip.clojure.core/assoc :juxt.site.alpha/type "https://meta.juxt.site/pass/permission")
+               (f/set-at (f/dip ["https://meta.juxt.site/pass/permission" :juxt.site.alpha/type]))
                xtdb.api/put]))]))})
      ;; end::create-grant-permission-action![]
      ))))
@@ -236,8 +235,8 @@
                  [::pass/redirect-uri [:re "https://"]]
                  [::pass/scope [:re "[a-z:\\s]+"]]])
 
-               (fc/assoc ::site/type "https://meta.juxt.site/pass/application")
-               (fc/assoc ::pass/client-secret (pass/as-hex-str (pass/random-bytes 20)))
+               (site/set-type "https://meta.juxt.site/pass/application")
+               (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes 20)) ::pass/client-secret]))
 
                (f/set-at
                 (f/keep

@@ -15,7 +15,8 @@
    [malli.core :as m]
    [malli.error :a me]
    [ring.util.codec :as codec]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   [juxt.flip.alpha.core :as f]))
 
 ;; See Factor, https://factorcode.org/
 ;; See K's XY language, https://www.nsl.com/k/xy/xy.htm
@@ -437,6 +438,10 @@
   [(cons (clojure.core/assoc m k v) stack) queue env])
 
 ;; Convenience words
+
+(defmethod word 'juxt.site.alpha/set-type
+  [[typ m & stack] [_ & queue] env]
+  [(cons (assoc m :juxt.site.alpha/type typ) stack) queue env])
 
 (defmethod word 'juxt.site.alpha/request-body-as-edn
   [stack [_ & queue] env]
