@@ -342,10 +342,10 @@
          _ (assert base-uri)
          db (xt/db (xt-node))]
      [ ;; Awaiting a fix to https://github.com/juxt/xtdb/issues/1480
-      {:complete? (xt/entity db "urn:site:tx-fns:do-action")
-       :happy-message "Site do-action transaction function installed."
-       :sad-message "Site do-action transaction function not installed. "
-       :fix "Enter (install-do-action-fn!) to fix this."}
+      #_{:complete? (xt/entity db "urn:site:tx-fns:do-action")
+         :happy-message "Site do-action transaction function installed."
+         :sad-message "Site do-action transaction function not installed. "
+         :fix "Enter (install-do-action-fn!) to fix this."}
 
       #_{:complete? (xt/entity db (str base-uri "/_site/apis/site/openapi.json"))
          :happy-message "Site API resources installed."
@@ -356,6 +356,11 @@
          :happy-message "Authentication resources installed."
          :sad-message "Authentication resources not installed. "
          :fix "Enter (put-auth-resources!) to fix this."}
+
+      {:complete? (xt/entity db (str base-uri "/subjects/system"))
+       :happy-message "System subject exists."
+       :sad-message "System subject does not exist."
+       :fix "Enter (init/install-system-subject!) to fix this."}
 
       #_{:complete? (xt/entity db (str base-uri "/_site/roles/superuser"))
          :happy-message "Role of superuser exists."
