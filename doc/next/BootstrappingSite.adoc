@@ -10,13 +10,13 @@ In this chapter we will explain the bootstrap process initiated in <<bootstrap>>
 (((primordial entities)))
 Before we can start to create and perform actions, we must start by installing four _primordial_ entities:
 
-* A *subject* that will only be used to bootstrap the system to a point where we have real users (<<bootstrap-install-system-subject>>).
+. A *subject* that will only be used to bootstrap the system to a point where we have real users (<<bootstrap-install-system-subject>>).
 
-* An *action* that allows the creation of other actions (<<bootstrap-install-create-action>>).
+. An *action* that allows the creation of other actions (<<bootstrap-install-create-action>>).
 
-* A *permission* to allow the *subject* (created in <<bootstrap-install-repl-subject>>) to call the action (created in <<bootstrap-install-system-permissions>>).
+. A *permission* to allow the *subject* (created in <<bootstrap-install-system-subject>>) to call the action (created in <<bootstrap-install-system-permissions>>).
 
-* A *transaction function* that we can use to _perform_ an action (<<bootstrap-install-transaction-function>>).
+. A *transaction function* that we can use to _perform_ an action (<<bootstrap-install-transaction-function>>).
 
 [[bootstrap-install-system-subject]]
 === The system subject
