@@ -261,7 +261,7 @@
                 [:map
                  [:xt/id [:re "https://example.org/(.+)"]]])
 
-               (site/set-methods
+               (site/set-methods ; <2>
                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-public-resource"}}
                  :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-public-resource"}}
                  :options {:juxt.pass.alpha/actions #{"https://example.org/actions/get-options"}}})
@@ -450,7 +450,7 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/put-immutable-protected-resource"
-       :juxt.pass.alpha/scope "write:resource"
+       :juxt.pass.alpha/scope "write:resource" ; <1>
 
        :juxt.flip.alpha/quotation
        `(
@@ -463,24 +463,20 @@
                 [:map
                  [:xt/id [:re "https://example.org/(.+)"]]])
 
-               (site/set-methods
+               (site/set-methods ; <2>
                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-protected-resource"}}
                  :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-protected-resource"}}
                  :options {:juxt.pass.alpha/actions #{"https://example.org/actions/get-options"}}})
 
                xtdb.api/put
-
-               ;; An action can be called as a transaction function, to allow actions to compose
-               #_:xt/fn
-               #_(quote (fn [xt-ctx ctx & args]
-                          (juxt.pass.alpha.actions/do-action* xt-ctx ctx args)))]))]))
+               ]))]))
 
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
           [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
 
-         [(allowed? subject resource permission) ; <2>
+         [(allowed? subject resource permission) ; <3>
           [subject :juxt.pass.alpha/user-identity id]
           [id :juxt.pass.alpha/user user]
           [permission :role role]
