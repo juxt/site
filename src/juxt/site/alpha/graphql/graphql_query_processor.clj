@@ -1,3 +1,5 @@
+;; Copyright © 2022, JUXT LTD.
+
 (ns juxt.site.alpha.graphql.graphql-query-processor
   (:require [xtdb.api :as xt]
             [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]

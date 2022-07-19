@@ -1,3 +1,5 @@
+;; Copyright © 2022, JUXT LTD.
+
 (ns juxt.site.graphql-auth-integration-test
   (:require  [clojure.test :refer [deftest testing is] :as t]
              [juxt.test.util :refer [*xt-node* *handler*] :as tutil]

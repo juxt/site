@@ -1,3 +1,5 @@
+;; Copyright © 2022, JUXT LTD.
+
 (ns juxt.site.graphql-compiler-test
   (:require  [clojure.test :refer [deftest testing is]]
              [juxt.site.alpha.graphql.graphql-compiler :as sut]
