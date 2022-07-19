@@ -1,7 +1,7 @@
 (ns juxt.site.alpha.graphql.graphql-query-processor
   (:require [xtdb.api :as xt]
             [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]
-            [juxt.pass.alpha.authorization :as authz]))
+            [juxt.pass.alpha.actions :as authz]))
 
 (defn graphql-query->xtdb-query
   "Transforms a graphql query string into an xtdb query

@@ -2,6 +2,7 @@
   (:require  [clojure.test :refer [deftest testing is] :as t]
              [juxt.test.util :refer [*xt-node* *handler*] :as tutil]
              [juxt.site.alpha.repl :as repl]
+             [juxt.site.alpha.init :as init]
              [juxt.site.alpha :as-alias site]
              [xtdb.api :as xt]
              [clojure.java.io :as io]
@@ -44,10 +45,10 @@
 
 (defn with-site-helpers
   [f]
-  (repl/put! (merge (make-user "host") {:name "Test Host User"}))
-  (repl/put! (make-identity "host"))
-  (repl/put! (make-subject "host" "host-test"))
-  (repl/put! (merge (make-permission "create-action") { :juxt.pass.alpha/user (str site-prefix "/users/host") }))
+  (init/put! (merge (make-user "host") {:name "Test Host User"}))
+  (init/put! (make-identity "host"))
+  (init/put! (make-subject "host" "host-test"))
+  (init/put! (merge (make-permission "create-action") { :juxt.pass.alpha/user (str site-prefix "/users/host") }))
   (f))
 
 (def fixtures [tutil/with-system-xt with-handler with-site-helpers])
@@ -116,29 +117,29 @@
         contractor (assoc (make-employee "ali") :phonenumber "91011" :juxt.site.alpha/type "https://test.example.com/contractor")
         client (assoc (make-client "acme-corp") :projects #{(:xt/id prj-alpha)
                                                             (:xt/id prj-bravo)})]
-    (repl/put! repository-a)
-    (repl/put! repository-b)
-    (repl/put! prj-alpha)
-    (repl/put! prj-bravo)
-    (repl/put! client)
-    (repl/put! manager)
-    (repl/put! employee)
-    (repl/put! contractor)
+    (init/put! repository-a)
+    (init/put! repository-b)
+    (init/put! prj-alpha)
+    (init/put! prj-bravo)
+    (init/put! client)
+    (init/put! manager)
+    (init/put! employee)
+    (init/put! contractor)
 
-    (repl/put! (make-lookup-action "getEmployee" "employee"))
-    (repl/put! (make-permission "getEmployee"))
-    (repl/put! (make-lookup-action "getContractor" "contractor"))
-    (repl/put! (make-permission "getContractor"))
-    (repl/put! (make-lookup-action "getProject" "project"))
-    (repl/put! (make-permission "getProject"))
-    (repl/put! (make-lookup-action "getRepository" "repository"))
-    (repl/put! (make-permission "getRepository"))
-    (repl/put! (make-lookup-action "getClient" "client"))
-    (repl/put! (make-permission "getClient"))
-    (repl/put! (update (make-action "getProject")
+    (init/put! (make-lookup-action "getEmployee" "employee"))
+    (init/put! (make-permission "getEmployee"))
+    (init/put! (make-lookup-action "getContractor" "contractor"))
+    (init/put! (make-permission "getContractor"))
+    (init/put! (make-lookup-action "getProject" "project"))
+    (init/put! (make-permission "getProject"))
+    (init/put! (make-lookup-action "getRepository" "repository"))
+    (init/put! (make-permission "getRepository"))
+    (init/put! (make-lookup-action "getClient" "client"))
+    (init/put! (make-permission "getClient"))
+    (init/put! (update (make-action "getProject")
                        :juxt.pass.alpha/rules conj ['(include? action e)
                                                     ['e :juxt.site.alpha/type "https://test.example.com/project"]]))
-    (repl/put! (update (make-action "getRepository")
+    (init/put! (update (make-action "getRepository")
                        :juxt.pass.alpha/rules #(conj %
                                                 ['(include? action e)
                                                  ['e :juxt.site.alpha/type "https://test.example.com/repository"]]
@@ -147,7 +148,7 @@
                                                  '[(keyword type-arg) type-arg-k]
                                                  '(or [e :type type-arg-k]
                                                       [(nil? type-arg)])])))
-    (repl/put! (update (make-action "getClient")
+    (init/put! (update (make-action "getClient")
                        :juxt.pass.alpha/rules conj ['(include? action e)
                                                     ['e :juxt.site.alpha/type "https://test.example.com/client"]]))
     ))
