@@ -1,0 +1,47 @@
+directive @site(
+
+  action: String!
+
+) on FIELD_DEFINITION
+
+
+type Query {
+  employee: [Employee] @site(action: "https://test.example.com/actions/getEmployee")
+  contractor: [Contractor] @site(action: "https://test.example.com/actions/getContractor")
+  project: [Project] @site(action: "https://test.example.com/actions/getProject")
+  client: [Client] @site(action: "https://test.example.com/actions/getClient")
+}
+
+type Employee {
+     name: String!
+     juxtcode: String!
+     phonenumber: String
+     manager: Employee @site(action: "https://test.example.com/actions/getEmployee")
+     reports: [Employee!] @site(action: "https://test.example.com/actions/getEmployee")
+     projects: [Project!] @site(action: "https://test.example.com/actions/getProject")
+}
+
+type Contractor {
+     name: String!
+     juxtcode: String!
+     phonenumber: String
+     manager: Employee @site(action: "https://test.example.com/actions/getEmployee")
+     reports: [Employee!] @site(action: "https://test.example.com/actions/getEmployee")
+     projects: [Project!] @site(action: "https://test.example.com/actions/getProject")
+}
+
+type Repository {
+     name: String!
+     url: String!
+}
+
+type Project {
+     name: String!
+     assigned: [Employee!] @site(action: "https://test.example.com/actions/getEmployee")
+     repositories: [Repository!] @site(action: "https://test.example.com/actions/getRepository")
+}
+
+type Client {
+     name: String!
+     projects: [Project!] @site(action: "https://test.example.com/actions/getProject")
+}
