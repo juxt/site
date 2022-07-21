@@ -1,0 +1,60 @@
+directive @site(
+  action: [String!]
+) on FIELD_DEFINITION
+
+
+type Query {
+  allStaff: [StaffMember!] @site(action: ["https://test.example.com/actions/getEmployee" "https://test.example.com/actions/getContractor"])
+  employee: [Employee] @site(action: "https://test.example.com/actions/getEmployee")
+  contractor: [Contractor] @site(action: "https://test.example.com/actions/getContractor")
+  project: [Project] @site(action: "https://test.example.com/actions/getProject")
+  client: [Client] @site(action: "https://test.example.com/actions/getClient")
+  repository: [Repository!] @site(action: "https://test.example.com/actions/getRepository")
+}
+
+interface StaffMember {
+     name: String!
+     juxtcode: String!
+     phonenumber: String
+     startdate: String!
+     manager: StaffMember @site(action: ["https://test.example.com/actions/getEmployee" "https://test.example.com/actions/getContractor"])
+     reports: [StaffMember!] @site(action: ["https://test.example.com/actions/getEmployee" "https://test.example.com/actions/getContractor"])
+     projects: [Project!] @site(action: "https://test.example.com/actions/getProject")
+}
+
+type Employee implements StaffMember {
+     name: String!
+     juxtcode: String!
+     phonenumber: String
+     startdate: String!
+     manager: StaffMember @site(action: ["https://test.example.com/actions/getEmployee" "https://test.example.com/actions/getContractor"])
+     reports: [StaffMember!] @site(action: ["https://test.example.com/actions/getEmployee" "https://test.example.com/actions/getContractor"])
+     projects: [Project!] @site(action: "https://test.example.com/actions/getProject")
+}
+
+type Contractor implements StaffMember {
+     name: String!
+     juxtcode: String!
+     phonenumber: String
+     startdate: String!
+     contractEnd: String
+     manager: StaffMember @site(action: ["https://test.example.com/actions/getEmployee" "https://test.example.com/actions/getContractor"])
+     reports: [StaffMember!] @site(action: ["https://test.example.com/actions/getEmployee" "https://test.example.com/actions/getContractor"])
+     projects: [Project!] @site(action: "https://test.example.com/actions/getProject")
+}
+
+type Repository {
+     name: String!
+     url: String!
+}
+
+type Project {
+     name: String!
+     assigned: [StaffMember!] @site(action: ["https://test.example.com/actions/getEmployee" "https://test.example.com/actions/getContractor"])
+     repositories: [Repository!] @site(action: "https://test.example.com/actions/getRepository")
+}
+
+type Client {
+     name: String!
+     projects: [Project!] @site(action: "https://test.example.com/actions/getProject")
+}

@@ -4,9 +4,8 @@
 
  :tests [{:id :test
           :test-paths ["test"]
-          :ns-patterns [#_"juxt.pipe.core-test"
-                        #_"juxt.pass.action-test"
-                        "juxt.book-test"
-                        ]}]
+          :ns-patterns ["juxt.book-test"
+                        "juxt.site.graphql-auth-integration-test"
+                        "juxt.site.graphql-compiler-test"]}]
 
  :reporter kaocha.report/documentation}
