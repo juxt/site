@@ -267,8 +267,8 @@
          :juxt.pass.alpha/puts
          :juxt.pass.alpha/deletes]))))
 
+;;
 ;;(t/join-fixtures [with-system-xt with-handler])
-
 (deftest login-test
   (init/bootstrap!)
   (book/protected-resource-preliminaries!)
@@ -360,6 +360,7 @@
         (testing "Access protected document with cookie"
           (let [request (assoc-in request [:ring.request/headers "cookie"] (format "id=%s" token))
                 response (*handler* request)]
+            response
             (is (= 200 (:ring.response/status response)))
             (is (= "<p>This is a protected message that is only visible when sending the correct session header.</p>"
                    (:ring.response/body response)))))))))
@@ -432,12 +433,6 @@
              {:ring.request/method :get
               :ring.request/path "/private/internal.html"}))))
 
-    #_(throw (ex-info "HI" {:response (*handler*
-                                     {:ring.request/method :get
-                                      :ring.request/path "/private/internal.html"})
-                          :resource (repl/e "https://site.test/private/internal.html")
-                          :action (repl/e "https://site.test/actions/get-protected-resource")}))
-
     ;; Now let's layer over a protection space
     (book/protection-spaces-preliminaries!)
 
@@ -456,8 +451,8 @@
     ;; Now if we try to access /private/internal.html we'll at least be
     ;; prompted to authenticate.
     (let [response (*handler*
-          {:ring.request/method :get
-           :ring.request/path "/private/internal.html"})]
+                    {:ring.request/method :get
+                     :ring.request/path "/private/internal.html"})]
       (is (= 401 (:ring.response/status response)))
       (is (re-matches #"Bearer.*" (get-in response [:ring.response/headers "www-authenticate"]))))
 
@@ -534,10 +529,11 @@
 
       ;; Grant Alice permission to perform /actions/oauth/authorize
       (authz/do-action
-       (let [xt-node *xt-node*]
+       (let [xt-node *xt-node*
+             db (xt/db xt-node)]
          {::site/xt-node xt-node
-          ::site/db (xt/db xt-node)
-          ::pass/subject "https://site.test/subjects/system"
+          ::site/db db
+          ::pass/subject (xt/entity db "https://site.test/subjects/system")
           ::pass/action "https://site.test/actions/grant-permission"
           ::site/base-uri "https://site.test"
           ::site/received-representation
@@ -572,6 +568,11 @@
                   :ring.request/path "/private/internal.html"}))))
 
     ;; with access token? No, because Alice doesn't have permission
+    (*handler*
+     {:ring.request/method :get
+      :ring.request/headers {"authorization" (format "Bearer %s" (:access-token @store))}
+      :ring.request/path "/private/internal.html"})
+
     (is (= 403 (:ring.response/status
                 (*handler*
                  {:ring.request/method :get
@@ -587,8 +588,7 @@
       :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
       :juxt.pass.alpha/user "https://site.test/users/alice"
       :juxt.site.alpha/uri "https://site.test/private/internal.html"
-      :juxt.pass.alpha/purpose nil
-      })
+      :juxt.pass.alpha/purpose nil})
 
     ;; Finally, now Alice has permission to access the resource, the application
     ;; does too (via the Bearer token)
@@ -600,4 +600,38 @@
               :ring.request/path "/private/internal.html"}))))
 
     ;; TODO: Test revocation
+
+    ;; TODO: Create a /graphql endpoint
+
+    (book/create-action-install-graphql-endpoint!)
+    (book/grant-permission-install-graphql-endpoint-to-alice!)
+
+    ;; We invoke the action explicitly by POSTing to the action's URL. This has
+    ;; the benefit of not needing to have an 'empty' resource that somehow is
+    ;; configured to allow PUTs (like with the original Site empty resource
+    ;; allowing StaticRepresentation resources to be PUT to it). Another
+    ;; benefit is that there is no ambiguity as to which action should
+    ;; performed. We get authorization 'for free'.
+
+    #_(let [body (.getBytes (pr-str {:xt/id "https://site.test/graphqlj"}))
+            request
+            {:ring.request/method :post
+             :ring.request/path "/actions/install-graphql-endpoint"
+             :ring.request/headers
+             {"authorization" (format "Bearer %s" (:access-token @store))
+              "content-length" (str (count body))
+              "content-type" "application/edn"}
+             :ring.request/body (io/input-stream body)}
+
+            response (*handler* request)
+            ]
+        response
+
+        ;;(repl/e "https://site.test/graphql")
+
+        )
+
+
+
+
     ))

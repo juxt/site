@@ -132,10 +132,14 @@
      {::http/content-type "application/edn"
       ::http/body (.getBytes (pr-str edn-arg))}}))
 
-(defn do-action [subject action edn-arg]
-  (::pass/action-result
-   (actions/do-action
-    (make-repl-request-context subject action edn-arg))))
+(defn do-action [subject-id action-id edn-arg]
+  (assert (or (nil? subject-id) (string? subject-id)) "Subject must a string or nil")
+  (let [xt-node (xt-node)
+        db (xt/db xt-node)
+        subject (when subject-id (xt/entity db subject-id))]
+    (::pass/action-result
+     (actions/do-action
+      (make-repl-request-context subject action-id edn-arg)))))
 
 (defn create-grant-permission-action! []
   (eval

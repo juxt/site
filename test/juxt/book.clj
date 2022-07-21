@@ -5,7 +5,6 @@
    [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]
    [juxt.site.alpha :as-alias site]
-   [juxt.flip.alpha :as-alias flip]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
    [juxt.book :as book]
    ))
@@ -57,7 +56,9 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
+          [permission :juxt.pass.alpha/subject
+           ;; TODO: This only needs to be 'subject', not hardcoded.
+           "https://example.org/subjects/system"]]
 
          [(allowed? subject resource permission) ; <5>
           [subject :juxt.pass.alpha/user-identity id]
@@ -1092,7 +1093,7 @@ Password: <input name=password type=password>
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
-      {:xt/id "https://site.test/actions/oauth/authorize"
+      {:xt/id "https://example.org/actions/oauth/authorize"
 
        ;; Eventually we should look up if there's a resource-owner decision in
        ;; place to cover the application and scopes requested.  The decision
@@ -1166,7 +1167,7 @@ Password: <input name=password type=password>
             (f/define make-access-token
               [(f/set-at
                 (f/keep
-                 [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
+                 [f/dup (f/of :subject) (f/of :xt/id) :juxt.pass.alpha/subject {} f/set-at f/swap
                   (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
                   ;; :juxt.pass.alpha/token
                   (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
@@ -1236,7 +1237,6 @@ Password: <input name=password type=password>
   (eval
    (substitute-actual-base-uri
     (quote
-     ;; tag::create-action-issue-access-token![]
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
@@ -1249,7 +1249,7 @@ Password: <input name=password type=password>
              (f/dip
               [site/request-body-as-edn
                (site/set-methods
-                {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/oauth/authorize"}}})
+                {:get #:juxt.pass.alpha{:actions #{"https://example.org/actions/oauth/authorize"}}})
                xtdb.api/put]))]))
 
        :juxt.pass.alpha/rules
@@ -1264,7 +1264,7 @@ Password: <input name=password type=password>
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/repl/put-user"
+      {:xt/id "https://example.org/permissions/system/install-authorization-server"
        :juxt.pass.alpha/subject "https://example.org/subjects/system"
        :juxt.pass.alpha/action "https://example.org/actions/install-authorization-server"
        :juxt.pass.alpha/purpose nil})))))
@@ -1279,30 +1279,6 @@ Password: <input name=password type=password>
       {:xt/id "https://example.org/oauth/authorize"
        :juxt.http.alpha/content-type "text/html;charset=utf-8"
        :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"})))))
-
-#_(defn install-authorization-server! []
-    ;; tag::install-authorization-server![]
-    (juxt.site.alpha.init/put!
-     {:xt/id "https://auth.example.org/oauth/authorize"
-      :juxt.site.alpha/methods
-      {:get
-       {:juxt.site.alpha/handler 'juxt.pass.alpha.authorization-server/authorize
-        :juxt.pass.alpha/actions #{"https://example.org/actions/authorize-application"}
-
-        ;; Should we create a 'session space' which functions like a protection
-        ;; space?  Like a protection space, it will extract the :juxt.pass.alpha/subject
-        ;; from the session and place into the request - see
-        ;; juxt.pass.alpha.session/wrap-associate-session
-
-        :juxt.pass.alpha/session-cookie "id"
-        ;; This will be called with query parameter return-to set to ::site/uri
-        ;; (effective URI) of request
-        :juxt.pass.alpha/redirect-when-no-session-session "https://example.org/_site/openid/auth0/login"
-        }}})
-    ;; end::install-authorization-server![]
-    )
-
-;; TODO: Put Authorization Server in a protection space
 
 ;; First Application
 
@@ -1320,65 +1296,82 @@ Password: <input name=password type=password>
      ;; end::register-example-application![]
      ))))
 
-(defn invoke-authorize-application! []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::invoke-authorize-application![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/alice"
-      "https://example.org/actions/authorize-application"
-      {:juxt.pass.alpha/user "https://example.org/users/alice"
-       :juxt.pass.alpha/application "https://example.org/applications/local-terminal"})
-     ;; end::invoke-authorize-application![]
-     ))))
+;; GraphQL endpoint
 
-(defn invoke-issue-access-token! []
+;; Some who has the install-graphql-schema action can put a GraphQL schema
+;; wherever the granted permission allows.
+
+;; Option: POST to the action's URI?
+
+(defn create-action-install-graphql-endpoint! []
   (eval
    (substitute-actual-base-uri
     (quote
-     ;; tag::invoke-issue-access-token![]
      (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/alice"
-      "https://example.org/actions/issue-access-token"
-      {:juxt.pass.alpha/subject "https://example.org/subjects/alice"
-       :juxt.pass.alpha/application "https://example.org/applications/local-terminal"
-       :juxt.pass.alpha/scope "read:admin"})
-       ;; end::invoke-issue-access-token![]
-     ))))
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/install-graphql-endpoint"
+
+       :juxt.site.alpha/methods
+       {
+        ;; As this is an 'installer' actions, we expose this action.
+        :post {:juxt.pass.alpha/actions #{"https://example.org/actions/install-graphql-endpoint"}}
+        ;; (the default action of an action resource is itself.)
+        }
+
+       :juxt.flip.alpha/quotation
+       `(
+         ;; We check that the permission resource matches the xt/id
+         (f/env ::pass/permissions)
+         ::pass/permissions
+         {:type :debug-info}
+         f/set-at
+         (f/throw (f/ex-info "break" f/swap))
+         (site/with-fx-acc
+           [(site/push-fx
+             (f/dip
+              [site/request-body-as-edn
+               (site/set-methods
+                {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-graphql-schema"}}
+                 :put {:juxt.pass.alpha/actions #{"https://example.org/actions/put-graphql-schema"}}
+                 :post {:juxt.pass.alpha/action "https://example.org/actions/graphql-request"}})
+               xtdb.api/put]))]))
+
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [subject :juxt.pass.alpha/user-identity id]
+          [id :juxt.pass.alpha/user user]
+          [permission :juxt.pass.alpha/user user]
+          ;;[permission :juxt.site.alpha/resource resource]
+          ;;[(re-pattern resource-pattern) compiled-pattern]
+          ;;[(re-matches compiled-pattern) resource]
+          ]]})))))
+
+(defn grant-permission-install-graphql-endpoint-to-alice! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/system/install-graphql-endpoint"
+       :juxt.pass.alpha/user "https://example.org/users/alice"
+       :juxt.pass.alpha/action "https://example.org/actions/install-graphql-endpoint"
+       :juxt.site.alpha/resource "https://example.org/graphql"
+       :juxt.pass.alpha/purpose nil})))))
+
+#_(defn install-graphql-endpoint! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/install-graphql-endpoint"
+      {:xt/id "https://example.org/graphql"
+       })))))
 
 ;; Other stuff
-
-#_(defn create-action-put-error-resource! []
-    (eval
-     (substitute-actual-base-uri
-      (quote
-       ;; tag::create-action-put-error-resource![]
-       (juxt.site.alpha.init/do-action
-        "https://example.org/subjects/system"
-        "https://example.org/actions/create-action"
-        {:xt/id "https://example.org/actions/put-error-resource"
-         :juxt.pass.alpha/scope "write:resource"
-
-         :juxt.pass.alpha.malli/args-schema
-         [:tuple
-          [:map
-           [:xt/id [:re "https://example.org/_site/errors/[a-z\\-]{3,}"]]
-           [:juxt.site.alpha/type [:= "ErrorResource"]]
-           [:ring.response/status :int]]]
-
-         :juxt.pass.alpha/process
-         [
-          [:juxt.pass.alpha.malli/validate]
-          [:xtdb.api/put]]
-
-         :juxt.pass.alpha/rules
-         '[
-           [(allowed? subject resource permission)
-            [permission :juxt.pass.alpha/user-identity i]
-            [subject :juxt.pass.alpha/user-identity i]]]})
-       ;; end::create-action-put-error-resource![]
-       ))))
 
 (defn grant-permission-to-put-error-resource! []
   (eval

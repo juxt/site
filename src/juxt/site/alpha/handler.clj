@@ -204,21 +204,19 @@
 (defn GET [{::pass/keys [subject] :as req}]
   (conditional/evaluate-preconditions! req)
   (let [req (assoc req :ring.response/status 200)
-        permitted-action (::pass/action (first (::pass/permitted-actions req)))
-        ]
+        permitted-action (::pass/action (first (::pass/permitted-actions req)))]
     (cond
       ;; It's rare but sometimes a GET will call an action. For example, the
       ;; Authorization Request (RFC 6749 Section 4.2.1).
       (and permitted-action (::flip/quotation permitted-action))
       (try
         (actions/do-action
-         (-> req
-             (assoc ::pass/action (:xt/id permitted-action))
-             (assoc ::pass/subject (:xt/id subject))
-             ;; A java.io.BufferedInputStream in the request can provke this
-             ;; error: "invalid tx-op: Unfreezable type: class
-             ;; java.io.BufferedInputStream".
-             (dissoc :ring.request/body)))
+         (cond-> req
+           permitted-action (assoc ::pass/action (:xt/id permitted-action))
+           ;; A java.io.BufferedInputStream in the request can provke this
+           ;; error: "invalid tx-op: Unfreezable type: class
+           ;; java.io.BufferedInputStream".
+           (:ring.request/body req) (dissoc :ring.request/body)))
         (catch Exception e
           (throw
            (ex-info

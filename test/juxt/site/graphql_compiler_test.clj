@@ -1,13 +1,14 @@
 ;; Copyright © 2022, JUXT LTD.
 
 (ns juxt.site.graphql-compiler-test
-  (:require  [clojure.test :refer [deftest testing is]]
-             [juxt.site.alpha.graphql.graphql-compiler :as sut]
-             [clojure.java.io :as io]
-             [juxt.grab.alpha.graphql :as-alias graphql]
-             [juxt.grab.alpha.document :as document]))
+  (:require
+   [clojure.test :refer [deftest testing is]]
+   [juxt.site.alpha.graphql.graphql-compiler :as sut]
+   [clojure.java.io :as io]
+   [juxt.grab.alpha.graphql :as-alias graphql]
+   [juxt.grab.alpha.document :as document]))
 
-(def example-schema (-> "juxt/data/example.graphql"
+(def example-schema (-> "juxt/site/example.graphql"
                         io/resource
                         slurp
                         sut/compile-schema))

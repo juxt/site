@@ -1,15 +1,16 @@
 ;; Copyright © 2022, JUXT LTD.
 
 (ns juxt.site.graphql-auth-integration-test
-  (:require  [clojure.test :refer [deftest testing is] :as t]
-             [juxt.test.util :refer [*xt-node* *handler*] :as tutil]
-             [juxt.site.alpha.repl :as repl]
-             [juxt.site.alpha.init :as init]
-             [juxt.site.alpha :as-alias site]
-             [xtdb.api :as xt]
-             [clojure.java.io :as io]
-             [juxt.site.alpha.graphql.graphql-query-processor :as graphql-proc]
-             [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]))
+  (:require
+   [clojure.test :refer [deftest testing is] :as t]
+   [juxt.test.util :refer [*xt-node* *handler*] :as tutil]
+   [juxt.site.alpha.init :as init :refer [put!]]
+   [juxt.site.alpha.repl :as repl]
+   [juxt.site.alpha :as-alias site]
+   [xtdb.api :as xt]
+   [clojure.java.io :as io]
+   [juxt.site.alpha.graphql.graphql-query-processor :as graphql-proc]
+   [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]))
 
 (def site-prefix "https://test.example.com")
 
@@ -96,7 +97,7 @@
           :juxt.pass.alpha/rules conj ['(include? action e)
                                        ['e :juxt.site.alpha/type (str site-prefix "/" lookup-type)]]))
 
-(def example-compiled-schema (-> "juxt/data/example.graphql"
+(def example-compiled-schema (-> "juxt/site/example.graphql"
                                  io/resource
                                  slurp
                                  gcompiler/compile-schema))
@@ -119,29 +120,29 @@
         contractor (assoc (make-employee "ali") :phonenumber "91011" :juxt.site.alpha/type "https://test.example.com/contractor")
         client (assoc (make-client "acme-corp") :projects #{(:xt/id prj-alpha)
                                                             (:xt/id prj-bravo)})]
-    (init/put! repository-a)
-    (init/put! repository-b)
-    (init/put! prj-alpha)
-    (init/put! prj-bravo)
-    (init/put! client)
-    (init/put! manager)
-    (init/put! employee)
-    (init/put! contractor)
+    (put! repository-a)
+    (put! repository-b)
+    (put! prj-alpha)
+    (put! prj-bravo)
+    (put! client)
+    (put! manager)
+    (put! employee)
+    (put! contractor)
 
-    (init/put! (make-lookup-action "getEmployee" "employee"))
-    (init/put! (make-permission "getEmployee"))
-    (init/put! (make-lookup-action "getContractor" "contractor"))
-    (init/put! (make-permission "getContractor"))
-    (init/put! (make-lookup-action "getProject" "project"))
-    (init/put! (make-permission "getProject"))
-    (init/put! (make-lookup-action "getRepository" "repository"))
-    (init/put! (make-permission "getRepository"))
-    (init/put! (make-lookup-action "getClient" "client"))
-    (init/put! (make-permission "getClient"))
-    (init/put! (update (make-action "getProject")
+    (put! (make-lookup-action "getEmployee" "employee"))
+    (put! (make-permission "getEmployee"))
+    (put! (make-lookup-action "getContractor" "contractor"))
+    (put! (make-permission "getContractor"))
+    (put! (make-lookup-action "getProject" "project"))
+    (put! (make-permission "getProject"))
+    (put! (make-lookup-action "getRepository" "repository"))
+    (put! (make-permission "getRepository"))
+    (put! (make-lookup-action "getClient" "client"))
+    (put! (make-permission "getClient"))
+    (put! (update (make-action "getProject")
                        :juxt.pass.alpha/rules conj ['(include? action e)
                                                     ['e :juxt.site.alpha/type "https://test.example.com/project"]]))
-    (init/put! (update (make-action "getRepository")
+    (put! (update (make-action "getRepository")
                        :juxt.pass.alpha/rules #(conj %
                                                 ['(include? action e)
                                                  ['e :juxt.site.alpha/type "https://test.example.com/repository"]]
@@ -150,7 +151,7 @@
                                                  '[(keyword type-arg) type-arg-k]
                                                  '(or [e :type type-arg-k]
                                                       [(nil? type-arg)])])))
-    (init/put! (update (make-action "getClient")
+    (put! (update (make-action "getClient")
                        :juxt.pass.alpha/rules conj ['(include? action e)
                                                     ['e :juxt.site.alpha/type "https://test.example.com/client"]]))
     ))

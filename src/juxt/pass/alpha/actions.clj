@@ -57,10 +57,9 @@
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
   [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose}]
 
-  (assert (or (nil? subject) (string? subject)) "Subject expected to be an id, or null")
+  (assert (or (nil? subject) (map? subject)) "Subject expected to be a map, or null")
 
-  (log/debugf "check-permissions: subject %s, resource: %s, purpose: %s, actions: %s, whole subject: %s" subject resource purpose actions
-              (xt/pull db '[*] subject))
+  (log/debugf "check-permissions: subject %s, resource: %s, purpose: %s, actions: %s, whole subject: %s" (:xt/id subject) resource purpose actions subject)
 
   (log/debugf "Actions: %s" actions)
   (log/debugf "Rules: %s" (actions->rules db actions))
@@ -70,7 +69,10 @@
       (let [permissions
             (query-permissions
              {:db db :rules rules
-              :subject subject :actions actions :resource resource :purpose purpose})]
+              :subject (:xt/id subject)
+              :actions actions
+              :resource resource
+              :purpose purpose})]
         ;;(log/debugf "Returning permissions: %s" (pr-str permissions))
         permissions))))
 
@@ -231,7 +233,7 @@
         tx (xt/indexing-tx xt-ctx)]
     (try
       (assert base-uri "The base-uri must be provided")
-      (assert (or (nil? subject) (string? subject)) "Subject to do-action* expected to be an id, or null")
+      (assert (or (nil? subject) (map? subject)) "Subject to do-action* expected to be a map, or null")
 
       ;; Check that we /can/ call the action
       (let [check-permissions-result
@@ -247,13 +249,18 @@
         (when-not (seq check-permissions-result)
           (throw (ex-info "Action denied" ctx)))
 
-        (let [[{::site/keys [fx]}]
+        (let [env (assoc
+                   ctx
+                   ::site/db db
+                   ::pass/permissions (map ::pass/permission check-permissions-result))
+              [{::site/keys [fx]}]
               (cond
                 (::flip/quotation action-doc)
                 (eval-quotation
                  (reverse args)         ; push the args to the stack
                  (::flip/quotation action-doc)
-                 (assoc ctx ::site/db db))
+                 env)
+
                 ;; There might be other strategies in the future (although the
                 ;; fewer the better really)
                 :else
@@ -285,7 +292,7 @@
                  (cond->
                      {:xt/id (format "%s/_site/action-log/%s" base-uri (::xt/tx-id tx))
                       ::site/type "https://meta.juxt.site/site/action-log-entry"
-                      ::pass/subject subject
+                      ::pass/subject (:xt/id subject)
                       ::pass/action action
                       ::pass/purpose purpose
                       ::pass/puts (vec
@@ -315,7 +322,7 @@
           [[::xt/put
             {:xt/id action-log-entry-uri
              ::site/type "https://meta.juxt.site/site/action-log-entry"
-             ::pass/subject subject
+             ::pass/subject (:xt/id subject)
              ::pass/action action
              ::site/resource resource
              ::pass/purpose purpose
@@ -360,7 +367,13 @@
   (assert (:juxt.site.alpha/xt-node ctx) "xt-node must be present")
   (assert (:juxt.site.alpha/db ctx) "db must be present")
   (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
-  (assert (or (nil? subject) (string? subject)) "Subject to do-action expected to be an id, or null")
+
+  (when-not (or (nil? subject) (map? subject))
+    (throw
+     (ex-info
+      "Subject to do-action expected to be a map, or null"
+      {::site/request-context ctx :subject subject})))
+
   ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed
   ;; by an anonymous user.
   (let [tx-fn (str base-uri "/_site/do-action")]
@@ -419,6 +432,8 @@
         :ring.request/keys [method]
         :as req}]
 
+    (assert (or (nil? subject) (map? subject)))
+
     (let [actions (get-in resource [::site/methods method ::pass/actions])
 
           _ (doseq [action actions]
@@ -430,7 +445,7 @@
           (check-permissions
            db
            actions
-           (cond-> {::pass/subject (:xt/id subject)}
+           (cond-> {::pass/subject subject}
              ;; When the resource is in the database, we can add it to the
              ;; permission checking in case there's a specific permission for
              ;; this resource.

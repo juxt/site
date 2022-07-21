@@ -1,9 +1,10 @@
 ;; Copyright © 2022, JUXT LTD.
 
 (ns juxt.site.alpha.graphql.graphql-query-processor
-  (:require [xtdb.api :as xt]
-            [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]
-            [juxt.pass.alpha.actions :as authz]))
+  (:require
+   [xtdb.api :as xt]
+   [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]
+   [juxt.pass.alpha.actions :as actions]))
 
 (defn graphql-query->xtdb-query
   "Transforms a graphql query string into an xtdb query
@@ -21,7 +22,7 @@
         query-operation    (first (get-in query-document [:juxt.grab.alpha.document/operations]))
         root-selection-set (get query-operation :juxt.grab.alpha.graphql/selection-set)
         action-rules       (->> (gcompiler/query-doc->actions query-document compiled-schema)
-                                (authz/actions->rules db))
+                                (actions/actions->rules db))
         built-query        (gcompiler/build-query-for-selection-set
                             (first root-selection-set)
                             compiled-schema
