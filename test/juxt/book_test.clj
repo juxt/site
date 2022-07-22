@@ -17,7 +17,8 @@
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
    [ring.util.codec :as codec]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   [clojure.set :as set]))
 
 (defn with-handler [f]
   (binding [*handler*
@@ -613,25 +614,79 @@
     ;; benefit is that there is no ambiguity as to which action should
     ;; performed. We get authorization 'for free'.
 
-    #_(let [body (.getBytes (pr-str {:xt/id "https://site.test/graphqlj"}))
-            request
-            {:ring.request/method :post
-             :ring.request/path "/actions/install-graphql-endpoint"
-             :ring.request/headers
-             {"authorization" (format "Bearer %s" (:access-token @store))
-              "content-length" (str (count body))
-              "content-type" "application/edn"}
-             :ring.request/body (io/input-stream body)}
+    (let [request
+          {:ring.request/method :post
+           :ring.request/path "/actions/install-graphql-endpoint"
+           :ring.request/headers
+           {"authorization" (format "Bearer %s" (:access-token @store))
+            "content-type" "application/edn"}}
 
-            response (*handler* request)
-            ]
-        response
+          with-body
+          (fn [req body-bytes]
+            (-> req
+                (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
+                (assoc :ring.request/body (io/input-stream body-bytes))))]
 
-        ;;(repl/e "https://site.test/graphql")
+      (testing "Installation allowed"
+        (let [response (*handler* (with-body request (.getBytes (pr-str {:xt/id "https://site.test/graphql"}))))]
+          (is (= 201 (:ring.response/status response)))
+          (is (= "https://site.test/graphql" (get-in response [:ring.response/headers "location"])))))
 
-        )
+      (testing "Installation denied"
+        (let [response (*handler* (with-body request (.getBytes (pr-str {:xt/id "https://site.test/my-graphql"}))))]
+          (is (= 403 (:ring.response/status response))))))))
 
 
 
+#_(f/eval-quotation
+   []
+   `(
+     (site/with-fx-acc
+       [(f/set-at (f/dip [site/request-body-as-edn
+                          (site/validate [:map {:closed true}
+                                          [:xt/id [:re "https://site.test/.*"]]])
+                          :input]))
+        (f/set-at (f/dip [(f/env ::pass/permissions) :permissions]))
+        ;; We check that the permission resource matches the xt/id
+        (f/set-at
+         (f/keep
+          [f/dup (f/of :input) (f/of :xt/id) f/swap (f/of :permissions)
+           (f/any? [(f/of ::pass/resource-pattern) f/<regex> f/matches?])
+           f/nip :matches?]))
 
-    ))
+        (f/keep [f/dup
+                 (f/of :matches?)
+                 (f/if
+                     [f/drop]
+                     [(f/throw
+                       (f/ex-info
+                        f/dup "No permission allows installation of GraphQL endpoint: " f/swap (f/of :input) (f/of :xt/id) f/swap f/str
+                        f/swap (f/of :input) (f/of :xt/id) :location {} f/set-at))])])
+
+        (site/push-fx
+         (f/keep
+          [(f/of :input)
+           (site/set-methods
+            {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-graphql-schema"}}
+             :put {:juxt.pass.alpha/actions #{"https://example.org/actions/put-graphql-schema"}}
+             :post {:juxt.pass.alpha/action "https://example.org/actions/graphql-request"}})
+           xtdb.api/put]))
+
+        (site/push-fx (f/dip [(site/set-status 302)]))
+        (site/push-fx (f/keep [(site/set-header "location" f/swap (f/of :input) (f/of :xt/id))]))
+
+        ]))
+
+   (let [body (.getBytes (pr-str {:xt/id "https://site.test/graphql3"}))]
+     {:ring.request/method :post
+      :ring.request/path "/actions/install-graphql-endpoint"
+      ::site/received-representation
+      {::http/content-type "application/edn"
+       ::http/body body}
+      ::pass/permissions
+      [{::site/type "https://meta.juxt.site/pass/permission"
+        ::pass/resource-pattern "\\Qhttps://site.test/graphql\\E"}
+       {::site/type "https://meta.juxt.site/pass/permission"
+        ::pass/resource-pattern "\\Qhttps://site.test/graphql2\\E"}
+       {::site/type "https://meta.juxt.site/pass/permission"
+        ::pass/resource-pattern "\\Qhttps://site.test/graphql3\\E"}]}))

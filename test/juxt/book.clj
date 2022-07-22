@@ -2,6 +2,7 @@
 
 (ns juxt.book
   (:require
+   [clojure.java.io :as io]
    [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]
    [juxt.site.alpha :as-alias site]
@@ -1321,32 +1322,46 @@ Password: <input name=password type=password>
 
        :juxt.flip.alpha/quotation
        `(
-         ;; We check that the permission resource matches the xt/id
-         (f/env ::pass/permissions)
-         ::pass/permissions
-         {:type :debug-info}
-         f/set-at
-         (f/throw (f/ex-info "break" f/swap))
          (site/with-fx-acc
-           [(site/push-fx
-             (f/dip
-              [site/request-body-as-edn
-               (site/set-methods
-                {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-graphql-schema"}}
-                 :put {:juxt.pass.alpha/actions #{"https://example.org/actions/put-graphql-schema"}}
-                 :post {:juxt.pass.alpha/action "https://example.org/actions/graphql-request"}})
-               xtdb.api/put]))]))
+           [(f/set-at (f/dip [site/request-body-as-edn
+                              (site/validate [:map {:closed true}
+                                              [:xt/id [:re "https://site.test/.*"]]])
+                              :input]))
+            (f/set-at (f/dip [(f/env ::pass/permissions) :permissions]))
+            ;; We check that the permission resource matches the xt/id
+            (f/set-at
+             (f/keep
+              [f/dup (f/of :input) (f/of :xt/id) f/swap (f/of :permissions)
+               (f/any? [(f/of ::site/resource-pattern) f/<regex> f/matches?])
+               f/nip :matches?]))
+
+            (f/keep [f/dup
+                     (f/of :matches?)
+                     (f/if
+                         [f/drop]
+                         [(f/throw
+                           (f/ex-info
+                            f/dup "No permission allows installation of GraphQL endpoint: " f/swap (f/of :input) (f/of :xt/id) f/swap f/str
+                            f/swap (f/of :input) (f/of :xt/id) :location {:ring.response/status 403} f/set-at))])])
+
+            (site/push-fx
+               (f/keep
+                [(f/of :input)
+                 (site/set-methods
+                  {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-graphql-schema"}}
+                   :put {:juxt.pass.alpha/actions #{"https://example.org/actions/put-graphql-schema"}}
+                   :post {:juxt.pass.alpha/action "https://example.org/actions/graphql-request"}})
+                 xtdb.api/put]))
+
+            (site/push-fx (f/dip [(site/set-status 201)]))
+            (site/push-fx (f/keep [(site/set-header "location" f/swap (f/of :input) (f/of :xt/id))]))]))
 
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
           [subject :juxt.pass.alpha/user-identity id]
           [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]
-          ;;[permission :juxt.site.alpha/resource resource]
-          ;;[(re-pattern resource-pattern) compiled-pattern]
-          ;;[(re-matches compiled-pattern) resource]
-          ]]})))))
+          [permission :juxt.pass.alpha/user user]]]})))))
 
 (defn grant-permission-install-graphql-endpoint-to-alice! []
   (eval
@@ -1355,10 +1370,13 @@ Password: <input name=password type=password>
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
+      ;; TODO: We need a specialist grant-permission for this because we want to documnent/validate the ::site/resource-pattern
       {:xt/id "https://example.org/permissions/system/install-graphql-endpoint"
        :juxt.pass.alpha/user "https://example.org/users/alice"
        :juxt.pass.alpha/action "https://example.org/actions/install-graphql-endpoint"
-       :juxt.site.alpha/resource "https://example.org/graphql"
+       ;; This permission can restrict exactly where a GraphQL endpoint can be
+       ;; installed.
+       :juxt.site.alpha/resource-pattern "\\Qhttps://example.org/graphql\\E"
        :juxt.pass.alpha/purpose nil})))))
 
 #_(defn install-graphql-endpoint! []

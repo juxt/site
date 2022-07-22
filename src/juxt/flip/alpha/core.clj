@@ -3,7 +3,7 @@
 (ns juxt.flip.alpha.core
   ;; When promoting this ns, move the defmethods that require all these
   ;; dependencies:
-  (:refer-clojure :exclude [+ first second symbol drop keep when str ex-info])
+  (:refer-clojure :exclude [+ first second symbol drop keep when str ex-info any? filter map])
   (:require
    [clojure.edn :as edn]
    [clojure.string :as str]
@@ -82,6 +82,7 @@
 (def bytes-to-string 'juxt.flip.alpha.core/bytes-to-string)
 (defmethod word 'juxt.flip.alpha.core/bytes-to-string
   [[bytes & stack] [_ & queue] env]
+  (assert bytes)
   [(cons (String. bytes) stack) queue env])
 
 ;; TODO: What is the Factor equivalent name, if any?
@@ -180,7 +181,12 @@
 
 ;; 2drop
 ;; 3drop
-;; nip
+
+(def nip 'juxt.flip.alpha.core/nip)
+(defmethod word 'juxt.flip.alpha.core/nip
+  [[y _ & stack] [_ & queue] env]
+  [(cons y stack) queue env])
+
 ;; 2nip
 
 (def dup 'juxt.flip.alpha.core/dup)
@@ -306,8 +312,46 @@
   [[m k & stack] [_ & queue] env]
   [(cons (dissoc m k) stack) queue env])
 
-#_(defmethod word 'juxt.flip.alpha.core/assoc [[k v m & stack] [_ & queue] env]
-  [(cons (assoc m k v) stack) queue env])
+;; Sequence combinators
+;; https://docs.factorcode.org/content/article-sequences-combinators.html
+
+;; each, reduce, map, etc.
+
+;; https://docs.factorcode.org/content/word-map,sequences.html
+(def map 'juxt.flip.alpha.core/map)
+(defmethod word 'juxt.flip.alpha.core/map
+  [[quot seq & stack] [_ & queue] env]
+  (let [subseq (clojure.core/map
+                (fn [el] (clojure.core/first (eval-quotation (cons el stack) quot env))) seq)]
+    [(cons subseq stack) queue env]))
+
+;; https://docs.factorcode.org/content/word-filter,sequences.html
+(def filter 'juxt.flip.alpha.core/filter)
+(defmethod word 'juxt.flip.alpha.core/filter
+  [[quot seq & stack] [_ & queue] env]
+  (let [subseq (clojure.core/filter
+                (fn [el] (clojure.core/first (eval-quotation (cons el stack) quot env))) seq)]
+    [(cons subseq stack) queue env]))
+
+;; https://docs.factorcode.org/content/word-any__que__%2Csequences.html
+(def any? 'juxt.flip.alpha.core/any?)
+(defmethod word 'juxt.flip.alpha.core/any?
+  [[quot seq & stack] [_ & queue] env]
+  (let [result (clojure.core/some
+                (fn [el] (clojure.core/first (eval-quotation (cons el stack) quot env))) seq)]
+    [(cons (some? result) stack) queue env]))
+
+;; Regex
+(def <regex> 'juxt.flip.alpha.core/<regex>)
+(defmethod word 'juxt.flip.alpha.core/<regex>
+  [[string & stack] [_ & queue] env]
+  [(cons (re-pattern string) stack) queue env])
+
+(def matches? 'juxt.flip.alpha.core/matches?)
+(defmethod word 'juxt.flip.alpha.core/matches?
+  [[regexp string & stack] [_ & queue] env]
+  (assert (instance? java.util.regex.Pattern regexp))
+  [(cons (clojure.core/re-matches regexp string) stack) queue env])
 
 (defmethod word 'juxt.pass.alpha/random-bytes
   [[size & stack] [_ & queue] env]
@@ -452,6 +496,7 @@
   [stack (concat `(:juxt.site.alpha/received-representation
                    env :juxt.http.alpha/body
                    of
+                   ;; TODO: Test if nil and throw an exception
                    bytes-to-string
                    juxt.flip.alpha.edn/read-string) queue) env])
 
@@ -574,7 +619,7 @@
       (throw
        (clojure.core/ex-info
         (format "Failure in quotation: %s" (.getMessage t))
-        (ex-data t)
+        (or (ex-data t) {})
         t)))))
 
 (defn eval-quotation
