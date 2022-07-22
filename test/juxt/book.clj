@@ -1322,39 +1322,55 @@ Password: <input name=password type=password>
 
        :juxt.flip.alpha/quotation
        `(
-         (site/with-fx-acc
+         (f/define extract-input
            [(f/set-at (f/dip [site/request-body-as-edn
                               (site/validate [:map {:closed true}
                                               [:xt/id [:re "https://site.test/.*"]]])
-                              :input]))
-            (f/set-at (f/dip [(f/env ::pass/permissions) :permissions]))
-            ;; We check that the permission resource matches the xt/id
-            (f/set-at
+                              :input]))])
+
+         (f/define extract-permissions
+           [(f/set-at (f/dip [(f/env ::pass/permissions) :permissions]))])
+
+         (f/define determine-if-match
+           ;; We check that the permission resource matches the xt/id
+           [(f/set-at
              (f/keep
               [f/dup (f/of :input) (f/of :xt/id) f/swap (f/of :permissions)
                (f/any? [(f/of ::site/resource-pattern) f/<regex> f/matches?])
-               f/nip :matches?]))
+               f/nip :matches?]))])
 
-            (f/keep [f/dup
-                     (f/of :matches?)
-                     (f/if
-                         [f/drop]
-                         [(f/throw
-                           (f/ex-info
-                            f/dup "No permission allows installation of GraphQL endpoint: " f/swap (f/of :input) (f/of :xt/id) f/swap f/str
-                            f/swap (f/of :input) (f/of :xt/id) :location {:ring.response/status 403} f/set-at))])])
+         (f/define throw-if-not-match
+           [(f/keep
+             [f/dup
+              (f/of :matches?)
+              (f/if
+                  [f/drop]
+                  [(f/throw
+                    (f/ex-info
+                     f/dup "No permission allows installation of GraphQL endpoint: " f/swap (f/of :input) (f/of :xt/id) f/swap f/str
+                     f/swap (f/of :input) (f/of :xt/id) :location {:ring.response/status 403} f/set-at))])])])
 
-            (site/push-fx
-               (f/keep
-                [(f/of :input)
-                 (site/set-methods
-                  {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-graphql-schema"}}
-                   :put {:juxt.pass.alpha/actions #{"https://example.org/actions/put-graphql-schema"}}
-                   :post {:juxt.pass.alpha/action "https://example.org/actions/graphql-request"}})
-                 xtdb.api/put]))
+         (f/define create-resource
+           [(site/push-fx
+             (f/keep
+              [(f/of :input)
+               (site/set-methods
+                {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-graphql-schema"}}
+                 :put {:juxt.pass.alpha/actions #{"https://example.org/actions/put-graphql-schema"}}
+                 :post {:juxt.pass.alpha/action "https://example.org/actions/graphql-request"}})
+               xtdb.api/put]))])
 
-            (site/push-fx (f/dip [(site/set-status 201)]))
-            (site/push-fx (f/keep [(site/set-header "location" f/swap (f/of :input) (f/of :xt/id))]))]))
+         (f/define configure-response
+           [(site/push-fx (f/dip [(site/set-status 201)]))
+            (site/push-fx (f/keep [(site/set-header "location" f/swap (f/of :input) (f/of :xt/id))]))])
+
+         (site/with-fx-acc
+           [extract-input
+            extract-permissions
+            determine-if-match
+            throw-if-not-match
+            create-resource
+            configure-response]))
 
        :juxt.pass.alpha/rules
        '[
