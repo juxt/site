@@ -283,18 +283,7 @@
            (merge (assoc req :ring.response/status 500)
                   (ex-data e))
            :permitted-action permitted-action}
-          e))))
-
-    ;;(assert post)
-
-    ;; TODO: Depending on the context, it might be applicable to reveal the URI
-    ;; of any newly created resource with a 201 and Location header. This
-    ;; determination perhaps ought to be configured into the Action doing the
-    ;; creation.
-    ;;(assoc req :ring.response/status 200)
-    ;;(post req)
-    )
-  )
+          e))))))
 
 (defn POST [req]
   (perform-unsafe-method req))
