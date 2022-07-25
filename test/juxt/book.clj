@@ -8,7 +8,8 @@
    [juxt.site.alpha :as-alias site]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
    [juxt.book :as book]
-   ))
+
+   [clojure.string :as str]))
 
 (comment
   ;; tag::example-action[]
@@ -206,23 +207,15 @@
        :juxt.pass.alpha/action "https://example.org/actions/put-subject"
        :juxt.pass.alpha/purpose nil})))))
 
-;; Create Alice
-
-;; TODO: Consider reserving 'put' to indicate a direct database put. Everything
-;; that goes via an action is really a 'create' or similar.
-(defn put-user-alice! []
+(defn create-user! [& {:keys [username name role]}]
   (eval
    (substitute-actual-base-uri
-    (quote
-     ;; tag::put-user-alice![]
-     (juxt.site.alpha.init/do-action
+    `(init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/put-user"
-      {:xt/id "https://example.org/users/alice"
-       :name "Alice"
-       :role "User"})
-       ;; end::put-user-alice![]
-     ))))
+      {:xt/id ~(format "https://example.org/users/%s" username)
+       :name ~name
+       :role ~(or role "User")}))))
 
 (defn install-user-identity-no-credentials-for-alice!
   "Put a minimal user-identity for Alice, which has no credentials. There is no
@@ -633,25 +626,21 @@
        ;; end::put-basic-protection-space![]
      ))))
 
-(defn put-basic-user-identity-alice! []
+(defn create-basic-user-identity! [& {:juxt.pass.alpha/keys [username password realm]}]
   (eval
    (substitute-actual-base-uri
-    (quote
-     ;; tag::put-basic-user-identity-alice![]
-     (juxt.site.alpha.init/do-action
+    `(init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/put-basic-user-identity"
-      {:xt/id "https://example.org/user-identities/alice/basic"
-       :juxt.pass.alpha/user "https://example.org/users/alice"
+      {:xt/id ~(format "https://example.org/user-identities/%s/basic" (str/lower-case username))
+       :juxt.pass.alpha/user ~(format "https://example.org/users/%s" (str/lower-case username))
        ;; Perhaps all user identities need this?
        :juxt.pass.alpha/canonical-root-uri "https://example.org"
-       :juxt.pass.alpha/realm "Wonderland"
+       :juxt.pass.alpha/realm ~realm
        ;; Basic auth will only work if these are present
-       :juxt.pass.alpha/username "ALICE" ; this will be downcased
+       :juxt.pass.alpha/username ~username
        ;; This will be encrypted
-       :juxt.pass.alpha/password "garden"})
-     ;; end::put-basic-user-identity-alice![]
-     ))))
+       :juxt.pass.alpha/password ~password}))))
 
 ;; HTTP Bearer Auth
 
@@ -1168,7 +1157,7 @@ Password: <input name=password type=password>
             (f/define make-access-token
               [(f/set-at
                 (f/keep
-                 [f/dup (f/of :subject) (f/of :xt/id) :juxt.pass.alpha/subject {} f/set-at f/swap
+                 [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
                   (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
                   ;; :juxt.pass.alpha/token
                   (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
@@ -1323,10 +1312,12 @@ Password: <input name=password type=password>
        :juxt.flip.alpha/quotation
        `(
          (f/define extract-input
-           [(f/set-at (f/dip [site/request-body-as-edn
-                              (site/validate [:map {:closed true}
-                                              [:xt/id [:re "https://site.test/.*"]]])
-                              :input]))])
+           [(f/set-at
+             (f/dip
+              [site/request-body-as-edn
+               (site/validate [:map {:closed true}
+                               [:xt/id [:re "https://site.test/.*"]]])
+               :input]))])
 
          (f/define extract-permissions
            [(f/set-at (f/dip [(f/env ::pass/permissions) :permissions]))])
@@ -1351,13 +1342,41 @@ Password: <input name=password type=password>
                      f/swap (f/of :input) (f/of :xt/id) :location {:ring.response/status 403} f/set-at))])])])
 
          (f/define create-resource
-           [(site/push-fx
+           [(f/set-at
              (f/keep
               [(f/of :input)
                (site/set-methods
                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-graphql-schema"}}
                  :put {:juxt.pass.alpha/actions #{"https://example.org/actions/put-graphql-schema"}}
                  :post {:juxt.pass.alpha/action "https://example.org/actions/graphql-request"}})
+               (f/set-at (f/dip ["https://meta.juxt.site/site/graphql-endpoint" :juxt.site.alpha/type]))
+               (f/set-at (f/dip ["GraphQL endpoint" :juxt.site.alpha/description]))
+               :new-resource]))])
+
+         (f/define extract-owner
+           [(f/set-at
+             (f/dip
+              [(f/env :juxt.pass.alpha/subject) site/entity (f/of :juxt.pass.alpha/user-identity) site/entity
+               (f/of :juxt.pass.alpha/user)
+               :owner]))])
+
+         (f/define add-owner
+           [(f/set-at
+             (f/keep
+              [f/dup (f/of :new-resource)
+               f/swap (f/of :owner) :juxt.pass.alpha/owner f/rot f/set-at
+               :new-resource]))])
+
+         (f/define push-resource
+           [(site/push-fx
+             (f/keep
+              [(f/of :new-resource)
+               xtdb.api/put]))])
+
+         (f/define push-permission
+           [(site/push-fx
+             (f/keep
+              [(f/of :new-permission)
                xtdb.api/put]))])
 
          (f/define configure-response
@@ -1369,7 +1388,40 @@ Password: <input name=password type=password>
             extract-permissions
             determine-if-match
             throw-if-not-match
+
             create-resource
+            extract-owner
+            add-owner
+            push-resource
+
+            (f/set-at
+             (f/dip
+              [{:juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
+                :juxt.site.alpha/description "Permission for endpoint owner to put GraphQL schema"
+                :juxt.pass.alpha/action "https://example.org/actions/put-graphql-schema"
+                :juxt.pass.alpha/purpose nil}
+               :new-permission]))
+
+            ;; Set new-permission to owner
+            ;; TODO: Need some kind of 'update' combinator for this common operation
+            (f/set-at
+             (f/keep
+              [f/dup (f/of :new-permission) f/swap
+               (f/of :owner) :juxt.pass.alpha/user f/rot f/set-at :new-permission]
+              ))
+
+            ;; Set xt/id
+            (f/set-at
+             (f/keep
+              [(f/of :new-permission)
+               (pass/make-nonce 10)
+               "https://example.org/permissions/"
+               f/str
+               :xt/id
+               f/rot f/set-at :new-permission]))
+
+            push-permission
+
             configure-response]))
 
        :juxt.pass.alpha/rules
@@ -1387,7 +1439,7 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       ;; TODO: We need a specialist grant-permission for this because we want to documnent/validate the ::site/resource-pattern
-      {:xt/id "https://example.org/permissions/system/install-graphql-endpoint"
+      {:xt/id "https://example.org/permissions/alice/install-graphql-endpoint"
        :juxt.pass.alpha/user "https://example.org/users/alice"
        :juxt.pass.alpha/action "https://example.org/actions/install-graphql-endpoint"
        ;; This permission can restrict exactly where a GraphQL endpoint can be
@@ -1404,6 +1456,21 @@ Password: <input name=password type=password>
       "https://example.org/actions/install-graphql-endpoint"
       {:xt/id "https://example.org/graphql"
        })))))
+
+(defn grant-permission-put-graphql-schema-to-alice! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      ;; TODO: We need a specialist grant-permission for this because we want to
+      ;; documnent/validate the ::site/resource
+      {:xt/id "https://example.org/permissions/alice/put-graphql-schema"
+       :juxt.pass.alpha/user "https://example.org/users/alice"
+       :juxt.pass.alpha/action "https://example.org/actions/put-graphql-schema"
+       :juxt.pass.alpha/purpose nil
+       :juxt.site.alpha/resource "https://example.org/graphql"})))))
 
 ;; Other stuff
 
@@ -1518,7 +1585,7 @@ Password: <input name=password type=password>
   (users-preliminaries!)
   (create-action-put-basic-user-identity!)
   (grant-permission-to-invoke-action-put-basic-user-identity!)
-  (put-basic-user-identity-alice!)
+  (create-basic-user-identity! #::pass{:username "ALICE" :password "garden" :realm "Wonderland"})
 
   (session-scopes-preliminaries!)
   (create-resource-protected-by-session-scope!)

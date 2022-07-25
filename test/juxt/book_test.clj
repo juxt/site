@@ -5,21 +5,20 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [juxt.book :as book]
-   [juxt.flip.alpha.core :as f]
-   [juxt.flip.clojure.core :as-alias fc]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.actions :as authz]
+   [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.pass.alpha.actions :as actions]
    [juxt.pass.alpha.http-authentication :as authn]
    [juxt.pass.alpha.session-scope :as session-scope]
    [juxt.site.alpha :as-alias site]
-   [juxt.site.alpha.init :as init :refer [put! do-action]]
-   [juxt.site.alpha.repl :as repl]
+   [juxt.site.alpha.init :as init]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
+   [malli.core :as malli]
    [ring.util.codec :as codec]
    [xtdb.api :as xt]
-   [clojure.set :as set]
-   [juxt.reap.alpha.regex :as re]))
+   [clojure.string :as str])
+  (:import (clojure.lang ExceptionInfo)))
 
 (defn with-handler [f]
   (binding [*handler*
@@ -78,7 +77,7 @@
   (book/users-preliminaries!)
   (book/create-action-put-basic-user-identity!)
   (book/grant-permission-to-invoke-action-put-basic-user-identity!)
-  (book/put-basic-user-identity-alice!)
+  (book/create-basic-user-identity! #::pass{:username "ALICE" :password "garden" :realm "Wonderland"})
 
   (is (xt/entity (xt/db *xt-node*) "https://site.test/protected-by-basic-auth/document.html"))
 
@@ -269,7 +268,6 @@
          :juxt.pass.alpha/puts
          :juxt.pass.alpha/deletes]))))
 
-;;
 ;;(t/join-fixtures [with-system-xt with-handler])
 (deftest login-test
   (init/bootstrap!)
@@ -290,8 +288,8 @@
   (book/create-action-put-basic-user-identity!)
   (book/grant-permission-to-invoke-action-put-basic-user-identity!)
 
-  (book/put-user-alice!)
-  (book/put-basic-user-identity-alice!)
+  (book/create-user! :username "alice" :name "Alice")
+  (book/create-basic-user-identity! #::pass{:username "ALICE" :password "garden" :realm "Wonderland"})
 
   (let [uri (some :juxt.pass.alpha/login-uri
                   (session-scope/session-scopes (xt/db *xt-node*) "https://site.test/protected-by-session-scope/document.html"))]
@@ -367,11 +365,21 @@
             (is (= "<p>This is a protected message that is only visible when sending the correct session header.</p>"
                    (:ring.response/body response)))))))))
 
+(defn with-body [req body-bytes]
+  (-> req
+      (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
+      (assoc :ring.request/body (io/input-stream body-bytes))))
+
 ;; A helper function for logging in with a form
 (defn login-with-form!
-  "Returns a session id (or nil) given a map of fields."
-  [fields]
-  (let [form (codec/form-encode fields)
+  "Return a session id (or nil) given a map of fields."
+  [& {:strs [username password] :as args}]
+  {:pre [(malli/validate
+          [:map
+           ["username" [:string {:min 2}]]
+           ["password" [:string {:min 6}]]] args)]
+   :post [(malli/validate [:string] %)]}
+  (let [form (codec/form-encode args)
         body (.getBytes form)
         req {:ring.request/method :post
              :ring.request/path "/login"
@@ -382,14 +390,61 @@
         response (*handler* req)
         {:strs [set-cookie]} (:ring.response/headers response)
         [_ id] (when set-cookie (re-matches #"id=(.*?);.*" set-cookie))]
+    (when-not id (throw (ex-info "Login failed" args)))
     id))
 
-(defn with-body [req body-bytes]
-  (-> req
-      (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
-      (assoc :ring.request/body (io/input-stream body-bytes))))
+(defn authorize!
+  "Authorize an application"
+  [& {:keys [sid client-id] :as args}]
+  {:pre [(malli/validate
+          [:map
+           [:sid :string]
+           [:client-id :string]] args)]
+   :post [(malli/validate [:string] %)]}
+  (let [state (make-nonce 10)
+        request {:ring.request/method :get
+                 :ring.request/path "/oauth/authorize"
+                 :ring.request/headers {"cookie" (format "id=%s" sid)}
+                 :ring.request/query
+                 (codec/form-encode
+                  {"response_type" "token"
+                   "client_id" client-id
+                   "state" state})}
+        response (*handler* request)
+        _ (case (:ring.response/status response)
+            302 :ok
+            403 (throw (ex-info "Forbidden to authorize" args)))
 
-;; (t/join-fixtures [with-system-xt with-handler])
+        location-header (-> response :ring.response/headers (get "location"))
+        [_ access-token returned-state]
+        (when location-header
+          (re-matches
+           #"https://site.test/terminal/callback#access_token=(.*?)\&token_type=bearer\&state=(.*?)" location-header))]
+    (is (= state returned-state))
+    (when-not access-token (throw (ex-info "No access token" args)))
+    access-token))
+
+(defn grant-permission-to-authorize!
+  [& {:keys [username] :as args}]
+  {:pre [(malli/validate [:map [:username [:string]]] args)]}
+  ;; Grant Alice permission to perform /actions/oauth/authorize
+  (actions/do-action
+   (let [xt-node *xt-node*
+         db (xt/db xt-node)]
+     {::site/xt-node xt-node
+      ::site/db db
+      ::pass/subject (xt/entity db "https://site.test/subjects/system")
+      ::pass/action "https://site.test/actions/grant-permission"
+      ::site/base-uri "https://site.test"
+      ::site/received-representation
+      {::http/content-type "application/edn"
+       ::http/body
+       (.getBytes
+        (pr-str
+         {:xt/id (format "https://site.test/permissions/%s-can-authorize" (str/lower-case username))
+          ::pass/action "https://site.test/actions/oauth/authorize"
+          ::pass/user (format "https://site.test/users/%s" (str/lower-case username))
+          ::pass/purpose nil}))}})))
 
 ;; TODO: Actions should eventually be promoted to 'site'.
 
@@ -400,9 +455,9 @@
 ;;
 
 ;;(t/join-fixtures [with-system-xt with-handler])
+
 (deftest grand-integration-test
-  (let [
-        ;; The lexical scoping of results causes numerous levels of unnecessary
+  (let [ ;; The lexical scoping of results causes numerous levels of unnecessary
         ;; indentation. After all, this is just a test, not part of the system
         ;; itself. We can store things like access tokens in this store.
         store (atom {})]
@@ -411,10 +466,10 @@
 
     ;; Create a user Alice, with her identity
     (book/users-preliminaries!)
-    (book/put-user-alice!)
+    (book/create-user! :username "alice" :name "Alice")
     (book/create-action-put-basic-user-identity!)
     (book/grant-permission-to-invoke-action-put-basic-user-identity!)
-    (book/put-basic-user-identity-alice!)
+    (book/create-basic-user-identity! #::pass{:username "ALICE" :password "garden" :realm "Wonderland"})
 
     ;; Register application
     (book/register-example-application!)
@@ -423,13 +478,12 @@
 
     ;; Let's create a protected resource that the application will access using
     ;; an access-token.
-    (juxt.site.alpha.init/do-action
+    (init/do-action
      "https://site.test/subjects/system"
      "https://site.test/actions/put-immutable-protected-resource"
      {:xt/id "https://site.test/private/internal.html"
       :juxt.http.alpha/content-type "text/plain"
-      :juxt.http.alpha/content "Internal message"
-      })
+      :juxt.http.alpha/content "Internal message"})
 
     ;; Try to access /private/internal.html - there is no protection space so no
     ;; WWW-Authenticate header. We simply can't perform
@@ -443,7 +497,7 @@
     ;; Now let's layer over a protection space
     (book/protection-spaces-preliminaries!)
 
-    (juxt.site.alpha.init/do-action
+    (init/do-action
      "https://site.test/subjects/system"
      "https://site.test/actions/put-protection-space"
      {:xt/id "https://site.test/protection-spaces/bearer"
@@ -482,7 +536,7 @@
     ;; somewhere we can login.
     (book/session-scopes-preliminaries!)
 
-    (juxt.site.alpha.init/do-action
+    (init/do-action
      "https://site.test/subjects/system"
      "https://site.test/actions/put-session-scope"
      {:xt/id "https://site.test/session-scopes/oauth"
@@ -514,56 +568,25 @@
         ;; Let's authenticate via the login action (via the login form)
         (let [sid (login-with-form! {"username" "ALICE" "password" "garden"})]
           (is sid)
-          (swap! store assoc :sid sid))))
+          (swap! store assoc-in ["alice" :sid] sid))))
 
     ;; We now have a session id linked to Alice's session and subject. We can
     ;; now request an access token from the authorization server.
 
     ;; GET on https://site.test/authorize
-    (let [request {:ring.request/method :get
-                   :ring.request/path "/oauth/authorize"
-                   :ring.request/headers {"cookie" (format "id=%s" (:sid @store))}
-                   :ring.request/query
-                   (codec/form-encode
-                    {"response_type" "token"
-                     "client_id" "local-terminal"
-                     "state" "abc123vcb"})}]
+    (is
+     (thrown-with-msg?
+      ExceptionInfo #"Forbidden to authorize"
+      (authorize!
+       :sid (get-in @store ["alice" :sid])
+       :client-id "local-terminal")))
 
-      ;; We have identified our subject, but this subject hasn't yet been
-      ;; granted access to the authorization server.
-      (let [response (*handler* request)]
-        (is (= 403 (:ring.response/status response))))
+    (grant-permission-to-authorize! :username "alice")
 
-      ;; Grant Alice permission to perform /actions/oauth/authorize
-      (authz/do-action
-       (let [xt-node *xt-node*
-             db (xt/db xt-node)]
-         {::site/xt-node xt-node
-          ::site/db db
-          ::pass/subject (xt/entity db "https://site.test/subjects/system")
-          ::pass/action "https://site.test/actions/grant-permission"
-          ::site/base-uri "https://site.test"
-          ::site/received-representation
-          {::http/content-type "application/edn"
-           ::http/body
-           (.getBytes
-            (pr-str
-             {:xt/id "https://site.test/permissions/alice-can-authorize"
-              ::pass/action "https://site.test/actions/oauth/authorize"
-              ::pass/user "https://site.test/users/alice"
-              ::pass/purpose nil}))}}))
-
-      (let [response (*handler* request)
-            location-header (-> response :ring.response/headers (get "location"))
-            location (when location-header
-                       (re-matches
-                        #"https://site.test/terminal/callback#access_token=(.*?)\&token_type=bearer\&state=abc123vcb" location-header))
-            access-token (second location)]
-        (is (= 302 (:ring.response/status response)))
-        (is location)
-        ;; Test that the callback path is the same as the application
-        (is access-token)
-        (swap! store assoc :access-token access-token)))
+    (swap! store assoc-in ["alice" :access-token]
+           (authorize!
+            :sid (get-in @store ["alice" :sid])
+            :client-id "local-terminal"))
 
     ;; We can now use the access-token to access a protected resource, using an application
 
@@ -577,18 +600,18 @@
     ;; with access token? No, because Alice doesn't have permission
     (*handler*
      {:ring.request/method :get
-      :ring.request/headers {"authorization" (format "Bearer %s" (:access-token @store))}
+      :ring.request/headers {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))}
       :ring.request/path "/private/internal.html"})
 
     (is (= 403 (:ring.response/status
                 (*handler*
                  {:ring.request/method :get
-                  :ring.request/headers {"authorization" (format "Bearer %s" (:access-token @store))}
+                  :ring.request/headers {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))}
                   :ring.request/path "/private/internal.html"}))))
 
     ;; Give Alice get-protected-resource permission to /private/internal.html
 
-    (juxt.site.alpha.init/do-action
+    (init/do-action
      "https://site.test/subjects/system"
      "https://site.test/actions/grant-permission"
      {:xt/id "https://site.test/permissions/alice/private/internal.html"
@@ -603,12 +626,10 @@
            (:ring.response/status
             (*handler*
              {:ring.request/method :get
-              :ring.request/headers {"authorization" (format "Bearer %s" (:access-token @store))}
+              :ring.request/headers {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))}
               :ring.request/path "/private/internal.html"}))))
 
     ;; TODO: Test revocation
-
-    ;; TODO: Create a /graphql endpoint
 
     (book/create-action-install-graphql-endpoint!)
     (book/grant-permission-install-graphql-endpoint-to-alice!)
@@ -624,7 +645,7 @@
           {:ring.request/method :post
            :ring.request/path "/actions/install-graphql-endpoint"
            :ring.request/headers
-           {"authorization" (format "Bearer %s" (:access-token @store))
+           {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))
             "content-type" "application/edn"}}]
 
       (testing "Installation denied"
@@ -632,40 +653,73 @@
           (is (= 403 (:ring.response/status response)))))
 
       (testing "Installation allowed"
-        (let [response (*handler* (with-body request (.getBytes (pr-str {:xt/id "https://site.test/graphql"}))))]
+        (let [response (*handler*
+                        (-> request
+                            (with-body (.getBytes (pr-str {:xt/id "https://site.test/graphql"})))))]
+          ;; This also creates a permission such that the owner (Alice) can
+          ;; put-graphql-schema to this /graphql resource.
           (is (= 201 (:ring.response/status response)))
-          (is (= "https://site.test/graphql" (get-in response [:ring.response/headers "location"])))))
+          (is (= "https://site.test/graphql" (get-in response [:ring.response/headers "location"]))))))
 
-      )
+    ;; Create the https://site.test/actions/put-graphql-schema action
+    (init/do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/create-action"
+     {:xt/id "https://site.test/actions/put-graphql-schema"
 
-    ;; Now let's make some PUT a schema against https://site.test/graphql
+      :juxt.flip.alpha/quotation '()
 
-    #_(repl/e "https://site.test/graphql")
+      :juxt.pass.alpha/rules
+      '[
+        [(allowed? subject resource permission)
+         [subject :juxt.pass.alpha/user-identity id]
+         [id :juxt.pass.alpha/user user]
+         [permission :juxt.pass.alpha/user user]]]})
 
-    #_(let [request
-            (-> {:ring.request/method :put
-                 :ring.request/path "/graphql"}
-                (with-body (.getBytes "schema { }")))]
-        (*handler* request))
+    ;; As Alice, PUT a schema against https://site.test/graphql
+    (let [request
+          (-> {:ring.request/method :put
+               :ring.request/path "/graphql"
+               :ring.request/headers
+               {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))
+                "content-type" "application/graphql"}})]
+      (is (= 200 (:ring.response/status
+                  (*handler*
+                   (-> request
+                       (with-body (.getBytes "schema { }"))))))))
 
+    ;; Now try with Bob
+    (book/create-user! :username "bob" :name "Bob")
+    (book/create-basic-user-identity! #::pass{:username "bob" :password "walrus" :realm "Wonderland"})
 
-    #_(f/eval-quotation
-       '[
+    ;; Login as bob
+    (swap! store assoc-in ["bob" :sid]
+           (login-with-form! {"username" "bob" "password" "walrus"}))
+    (grant-permission-to-authorize! :username "bob")
+    (swap! store assoc-in ["bob" :access-token]
+           (authorize! :sid (get-in @store ["bob" :sid]) :client-id "local-terminal" :username "bob"))
 
-         (site/with-fx-acc
-           [
-            ])
-         ]
-       '()
-       {::site/xt-node *xt-node*
-        ::site/db (xt/db *xt-node*)
-        ::pass/subject "https://site.test/users/alice"
-        ::pass/action "https://site.test/actions/put-graphql-schema"
-        ::site/base-uri "https://site.test"
-        ::site/received-representation
-        {::http/content-type "application/graphql"
-         ::http/body (.getBytes "schema {}")}}
-       )
+    ;; Check Bob can't put a schema to Alice's graphql
+    (let [request
+          (-> {:ring.request/method :put
+               :ring.request/path "/graphql"
+               :ring.request/headers
+               {"authorization" (format "Bearer %s" (get-in @store ["bob" :access-token]))
+                "content-type" "application/graphql"}})
+          response (*handler*
+                     (-> request
+                         (with-body (.getBytes "schema { }"))))]
+      (is (= 403 (:ring.response/status response))))
 
+    ;; TODO: Now try with Alice, via a different application, one that doesn't
+    ;; have sufficient scope
+
+    ;; Think about scopes - there must be a scope for a PUT to /graphql. This
+    ;; must be granted to the access-token.
+
+    ;; Scope is individual to the user.
+
+    ;; Since OpenAPI operations are linked to actions, actions must be linked to
+    ;; scope (rather than permissions linked to scope).
 
     ))

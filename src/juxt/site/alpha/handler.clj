@@ -260,20 +260,11 @@
 
     (into req {:ring.response/status (if existing 204 201)})))
 
-(defn POST [req]
+(defn perform-unsafe-method [req]
   (let [req (receive-representation req)
-
-        #_#_content-type (get-in req [:ring.request/headers "content-type"] "application/octet-stream")
-
-        #_#_body-as-value
-        (case content-type
-          "application/x-www-form-urlencoded"
-          (codec/form-decode (String. (::http/body rep))))
-
         ;; TODO: Should we fail if more than one permitted action available?
         permitted-action (::pass/action (first (::pass/permitted-actions req)))
-
-        ;; Default
+        ;; Default response status
         req (assoc req :ring.response/status 200)]
 
     (try
@@ -287,7 +278,7 @@
       (catch Exception e
         (throw
          (ex-info
-          (format "POST transaction failed: %s" (.getMessage e))
+          (format "Transaction failed: %s" (.getMessage e))
           {::site/request-context
            (merge (assoc req :ring.response/status 500)
                   (ex-data e))
@@ -302,48 +293,14 @@
     ;; creation.
     ;;(assoc req :ring.response/status 200)
     ;;(post req)
-    ))
+    )
+  )
 
-(defn PUT [{::site/keys [resource] :as req}]
-  (let [req (receive-representation req)
-        put-fn (::site/put-fn resource)]
+(defn POST [req]
+  (perform-unsafe-method req))
 
-    (log/tracef "PUT, put-fn is %s" put-fn)
-    (let [put
-          (cond
-            (fn? put-fn)
-            put-fn
-
-            (symbol? put-fn)
-            (try
-              (or
-               (requiring-resolve put-fn)
-               (throw (ex-info (format "Requiring resolve of %s returned nil" put-fn) {:put-fn put-fn})))
-              (catch Exception e
-                (throw
-                 (ex-info
-                  (format "put-fn '%s' is not resolvable" put-fn)
-                  {::put-fn put-fn
-                   ::site/request-context (assoc req :ring.response/status 500)}
-                  e))))
-            (nil? put-fn)
-            (throw
-             (ex-info
-              "Resource allows PUT but doesn't contain a put-fn function"
-              {::site/request-context (assoc req :ring.response/status 500)}))
-
-            :else
-            (throw
-             (ex-info
-              (format "put-fn is neither a function or a symbol, but type '%s'" (type put-fn))
-              {::site/request-context (assoc req :ring.response/status 500)})))]
-      (if-let [response (put req)]
-        response
-        (throw
-         (ex-info
-          "put-fn returned a nil response"
-          {:put-fn put-fn
-           ::site/request-context (assoc req :ring.response/status 500)}))))))
+(defn PUT [req]
+  (perform-unsafe-method req))
 
 (defn PATCH [{::site/keys [resource] :as req}]
   (let [req (receive-representation req)

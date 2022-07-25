@@ -26,6 +26,8 @@
 ;; authorization is denied and we don't know why. A better authorization
 ;; debugger is definitely required.
 (defn query-permissions [{:keys [db rules subject actions resource purpose] :as args}]
+  (assert (or (nil? subject) (string? subject)))
+  (assert (or (nil? resource) (string? resource)))
   (xt/q
    db
    {:find '[(pull permission [*]) (pull action [*])]
@@ -57,9 +59,10 @@
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
   [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose}]
 
-  (assert (or (nil? subject) (map? subject)) "Subject expected to be a map, or null")
+  (assert (or (nil? subject) (string? subject)) "Subject expected to be a string, or null")
+  (assert (or (nil? resource) (string? resource)) "Resource expected to be a string, or null")
 
-  (log/debugf "check-permissions: subject %s, resource: %s, purpose: %s, actions: %s, whole subject: %s" (:xt/id subject) resource purpose actions subject)
+  (log/debugf "check-permissions: resource: %s, purpose: %s, actions: %s, subject: %s" resource purpose actions subject)
 
   (log/debugf "Actions: %s" actions)
   (log/debugf "Rules: %s" (actions->rules db actions))
@@ -68,8 +71,9 @@
     (when (seq rules)
       (let [permissions
             (query-permissions
-             {:db db :rules rules
-              :subject (:xt/id subject)
+             {:db db
+              :rules rules
+              :subject subject
               :actions actions
               :resource resource
               :purpose purpose})]
@@ -233,7 +237,8 @@
         tx (xt/indexing-tx xt-ctx)]
     (try
       (assert base-uri "The base-uri must be provided")
-      (assert (or (nil? subject) (map? subject)) "Subject to do-action* expected to be a map, or null")
+      (assert (or (nil? subject) (string? subject)) "Subject to do-action* expected to be a string, or null")
+      (assert (or (nil? resource) (string? resource)) "Resource to do-action* expected to be a string, or null")
 
       ;; Check that we /can/ call the action
       (let [check-permissions-result
@@ -292,7 +297,7 @@
                  (cond->
                      {:xt/id (format "%s/_site/action-log/%s" base-uri (::xt/tx-id tx))
                       ::site/type "https://meta.juxt.site/site/action-log-entry"
-                      ::pass/subject (:xt/id subject)
+                      ::pass/subject subject
                       ::pass/action action
                       ::pass/purpose purpose
                       ::pass/puts (vec
@@ -322,7 +327,7 @@
           [[::xt/put
             {:xt/id action-log-entry-uri
              ::site/type "https://meta.juxt.site/site/action-log-entry"
-             ::pass/subject (:xt/id subject)
+             ::pass/subject subject
              ::pass/action action
              ::site/resource resource
              ::pass/purpose purpose
@@ -349,7 +354,12 @@
 ;; only transitory for the purposes of responnding to the request.
 
 (defn sanitize-ctx [ctx]
-  (dissoc ctx ::site/xt-node ::site/db))
+  (-> ctx
+      (dissoc ::site/xt-node ::site/db)
+      ;; We take the ids, because it saves on serialization cost and we only
+      ;; need the ids in do-action*
+      (update ::site/resource :xt/id)
+      (update ::pass/subject :xt/id)))
 
 (defn apply-request-context-operations [ctx ops]
   (let [res
@@ -363,7 +373,7 @@
          ops)]
     res))
 
-(defn do-action [{::site/keys [xt-node db base-uri] ::pass/keys [subject action] :as ctx}]
+(defn do-action [{::site/keys [xt-node db base-uri resource] ::pass/keys [subject action] :as ctx}]
   (assert (:juxt.site.alpha/xt-node ctx) "xt-node must be present")
   (assert (:juxt.site.alpha/db ctx) "db must be present")
   (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
@@ -373,6 +383,12 @@
      (ex-info
       "Subject to do-action expected to be a map, or null"
       {::site/request-context ctx :subject subject})))
+
+  (when-not (or (nil? resource) (map? resource))
+    (throw
+     (ex-info
+      "Resource to do-action expected to be a map, or null"
+      {::site/request-context ctx :resource resource})))
 
   ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed
   ;; by an anonymous user.
@@ -433,6 +449,7 @@
         :as req}]
 
     (assert (or (nil? subject) (map? subject)))
+    (assert (or (nil? resource) (map? resource)))
 
     (let [actions (get-in resource [::site/methods method ::pass/actions])
 
@@ -445,11 +462,11 @@
           (check-permissions
            db
            actions
-           (cond-> {::pass/subject subject}
+           (cond-> {::pass/subject (:xt/id subject)}
              ;; When the resource is in the database, we can add it to the
              ;; permission checking in case there's a specific permission for
              ;; this resource.
-             (:xt/id resource) (assoc ::site/resource (:xt/id resource))))]
+             resource (assoc ::site/resource (:xt/id resource))))]
 
       (if (seq permitted-actions)
         (h (assoc req ::pass/permitted-actions permitted-actions))
