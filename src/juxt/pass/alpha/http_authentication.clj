@@ -274,6 +274,7 @@
                  :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"
                  :juxt.pass.alpha/user-identity (:xt/id user-identity)
                  :juxt.pass.alpha/protection-space (:xt/id protection-space)}
+        ;; TODO: Replace this with a Flip tx-fn to ensure database consistency
         tx (xt/submit-tx xt-node [[:xtdb.api/put subject]])]
     (xt/await-tx xt-node tx)
     ;; TODO: Find an existing subject we can re-use or we create a subject for
