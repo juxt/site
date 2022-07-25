@@ -659,6 +659,8 @@
           ;; This also creates a permission such that the owner (Alice) can
           ;; put-graphql-schema to this /graphql resource.
           (is (= 201 (:ring.response/status response)))
+          (when-not (= 201 (:ring.response/status response))
+            (throw (ex-info "Good break" {})))
           (is (= "https://site.test/graphql" (get-in response [:ring.response/headers "location"]))))))
 
     ;; Create the https://site.test/actions/put-graphql-schema action
@@ -716,8 +718,6 @@
 
     ;; Think about scopes - there must be a scope for a PUT to /graphql. This
     ;; must be granted to the access-token.
-
-    ;; Scope is individual to the user.
 
     ;; Since OpenAPI operations are linked to actions, actions must be linked to
     ;; scope (rather than permissions linked to scope).

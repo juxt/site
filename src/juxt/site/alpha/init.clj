@@ -68,7 +68,6 @@
       {:xt/id "https://example.org/actions/create-action"
        :juxt.site.alpha/description "The action to create all other actions"
        :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
-       :juxt.pass.alpha/scope "write:admin"
 
        :juxt.pass.alpha/rules
        '[
@@ -153,7 +152,6 @@
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/grant-permission"
        :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
-       :juxt.pass.alpha/scope "write:admin"
 
        :juxt.pass.alpha/rules
        '[
@@ -195,7 +193,6 @@
         "https://example.org/subjects/system"
         "https://example.org/actions/create-action"
         {:xt/id "https://example.org/actions/get-not-found"
-         :juxt.pass.alpha/scope "read:resource"
          :juxt.pass.alpha/rules
          [
           ['(allowed? subject resource permission)
@@ -229,7 +226,6 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/register-application"
-       :juxt.pass.alpha/scope "write:application"
 
        :juxt.flip.alpha/quotation
        `(
@@ -240,8 +236,7 @@
                (site/validate
                 [:map
                  [::pass/client-id [:re "[a-z-]{3,}"]]
-                 [::pass/redirect-uri [:re "https://"]]
-                 [::pass/scope [:re "[a-z:\\s]+"]]])
+                 [::pass/redirect-uri [:re "https://"]]])
 
                (site/set-type "https://meta.juxt.site/pass/application")
                (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes 20)) ::pass/client-secret]))
