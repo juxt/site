@@ -471,6 +471,10 @@
                   ['e attr val]]
           } stack) queue env])
 
+(defmethod word 'juxt.site.alpha/entity
+  [[id & stack] [_ & queue] env]
+  [(cons (xt/entity (::site/db env) id) stack) queue env])
+
 (defmethod word 'jsonista.core/read-string
   [[s & stack] [_ & queue] env]
   [(cons (jsonista.core/read-value s) stack) queue env])
