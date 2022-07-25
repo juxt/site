@@ -358,8 +358,8 @@
       (dissoc ::site/xt-node ::site/db)
       ;; We take the ids, because it saves on serialization cost and we only
       ;; need the ids in do-action*
-      (update ::site/resource :xt/id)
-      (update ::pass/subject :xt/id)))
+      (update ::pass/subject :xt/id)
+      (update ::site/resource :xt/id)))
 
 (defn apply-request-context-operations [ctx ops]
   (let [res
