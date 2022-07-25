@@ -192,8 +192,7 @@
             (conj '(include? subject action resource))
 
             resources-in-scope
-            (conj '[(contains? resources-in-scope resource)]
-                  ))
+            (conj '[(contains? resources-in-scope resource)]))
 
           :rules (vec (concat rules include-rules))
 
@@ -252,7 +251,7 @@
                   (format "Action '%s' not found in db" action)
                   {:action action})))
 
-            #_#__ (when scope
+            _ (when scope
                 (when-not access-token
                   (throw
                    (ex-info
@@ -260,7 +259,7 @@
                     {:ring.response/status 403
                      :action action
                      :scope scope})))
-                (when-not (contains? (::pass/scope access-token) scope)
+                (when-not (contains? (set (::pass/scope access-token)) scope)
                   (throw
                    (ex-info
                     (format "Access token does not have sufficient scope (%s)" scope)

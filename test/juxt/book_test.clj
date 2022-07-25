@@ -610,6 +610,11 @@
     (swap! store assoc-in ["alice" :access-token]
            (authorize!
             :sid (get-in @store ["alice" :sid])
+            "client_id" "local-terminal"))
+
+    (swap! store assoc-in ["alice" :access-token-with-admin-graphql-scope]
+           (authorize!
+            :sid (get-in @store ["alice" :sid])
             "client_id" "local-terminal"
             "scope" ["admin.graphql" "query.graphql"]))
 
@@ -666,29 +671,46 @@
     ;; benefit is that there is no ambiguity as to which action should
     ;; performed. We get authorization 'for free'.
 
-    (let [request
-          {:ring.request/method :post
-           :ring.request/path "/actions/install-graphql-endpoint"
-           :ring.request/headers
-           {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))
-            "content-type" "application/edn"}}]
 
-      (testing "Installation denied"
-        (let [response (*handler* (with-body request (.getBytes (pr-str {:xt/id "https://site.test/my-graphql"}))))]
-          (is (= 403 (:ring.response/status response)))))
+    (testing "Installation at wrong endpoint denied"
+      (let [request
+            {:ring.request/method :post
+             :ring.request/path "/actions/install-graphql-endpoint"
+             :ring.request/headers
+             {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))
+              "content-type" "application/edn"}}
+            response (*handler* (with-body request (.getBytes (pr-str {:xt/id "https://site.test/my-graphql"}))))]
+        (is (= 403 (:ring.response/status response)))))
 
-      (testing "Installation allowed"
-        (let [response (*handler*
-                        (-> request
-                            (with-body (.getBytes (pr-str {:xt/id "https://site.test/graphql"})))))]
-          ;; This also creates a permission such that the owner (Alice) can
-          ;; put-graphql-schema to this /graphql resource.
-          (is (= 201 (:ring.response/status response)))
+    (testing "Installation without scope"
+      (let [request
+            {:ring.request/method :post
+             :ring.request/path "/actions/install-graphql-endpoint"
+             :ring.request/headers
+             {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))
+              "content-type" "application/edn"}}
+            response (*handler*
+                      (-> request
+                          (with-body (.getBytes (pr-str {:xt/id "https://site.test/graphql"})))))]
+        (is (= 403 (:ring.response/status response)))
+        ;;(is (= "https://site.test/graphql" (get-in response [:ring.response/headers "location"])))
+        ))
 
-          (when-not (= 201 (:ring.response/status response))
-            (throw (ex-info "Good break" {:response response})))
+    (testing "Installation allowed"
+      (let [request
+            {:ring.request/method :post
+             :ring.request/path "/actions/install-graphql-endpoint"
+             :ring.request/headers
+             {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token-with-admin-graphql-scope]))
+              "content-type" "application/edn"}}
+            response (*handler*
+                      (-> request
+                          (with-body (.getBytes (pr-str {:xt/id "https://site.test/graphql"})))))]
+        ;; This also creates a permission such that the owner (Alice) can
+        ;; put-graphql-schema to this /graphql resource.
+        (is (= 201 (:ring.response/status response)))
 
-          (is (= "https://site.test/graphql" (get-in response [:ring.response/headers "location"]))))))
+        (is (= "https://site.test/graphql" (get-in response [:ring.response/headers "location"])))))
 
     ;; Create the https://site.test/actions/put-graphql-schema action
     (init/do-action

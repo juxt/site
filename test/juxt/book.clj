@@ -1153,9 +1153,8 @@ Password: <input name=password type=password>
               [(f/set-at
                 (f/keep
                  [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
-                  ;;f/dup (f/of :scope) :juxt.pass.alpha/scope {} f/set-at f/swap
-                  (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
-                  ;; :juxt.pass.alpha/token
+                  f/dup (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
+                  (f/of :scope) :juxt.pass.alpha/scope f/rot f/set-at
                   (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
                   ;; :xt/id (as a function of :juxt.pass.alpha/token)
                   (f/set-at (f/keep [(f/of :juxt.pass.alpha/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
@@ -1203,16 +1202,12 @@ Password: <input name=password type=password>
             fail-if-no-application
             extract-subject
             assert-subject
-
             extract-and-decode-scope
-
-            f/break
             make-access-token
             push-access-token-fx
             collate-response
             encode-fragment
             redirect-to-application-redirect-uri
-
             ]))
 
        :juxt.pass.alpha/rules
@@ -1664,3 +1659,44 @@ Password: <input name=password type=password>
        juxt.flip.alpha.core/rot
        juxt.flip.alpha.core/set-at]]]})
  `())
+
+
+#_(f/eval-quotation
+ '({:application
+    {:juxt.pass.alpha/client-id "local-terminal",
+     :juxt.pass.alpha/redirect-uri "https://site.test/terminal/callback",
+     :juxt.site.alpha/type "https://meta.juxt.site/pass/application",
+     :juxt.pass.alpha/client-secret "f8e34cd7cc2519a4d3cdeaf8b64a4548e5e42705",
+     :xt/id "https://site.test/applications/local-terminal"},
+    :query
+    {"response_type" "token",
+     "client_id" "local-terminal",
+     "scope" "admin.graphql%20query.graphql",
+     "state" "72c7c1f56c97fa025179"},
+    :scope ["admin.graphql" "query.graphql"],
+    :subject "https://site.test/subjects/d473ea8cc04d7dc0218f",
+    :juxt.site.alpha/fx []})
+
+ `(
+   (f/define access-token-length [16])
+
+   (f/define make-access-token
+     [(f/set-at
+       (f/keep
+        [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
+         f/dup (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
+         (f/of :scope) :juxt.pass.alpha/scope f/rot f/set-at
+         (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
+         ;; :xt/id (as a function of :juxt.pass.alpha/token)
+         (f/set-at (f/keep [(f/of :juxt.pass.alpha/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
+         ;; ::site/type
+         (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
+         ;; TODO: Add scope
+         ;; key in map
+         :access-token]))])
+
+   make-access-token
+   )
+ {::site/base-uri "https://site.test"}
+
+ )
