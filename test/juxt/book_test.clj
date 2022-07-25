@@ -644,7 +644,11 @@
                           :in [client-id]})
                       f/first
                       f/first
-                      :application]))])
+
+                      (f/if* [:application]
+                             ["unauthorized_client" :error])])
+
+                    )])
 
                 (f/define fail-if-no-application
                   [(f/keep
@@ -725,15 +729,21 @@
                       f/swap f/str
                       (site/set-header "location" f/swap)]))])
 
+
                 extract-and-decode-query-string
 
-                lookup-application-from-database
-                #_fail-if-no-application
+                ;; Check parameters, if not, return 'error=invalid_request'
 
+                ;; TODO: How to catch exceptions?
+
+                lookup-application-from-database
+
+                #_f/break
+                #_fail-if-no-application
 
                 extract-subject
                 assert-subject
-                ;;                  extract-and-decode-scope
+                ;; extract-and-decode-scope
                 make-access-token
                 push-access-token-fx
                 collate-response
@@ -752,7 +762,7 @@
             :ring.request/query
             (codec/form-encode
              {"response_type" "token"
-              ;;"client_id" client-id
+              "client_id" "local-terminal"
               ;;"scope" (codec/url-encode (str/join " " scope))
               ;;"state" state
               })})]
