@@ -397,14 +397,16 @@
     (let [tx (xt/submit-tx
               xt-node
               [[::xt/fn tx-fn (sanitize-ctx ctx)]])
-          {::xt/keys [tx-id]} (xt/await-tx xt-node tx)]
+          {::xt/keys [tx-id]} (xt/await-tx xt-node tx)
+          ctx (assoc ctx ::site/db (xt/db xt-node))]
 
       (when-not (xt/tx-committed? xt-node tx)
         (throw
          (ex-info
           (format "Transaction failed to be committed for action %s" action)
           {::xt/tx-id tx-id
-           ::pass/action action})))
+           ::pass/action action
+           ::site/request-context ctx})))
 
       (let [result
             (xt/entity
