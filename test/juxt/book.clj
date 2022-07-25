@@ -1206,11 +1206,13 @@ Password: <input name=password type=password>
 
             extract-and-decode-scope
 
+            f/break
             make-access-token
             push-access-token-fx
             collate-response
             encode-fragment
             redirect-to-application-redirect-uri
+
             ]))
 
        :juxt.pass.alpha/rules
@@ -1297,7 +1299,7 @@ Password: <input name=password type=password>
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/install-graphql-endpoint"
 
-       :juxt.pass.alpha/scope "https://example.org/scope/admin.graphql"
+       :juxt.pass.alpha/scope "admin.graphql"
 
        :juxt.site.alpha/methods
        {
@@ -1380,6 +1382,15 @@ Password: <input name=password type=password>
            [(site/push-fx (f/dip [(site/set-status 201)]))
             (site/push-fx (f/keep [(site/set-header "location" f/swap (f/of :input) (f/of :xt/id))]))])
 
+         (f/define create-permission
+           [(f/set-at
+             (f/dip
+              [{:juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
+                :juxt.site.alpha/description "Permission for endpoint owner to put GraphQL schema"
+                :juxt.pass.alpha/action "https://example.org/actions/put-graphql-schema"
+                :juxt.pass.alpha/purpose nil}
+               :new-permission]))])
+
          (site/with-fx-acc
            [extract-input
             extract-permissions
@@ -1391,21 +1402,14 @@ Password: <input name=password type=password>
             add-owner
             push-resource
 
-            (f/set-at
-             (f/dip
-              [{:juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
-                :juxt.site.alpha/description "Permission for endpoint owner to put GraphQL schema"
-                :juxt.pass.alpha/action "https://example.org/actions/put-graphql-schema"
-                :juxt.pass.alpha/purpose nil}
-               :new-permission]))
+            create-permission
 
             ;; Set new-permission to owner
             ;; TODO: Need some kind of 'update' combinator for this common operation
             (f/set-at
              (f/keep
               [f/dup (f/of :new-permission) f/swap
-               (f/of :owner) :juxt.pass.alpha/user f/rot f/set-at :new-permission]
-              ))
+               (f/of :owner) :juxt.pass.alpha/user f/rot f/set-at :new-permission]))
 
             ;; Set xt/id
             (f/set-at
@@ -1603,13 +1607,60 @@ Password: <input name=password type=password>
   (put-bearer-protection-space!))
 
 
+
+
 (f/eval-quotation
- [{:query
-   {"response_type" "token",
-    "client_id" "local-terminal",
-    "scope"
-    "https%3A%2F%2Fexample.org%2Fscope%2Fadmin.graphql%20https%3A%2F%2Fexample.org%2Fscope%2Fquery.graphql",
-    "state" "80c709ab3abb5a78b2c0"}}]
- `[(f/of :query) (f/of "scope") f/form-decode "\\s" f/<regex> f/split :scope
-   ]
- )
+ '({:access-token
+    {:juxt.pass.alpha/subject
+     "https://site.test/subjects/185c0df2eff89b1da299",
+     :juxt.pass.alpha/application
+     "https://site.test/applications/local-terminal",
+     :juxt.pass.alpha/token "65a4a467d3f8ee7efafc6377ae946aad",
+     :xt/id "https://site.test/access-tokens/65a4a467d3f8ee7efafc6377ae946aad",
+     :juxt.site.alpha/type "https://meta.juxt.site/pass/access-token"},
+    :application
+    {:juxt.pass.alpha/client-id "local-terminal",
+     :juxt.pass.alpha/redirect-uri "https://site.test/terminal/callback",
+     :juxt.site.alpha/type "https://meta.juxt.site/pass/application",
+     :juxt.pass.alpha/client-secret "0449d1d59c556a687e0cfa4834e7e62e0120d5dd",
+     :xt/id "https://site.test/applications/local-terminal"},
+    :fragment
+    "access_token=65a4a467d3f8ee7efafc6377ae946aad&token_type=bearer&state=2086060840686b2d3de4",
+    :query
+    {"response_type" "token",
+     "client_id" "local-terminal",
+     "scope" "admin.graphql%20query.graphql",
+     "state" "2086060840686b2d3de4"},
+    :response
+    {"access_token" "65a4a467d3f8ee7efafc6377ae946aad",
+     "token_type" "bearer",
+     "state" "2086060840686b2d3de4"},
+    :scope ["admin.graphql" "query.graphql"],
+    :subject "https://site.test/subjects/185c0df2eff89b1da299",
+    :juxt.site.alpha/fx
+    [[:xtdb.api/put
+      {:juxt.pass.alpha/subject
+       "https://site.test/subjects/185c0df2eff89b1da299",
+       :juxt.pass.alpha/application
+       "https://site.test/applications/local-terminal",
+       :juxt.pass.alpha/token "65a4a467d3f8ee7efafc6377ae946aad",
+       :xt/id
+       "https://site.test/access-tokens/65a4a467d3f8ee7efafc6377ae946aad",
+       :juxt.site.alpha/type "https://meta.juxt.site/pass/access-token"}]
+     [:juxt.site.alpha/apply-to-request-context
+      [302
+       :ring.response/status
+       juxt.flip.alpha.core/rot
+       juxt.flip.alpha.core/set-at]]
+     [:juxt.site.alpha/apply-to-request-context
+      [juxt.flip.alpha.core/dup
+       (juxt.flip.alpha.core/of :ring.response/headers)
+       (juxt.flip.alpha.core/if* [] [juxt.flip.alpha.core/<array-map>])
+       "https://site.test/terminal/callback#access_token=65a4a467d3f8ee7efafc6377ae946aad&token_type=bearer&state=2086060840686b2d3de4"
+       "location"
+       juxt.flip.alpha.core/rot
+       juxt.flip.alpha.core/set-at
+       :ring.response/headers
+       juxt.flip.alpha.core/rot
+       juxt.flip.alpha.core/set-at]]]})
+ `())

@@ -17,7 +17,8 @@
    [malli.core :as malli]
    [ring.util.codec :as codec]
    [xtdb.api :as xt]
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [juxt.site.alpha.repl :as repl])
   (:import (clojure.lang ExceptionInfo)))
 
 (defn with-handler [f]
@@ -516,13 +517,29 @@
       :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
       })
 
+    ;; Add an additional Basic auth protection space
+    (init/do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/put-protection-space"
+     {:xt/id "https://site.test/protection-spaces/basic"
+
+      :juxt.pass.alpha/canonical-root-uri "https://site.test"
+      :juxt.pass.alpha/realm "Wonderland" ; optional
+
+      :juxt.pass.alpha/auth-scheme "Basic"
+      :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
+      })
+
     ;; Now if we try to access /private/internal.html we'll at least be
     ;; prompted to authenticate.
     (let [response (*handler*
                     {:ring.request/method :get
                      :ring.request/path "/private/internal.html"})]
       (is (= 401 (:ring.response/status response)))
-      (is (re-matches #"Bearer.*" (get-in response [:ring.response/headers "www-authenticate"]))))
+      ;; TODO: Remove space
+      (is (= "Bearer , Basic realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"]))))
+
+    ;; TODO: Test that basic auth works
 
     ;; So we need to get a bearer token so that we can access /private/internal.html
     ;; Bearer tokens are issued by an authorization server.
@@ -594,8 +611,7 @@
            (authorize!
             :sid (get-in @store ["alice" :sid])
             "client_id" "local-terminal"
-            "scope" ["https://example.org/scope/admin.graphql"
-                     "https://example.org/scope/query.graphql"]))
+            "scope" ["admin.graphql" "query.graphql"]))
 
     ;; We can now use the access-token to access a protected resource, using an application
 
