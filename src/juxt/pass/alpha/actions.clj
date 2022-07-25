@@ -252,7 +252,7 @@
                   (format "Action '%s' not found in db" action)
                   {:action action})))
 
-            _ (when scope
+            #_#__ (when scope
                 (when-not access-token
                   (throw
                    (ex-info
@@ -265,6 +265,7 @@
                    (ex-info
                     (format "Access token does not have sufficient scope (%s)" scope)
                     {:ring.response/status 403
+                     :access-token access-token
                      :action action
                      :scope-granted (::pass/scope access-token)
                      :scope-required scope}))))]

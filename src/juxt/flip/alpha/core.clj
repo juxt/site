@@ -380,6 +380,10 @@
    queue
    env])
 
+(defmethod word 'juxt.flip.alpha.core/split
+  [[regexp string & stack] [_ & queue] env]
+  [(clojure.core/cons (str/split string regexp) stack) queue env])
+
 (def in 'juxt.flip.alpha.core/in?)
 (defmethod word 'juxt.flip.alpha.core/in?
   [[set elt & stack] [_ & queue] env]

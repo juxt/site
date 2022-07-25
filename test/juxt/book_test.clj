@@ -395,11 +395,16 @@
 
 (defn authorize!
   "Authorize an application"
-  [& {:keys [sid client-id] :as args}]
+  [& {:keys [sid]
+      client-id "client_id"
+      scope "scope"
+      :as args}]
   {:pre [(malli/validate
           [:map
-           [:sid :string]
-           [:client-id :string]] args)]
+           ^{:doc "to authenticate with authorization server"} [:sid :string]
+           ["client_id" :string]
+           ["scope" {:optional true} [:sequential :string]]]
+          args)]
    :post [(malli/validate [:string] %)]}
   (let [state (make-nonce 10)
         request {:ring.request/method :get
@@ -409,11 +414,13 @@
                  (codec/form-encode
                   {"response_type" "token"
                    "client_id" client-id
+                   "scope" (codec/url-encode (str/join " " scope))
                    "state" state})}
         response (*handler* request)
         _ (case (:ring.response/status response)
             302 :ok
-            403 (throw (ex-info "Forbidden to authorize" args)))
+            403 (throw (ex-info "Forbidden to authorize" (assoc args :response response)))
+            (throw (ex-info "Unexpected error" (assoc args :response response))))
 
         location-header (-> response :ring.response/headers (get "location"))
         [_ access-token returned-state]
@@ -579,14 +586,16 @@
       ExceptionInfo #"Forbidden to authorize"
       (authorize!
        :sid (get-in @store ["alice" :sid])
-       :client-id "local-terminal")))
+       "client_id" "local-terminal")))
 
     (grant-permission-to-authorize! :username "alice")
 
     (swap! store assoc-in ["alice" :access-token]
            (authorize!
             :sid (get-in @store ["alice" :sid])
-            :client-id "local-terminal"))
+            "client_id" "local-terminal"
+            "scope" ["https://example.org/scope/admin.graphql"
+                     "https://example.org/scope/query.graphql"]))
 
     ;; We can now use the access-token to access a protected resource, using an application
 
@@ -659,8 +668,10 @@
           ;; This also creates a permission such that the owner (Alice) can
           ;; put-graphql-schema to this /graphql resource.
           (is (= 201 (:ring.response/status response)))
+
           (when-not (= 201 (:ring.response/status response))
-            (throw (ex-info "Good break" {})))
+            (throw (ex-info "Good break" {:response response})))
+
           (is (= "https://site.test/graphql" (get-in response [:ring.response/headers "location"]))))))
 
     ;; Create the https://site.test/actions/put-graphql-schema action
@@ -699,7 +710,10 @@
            (login-with-form! {"username" "bob" "password" "walrus"}))
     (grant-permission-to-authorize! :username "bob")
     (swap! store assoc-in ["bob" :access-token]
-           (authorize! :sid (get-in @store ["bob" :sid]) :client-id "local-terminal" :username "bob"))
+           (authorize!
+            :sid (get-in @store ["bob" :sid])
+            :username "bob"
+            "client_id" "local-terminal"))
 
     ;; Check Bob can't put a schema to Alice's graphql
     (let [request
@@ -709,8 +723,8 @@
                {"authorization" (format "Bearer %s" (get-in @store ["bob" :access-token]))
                 "content-type" "application/graphql"}})
           response (*handler*
-                     (-> request
-                         (with-body (.getBytes "schema { }"))))]
+                    (-> request
+                        (with-body (.getBytes "schema { }"))))]
       (is (= 403 (:ring.response/status response))))
 
     ;; TODO: Now try with Alice, via a different application, one that doesn't

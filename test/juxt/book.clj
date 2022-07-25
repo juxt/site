@@ -1100,8 +1100,7 @@ Password: <input name=password type=password>
             (f/define extract-and-decode-query-string
               [(f/set-at
                 (f/dip
-                 [:ring.request/query
-                  f/env
+                 [(f/env :ring.request/query)
                   (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
                   f/form-decode
                   :query]))])
@@ -1141,6 +1140,11 @@ Password: <input name=password type=password>
             (f/define assert-subject
               [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
 
+            (f/define extract-and-decode-scope
+              [(f/set-at
+                (f/keep
+                 [(f/of :query) (f/of "scope") f/form-decode "\\s" f/<regex> f/split :scope]))])
+
             ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
             (f/define access-token-length [16])
 
@@ -1149,6 +1153,7 @@ Password: <input name=password type=password>
               [(f/set-at
                 (f/keep
                  [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
+                  ;;f/dup (f/of :scope) :juxt.pass.alpha/scope {} f/set-at f/swap
                   (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
                   ;; :juxt.pass.alpha/token
                   (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
@@ -1198,6 +1203,9 @@ Password: <input name=password type=password>
             fail-if-no-application
             extract-subject
             assert-subject
+
+            extract-and-decode-scope
+
             make-access-token
             push-access-token-fx
             collate-response
@@ -1276,13 +1284,10 @@ Password: <input name=password type=password>
      ;; end::register-example-application![]
      ))))
 
-;; GraphQL endpoint
+;; GraphQL
 
-;; Some who has the install-graphql-schema action can put a GraphQL schema
-;; wherever the granted permission allows.
-
-;; Option: POST to the action's URI?
-
+;; Someone who has permission to perform the install-graphql-endpoint action can
+;; put a GraphQL schema wherever the granted permission allows.
 (defn create-action-install-graphql-endpoint! []
   (eval
    (substitute-actual-base-uri
@@ -1596,3 +1601,15 @@ Password: <input name=password type=password>
   (create-resource-protected-by-bearer-auth!)
   (grant-permission-to-resource-protected-by-bearer-auth!)
   (put-bearer-protection-space!))
+
+
+(f/eval-quotation
+ [{:query
+   {"response_type" "token",
+    "client_id" "local-terminal",
+    "scope"
+    "https%3A%2F%2Fexample.org%2Fscope%2Fadmin.graphql%20https%3A%2F%2Fexample.org%2Fscope%2Fquery.graphql",
+    "state" "80c709ab3abb5a78b2c0"}}]
+ `[(f/of :query) (f/of "scope") f/form-decode "\\s" f/<regex> f/split :scope
+   ]
+ )
