@@ -251,17 +251,18 @@
      protection-space)))
 
 (defn authenticate-with-bearer-auth [req db token68 protection-spaces]
-  (let [subject
-        (:subject
-         (first
-          (xt/q db '{:find [(pull sub [*])]
-                     :keys [subject]
-                     :where [[at ::pass/token tok]
-                             [at ::site/type "https://meta.juxt.site/pass/access-token"]
-                             [at ::pass/subject sub]
-                             [sub ::site/type "https://meta.juxt.site/pass/subject"]]
-                     :in [tok]} token68)))]
-    (cond-> req subject (assoc ::pass/subject subject))))
+  (let [{:keys [subject access-token]}
+        (first
+         (xt/q db '{:find [(pull sub [*]) (pull at [*])]
+                    :keys [subject access-token]
+                    :where [[at ::pass/token tok]
+                            [at ::site/type "https://meta.juxt.site/pass/access-token"]
+                            [at ::pass/subject sub]
+                            [sub ::site/type "https://meta.juxt.site/pass/subject"]]
+                    :in [tok]} token68))]
+    (cond-> req
+      subject (assoc ::pass/subject subject
+                     ::pass/access-token access-token))))
 
 ;; TODO (idea): Tie bearer token to other security aspects such as remote IP so that
 ;; the bearer token is more difficult to use if intercepted.
