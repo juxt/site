@@ -72,6 +72,8 @@
 
        :juxt.pass.alpha/rules
        '[
+         ;; Creating actions should only be available to the most trusted
+         ;; subjects. Actions can write directly to the database, if they wish.
          [(allowed? subject resource permission) ; <1>
           [permission :juxt.pass.alpha/subject subject]]]
 
@@ -156,9 +158,11 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
+          [permission :juxt.pass.alpha/subject subject]]
 
-         [(allowed? subject resource permission)
+         ;; This might be overly powerful, as a general way of granting anyone a
+         ;; permission on any action! Let's comment for now
+         #_[(allowed? subject resource permission)
           [subject :juxt.pass.alpha/user-identity id]
           [id :juxt.pass.alpha/user user]
           [user :role role]
