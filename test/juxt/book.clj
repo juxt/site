@@ -34,7 +34,6 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/put-user"
-       :juxt.pass.alpha/scope "write:users"
 
        :juxt.flip.alpha/quotation
        `(
@@ -91,7 +90,6 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/put-basic-user-identity"
-       :juxt.pass.alpha/scope "write:users"
 
        :juxt.flip.alpha/quotation
        `(
@@ -167,7 +165,6 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/put-subject"
-       ;;:juxt.pass.alpha/scope "write:users"
 
        :juxt.flip.alpha/quotation
        `(
@@ -243,7 +240,6 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/put-immutable-public-resource"
-       :juxt.pass.alpha/scope "write:resource" ; <1>
 
        :juxt.flip.alpha/quotation
        `(
@@ -300,7 +296,6 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/get-public-resource"
-       :juxt.pass.alpha/scope "read:resource" ; <1>
 
        :juxt.pass.alpha/rules
        '[
@@ -445,7 +440,6 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/put-immutable-protected-resource"
-       :juxt.pass.alpha/scope "write:resource" ; <1>
 
        :juxt.flip.alpha/quotation
        `(
@@ -503,7 +497,6 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/get-protected-resource"
-       :juxt.pass.alpha/scope "read:resource"
 
        :juxt.pass.alpha/rules
        '[
@@ -527,7 +520,6 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/put-protection-space"
-       :juxt.pass.alpha/scope "write:admin"
 
        :juxt.flip.alpha/quotation
        `(
@@ -703,7 +695,6 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/put-session-scope"
-       :juxt.pass.alpha/scope "write:admin"
 
        :juxt.flip.alpha/quotation
        `(
