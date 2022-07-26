@@ -455,10 +455,25 @@
          stack)
    queue env])
 
-(def throw 'juxt.flip.alpha.core/throw)
-(defmethod word 'juxt.flip.alpha.core/throw
+;; TODO: This is more of an 'exit'
+(def throw-exception 'juxt.flip.alpha.core/throw-exception)
+(defmethod word 'juxt.flip.alpha.core/throw-exception
   [[err & stack] [_ & queue] env]
   (throw err))
+
+(defmethod word 'juxt.flip.alpha.core/throw
+  [[error & stack] [_ & queue] env]
+  (throw (clojure.core/ex-info "error" {::error error})))
+
+(defmethod word 'juxt.flip.alpha.core/recover
+  [[recovery try* & stack] [_ & queue] env]
+  (try
+    [(eval-quotation stack try* env) queue env]
+    (catch clojure.lang.ExceptionInfo e
+      ;; If this is thrown by flip, we can call the recover quotation
+      (if-let [error (::error (ex-data e))]
+        [(eval-quotation (cons error stack) recovery env) queue env]
+        (throw e)))))
 
 ;; XTDB
 
