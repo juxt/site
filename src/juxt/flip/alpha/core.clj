@@ -442,10 +442,16 @@
          stack)
    queue env])
 
-(def throw 'juxt.flip.alpha.core/throw)
-(defmethod word 'juxt.flip.alpha.core/throw
+;; TODO: This is more of an 'exit'
+(def throw-exception 'juxt.flip.alpha.core/throw-exception)
+(defmethod word 'juxt.flip.alpha.core/throw-exception
   [[err & stack] [_ & queue] env]
   (throw err))
+
+#_(def throw 'juxt.flip.alpha.core/throw)
+#_(defmethod word 'juxt.flip.alpha.core/throw
+  [[error & stack] [_ & queue] env]
+  [stack '() (assoc env ::error-continuation queue)])
 
 ;; XTDB
 

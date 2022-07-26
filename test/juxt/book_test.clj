@@ -632,23 +632,20 @@
                       :query]))])
 
                 (f/define lookup-application-from-database
-                  [(f/set-at
-                    (f/keep
-                     [
-                      (f/of :query)
-                      (f/of "client_id")
-                      (juxt.flip.alpha.xtdb/q
-                       ~'{:find [(pull e [*])]
-                          :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
-                                  [e :juxt.pass.alpha/client-id client-id]]
-                          :in [client-id]})
-                      f/first
-                      f/first
+                  [
+                   f/dup
+                   (f/of :query)
+                   (f/of "client_id")
+                   (juxt.flip.alpha.xtdb/q
+                    ~'{:find [(pull e [*])]
+                       :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                               [e :juxt.pass.alpha/client-id client-id]]
+                       :in [client-id]})
+                   f/first
+                   f/first
 
-                      (f/if* [:application]
-                             ["unauthorized_client" :error])])
-
-                    )])
+                   (f/if* [:application f/set-at]
+                          [(f/newthrow "unauthorized_client")])])
 
                 (f/define fail-if-no-application
                   [(f/keep
@@ -730,25 +727,28 @@
                       (site/set-header "location" f/swap)]))])
 
 
-                extract-and-decode-query-string
+                (f/recover
+                 [extract-and-decode-query-string
 
-                ;; Check parameters, if not, return 'error=invalid_request'
+                  ;; Check parameters, if not, return 'error=invalid_request'
 
-                ;; TODO: How to catch exceptions?
+                  ;; TODO: How to catch exceptions?
 
-                lookup-application-from-database
+                  lookup-application-from-database
 
-                #_f/break
-                #_fail-if-no-application
+                  #_f/break
+                  #_fail-if-no-application
 
-                extract-subject
-                assert-subject
-                ;; extract-and-decode-scope
-                make-access-token
-                push-access-token-fx
-                collate-response
-                encode-fragment
-                redirect-to-application-redirect-uri
+                  extract-subject
+                  assert-subject
+                  ;; extract-and-decode-scope
+                  make-access-token
+                  push-access-token-fx
+                  collate-response
+                  encode-fragment
+                  redirect-to-application-redirect-uri]
+
+                 ["recovered" :recovery f/rot f/set-at])
                 ]))
 
            {::site/xt-node *xt-node*
