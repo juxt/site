@@ -647,3 +647,27 @@
      (if (seq queue)
        (recur (try-word* stack queue env))
        stack))))
+
+(defmethod word 'juxt.flip.alpha.core/tap-stack
+  [stack [_ & queue] env]
+  (tap> stack)
+  [stack queue env])
+
+(defmethod word 'juxt.flip.alpha.core/tap-stack-with-label
+  [[label & stack] [_ & queue] env]
+  (tap> {:label label :stack stack})
+  [stack queue env])
+
+(defmethod word 'juxt.flip.alpha.core/tap-queue [stack [_ & queue] env]
+  (tap> queue)
+  [stack queue env])
+
+(defmethod word 'juxt.flip.alpha.core/tap-env [stack [_ & queue] env]
+  (tap> env)
+  [stack queue env])
+
+(defmethod word 'juxt.flip.alpha.core/tap-everything [stack [_ & queue] env]
+  (tap> {:stack stack
+         :queue queue
+         :env env})
+  [stack queue env])
