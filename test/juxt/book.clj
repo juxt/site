@@ -916,7 +916,7 @@ Password: <input name=password type=password>
                    ;; stack order
                    :in [password username]})
                f/first
-               (f/unless* [(f/throw (f/ex-info "Login failed" {}))])
+               (f/unless* [(f/throw-exception (f/ex-info "Login failed" {}))])
                :matched-user]))])
 
          (f/define make-subject
@@ -1101,7 +1101,7 @@ Password: <input name=password type=password>
               [(f/set-at
                 (f/dip
                  [(f/env :ring.request/query)
-                  (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
+                  (f/unless* [(f/throw-exception (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
                   f/form-decode
                   :query]))])
 
@@ -1131,14 +1131,14 @@ Password: <input name=password type=password>
                  (f/if [f/drop]
                    ;; else throw the error
                    [:client-id {:ring.response/status 400} f/set-at
-                    (f/throw (f/ex-info "No such app" f/swap))])])])
+                    (f/throw-exception (f/ex-info "No such app" f/swap))])])])
 
             ;; Get subject (it's in the environment, fail if missing subject)
             (f/define extract-subject
               [(f/set-at (f/dip [(f/env :juxt.pass.alpha/subject) :subject]))])
 
             (f/define assert-subject
-              [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
+              [(f/keep [(f/of :subject) (f/unless [(f/throw-exception (f/ex-info "Cannot create access-token: no subject" {}))])])])
 
             (f/define extract-and-decode-scope
               [(f/set-at
@@ -1193,7 +1193,7 @@ Password: <input name=password type=password>
                  [f/dup (f/of :application) (f/of :juxt.pass.alpha/redirect-uri)
                   "#" f/swap f/str
                   f/swap (f/of :fragment)
-                  (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
+                  (f/unless* [(f/throw-exception (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
                   f/swap f/str
                   (site/set-header "location" f/swap)]))])
 
@@ -1330,7 +1330,7 @@ Password: <input name=password type=password>
               (f/of :matches?)
               (f/if
                   [f/drop]
-                  [(f/throw
+                  [(f/throw-exception
                     (f/ex-info
                      f/dup "No permission allows installation of GraphQL endpoint: " f/swap (f/of :input) (f/of :xt/id) f/swap f/str
                      f/swap (f/of :input) (f/of :xt/id) :location {:ring.response/status 403} f/set-at))])])])
@@ -1600,103 +1600,3 @@ Password: <input name=password type=password>
   (create-resource-protected-by-bearer-auth!)
   (grant-permission-to-resource-protected-by-bearer-auth!)
   (put-bearer-protection-space!))
-
-
-
-
-(f/eval-quotation
- '({:access-token
-    {:juxt.pass.alpha/subject
-     "https://site.test/subjects/185c0df2eff89b1da299",
-     :juxt.pass.alpha/application
-     "https://site.test/applications/local-terminal",
-     :juxt.pass.alpha/token "65a4a467d3f8ee7efafc6377ae946aad",
-     :xt/id "https://site.test/access-tokens/65a4a467d3f8ee7efafc6377ae946aad",
-     :juxt.site.alpha/type "https://meta.juxt.site/pass/access-token"},
-    :application
-    {:juxt.pass.alpha/client-id "local-terminal",
-     :juxt.pass.alpha/redirect-uri "https://site.test/terminal/callback",
-     :juxt.site.alpha/type "https://meta.juxt.site/pass/application",
-     :juxt.pass.alpha/client-secret "0449d1d59c556a687e0cfa4834e7e62e0120d5dd",
-     :xt/id "https://site.test/applications/local-terminal"},
-    :fragment
-    "access_token=65a4a467d3f8ee7efafc6377ae946aad&token_type=bearer&state=2086060840686b2d3de4",
-    :query
-    {"response_type" "token",
-     "client_id" "local-terminal",
-     "scope" "admin.graphql%20query.graphql",
-     "state" "2086060840686b2d3de4"},
-    :response
-    {"access_token" "65a4a467d3f8ee7efafc6377ae946aad",
-     "token_type" "bearer",
-     "state" "2086060840686b2d3de4"},
-    :scope ["admin.graphql" "query.graphql"],
-    :subject "https://site.test/subjects/185c0df2eff89b1da299",
-    :juxt.site.alpha/fx
-    [[:xtdb.api/put
-      {:juxt.pass.alpha/subject
-       "https://site.test/subjects/185c0df2eff89b1da299",
-       :juxt.pass.alpha/application
-       "https://site.test/applications/local-terminal",
-       :juxt.pass.alpha/token "65a4a467d3f8ee7efafc6377ae946aad",
-       :xt/id
-       "https://site.test/access-tokens/65a4a467d3f8ee7efafc6377ae946aad",
-       :juxt.site.alpha/type "https://meta.juxt.site/pass/access-token"}]
-     [:juxt.site.alpha/apply-to-request-context
-      [302
-       :ring.response/status
-       juxt.flip.alpha.core/rot
-       juxt.flip.alpha.core/set-at]]
-     [:juxt.site.alpha/apply-to-request-context
-      [juxt.flip.alpha.core/dup
-       (juxt.flip.alpha.core/of :ring.response/headers)
-       (juxt.flip.alpha.core/if* [] [juxt.flip.alpha.core/<array-map>])
-       "https://site.test/terminal/callback#access_token=65a4a467d3f8ee7efafc6377ae946aad&token_type=bearer&state=2086060840686b2d3de4"
-       "location"
-       juxt.flip.alpha.core/rot
-       juxt.flip.alpha.core/set-at
-       :ring.response/headers
-       juxt.flip.alpha.core/rot
-       juxt.flip.alpha.core/set-at]]]})
- `())
-
-
-#_(f/eval-quotation
- '({:application
-    {:juxt.pass.alpha/client-id "local-terminal",
-     :juxt.pass.alpha/redirect-uri "https://site.test/terminal/callback",
-     :juxt.site.alpha/type "https://meta.juxt.site/pass/application",
-     :juxt.pass.alpha/client-secret "f8e34cd7cc2519a4d3cdeaf8b64a4548e5e42705",
-     :xt/id "https://site.test/applications/local-terminal"},
-    :query
-    {"response_type" "token",
-     "client_id" "local-terminal",
-     "scope" "admin.graphql%20query.graphql",
-     "state" "72c7c1f56c97fa025179"},
-    :scope ["admin.graphql" "query.graphql"],
-    :subject "https://site.test/subjects/d473ea8cc04d7dc0218f",
-    :juxt.site.alpha/fx []})
-
- `(
-   (f/define access-token-length [16])
-
-   (f/define make-access-token
-     [(f/set-at
-       (f/keep
-        [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
-         f/dup (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
-         (f/of :scope) :juxt.pass.alpha/scope f/rot f/set-at
-         (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
-         ;; :xt/id (as a function of :juxt.pass.alpha/token)
-         (f/set-at (f/keep [(f/of :juxt.pass.alpha/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
-         ;; ::site/type
-         (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
-         ;; TODO: Add scope
-         ;; key in map
-         :access-token]))])
-
-   make-access-token
-   )
- {::site/base-uri "https://site.test"}
-
- )

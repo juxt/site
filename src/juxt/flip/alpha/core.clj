@@ -36,10 +36,15 @@
     [stack (concat quotation queue) env]
     ;; Don't apply, simply treat as a symbol. We might be in the process of
     ;; defining a word.
-    (if (and (clojure.core/vector? (clojure.core/first queue))
-              (= (clojure.core/second queue) 'juxt.flip.alpha.core/define))
+    (cond
+
+      ;; define
+      (and
+       (clojure.core/vector? (clojure.core/first queue))
+       (= (clojure.core/second queue) 'juxt.flip.alpha.core/define))
       [(cons name stack) queue env]
 
+      :else
       (throw (clojure.core/ex-info (format "Symbol not defined: %s" name) {:symbol name})))))
 
 (def break 'juxt.flip.alpha.core/break)

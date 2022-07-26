@@ -966,3 +966,12 @@
     ;; scope (rather than permissions linked to scope).
 
     ))
+
+
+#_(f/eval-quotation
+ '()
+ `(:foo :bar f/swap f/dup keyword?)
+ {}
+ )
+
+;; TODO: Test all branches of flip, especially cases where quotations should throw exceptions
