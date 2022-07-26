@@ -610,177 +610,174 @@
     ;; Register application (but test before registering an application)
     (book/register-example-application!)
 
-    ;; Try authorize with bad
+    ;; Try authorize with bad client id
 
-    #_(let [db (xt/db *xt-node*)
-            session-token (repl/e (format "https://site.test/session-tokens/%s" (get-in @store ["alice" :sid])))
-            session (repl/e (::pass/session session-token))
-            subject (repl/e (::pass/subject session))
+    (let [db (xt/db *xt-node*)
+          session-token (repl/e (format "https://site.test/session-tokens/%s" (get-in @store ["alice" :sid])))
+          session (repl/e (::pass/session session-token))
+          subject (repl/e (::pass/subject session))
 
-            result
-            (f/eval-quotation
-             '()
-             `(
-               (site/with-fx-acc
-                 [
-                  ;; Extract query string from environment, decode it and store it at
-                  ;; keyword :query
-                  (f/define extract-and-decode-query-string
-                    [(f/set-at
-                      (f/dip
-                       [(f/env :ring.request/query)
-                        (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
-                        f/form-decode
-                        :query]))])
+          result
+          (f/eval-quotation
+           '()
+           `(
+             (site/with-fx-acc
+               [
+                ;; Extract query string from environment, decode it and store it at
+                ;; keyword :query
+                (f/define extract-and-decode-query-string
+                  [(f/set-at
+                    (f/dip
+                     [(f/env :ring.request/query)
+                      (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
+                      f/form-decode
+                      :query]))])
 
-                  (f/define lookup-application-from-database
+                (f/define lookup-application-from-database
+                  [
+                   f/dup
+                   (f/of :query)
+                   (f/of "client_id")
+                   (juxt.flip.alpha.xtdb/q
+                    ~'{:find [(pull e [*])]
+                       :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                               [e :juxt.pass.alpha/client-id client-id]]
+                       :in [client-id]})
+                   f/first
+                   f/first
+
+                   (f/if* [:application f/set-at]
+                          [(f/throw "unauthorized_client")])])
+
+                (f/define fail-if-no-application
+                  [(f/keep
                     [
-                     f/dup
-                     (f/of :query)
-                     (f/of "client_id")
-                     (juxt.flip.alpha.xtdb/q
-                      ~'{:find [(pull e [*])]
-                         :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
-                                 [e :juxt.pass.alpha/client-id client-id]]
-                         :in [client-id]})
-                     f/first
-                     f/first
+                     ;; Grab the client-id for error reporting
+                     f/dup (f/of :query) (f/of "client_id") f/swap
+                     (f/of :application)
+                     ;; If no application entry, drop the client_id (to clean up the
+                     ;; stack)
+                     (f/if [f/drop]
+                       ;; else throw the error
+                       [:client-id {:ring.response/status 400} f/set-at
+                        (f/throw (f/ex-info "No such app" f/swap))])])])
 
-                     (f/if* [:application f/set-at]
-                            [(f/newthrow "unauthorized_client")])])
+                ;; Get subject (it's in the environment, fail if missing subject)
+                (f/define extract-subject
+                  [(f/set-at (f/dip [(f/env :juxt.pass.alpha/subject) :subject]))])
 
-                  (f/define fail-if-no-application
-                    [(f/keep
-                      [
-                       ;; Grab the client-id for error reporting
-                       f/dup (f/of :query) (f/of "client_id") f/swap
-                       (f/of :application)
-                       ;; If no application entry, drop the client_id (to clean up the
-                       ;; stack)
-                       (f/if [f/drop]
-                         ;; else throw the error
-                         [:client-id {:ring.response/status 400} f/set-at
-                          (f/throw (f/ex-info "No such app" f/swap))])])])
+                (f/define assert-subject
+                  [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
 
-                  ;; Get subject (it's in the environment, fail if missing subject)
-                  (f/define extract-subject
-                    [(f/set-at (f/dip [(f/env :juxt.pass.alpha/subject) :subject]))])
-
-                  (f/define assert-subject
-                    [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
-
-                  ;; Rewrite to allow scope to be nil
-                  #_(f/define extract-and-decode-scope
-                      [(f/set-at
-                        (f/keep
-                         [(f/of :query) (f/of "scope")
-                          f/form-decode "\\s" f/<regex> f/split :scope]))])
-
-                  ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
-                  (f/define access-token-length [16])
-
-                  ;; Create access-token tied to subject, scope and application
-                  (f/define make-access-token
+                ;; Rewrite to allow scope to be nil
+                #_(f/define extract-and-decode-scope
                     [(f/set-at
                       (f/keep
-                       [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
-                        f/dup (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
-                        (f/of :scope) :juxt.pass.alpha/scope f/rot f/set-at
-                        (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
-                        ;; :xt/id (as a function of :juxt.pass.alpha/token)
-                        (f/set-at (f/keep [(f/of :juxt.pass.alpha/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
-                        ;; ::site/type
-                        (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
-                        ;; TODO: Add scope
-                        ;; key in map
-                        :access-token]))])
+                       [(f/of :query) (f/of "scope")
+                        f/form-decode "\\s" f/<regex> f/split :scope]))])
 
-                  (f/define push-access-token-fx
-                    [(site/push-fx
-                      (f/keep
-                       [(f/of :access-token) xtdb.api/put]))])
+                ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
+                (f/define access-token-length [16])
 
-                  (f/define collate-response
-                    [(f/set-at
-                      (f/keep
-                       [ ;; access_token
-                        f/dup (f/of :access-token) (f/of :juxt.pass.alpha/token) "access_token" {} f/set-at
-                        ;; token_token
-                        "bearer" "token_type" f/rot f/set-at
-                        ;; state
-                        f/swap (f/of :query) (f/of "state") "state" f/rot f/set-at
-                        ;; key in map
-                        :response]))])
+                ;; Create access-token tied to subject, scope and application
+                (f/define make-access-token
+                  [(f/set-at
+                    (f/keep
+                     [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
+                      f/dup (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
+                      (f/of :scope) :juxt.pass.alpha/scope f/rot f/set-at
+                      (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
+                      ;; :xt/id (as a function of :juxt.pass.alpha/token)
+                      (f/set-at (f/keep [(f/of :juxt.pass.alpha/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
+                      ;; ::site/type
+                      (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
+                      ;; TODO: Add scope
+                      ;; key in map
+                      :access-token]))])
 
-                  (f/define encode-fragment
-                    [(f/set-at
-                      (f/keep
-                       [(f/of :response) f/form-encode :fragment]))])
+                (f/define push-access-token-fx
+                  [(site/push-fx
+                    (f/keep
+                     [(f/of :access-token) xtdb.api/put]))])
 
-                  (f/define redirect-to-application-redirect-uri
-                    [(site/push-fx (f/dip [(site/set-status 302)]))
-                     (site/push-fx
-                      (f/keep
-                       [f/dup (f/of :application) (f/of :juxt.pass.alpha/redirect-uri)
-                        "#" f/swap f/str
-                        f/swap (f/of :fragment)
-                        (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
-                        f/swap f/str
-                        (site/set-header "location" f/swap)]))])
+                (f/define collate-response
+                  [(f/set-at
+                    (f/keep
+                     [ ;; access_token
+                      f/dup (f/of :access-token) (f/of :juxt.pass.alpha/token) "access_token" {} f/set-at
+                      ;; token_token
+                      "bearer" "token_type" f/rot f/set-at
+                      ;; state
+                      f/swap (f/of :query) (f/of "state") "state" f/rot f/set-at
+                      ;; key in map
+                      :response]))])
 
+                (f/define encode-fragment
+                  [(f/set-at
+                    (f/keep
+                     [(f/of :response) f/form-encode :fragment]))])
 
-                  (f/recover
-                   [extract-and-decode-query-string
-
-                    ;; Check parameters, if not, return 'error=invalid_request'
-
-                    ;; TODO: How to catch exceptions?
-
-                    lookup-application-from-database
-
-                    #_f/break
-                    #_fail-if-no-application
-
-                    extract-subject
-                    assert-subject
-                    ;; extract-and-decode-scope
-                    make-access-token
-                    push-access-token-fx
-                    collate-response
-                    encode-fragment
-                    redirect-to-application-redirect-uri]
-
-                   ["recovered" :recovery f/rot f/set-at])
-                  ]))
-
-             {::site/xt-node *xt-node*
-              ::site/db db
-              ::pass/subject subject
-              ::pass/action "https://example.org/actions/oauth/authorize"
-              ::site/base-uri "https://site.test"
-
-              :ring.request/method :get
-              :ring.request/path "/oauth/authorize"
-              :ring.request/query
-              (codec/form-encode
-               {"response_type" "token"
-                "client_id" "local-terminal"
-                ;;"scope" (codec/url-encode (str/join " " scope))
-                ;;"state" state
-                })})]
-
-        (throw
-         (ex-info
-          "session"
-          {:session-token session-token
-           :session session
-           :subject subject
-           :sid (get-in @store ["alice" :sid])
-           :result result
-           }))
+                (f/define redirect-to-application-redirect-uri
+                  [(site/push-fx (f/dip [(site/set-status 302)]))
+                   (site/push-fx
+                    (f/keep
+                     [f/dup (f/of :application) (f/of :juxt.pass.alpha/redirect-uri)
+                      "#" f/swap f/str
+                      f/swap (f/of :fragment)
+                      (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
+                      f/swap f/str
+                      (site/set-header "location" f/swap)]))])
 
 
-        )
+                (f/recover
+                 [extract-and-decode-query-string
+
+                  ;; Check parameters, if not, return 'error=invalid_request'
+
+                  ;; TODO: How to catch exceptions?
+
+                  lookup-application-from-database
+
+                  #_f/break
+                  #_fail-if-no-application
+
+                  extract-subject
+                  assert-subject
+                  ;; extract-and-decode-scope
+                  make-access-token
+                  push-access-token-fx
+                  collate-response
+                  encode-fragment
+                  redirect-to-application-redirect-uri]
+
+                 [:error f/rot f/set-at])
+                ]))
+
+           {::site/xt-node *xt-node*
+            ::site/db db
+            ::pass/subject subject
+            ::pass/action "https://example.org/actions/oauth/authorize"
+            ::site/base-uri "https://site.test"
+
+            :ring.request/method :get
+            :ring.request/path "/oauth/authorize"
+            :ring.request/query
+            (codec/form-encode
+             {"response_type" "token"
+              ;;"client_id" "local-terminal"
+              ;;"scope" (codec/url-encode (str/join " " scope))
+              ;;"state" state
+              })})]
+
+      (throw
+       (ex-info
+        "session"
+        {:session-token session-token
+         :session session
+         :subject subject
+         :sid (get-in @store ["alice" :sid])
+         :result result
+         })))
 
     #_(testing "Authorize error"
         (let [state (make-nonce 10)
@@ -972,10 +969,38 @@
 ;; TODO: Flip error handling
 
 
-(f/eval-quotation
- '()
- `(
-   (odd? 2)
+(comment
+  (f/eval-quotation
+   '()
+   `(
+     (f/recover
+      [:foo {"name" "cwi"}
+       (f/dip
+        [(even? 3) (f/if [:true] [{:error "invalid math"} f/throw])])] ;try
+      [:set-error (f/ex-info "foo" {}) f/throw-exception]) ;recovery
+     )
+   {}
    )
- {}
- )
+
+  (f/eval-quotation
+   '()
+   `(
+
+     (f/recover
+      [:foo]
+      [])
+     )
+   {}
+   )
+
+  (f/eval-quotation
+   '()
+   `(
+
+     :foo
+     )
+   {}
+   )
+
+
+  ["error"]) '(throw blah blah blah catch)

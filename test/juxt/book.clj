@@ -1131,7 +1131,9 @@ Password: <input name=password type=password>
                  (f/if [f/drop]
                    ;; else throw the error
                    [:client-id {:ring.response/status 400} f/set-at
-                    (f/throw-exception (f/ex-info "No such app" f/swap))])])])
+                    (f/error "unauthorized_client")
+                    ;;(f/throw-exception (f/ex-info "No such app" f/swap))
+                    ])])])
 
             ;; Get subject (it's in the environment, fail if missing subject)
             (f/define extract-subject
@@ -1191,6 +1193,7 @@ Password: <input name=password type=password>
                (site/push-fx
                 (f/keep
                  [f/dup (f/of :application) (f/of :juxt.pass.alpha/redirect-uri)
+                  ;; TODO: Add any error in the query string
                   "#" f/swap f/str
                   f/swap (f/of :fragment)
                   (f/unless* [(f/throw-exception (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
@@ -1208,6 +1211,8 @@ Password: <input name=password type=password>
             collate-response
             encode-fragment
             redirect-to-application-redirect-uri
+
+
             ]))
 
        :juxt.pass.alpha/rules
