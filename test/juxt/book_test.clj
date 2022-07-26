@@ -967,11 +967,15 @@
 
     ))
 
+;; TODO: Test all branches of flip, especially cases where quotations should throw exceptions
 
-#_(f/eval-quotation
+;; TODO: Flip error handling
+
+
+(f/eval-quotation
  '()
- `(:foo :bar f/swap f/dup keyword?)
+ `(
+   (odd? 2)
+   )
  {}
  )
-
-;; TODO: Test all branches of flip, especially cases where quotations should throw exceptions
