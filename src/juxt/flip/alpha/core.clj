@@ -36,11 +36,24 @@
     [stack (concat quotation queue) env]
     ;; Don't apply, simply treat as a symbol. We might be in the process of
     ;; defining a word.
-    (if (and (clojure.core/vector? (clojure.core/first queue))
-              (= (clojure.core/second queue) 'juxt.flip.alpha.core/define))
-      [(cons name stack) queue env]
+    (clojure.core/or
 
-      (throw (clojure.core/ex-info (format "Symbol not defined: %s" name) {:symbol name})))))
+     ;; Clojure interop - but should be subject to a whitelist!!
+     #_(clojure.core/when-let [var (requiring-resolve name)]
+       (clojure.core/when-let [arglists (:arglists (clojure.core/meta var))]
+         (if (= (clojure.core/count arglists) 1)
+           (let [[args stack] (clojure.core/split-at (clojure.core/count (clojure.core/first arglists)) stack)]
+             [(clojure.core/cons (clojure.core/apply var (clojure.core/reverse args)) stack) queue env])
+           (throw (clojure.core/ex-info (format "Clojure function has multiple forms: %s" name) {:symbol name})))))
+
+     ;; define
+     (clojure.core/when
+         (clojure.core/and
+          (clojure.core/vector? (clojure.core/first queue))
+          (= (clojure.core/second queue) 'juxt.flip.alpha.core/define))
+         [(cons name stack) queue env])
+
+     (throw (clojure.core/ex-info (format "Symbol not defined: %s" name) {:symbol name})))))
 
 (def break 'juxt.flip.alpha.core/break)
 (defmethod word 'juxt.flip.alpha.core/break [stack [_ & queue] env]
