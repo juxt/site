@@ -916,7 +916,7 @@ Password: <input name=password type=password>
                    ;; stack order
                    :in [password username]})
                f/first
-               (f/unless* [(f/throw (f/ex-info "Login failed" {}))])
+               (f/unless* [(f/throw-exception (f/ex-info "Login failed" {}))])
                :matched-user]))])
 
          (f/define make-subject
@@ -1100,46 +1100,51 @@ Password: <input name=password type=password>
             (f/define extract-and-decode-query-string
               [(f/set-at
                 (f/dip
-                 [:ring.request/query
-                  f/env
-                  (f/unless* [(f/throw (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
+                 [(f/env :ring.request/query)
+                  (f/unless* [(f/throw-exception (f/ex-info "No query string" {:note "We should respond with a 400 status"}))])
                   f/form-decode
                   :query]))])
 
-            (f/define lookup-application-from-database
-              [(f/set-at
-                (f/keep
-                 [
-                  (f/of :query)
-                  (f/of "client_id")
-                  (juxt.flip.alpha.xtdb/q
-                   ~'{:find [(pull e [*])]
-                      :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
-                              [e :juxt.pass.alpha/client-id client-id]]
-                      :in [client-id]})
-                  f/first
-                  f/first
-                  :application]))])
-
-            (f/define fail-if-no-application
+            (f/define check-query-params
               [(f/keep
-                [
-                 ;; Grab the client-id for error reporting
-                 f/dup (f/of :query) (f/of "client_id") f/swap
-                 (f/of :application)
-                 ;; If no application entry, drop the client_id (to clean up the
-                 ;; stack)
-                 (f/if [f/drop]
-                   ;; else throw the error
-                   [:client-id {:ring.response/status 400} f/set-at
-                    (f/throw (f/ex-info "No such app" f/swap))])])])
+                [(f/of :query) (f/of "response_type") (f/in? #{"code" "token"})
+                 (f/unless [(f/throw "invalid_request")])])])
+
+            (f/define lookup-application-from-database
+              [
+               ;; Get client_id
+               f/dup (f/of :query) (f/of "client_id")
+
+               ;; TODO: Check if nil
+
+               (f/tap-stack-with-label "lookup-application-from-database")
+
+               ;; Query it
+               (juxt.flip.alpha.xtdb/q
+                ~'{:find [(pull e [*])]
+                   :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                           [e :juxt.pass.alpha/client-id client-id]]
+                   :in [client-id]})
+               f/first
+               f/first
+
+               (f/tap-stack-with-label "lookup-application-from-database: after query")
+
+               (f/if* [:application f/rot f/set-at]
+                      [(f/tap-stack-with-label "throwing unauthorized_client")
+                       (f/throw-exception (f/ex-info "No such client" {:ring.response/status 400}))])])
 
             ;; Get subject (it's in the environment, fail if missing subject)
             (f/define extract-subject
               [(f/set-at (f/dip [(f/env :juxt.pass.alpha/subject) :subject]))])
 
             (f/define assert-subject
-              [(f/keep [(f/of :subject) (f/unless [(f/throw (f/ex-info "Cannot create access-token: no subject" {}))])])])
+              [(f/keep [(f/of :subject) (f/unless [(f/throw-exception (f/ex-info "Cannot create access-token: no subject" {}))])])])
+
+            (f/define extract-and-decode-scope
+              [(f/set-at
+                (f/keep
+                 [(f/of :query) (f/of "scope") f/form-decode "\\s" f/<regex> f/split :scope]))])
 
             ;; "The authorization server SHOULD document the size of any value it issues." -- RFC 6749 Section 4.2.2
             (f/define access-token-length [16])
@@ -1149,8 +1154,8 @@ Password: <input name=password type=password>
               [(f/set-at
                 (f/keep
                  [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
-                  (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
-                  ;; :juxt.pass.alpha/token
+                  f/dup (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
+                  (f/of :scope) :juxt.pass.alpha/scope f/rot f/set-at
                   (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
                   ;; :xt/id (as a function of :juxt.pass.alpha/token)
                   (f/set-at (f/keep [(f/of :juxt.pass.alpha/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
@@ -1187,23 +1192,57 @@ Password: <input name=password type=password>
                (site/push-fx
                 (f/keep
                  [f/dup (f/of :application) (f/of :juxt.pass.alpha/redirect-uri)
+                  ;; TODO: Add any error in the query string
                   "#" f/swap f/str
                   f/swap (f/of :fragment)
-                  (f/unless* [(f/throw (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
+                  (f/unless* [(f/throw-exception (f/ex-info "Assert failed: No fragment found at :fragment" {}))])
                   f/swap f/str
+                  (site/set-header "location" f/swap)]))])
+
+            (f/define redirect-with-error
+              [(site/push-fx (f/dip [(site/set-status 302)]))
+               (site/push-fx
+                (f/keep
+                 ;; We could really use a string-builder combinator to replace
+                 ;; this difficult series of stack manipulations.
+                 [f/dup
+
+                  ;; TODO: Should also use a f/form-encode approach, as per
+                  ;; encode-fragment above.
+
+                  (f/of :query) (f/of "state") "&state=" f/str
+
+                  f/swap ; save the string so far
+
+                  f/dup
+                  (f/of :error) "#error=" f/str
+                  f/rot f/swap f/str ; build the string
+
+                  f/swap
+                  f/dup
+
+                  (f/of :application) (f/of :juxt.pass.alpha/redirect-uri)
+                  f/rot f/swap f/str
+
+                  f/nip ; remove the second element (map) from the stack
+
                   (site/set-header "location" f/swap)]))])
 
             extract-and-decode-query-string
             lookup-application-from-database
-            fail-if-no-application
-            extract-subject
-            assert-subject
-            make-access-token
-            push-access-token-fx
-            collate-response
-            encode-fragment
-            redirect-to-application-redirect-uri
-            ]))
+
+            (f/recover
+             [check-query-params
+              extract-subject
+              assert-subject
+              extract-and-decode-scope
+              make-access-token
+              push-access-token-fx
+              collate-response
+              encode-fragment
+              redirect-to-application-redirect-uri]
+
+             [:error f/rot f/set-at redirect-with-error])]))
 
        :juxt.pass.alpha/rules
        '[
@@ -1272,18 +1311,14 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/register-application"
       {:juxt.pass.alpha/client-id "local-terminal"
-       :juxt.pass.alpha/redirect-uri "https://example.org/terminal/callback"
-       :juxt.pass.alpha/scope "user:admin"})
+       :juxt.pass.alpha/redirect-uri "https://example.org/terminal/callback"})
      ;; end::register-example-application![]
      ))))
 
-;; GraphQL endpoint
+;; GraphQL
 
-;; Some who has the install-graphql-schema action can put a GraphQL schema
-;; wherever the granted permission allows.
-
-;; Option: POST to the action's URI?
-
+;; Someone who has permission to perform the install-graphql-endpoint action can
+;; put a GraphQL schema wherever the granted permission allows.
 (defn create-action-install-graphql-endpoint! []
   (eval
    (substitute-actual-base-uri
@@ -1292,6 +1327,8 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/install-graphql-endpoint"
+
+       :juxt.pass.alpha/scope "admin.graphql"
 
        :juxt.site.alpha/methods
        {
@@ -1327,7 +1364,7 @@ Password: <input name=password type=password>
               (f/of :matches?)
               (f/if
                   [f/drop]
-                  [(f/throw
+                  [(f/throw-exception
                     (f/ex-info
                      f/dup "No permission allows installation of GraphQL endpoint: " f/swap (f/of :input) (f/of :xt/id) f/swap f/str
                      f/swap (f/of :input) (f/of :xt/id) :location {:ring.response/status 403} f/set-at))])])])
@@ -1374,6 +1411,15 @@ Password: <input name=password type=password>
            [(site/push-fx (f/dip [(site/set-status 201)]))
             (site/push-fx (f/keep [(site/set-header "location" f/swap (f/of :input) (f/of :xt/id))]))])
 
+         (f/define create-permission
+           [(f/set-at
+             (f/dip
+              [{:juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
+                :juxt.site.alpha/description "Permission for endpoint owner to put GraphQL schema"
+                :juxt.pass.alpha/action "https://example.org/actions/put-graphql-schema"
+                :juxt.pass.alpha/purpose nil}
+               :new-permission]))])
+
          (site/with-fx-acc
            [extract-input
             extract-permissions
@@ -1385,21 +1431,14 @@ Password: <input name=password type=password>
             add-owner
             push-resource
 
-            (f/set-at
-             (f/dip
-              [{:juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
-                :juxt.site.alpha/description "Permission for endpoint owner to put GraphQL schema"
-                :juxt.pass.alpha/action "https://example.org/actions/put-graphql-schema"
-                :juxt.pass.alpha/purpose nil}
-               :new-permission]))
+            create-permission
 
             ;; Set new-permission to owner
             ;; TODO: Need some kind of 'update' combinator for this common operation
             (f/set-at
              (f/keep
               [f/dup (f/of :new-permission) f/swap
-               (f/of :owner) :juxt.pass.alpha/user f/rot f/set-at :new-permission]
-              ))
+               (f/of :owner) :juxt.pass.alpha/user f/rot f/set-at :new-permission]))
 
             ;; Set xt/id
             (f/set-at

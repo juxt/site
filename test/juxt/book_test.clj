@@ -17,7 +17,10 @@
    [malli.core :as malli]
    [ring.util.codec :as codec]
    [xtdb.api :as xt]
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [juxt.site.alpha.repl :as repl]
+   [juxt.flip.alpha.core :as f]
+   [clojure.tools.logging :as log])
   (:import (clojure.lang ExceptionInfo)))
 
 (defn with-handler [f]
@@ -395,11 +398,16 @@
 
 (defn authorize!
   "Authorize an application"
-  [& {:keys [sid client-id] :as args}]
+  [& {:keys [sid]
+      client-id "client_id"
+      scope "scope"
+      :as args}]
   {:pre [(malli/validate
           [:map
-           [:sid :string]
-           [:client-id :string]] args)]
+           ^{:doc "to authenticate with authorization server"} [:sid :string]
+           ["client_id" :string]
+           ["scope" {:optional true} [:sequential :string]]]
+          args)]
    :post [(malli/validate [:string] %)]}
   (let [state (make-nonce 10)
         request {:ring.request/method :get
@@ -409,11 +417,13 @@
                  (codec/form-encode
                   {"response_type" "token"
                    "client_id" client-id
+                   "scope" (codec/url-encode (str/join " " scope))
                    "state" state})}
         response (*handler* request)
         _ (case (:ring.response/status response)
             302 :ok
-            403 (throw (ex-info "Forbidden to authorize" args)))
+            403 (throw (ex-info "Forbidden to authorize" (assoc args :response response)))
+            (throw (ex-info "Unexpected error" (assoc args :response response))))
 
         location-header (-> response :ring.response/headers (get "location"))
         [_ access-token returned-state]
@@ -454,8 +464,6 @@
 ;; it feels better to focus attention on a single test that tells a whole story.
 ;;
 
-;;(t/join-fixtures [with-system-xt with-handler])
-
 (deftest grand-integration-test
   (let [ ;; The lexical scoping of results causes numerous levels of unnecessary
         ;; indentation. After all, this is just a test, not part of the system
@@ -467,12 +475,6 @@
     ;; Create a user Alice, with her identity
     (book/users-preliminaries!)
     (book/create-user! :username "alice" :name "Alice")
-    (book/create-action-put-basic-user-identity!)
-    (book/grant-permission-to-invoke-action-put-basic-user-identity!)
-    (book/create-basic-user-identity! #::pass{:username "ALICE" :password "garden" :realm "Wonderland"})
-
-    ;; Register application
-    (book/register-example-application!)
 
     (book/protected-resource-preliminaries!)
 
@@ -509,13 +511,29 @@
       :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
       })
 
+    ;; Add an additional Basic auth protection space
+    (init/do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/put-protection-space"
+     {:xt/id "https://site.test/protection-spaces/basic"
+
+      :juxt.pass.alpha/canonical-root-uri "https://site.test"
+      :juxt.pass.alpha/realm "Wonderland" ; optional
+
+      :juxt.pass.alpha/auth-scheme "Basic"
+      :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
+      })
+
     ;; Now if we try to access /private/internal.html we'll at least be
     ;; prompted to authenticate.
     (let [response (*handler*
                     {:ring.request/method :get
                      :ring.request/path "/private/internal.html"})]
       (is (= 401 (:ring.response/status response)))
-      (is (re-matches #"Bearer.*" (get-in response [:ring.response/headers "www-authenticate"]))))
+      ;; TODO: Remove space
+      (is (= "Bearer , Basic realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"]))))
+
+    ;; TODO: Test that basic auth works
 
     ;; So we need to get a bearer token so that we can access /private/internal.html
     ;; Bearer tokens are issued by an authorization server.
@@ -565,7 +583,12 @@
         (book/grant-permission-to-create-login-resource!)
         (book/create-login-resource!)
 
-        ;; Let's authenticate via the login action (via the login form)
+        ;; Alice will need a password to log her in
+        (book/create-action-put-basic-user-identity!)
+        (book/grant-permission-to-invoke-action-put-basic-user-identity!)
+        (book/create-basic-user-identity! #::pass{:username "ALICE" :password "garden" :realm "Wonderland"})
+
+        ;; Let's authenticate Alice via the login form
         (let [sid (login-with-form! {"username" "ALICE" "password" "garden"})]
           (is sid)
           (swap! store assoc-in ["alice" :sid] sid))))
@@ -579,38 +602,67 @@
       ExceptionInfo #"Forbidden to authorize"
       (authorize!
        :sid (get-in @store ["alice" :sid])
-       :client-id "local-terminal")))
+       "client_id" "local-terminal")))
 
     (grant-permission-to-authorize! :username "alice")
+
+    ;; Register application (but test before registering an application)
+    (book/register-example-application!)
+
+    (testing "Authorization error with invalid client"
+      (let [state (make-nonce 10)
+            request {:ring.request/method :get
+                     :ring.request/path "/oauth/authorize"
+                     :ring.request/headers {"cookie" (format "id=%s" (get-in @store ["alice" :sid]))}
+                     :ring.request/query
+                     (codec/form-encode
+                      {"response_type" "token"
+                       "client_id" "dummy-not-exists"
+                       })}
+            response (*handler* request)]
+        ;; We can't redirect because we don't want to allow an Open
+        ;; Redirector. See RFC 6749 Section 10.15.
+        (is (= 400 (:ring.response/status response)))))
+
+    (testing "Authorization error due to missing response type"
+      (let [state (make-nonce 10)
+            request {:ring.request/method :get
+                     :ring.request/path "/oauth/authorize"
+                     :ring.request/headers {"cookie" (format "id=%s" (get-in @store ["alice" :sid]))}
+                     :ring.request/query
+                     (codec/form-encode
+                      {"client_id" "local-terminal"
+                       "state" state})}
+            response (*handler* request)
+            location-header (-> response :ring.response/headers (get "location"))
+            [_ error returned-state]
+            (when location-header
+              (re-matches
+               #"https://site.test/terminal/callback#error=(.*?)\&state=(.*?)" location-header))]
+        (is (= error "invalid_request"))
+        (is (= state returned-state))))
 
     (swap! store assoc-in ["alice" :access-token]
            (authorize!
             :sid (get-in @store ["alice" :sid])
-            :client-id "local-terminal"))
+            "client_id" "local-terminal"))
 
     ;; We can now use the access-token to access a protected resource, using an application
-
-    ;; without an access token? (possibly this is repeating what we've done
-    ;; above, but let's check for clarity)
-    (is (= 401 (:ring.response/status
-                (*handler*
-                 {:ring.request/method :get
-                  :ring.request/path "/private/internal.html"}))))
+    (testing "with no access token but with protection space prompting for one"
+      (is (= 401 (:ring.response/status
+                  (*handler*
+                   {:ring.request/method :get
+                    :ring.request/path "/private/internal.html"})))))
 
     ;; with access token? No, because Alice doesn't have permission
-    (*handler*
-     {:ring.request/method :get
-      :ring.request/headers {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))}
-      :ring.request/path "/private/internal.html"})
-
-    (is (= 403 (:ring.response/status
-                (*handler*
-                 {:ring.request/method :get
-                  :ring.request/headers {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))}
-                  :ring.request/path "/private/internal.html"}))))
+    (testing "with access token but no permission"
+      (is (= 403 (:ring.response/status
+                  (*handler*
+                   {:ring.request/method :get
+                    :ring.request/headers {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))}
+                    :ring.request/path "/private/internal.html"})))))
 
     ;; Give Alice get-protected-resource permission to /private/internal.html
-
     (init/do-action
      "https://site.test/subjects/system"
      "https://site.test/actions/grant-permission"
@@ -622,12 +674,13 @@
 
     ;; Finally, now Alice has permission to access the resource, the application
     ;; does too (via the Bearer token)
-    (is (= 200
-           (:ring.response/status
-            (*handler*
-             {:ring.request/method :get
-              :ring.request/headers {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))}
-              :ring.request/path "/private/internal.html"}))))
+    (testing "with correct access token"
+      (is (= 200
+             (:ring.response/status
+              (*handler*
+               {:ring.request/method :get
+                :ring.request/headers {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))}
+                :ring.request/path "/private/internal.html"})))))
 
     ;; TODO: Test revocation
 
@@ -641,25 +694,52 @@
     ;; benefit is that there is no ambiguity as to which action should
     ;; performed. We get authorization 'for free'.
 
-    (let [request
-          {:ring.request/method :post
-           :ring.request/path "/actions/install-graphql-endpoint"
-           :ring.request/headers
-           {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))
-            "content-type" "application/edn"}}]
 
-      (testing "Installation denied"
-        (let [response (*handler* (with-body request (.getBytes (pr-str {:xt/id "https://site.test/my-graphql"}))))]
-          (is (= 403 (:ring.response/status response)))))
+    (testing "Installation at wrong endpoint denied"
+      (let [request
+            {:ring.request/method :post
+             :ring.request/path "/actions/install-graphql-endpoint"
+             :ring.request/headers
+             {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))
+              "content-type" "application/edn"}}
+            response (*handler* (with-body request (.getBytes (pr-str {:xt/id "https://site.test/my-graphql"}))))]
+        (is (= 403 (:ring.response/status response)))))
 
-      (testing "Installation allowed"
-        (let [response (*handler*
-                        (-> request
-                            (with-body (.getBytes (pr-str {:xt/id "https://site.test/graphql"})))))]
-          ;; This also creates a permission such that the owner (Alice) can
-          ;; put-graphql-schema to this /graphql resource.
-          (is (= 201 (:ring.response/status response)))
-          (is (= "https://site.test/graphql" (get-in response [:ring.response/headers "location"]))))))
+    (testing "Installation without sufficient scope"
+      (let [request
+            {:ring.request/method :post
+             :ring.request/path "/actions/install-graphql-endpoint"
+             :ring.request/headers
+             {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token]))
+              "content-type" "application/edn"}}
+            response (*handler*
+                      (-> request
+                          (with-body (.getBytes (pr-str {:xt/id "https://site.test/graphql"})))))]
+        (is (= 403 (:ring.response/status response)))
+        ;;(is (= "https://site.test/graphql" (get-in response [:ring.response/headers "location"])))
+        ))
+
+    (swap! store assoc-in ["alice" :access-token-with-admin-graphql-scope]
+           (authorize!
+            :sid (get-in @store ["alice" :sid])
+            "client_id" "local-terminal"
+            "scope" ["admin.graphql" "query.graphql"]))
+
+    (testing "Installation of graphql endpoint with access token with sufficient scope"
+      (let [request
+            {:ring.request/method :post
+             :ring.request/path "/actions/install-graphql-endpoint"
+             :ring.request/headers
+             {"authorization" (format "Bearer %s" (get-in @store ["alice" :access-token-with-admin-graphql-scope]))
+              "content-type" "application/edn"}}
+            response (*handler*
+                      (-> request
+                          (with-body (.getBytes (pr-str {:xt/id "https://site.test/graphql"})))))]
+        ;; This also creates a permission such that the owner (Alice) can
+        ;; put-graphql-schema to this /graphql resource.
+        (is (= 201 (:ring.response/status response)))
+
+        (is (= "https://site.test/graphql" (get-in response [:ring.response/headers "location"])))))
 
     ;; Create the https://site.test/actions/put-graphql-schema action
     (init/do-action
@@ -697,7 +777,10 @@
            (login-with-form! {"username" "bob" "password" "walrus"}))
     (grant-permission-to-authorize! :username "bob")
     (swap! store assoc-in ["bob" :access-token]
-           (authorize! :sid (get-in @store ["bob" :sid]) :client-id "local-terminal" :username "bob"))
+           (authorize!
+            :sid (get-in @store ["bob" :sid])
+            :username "bob"
+            "client_id" "local-terminal"))
 
     ;; Check Bob can't put a schema to Alice's graphql
     (let [request
@@ -707,8 +790,8 @@
                {"authorization" (format "Bearer %s" (get-in @store ["bob" :access-token]))
                 "content-type" "application/graphql"}})
           response (*handler*
-                     (-> request
-                         (with-body (.getBytes "schema { }"))))]
+                    (-> request
+                        (with-body (.getBytes "schema { }"))))]
       (is (= 403 (:ring.response/status response))))
 
     ;; TODO: Now try with Alice, via a different application, one that doesn't
@@ -717,9 +800,48 @@
     ;; Think about scopes - there must be a scope for a PUT to /graphql. This
     ;; must be granted to the access-token.
 
-    ;; Scope is individual to the user.
-
     ;; Since OpenAPI operations are linked to actions, actions must be linked to
     ;; scope (rather than permissions linked to scope).
 
     ))
+
+;; TODO: Test all branches of flip, especially cases where quotations should throw exceptions
+
+;; TODO: Flip error handling
+
+
+(comment
+  (f/eval-quotation
+   '()
+   `(
+     (f/recover
+      [:foo {"name" "cwi"}
+       (f/dip
+        [(even? 3) (f/if [:true] [{:error "invalid math"} f/throw])])] ;try
+      [:set-error (f/ex-info "foo" {}) f/throw-exception]) ;recovery
+     )
+   {}
+   )
+
+  (f/eval-quotation
+   '()
+   `(
+
+     (f/recover
+      [:foo]
+      [])
+     )
+   {}
+   )
+
+  (f/eval-quotation
+   '()
+   `(
+
+     :foo
+     )
+   {}
+   )
+
+
+  ["error"]) '(throw blah blah blah catch)

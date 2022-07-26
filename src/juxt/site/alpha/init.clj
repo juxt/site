@@ -236,8 +236,7 @@
                (site/validate
                 [:map
                  [::pass/client-id [:re "[a-z-]{3,}"]]
-                 [::pass/redirect-uri [:re "https://"]]
-                 [::pass/scope [:re "[a-z:\\s]+"]]])
+                 [::pass/redirect-uri [:re "https://"]]])
 
                (site/set-type "https://meta.juxt.site/pass/application")
                (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes 20)) ::pass/client-secret]))

@@ -192,8 +192,7 @@
             (conj '(include? subject action resource))
 
             resources-in-scope
-            (conj '[(contains? resources-in-scope resource)]
-                  ))
+            (conj '[(contains? resources-in-scope resource)]))
 
           :rules (vec (concat rules include-rules))
 
@@ -229,6 +228,7 @@
   [xt-ctx
    {subject ::pass/subject
     action ::pass/action
+    access-token ::pass/access-token
     resource ::site/resource
     purpose ::pass/purpose
     base-uri ::site/base-uri
@@ -244,12 +244,30 @@
       (let [check-permissions-result
             (check-permissions db #{action} ctx)
 
-            action-doc (xt/entity db action)
+            {::pass/keys [scope] :as action-doc} (xt/entity db action)
             _ (when-not action-doc
                 (throw
                  (ex-info
                   (format "Action '%s' not found in db" action)
-                  {:action action})))]
+                  {:action action})))
+
+            _ (when scope
+                (when-not access-token
+                  (throw
+                   (ex-info
+                    (format "Action (%s) requires a scope (%s) but there is no access-token" action scope)
+                    {:ring.response/status 403
+                     :action action
+                     :scope scope})))
+                (when-not (contains? (set (::pass/scope access-token)) scope)
+                  (throw
+                   (ex-info
+                    (format "Access token does not have sufficient scope (%s)" scope)
+                    {:ring.response/status 403
+                     :access-token access-token
+                     :action action
+                     :scope-granted (::pass/scope access-token)
+                     :scope-required scope}))))]
 
         (when-not (seq check-permissions-result)
           (throw (ex-info "Action denied" ctx)))
@@ -373,9 +391,12 @@
          ops)]
     res))
 
-(defn do-action [{::site/keys [xt-node db base-uri resource] ::pass/keys [subject action] :as ctx}]
-  (assert (:juxt.site.alpha/xt-node ctx) "xt-node must be present")
-  (assert (:juxt.site.alpha/db ctx) "db must be present")
+(defn do-action
+  [{::site/keys [xt-node db base-uri resource]
+    ::pass/keys [subject action]
+    :as ctx}]
+  (assert (::site/xt-node ctx) "xt-node must be present")
+  (assert (::site/db ctx) "db must be present")
   (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
 
   (when-not (or (nil? subject) (map? subject))
