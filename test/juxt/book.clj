@@ -1105,35 +1105,34 @@ Password: <input name=password type=password>
                   f/form-decode
                   :query]))])
 
-            (f/define lookup-application-from-database
-              [(f/set-at
-                (f/keep
-                 [
-                  (f/of :query)
-                  (f/of "client_id")
-                  (juxt.flip.alpha.xtdb/q
-                   ~'{:find [(pull e [*])]
-                      :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
-                              [e :juxt.pass.alpha/client-id client-id]]
-                      :in [client-id]})
-                  f/first
-                  f/first
-                  :application]))])
-
-            (f/define fail-if-no-application
+            (f/define check-query-params
               [(f/keep
-                [
-                 ;; Grab the client-id for error reporting
-                 f/dup (f/of :query) (f/of "client_id") f/swap
-                 (f/of :application)
-                 ;; If no application entry, drop the client_id (to clean up the
-                 ;; stack)
-                 (f/if [f/drop]
-                   ;; else throw the error
-                   [:client-id {:ring.response/status 400} f/set-at
-                    (f/error "unauthorized_client")
-                    ;;(f/throw-exception (f/ex-info "No such app" f/swap))
-                    ])])])
+                [(f/of :query) (f/of "response_type") (f/in? #{"code" "token"})
+                 (f/unless [(f/throw "invalid_request")])])])
+
+            (f/define lookup-application-from-database
+              [
+               ;; Get client_id
+               f/dup (f/of :query) (f/of "client_id")
+
+               ;; TODO: Check if nil
+
+               (f/tap-stack-with-label "lookup-application-from-database")
+
+               ;; Query it
+               (juxt.flip.alpha.xtdb/q
+                ~'{:find [(pull e [*])]
+                   :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                           [e :juxt.pass.alpha/client-id client-id]]
+                   :in [client-id]})
+               f/first
+               f/first
+
+               (f/tap-stack-with-label "lookup-application-from-database: after query")
+
+               (f/if* [:application f/rot f/set-at]
+                      [(f/tap-stack-with-label "throwing unauthorized_client")
+                       (f/throw-exception (f/ex-info "No such client" {:ring.response/status 400}))])])
 
             ;; Get subject (it's in the environment, fail if missing subject)
             (f/define extract-subject
@@ -1200,20 +1199,50 @@ Password: <input name=password type=password>
                   f/swap f/str
                   (site/set-header "location" f/swap)]))])
 
+            (f/define redirect-with-error
+              [(site/push-fx (f/dip [(site/set-status 302)]))
+               (site/push-fx
+                (f/keep
+                 ;; We could really use a string-builder combinator to replace
+                 ;; this difficult series of stack manipulations.
+                 [f/dup
+
+                  ;; TODO: Should also use a f/form-encode approach, as per
+                  ;; encode-fragment above.
+
+                  (f/of :query) (f/of "state") "&state=" f/str
+
+                  f/swap ; save the string so far
+
+                  f/dup
+                  (f/of :error) "#error=" f/str
+                  f/rot f/swap f/str ; build the string
+
+                  f/swap
+                  f/dup
+
+                  (f/of :application) (f/of :juxt.pass.alpha/redirect-uri)
+                  f/rot f/swap f/str
+
+                  f/nip ; remove the second element (map) from the stack
+
+                  (site/set-header "location" f/swap)]))])
+
             extract-and-decode-query-string
             lookup-application-from-database
-            fail-if-no-application
-            extract-subject
-            assert-subject
-            extract-and-decode-scope
-            make-access-token
-            push-access-token-fx
-            collate-response
-            encode-fragment
-            redirect-to-application-redirect-uri
 
+            (f/recover
+             [check-query-params
+              extract-subject
+              assert-subject
+              extract-and-decode-scope
+              make-access-token
+              push-access-token-fx
+              collate-response
+              encode-fragment
+              redirect-to-application-redirect-uri]
 
-            ]))
+             [:error f/rot f/set-at redirect-with-error])]))
 
        :juxt.pass.alpha/rules
        '[
