@@ -272,8 +272,7 @@
 
                       list-type (field->type arg-def)]
                   (cond
-                    (or (enum? list-type types-by-name)
-                        (scalar? list-type types-by-name))
+                    (scalar? list-type types-by-name)
                     (assoc-some acc key val)
                     :else
                     (throw (ex-info "Unsupported list-type" {:arg-def arg-def
@@ -789,13 +788,12 @@
             (and (field->type field)
                  (not (scalar? (field->type field) types-by-name))
                  (not (enum? (field->type field) types-by-name)))
-            (throw (ex-info (field->type field))
-             (infer-query db
-                          xt-node
-                          subject
-                          field
-                          (to-xt-query opts)
-                          argument-values))
+            (infer-query db
+                         xt-node
+                         subject
+                         field
+                         (to-xt-query opts)
+                         argument-values)
 
             (get argument-values "id")
             (xt/entity db (get argument-values "id"))
