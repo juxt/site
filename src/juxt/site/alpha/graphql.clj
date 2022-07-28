@@ -780,22 +780,22 @@
                   (get-in field [::schema/directives-by-name "onObject"])
                   (contains? object-value (keyword field-name))))
             (let [result (get object-value (keyword field-name))]
-                (cond
-                  (-> field ::g/type-ref list-type?)
-                  (limit-results argument-values result)
-                  ;; TODO validate enum (enum? (field->type field) types-by-name)
-                  :else
-                  result))
-
+              (cond
+                (-> field ::g/type-ref list-type?)
+                (limit-results argument-values result)
+                ;; TODO validate enum (enum? (field->type field) types-by-name)
+                :else
+                result))
             (and (field->type field)
                  (not (scalar? (field->type field) types-by-name))
                  (not (enum? (field->type field) types-by-name)))
-            (infer-query db
-                         xt-node
-                         subject
-                         field
-                         (to-xt-query opts)
-                         argument-values)
+            (throw (ex-info (field->type field))
+             (infer-query db
+                          xt-node
+                          subject
+                          field
+                          (to-xt-query opts)
+                          argument-values))
 
             (get argument-values "id")
             (xt/entity db (get argument-values "id"))
