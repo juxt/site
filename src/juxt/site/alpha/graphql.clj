@@ -272,7 +272,8 @@
 
                       list-type (field->type arg-def)]
                   (cond
-                    (scalar? list-type types-by-name)
+                    (or (enum? list-type types-by-name)
+                        (scalar? list-type types-by-name))
                     (assoc-some acc key val)
                     :else
                     (throw (ex-info "Unsupported list-type" {:arg-def arg-def
