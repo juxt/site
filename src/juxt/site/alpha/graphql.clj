@@ -793,8 +793,7 @@
                          xt-node
                          subject
                          field
-                         (to-xt-query opts)
-                         argument-values)
+                         (to-xt-query opts))
 
             (get argument-values "id")
             (xt/entity db (get argument-values "id"))
