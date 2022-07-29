@@ -5,6 +5,7 @@
    [clojure.string :as str]
    [clojure.walk :refer [postwalk]]
    [jsonista.core :as json]
+   [malli.core :as malli]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.actions :as actions]
    [juxt.flip.alpha.core :as f]
@@ -182,38 +183,89 @@
      ;; end::create-grant-permission-action![]
      ))))
 
-(defn install-not-found
-  "Install an action to perform on '404'."
-  []
+(defn create-action-get-not-found! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/get-not-found"
+       :juxt.pass.alpha/rules
+       [
+        ['(allowed? subject resource permission)
+         ['permission :xt/id]]]})))))
+
+(defn create-action-install-not-found! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/install-not-found"
+       :juxt.flip.alpha/quotation
+       `(
+         (site/with-fx-acc
+           [(site/push-fx
+             (f/dip
+              [site/request-body-as-edn
+               (site/validate
+                [:map
+                 [:xt/id [:re "https://example.org/.*"]]])
+               (site/set-type "https://meta.juxt.site/not-found")
+               (site/set-methods
+                {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}
+                 :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}})
+               xtdb.api/put]))]))
+       :juxt.pass.alpha/rules
+       [
+        ['(allowed? subject resource permission)
+         '[permission :juxt.pass.alpha/subject subject]]]})))))
+
+(defn grant-permission-install-not-found! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/system/install-not-found"
+       :juxt.pass.alpha/subject "https://example.org/subjects/system"
+       :juxt.pass.alpha/action "https://example.org/actions/install-not-found"
+       :juxt.pass.alpha/purpose nil})))))
+
+(defn install-not-found-resource! []
   (eval
    (substitute-actual-base-uri
     (quote
      (do
        (juxt.site.alpha.init/do-action
         "https://example.org/subjects/system"
-        "https://example.org/actions/create-action"
-        {:xt/id "https://example.org/actions/get-not-found"
-         :juxt.pass.alpha/rules
-         [
-          ['(allowed? subject resource permission)
-           ['permission :xt/id]]]})
+        "https://example.org/actions/install-not-found"
+        {:xt/id "https://example.org/_site/not-found"}))))))
 
+(defn grant-permission-get-not-found! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (do
        (juxt.site.alpha.init/do-action
         "https://example.org/subjects/system"
         "https://example.org/actions/grant-permission"
         {:xt/id "https://example.org/permissions/get-not-found"
          :juxt.pass.alpha/action "https://example.org/actions/get-not-found"
-         :juxt.pass.alpha/purpose nil})
+         :juxt.pass.alpha/purpose nil}))))))
 
-       ;; TODO: This violates the rule that, after primordial documents have
-       ;; been put into XTDB, all further transactions must be audited. We could
-       ;; resolve this by creating an action that creates the not-found
-       ;; resource.
-       (juxt.site.alpha.init/put!
-        {:xt/id "https://example.org/_site/not-found"
-         :juxt.site.alpha/methods
-         {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}
-          :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}}}))))))
+(defn ^{:deprecated "This is the original function prior to adding the dependency graph approach."}
+  install-not-found
+  "Install an action to perform on '404'."
+  []
+  (create-action-get-not-found!)
+  (create-action-install-not-found!)
+  (grant-permission-install-not-found!)
+  (install-not-found-resource!)
+  (grant-permission-get-not-found!))
 
 ;; TODO: In the context of an application, rename 'put' to 'register'
 (defn create-action-register-application!
@@ -512,3 +564,111 @@
           ]
       {:login-uri (get-in login [::pass/puts 0])
        :callback-uri (get-in callback [::pass/puts 0])})))
+
+(def ^{::malli/schema [:map-of [:or :string :keyword]
+                       [:map
+                        [:create {:optional true} :any]
+                        [:deps {:optional true} [:set [:or :string :keyword]]]]]}
+  dependency-graph
+  {"https://example.org/_site/do-action"
+   {:create install-do-action-fn!}
+
+   "https://example.org/subjects/system"
+   {:create install-system-subject!}
+
+   "https://example.org/permissions/system/bootstrap"
+   {:create install-system-permissions!}
+
+   "https://example.org/permissions/get-not-found"
+   {:create grant-permission-get-not-found!}
+
+   "https://example.org/actions/create-action"
+   {:create install-create-action!}
+
+   "https://example.org/actions/grant-permission"
+   {:create create-grant-permission-action!
+    :deps #{"https://example.org/_site/do-action"
+            "https://example.org/subjects/system"
+            "https://example.org/actions/create-action"
+            "https://example.org/permissions/system/bootstrap"}}
+
+   "https://example.org/actions/get-not-found"
+   {:create create-action-get-not-found!
+    :deps #{"https://example.org/_site/do-action"
+            "https://example.org/subjects/system"
+            "https://example.org/actions/create-action"}}
+
+   "https://example.org/actions/install-not-found"
+   {:create create-action-install-not-found!
+    :deps #{"https://example.org/_site/do-action"
+            "https://example.org/subjects/system"
+            "https://example.org/actions/create-action"}}
+
+   "https://example.org/permissions/system/install-not-found"
+   {:create grant-permission-install-not-found!
+    :deps #{"https://example.org/_site/do-action"
+            "https://example.org/subjects/system"
+            "https://example.org/actions/grant-permission"}}
+
+   "https://example.org/_site/not-found"
+   {:create install-not-found-resource!
+    :deps #{"https://example.org/_site/do-action"
+            "https://example.org/subjects/system"
+            "https://example.org/actions/install-not-found"}}
+
+   ::system {:deps #{"https://example.org/_site/do-action"
+                     "https://example.org/_site/not-found"
+
+                     "https://example.org/subjects/system"
+
+                     "https://example.org/actions/create-action"
+                     "https://example.org/actions/grant-permission"
+                     "https://example.org/actions/install-not-found"
+                     "https://example.org/actions/get-not-found"
+
+                     "https://example.org/permissions/system/bootstrap"
+                     "https://example.org/permissions/system/install-not-found"
+                     "https://example.org/permissions/get-not-found"}}
+
+   "https://example.org/actions/register-application"
+   {:create create-action-register-application!
+    :deps #{::system}}
+
+   "https://example.org/permissions/system/register-application"
+   {:create grant-permission-to-invoke-action-register-application!
+    :deps #{::system}}})
+
+(defn converge!
+  "Given a set of resource ids and a dependency graph, create resources and their
+  dependencies."
+  [ids graph]
+  {:pre [(malli/validate [:or [:set [:or :string :keyword]] [:sequential [:or :string :keyword]]] ids)
+         (malli/validate (::malli/schema (meta #'dependency-graph)) graph)]
+   :post [(malli/validate
+           [:sequential
+            [:map
+             [:id :string]
+             [:status :keyword]
+             [:error {:optional true} :any]]] %)]}
+  (->> ids
+       (mapcat (fn [r]
+                 (->> r
+                      (tree-seq some? (comp :deps graph))
+                      (keep (fn [id]
+                              (if-let [v (graph id)]
+                                (when-not (keyword? id) [id v])
+                                (throw (ex-info (format "No dependency graph entry for %s" id) {:id id}))))))))
+       reverse distinct
+       (reduce
+        (fn [acc [id {:keys [create]}]]
+          (when-not create (throw (ex-info (format "No creator for %s" id) {:id id})))
+          (conj acc (try
+                      (let [{::pass/keys [puts] :as result} (create)]
+                        (when (and puts (not (contains? (set puts) id)))
+                          (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
+                        {:id id :status :created :result result})
+                      (catch Throwable cause
+                        ;;(throw (ex-info (format "Failed to converge %s" id) {} cause))
+                        {:id id :status :error :error cause}
+                        ))))
+        [])))

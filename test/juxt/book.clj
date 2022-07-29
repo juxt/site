@@ -3,12 +3,15 @@
 (ns juxt.book
   (:require
    [clojure.java.io :as io]
+   [ring.util.codec :as codec]
    [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]
+   [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.site.alpha :as-alias site]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
+   [juxt.test.util :refer [*handler*]]
    [juxt.book :as book]
-
+   [malli.core :as malli]
    [clojure.string :as str]))
 
 (comment
@@ -57,9 +60,7 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject
-           ;; TODO: This only needs to be 'subject', not hardcoded.
-           "https://example.org/subjects/system"]]
+          [permission :juxt.pass.alpha/subject subject]]
 
          [(allowed? subject resource permission) ; <5>
           [subject :juxt.pass.alpha/user-identity id]
@@ -619,6 +620,9 @@
      ))))
 
 (defn create-basic-user-identity! [& {:juxt.pass.alpha/keys [username password realm]}]
+  (assert username)
+  (assert password)
+  (assert realm)
   (eval
    (substitute-actual-base-uri
     `(init/do-action
@@ -1344,7 +1348,7 @@ Password: <input name=password type=password>
              (f/dip
               [site/request-body-as-edn
                (site/validate [:map {:closed true}
-                               [:xt/id [:re "https://site.test/.*"]]])
+                               [:xt/id [:re "https://example.org/.*"]]])
                :input]))])
 
          (f/define extract-permissions
@@ -1599,6 +1603,353 @@ Password: <input name=password type=password>
 
 ;; TODO: We could use a dependency graph here, to allow installation of a set of
 ;; documents where there are dependencies on other documents being created.
+
+(defn grant-permission-to-authorize!
+  [& {:keys [username] :as args}]
+  {:pre [(malli/validate [:map [:username [:string]]] args)]}
+  ;; Grant user permission to perform /actions/oauth/authorize
+  (eval
+   (substitute-actual-base-uri
+    `(init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id (format "https://example.org/permissions/%s-can-authorize" ~(str/lower-case username))
+       ::pass/action "https://example.org/actions/oauth/authorize"
+       ::pass/user (format "https://example.org/users/%s" ~(str/lower-case username))
+       ::pass/purpose nil}))))
+
+(defn with-body [req body-bytes]
+  (-> req
+      (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
+      (assoc :ring.request/body (io/input-stream body-bytes))))
+
+(defn login-with-form!
+  "Return a session id (or nil) given a map of fields."
+  [& {:strs [username password] :as args}]
+  {:pre [(malli/validate
+          [:map
+           ["username" [:string {:min 2}]]
+           ["password" [:string {:min 6}]]] args)]
+   :post [(malli/validate [:string] %)]}
+  (let [form (codec/form-encode args)
+        body (.getBytes form)
+        req {:ring.request/method :post
+             :ring.request/path "/login"
+             :ring.request/headers
+             {"content-length" (str (count body))
+              "content-type" "application/x-www-form-urlencoded"}
+             :ring.request/body (io/input-stream body)}
+        response (*handler* req)
+        {:strs [set-cookie]} (:ring.response/headers response)
+        [_ id] (when set-cookie (re-matches #"id=(.*?);.*" set-cookie))]
+    (when-not id (throw (ex-info "Login failed" args)))
+    id))
+
+(defn authorize!
+  "Authorize an application"
+  [& {:keys [session-id]
+      client-id "client_id"
+      scope "scope"
+      :as args}]
+  {:pre [(malli/validate
+          [:map
+           ^{:doc "to authenticate with authorization server"} [:session-id :string]
+           ["client_id" :string]
+           ["scope" {:optional true} [:sequential :string]]]
+          args)]
+   :post [(malli/validate [:string] %)]}
+  (let [state (make-nonce 10)
+        request {:ring.request/method :get
+                 :ring.request/path "/oauth/authorize"
+                 :ring.request/headers {"cookie" (format "id=%s" session-id)}
+                 :ring.request/query
+                 (codec/form-encode
+                  {"response_type" "token"
+                   "client_id" client-id
+                   "scope" (codec/url-encode (str/join " " scope))
+                   "state" state})}
+        response (*handler* request)
+        _ (case (:ring.response/status response)
+            302 :ok
+            400 (throw (ex-info "Client error" (assoc args :response response)))
+            403 (throw (ex-info "Forbidden to authorize" (assoc args :response response)))
+            (throw (ex-info "Unexpected error" (assoc args :response response))))
+
+        location-header (-> response :ring.response/headers (get "location"))
+        [_ access-token returned-state]
+        (when location-header
+          (re-matches
+           #"https://site.test/terminal/callback#access_token=(.*?)\&token_type=bearer\&state=(.*?)" location-header))]
+    (when-not access-token (throw (ex-info "No access token" args)))
+    access-token))
+
+(def dependency-graph
+  {"https://example.org/actions/put-user"
+   {:create create-action-put-user!
+    :deps #{::init/system}}
+
+   "https://example.org/permissions/repl/put-user"
+   {:create grant-permission-to-invoke-action-put-user!
+    :deps #{::init/system}}
+
+   "https://example.org/actions/put-immutable-protected-resource"
+   {:create create-action-put-immutable-protected-resource!
+    :deps #{::init/system}}
+
+   "https://example.org/permissions/repl/put-immutable-protected-resource"
+   {:create grant-permission-to-put-immutable-protected-resource!
+    :deps #{::init/system}}
+
+   "https://example.org/actions/get-protected-resource"
+   {:create create-action-get-protected-resource!
+    :deps #{::init/system}}
+
+   "https://example.org/actions/put-protection-space"
+   {:create create-action-put-protection-space!
+    :deps #{::init/system}}
+
+   "https://example.org/permissions/repl/put-protection-space"
+   {:create grant-permission-to-put-protection-space!
+    :deps #{::init/system}}
+
+   "https://example.org/actions/put-basic-user-identity"
+   {:create create-action-put-basic-user-identity!
+    :deps #{::init/system}}
+
+   "https://example.org/permissions/repl/put-basic-user-identity"
+   {:create grant-permission-to-invoke-action-put-basic-user-identity!
+    :deps #{::init/system}}
+
+   "https://example.org/users/alice"
+   {:create (fn [] (create-user! {:username "alice" :name "Alice"}))
+    :deps #{::init/system
+            "https://example.org/actions/put-user"
+            "https://example.org/permissions/repl/put-user"}}
+
+   "https://example.org/user-identities/alice/basic"
+   {:create (fn [] (create-basic-user-identity!
+                    {::pass/username "alice" ::pass/password "garden" ::pass/realm "Wonderland"}))
+    :deps #{::init/system
+            "https://example.org/actions/put-basic-user-identity"
+            "https://example.org/permissions/repl/put-basic-user-identity"
+            "https://example.org/users/alice"}}
+
+   "https://example.org/users/bob"
+   {:create (fn [] (create-user! {:username "bob" :name "Bob"}))
+    :deps #{::init/system
+            "https://example.org/actions/put-user"
+            "https://example.org/permissions/repl/put-user"}}
+
+   "https://example.org/user-identities/bob/basic"
+   {:create (fn [] (create-basic-user-identity!
+                    #::pass{:username "bob" :password "walrus" :realm "Wonderland"}))
+    :deps #{::init/system
+            "https://example.org/actions/put-basic-user-identity"
+            "https://example.org/permissions/repl/put-basic-user-identity"
+            "https://example.org/users/bob"}}
+
+   "https://example.org/actions/oauth/authorize"
+   {:create create-action-oauth-authorize!
+    :deps #{::init/system}}
+
+   "https://example.org/actions/install-authorization-server"
+   {:create create-action-install-authorization-server!
+    :deps #{::init/system}}
+
+   "https://example.org/permissions/system/install-authorization-server"
+   {:create grant-permission-install-authorization-server!
+    :deps #{::init/system}}
+
+   "https://example.org/oauth/authorize"
+   {:create install-authorization-server!
+    :deps #{::init/system
+            "https://example.org/actions/install-authorization-server"
+            "https://example.org/permissions/system/install-authorization-server"
+            "https://example.org/actions/oauth/authorize"}}
+
+   "https://example.org/actions/put-session-scope"
+   {:create create-action-put-session-scope!
+    :deps #{::init/system}}
+
+   "https://example.org/permissions/repl/put-session-scope"
+   {:create grant-permission-to-put-session-scope!
+    :deps #{::init/system}}
+
+   "https://example.org/actions/login"
+   {:create create-action-login!
+    :deps #{::init/system}}
+
+   "https://example.org/permissions/login"
+   {:create grant-permission-to-invoke-action-login!
+    :deps #{::init/system}}
+
+   "https://example.org/actions/create-login-resource"
+   {:create create-action-create-login-resource!
+    :deps #{::init/system
+            "https://example.org/actions/login"
+            "https://example.org/permissions/login"}}
+
+   "https://example.org/permissions/system/create-login-resource"
+   {:create grant-permission-to-create-login-resource!
+    :deps #{::init/system}}
+
+   "https://example.org/login"
+   {:create create-login-resource!
+    :deps #{::init/system
+            "https://example.org/actions/create-login-resource"
+            "https://example.org/permissions/system/create-login-resource"}}
+
+   "https://example.org/permissions/alice-can-authorize"
+   {:create (fn [] (grant-permission-to-authorize! :username "alice"))
+    :deps #{::init/system
+            "https://example.org/actions/oauth/authorize"
+            "https://example.org/users/alice"}}
+
+   "https://example.org/permissions/bob-can-authorize"
+   {:create (fn [] (grant-permission-to-authorize! :username "bob"))
+    :deps #{::init/system
+            "https://example.org/actions/oauth/authorize"
+            "https://example.org/users/bob"}}
+
+   "https://example.org/applications/local-terminal"
+   {:create book/register-example-application!
+    :deps #{::init/system
+            "https://example.org/actions/register-application"
+            "https://example.org/permissions/system/register-application"}}
+
+   "https://example.org/actions/install-graphql-endpoint"
+   {:create create-action-install-graphql-endpoint!
+    :deps #{::init/system}}
+
+   "https://example.org/permissions/alice/install-graphql-endpoint"
+   {:create grant-permission-install-graphql-endpoint-to-alice!
+    :deps #{::init/system}}
+
+   "https://site.test/private/internal.html"
+   {:deps #{::init/system
+            "https://site.test/_site/do-action"
+            "https://site.test/subjects/system"
+            "https://site.test/actions/put-immutable-protected-resource"
+            "https://site.test/permissions/repl/put-immutable-protected-resource"
+            "https://site.test/actions/get-protected-resource"}
+    :create (fn [] (init/do-action
+                    "https://site.test/subjects/system"
+                    "https://site.test/actions/put-immutable-protected-resource"
+                    {:xt/id "https://site.test/private/internal.html"
+                     :juxt.http.alpha/content-type "text/plain"
+                     :juxt.http.alpha/content "Internal message"}))}
+
+   "https://site.test/permissions/alice/private/internal.html"
+   {:deps #{::init/system
+            "https://site.test/subjects/system"
+            "https://site.test/actions/grant-permission"
+            "https://site.test/actions/get-protected-resource"}
+    :create (fn [] (init/do-action
+                    "https://site.test/subjects/system"
+                    "https://site.test/actions/grant-permission"
+                    {:xt/id "https://site.test/permissions/alice/private/internal.html"
+                     :juxt.pass.alpha/action "https://site.test/actions/get-protected-resource"
+                     :juxt.pass.alpha/user "https://site.test/users/alice"
+                     :juxt.site.alpha/uri "https://site.test/private/internal.html"
+                     :juxt.pass.alpha/purpose nil}))}
+
+   "https://site.test/protection-spaces/bearer"
+   {:deps #{::init/system
+            "https://site.test/_site/do-action"
+            "https://site.test/subjects/system"
+            "https://site.test/actions/put-protection-space"
+            "https://site.test/permissions/repl/put-protection-space"}
+    :create (fn []
+              (init/do-action
+               "https://site.test/subjects/system"
+               "https://site.test/actions/put-protection-space"
+               {:xt/id "https://site.test/protection-spaces/bearer"
+
+                :juxt.pass.alpha/canonical-root-uri "https://site.test"
+                ;;:juxt.pass.alpha/realm "Wonderland" ; optional
+
+                :juxt.pass.alpha/auth-scheme "Bearer"
+                :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
+                }))}
+
+   "https://site.test/protection-spaces/basic"
+   {:deps #{::init/system
+            "https://site.test/_site/do-action"
+            "https://site.test/subjects/system"
+            "https://site.test/actions/put-protection-space"
+            "https://site.test/permissions/repl/put-protection-space"}
+    :create (fn []
+              (init/do-action
+               "https://site.test/subjects/system"
+               "https://site.test/actions/put-protection-space"
+               {:xt/id "https://site.test/protection-spaces/basic"
+
+                :juxt.pass.alpha/canonical-root-uri "https://site.test"
+                :juxt.pass.alpha/realm "Wonderland" ; optional
+
+                :juxt.pass.alpha/auth-scheme "Basic"
+                :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
+                }))}
+
+   "https://site.test/session-scopes/oauth"
+   {:deps #{::init/system
+            "https://site.test/actions/put-session-scope"
+            "https://site.test/permissions/repl/put-session-scope"}
+    :create (fn []
+              (init/do-action
+               "https://site.test/subjects/system"
+               "https://site.test/actions/put-session-scope"
+               {:xt/id "https://site.test/session-scopes/oauth"
+                :juxt.pass.alpha/cookie-name "id"
+                :juxt.pass.alpha/cookie-domain "https://site.test"
+                :juxt.pass.alpha/cookie-path "/oauth"
+                :juxt.pass.alpha/login-uri "https://site.test/login"}))}
+
+   "https://site.test/actions/put-graphql-schema"
+   {:deps #{::init/system}
+    :create (fn []
+              (init/do-action
+               "https://site.test/subjects/system"
+               "https://site.test/actions/create-action"
+               {:xt/id "https://site.test/actions/put-graphql-schema"
+
+                :juxt.flip.alpha/quotation '()
+
+                :juxt.pass.alpha/rules
+                '[
+                  [(allowed? subject resource permission)
+                   [subject :juxt.pass.alpha/user-identity id]
+                   [id :juxt.pass.alpha/user user]
+                   [permission :juxt.pass.alpha/user user]]]}))}
+
+   "https://site.test/graphql"
+   {:deps #{::init/system
+            "https://site.test/oauth/authorize"
+            "https://site.test/session-scopes/oauth"
+            "https://site.test/login"
+            "https://site.test/user-identities/alice/basic"
+            "https://site.test/permissions/alice-can-authorize"
+
+            "https://site.test/applications/local-terminal"
+
+            "https://site.test/actions/install-graphql-endpoint"
+            "https://site.test/permissions/alice/install-graphql-endpoint"
+            "https://site.test/actions/put-graphql-schema"}
+
+    :create (fn []
+              (let [session-id (login-with-form! {"username" "ALICE" "password" "garden"})
+                    access-token (authorize! :session-id session-id
+                                             "client_id" "local-terminal"
+                                             "scope" ["admin.graphql"])
+                    request
+                    {:ring.request/method :post
+                     :ring.request/path "/actions/install-graphql-endpoint"
+                     :ring.request/headers
+                     {"authorization" (format "Bearer %s" access-token)
+                      "content-type" "application/edn"}}]
+                (*handler* (with-body request (.getBytes (pr-str {:xt/id "https://site.test/graphql"}))))))}
+
+   })
 
 (defn init-all! []
   (init/bootstrap!)
