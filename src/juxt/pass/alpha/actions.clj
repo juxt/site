@@ -52,8 +52,7 @@
 
     :in '[subject actions resource purpose]}
 
-   subject actions resource purpose)
-  )
+   subject actions resource purpose))
 
 (defn check-permissions
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
@@ -61,11 +60,6 @@
 
   (assert (or (nil? subject) (string? subject)) "Subject expected to be a string, or null")
   (assert (or (nil? resource) (string? resource)) "Resource expected to be a string, or null")
-
-  (log/debugf "check-permissions: resource: %s, purpose: %s, actions: %s, subject: %s" resource purpose actions subject)
-
-  (log/debugf "Actions: %s" actions)
-  (log/debugf "Rules: %s" (actions->rules db actions))
 
   (let [rules (actions->rules db actions)]
     (when (seq rules)
