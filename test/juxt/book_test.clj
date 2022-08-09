@@ -585,9 +585,12 @@
     (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
           {access-token "access_token"
            error "error"}
-          (book/authorize! :session-id session-id
-                           "client_id" "local-terminal"
-                           "scope" ["https://site.test/oauth/scope/graphql/develop"])
+          (book/authorize!
+           :session-id session-id
+           "client_id" "local-terminal"
+           ;; The graphql/develop scope is going to let us perform
+           ;; put-graphql-schema and get-graphql-schema.
+           "scope" ["https://site.test/oauth/scope/graphql/develop"])
           _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
           get-request
@@ -603,12 +606,13 @@
           _ (is (= 404 (:ring.response/status get-response)))
 
           put-response-bad-content
-          (*handler* (-> {:ring.request/method :put
-                          :ring.request/path "/graphql"
-                          :ring.request/headers
-                          {"authorization" (format "Bearer %s" access-token)
-                           "content-type" "text/csv"}}
-                         (book/with-body (.getBytes "schema { }"))))
+          (*handler*
+           (-> {:ring.request/method :put
+                :ring.request/path "/graphql"
+                :ring.request/headers
+                {"authorization" (format "Bearer %s" access-token)
+                 "content-type" "text/csv"}}
+               (book/with-body (.getBytes "schema { }"))))
 
           _ (is (= 415 (:ring.response/status put-response-bad-content)))
 
