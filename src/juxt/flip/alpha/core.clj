@@ -560,12 +560,6 @@
              bytes-to-string))
    env])
 
-#_(defmethod word 'juxt.site.alpha/request-query-string
-  [stack [_ & queue] env]
-  [stack (concat `( :ring.request/query env
-
-                   jsonista.core/read-string) queue) env])
-
 (defmethod word 'juxt.site.alpha/apply-to-request-context
   [stack [_ & queue] env]
   [stack
