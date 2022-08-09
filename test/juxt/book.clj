@@ -1346,7 +1346,7 @@ Password: <input name=password type=password>
          (f/define extract-permissions
            [(f/set-at (f/dip [(f/env ::pass/permissions) :permissions]))])
 
-         (f/define determine-if-match
+         (f/define determine-if-match-resource-pattern
            ;; We check that the permission resource matches the xt/id
            [(f/set-at
              (f/keep
@@ -1419,8 +1419,9 @@ Password: <input name=password type=password>
 
          (site/with-fx-acc
            [extract-input
+
             extract-permissions
-            determine-if-match
+            determine-if-match-resource-pattern
             throw-if-not-match
 
             create-resource
@@ -1490,10 +1491,42 @@ Password: <input name=password type=password>
        ;; with a custom word.
        :juxt.flip.alpha/quotation
        `(
+         (f/define extract-input
+           [(f/set-at
+             (f/dip
+              [site/request-body-as-string
+               :input]))])
+
+         (f/define compile-input-to-schema
+           [(f/set-at
+             (f/keep
+              [(f/of :input)
+               graphql-flip/compile-schema
+               :compiled-schema]))])
+
+         (f/define create-resource
+           [(f/set-at
+             (f/keep
+              [{}
+               (f/set-at (f/dip ["GraphQL endpoint" ::site/description]))
+               (f/set-at (f/dip [(f/env ::site/resource) :xt/id]))
+               (f/set-at (f/dip [f/dup (f/of :input) ::site/content]))
+               (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))
+               :new-resource]))])
+
+         (f/define push-resource
+           [(site/push-fx
+             (f/keep
+              [(f/of :new-resource)
+               xtdb.api/put]))])
+
          (site/with-fx-acc
-           [
-            ;; graphql-flip/compile-schema ;;;;;;;
-            ;; Return a 201 if there is no existing schema
+           [extract-input
+            compile-input-to-schema
+            create-resource
+            push-resource
+
+            ;; Return a 201 if there is no existing schema (how do we do this?)
             (site/set-status 201) f/swap site/push-fx
             ;; TODO: Otherwise return a 200.
             ]))

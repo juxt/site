@@ -552,12 +552,12 @@
              jsonista.core/read-string) queue)
    env])
 
-(defmethod word 'juxt.site.alpha/request-body-as-text
+(defmethod word 'juxt.site.alpha/request-body-as-string
   [stack [_ & queue] env]
   [stack
    (concat `((env :juxt.site.alpha/received-representation)
              (of :juxt.http.alpha/body)
-             bytes-to-string))
+             bytes-to-string) queue)
    env])
 
 (defmethod word 'juxt.site.alpha/apply-to-request-context

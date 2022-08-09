@@ -2,7 +2,6 @@
 
 (ns juxt.book-test
   (:require
-   [portal.api :as p]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [juxt.book :as book]
    [juxt.pass.alpha :as-alias pass]
@@ -342,7 +341,6 @@
           (is access-token)
           (is (nil? error)))))))
 
-;;with-fixtures
 (deftest authorization-server-implicit-grant-invalid-response-type
   (with-resources #{"https://site.test/oauth/authorize"
                     "https://site.test/session-scopes/oauth"
@@ -531,7 +529,7 @@
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
                 "content-type" "application/edn"}}
-              response (*handler* (book/with-body request (.getBytes (pr-str {:xt/id "https://site.test/my-graphql"}))))]
+              response (*handler* (book/with-body request (.getBytes (pr-str {:xt/id "https://site.test/wrong-graphql"}))))]
           (is (= 403 (:ring.response/status response)))))
 
       (testing "Installation successful"
@@ -576,6 +574,7 @@
       (testing "Attempting for an unauthorized user to PUT a graphql schema"
         (is (= 403 (:ring.response/status response)))))))
 
+;;with-fixtures
 (deftest put-graphql-schema
   (with-resources #{"https://site.test/graphql"
                     "https://site.test/actions/put-graphql-schema"
@@ -597,8 +596,7 @@
           (-> {:ring.request/method :get
                :ring.request/path "/graphql"
                :ring.request/headers
-               {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/graphql"}})
+               {"authorization" (format "Bearer %s" access-token)}})
 
           get-response (*handler* get-request)
           ;; Confirm there are no representations for /graphql before attempting
@@ -622,17 +620,31 @@
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
                 "content-type" "application/graphql"}}
-              (book/with-body (.getBytes "schema { }")))
+              (book/with-body (.getBytes "type Query { myName: String }")))
 
           put-response (*handler* put-request)
 
           _ (is (= 201 (:ring.response/status put-response)))
-          _ (is (nil? (get-in put-response [:ring.response/headers "location"])))])))
+          _ (is (nil? (get-in put-response [:ring.response/headers "location"])))
+
+
+
+          #_#_put-response (*handler* (-> put-request
+                                      (book/with-body (.getBytes "type Query { myName: String }"))))
+          #_#__ (is (= 200 (:ring.response/status put-response)))
+          ]
+
+      put-response
+
+      (repl/e "https://site.test/graphql")
+
+      )))
 
 
 ;; Portal
 
 (comment
+  (require '[portal.api :as p])
   (def p (p/open)))
 
 (comment

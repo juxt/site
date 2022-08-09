@@ -102,6 +102,8 @@
                                  slurp
                                  gcompiler/compile-schema))
 
+(gcompiler/compile-schema "type Query { myName: String }")
+
 (apply (partial t/use-fixtures :each) fixtures)
 
 (defn setup-db
