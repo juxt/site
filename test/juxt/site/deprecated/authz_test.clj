@@ -1,6 +1,6 @@
 ;; Copyright © 2021, JUXT LTD.
 
-(ns juxt.site.authz-test
+(ns juxt.site.deprecated.authz-test
   (:require
    [clojure.test :refer [deftest is are testing] :as t]
    [xtdb.api :as x]

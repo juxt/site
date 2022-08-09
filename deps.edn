@@ -110,7 +110,8 @@
   {:extra-paths ["test"]
    :extra-deps {
                 lambdaisland/kaocha-cloverage {:mvn/version "1.0.75"}
-                org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}}}
+                org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}
+                djblue/portal {:mvn/version "0.29.1"}}}
 
   :prod
   {:extra-paths ["prod"]

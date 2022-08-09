@@ -9,7 +9,6 @@
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.actions :as actions]
    [juxt.flip.alpha.core :as f]
-   [juxt.flip.clojure.core :as-alias fc]
    [juxt.reap.alpha.combinators :as p]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.site.alpha :as-alias site]
@@ -113,15 +112,6 @@
 
 (defn install-do-action-fn! []
   (put! (actions/install-do-action-fn (base-uri))))
-
-(defn bootstrap-primordials!
-  "Add just enough for the REPL to call actions for everything else"
-  []
-  (install-system-subject!)
-  (install-create-action!)
-  (install-system-permissions!)
-  (install-do-action-fn!)
-  :ok)
 
 (defn make-repl-request-context [subject action edn-arg]
   (let [xt-node (xt-node)]
@@ -321,14 +311,6 @@
        :juxt.pass.alpha/subject "https://example.org/subjects/system"
        :juxt.pass.alpha/action "https://example.org/actions/register-application"
        :juxt.pass.alpha/purpose nil})))))
-
-(defn bootstrap! []
-  (bootstrap-primordials!)
-  (create-grant-permission-action!)
-  (install-not-found)
-  (create-action-register-application!)
-  (grant-permission-to-invoke-action-register-application!)
-  :ok)
 
 #_(defn put-graphql-schema-endpoint!
     "Initialise the resource that will host Site's GraphQL schema, as well as the
@@ -668,7 +650,7 @@
                           (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
                         {:id id :status :created :result result})
                       (catch Throwable cause
-                        ;;(throw (ex-info (format "Failed to converge %s" id) {} cause))
-                        {:id id :status :error :error cause}
+                        (throw (ex-info (format "Failed to converge %s" id) {} cause))
+                        ;;{:id id :status :error :error cause}
                         ))))
         [])))

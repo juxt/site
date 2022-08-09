@@ -8,7 +8,7 @@
    [clojure.tools.logging :as log]
    [clojure.java.io :as io]
    [juxt.site.alpha.repl :refer :all]
-   [juxt.site.alpha.init :as init :refer [config base-uri xt-node system put! do-action bootstrap!]]
+   [juxt.site.alpha.init :as init :refer [config base-uri xt-node system put! do-action]]
    [integrant.core :as ig]
    [xtdb.api :as xt]
    [juxt.book :as book]))

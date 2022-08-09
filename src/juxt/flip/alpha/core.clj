@@ -15,8 +15,7 @@
    [malli.core :as m]
    [malli.error :a me]
    [ring.util.codec :as codec]
-   [xtdb.api :as xt]
-   [juxt.flip.alpha.core :as f]))
+   [xtdb.api :as xt]))
 
 ;; See Factor, https://factorcode.org/
 ;; See K's XY language, https://www.nsl.com/k/xy/xy.htm
@@ -146,13 +145,13 @@
 (defmethod word 'juxt.flip.alpha.core/append
   [[seq2 seq1 & stack] [_ & queue] env]
   [(cons (cond->> (concat seq1 seq2)
-           (vector? seq1) vec) stack) queue env])
+           (clojure.core/vector? seq1) vec) stack) queue env])
 
 (def push 'juxt.flip.alpha.core/push)
 (defmethod word 'juxt.flip.alpha.core/push
   [[seq elt & stack] [_ & queue] env]
-  [(cons (cond (vector? seq) (conj seq elt)
-               (list? seq) (concat seq [elt])) stack)
+  [(cons (cond (clojure.core/vector? seq) (clojure.core/conj seq elt)
+               (clojure.core/list? seq) (clojure.core/concat seq [elt])) stack)
    queue env])
 
 (def >list 'juxt.flip.alpha.core/>list)
@@ -259,16 +258,16 @@
 (def if 'juxt.flip.alpha.core/if)
 (defmethod word 'juxt.flip.alpha.core/if
   [[f t ? & stack] [_ & queue] env]
-  (assert (vector? t) "Expecting t to be a quotation")
-  (assert (vector? f) "Expecting f to be a quotation")
+  (assert (clojure.core/vector? t) "Expecting t to be a quotation")
+  (assert (clojure.core/vector? f) "Expecting f to be a quotation")
   [stack (concat (if ? t f) queue) env])
 
 ;; "Alternative conditional form that preserves the cond value if it is true."
 (def if* 'juxt.flip.alpha.core/if*)
 (defmethod word 'juxt.flip.alpha.core/if*
   [[f t ? & stack] [_ & queue] env]
-  (assert (vector? t) "Expecting t to be a quotation")
-  (assert (vector? f) "Expecting f to be a quotation")
+  (assert (clojure.core/vector? t) "Expecting t to be a quotation")
+  (assert (clojure.core/vector? f) "Expecting f to be a quotation")
   (if ?
     [(cons ? stack) (concat t queue) env]
     [stack (concat f queue) env]))
@@ -276,13 +275,13 @@
 (def when 'juxt.flip.alpha.core/when)
 (defmethod word 'juxt.flip.alpha.core/when
   [[t ? & stack] [_ & queue] env]
-  (assert (vector? t) "Expecting t to be a quotation")
+  (assert (clojure.core/vector? t) "Expecting t to be a quotation")
   [stack (concat (clojure.core/when ? t) queue) env])
 
 (def when* 'juxt.flip.alpha.core/when*)
 (defmethod word 'juxt.flip.alpha.core/when*
   [[t ? & stack] [_ & queue] env]
-  (assert (vector? t) "Expecting t to be a quotation")
+  (assert (clojure.core/vector? t) "Expecting t to be a quotation")
   (if ?
     [(cons ? stack) (concat t queue) env]
     [stack queue env]))
@@ -295,7 +294,7 @@
 (def unless* 'juxt.flip.alpha.core/unless*)
 (defmethod word 'juxt.flip.alpha.core/unless*
   [[f ? & stack] [_ & queue] env]
-  (assert (vector? f) "Expecting f to be a quotation")
+  (assert (clojure.core/vector? f) "Expecting f to be a quotation")
   (if-not ?
     [(cons ? stack) (concat f queue) env]
     [(cons ? stack) queue env]))
@@ -352,7 +351,15 @@
   [[quot seq & stack] [_ & queue] env]
   (let [result (clojure.core/some
                 (fn [el] (clojure.core/first (eval-quotation (cons el stack) quot env))) seq)]
+    ;; TODO: Probably want to do (when result true)
     [(cons (some? result) stack) queue env]))
+
+(def all? 'juxt.flip.alpha.core/all?)
+(defmethod word 'juxt.flip.alpha.core/all?
+  [[quot seq & stack] [_ & queue] env]
+  (let [result (clojure.core/every?
+                (fn [el] (clojure.core/first (eval-quotation (cons el stack) quot env))) seq)]
+    [(cons result stack) queue env]))
 
 ;; Regex
 (def <regex> 'juxt.flip.alpha.core/<regex>)
@@ -401,6 +408,10 @@
 (defmethod word 'juxt.flip.alpha.core/in?
   [[set elt & stack] [_ & queue] env]
   [(cons (contains? (clojure.core/set set) elt) stack) queue env])
+
+(defmethod word 'juxt.flip.alpha.core/sequential?
+  [[el & stack] [_ & queue] env]
+  [(cons (clojure.core/sequential? el) stack) queue env])
 
 (defmethod word 'juxt.flip.alpha.core/assoc-filter
   [[quot assoc & stack] [_ & queue] env]
@@ -510,12 +521,6 @@
 (defmethod word 'jsonista.core/read-string
   [[s & stack] [_ & queue] env]
   [(cons (jsonista.core/read-value s) stack) queue env])
-
-;; Some friends from Clojure
-
-(defmethod word 'juxt.flip.clojure.core/assoc
-  [[v k m & stack] [_ & queue] env]
-  [(cons (clojure.core/assoc m k v) stack) queue env])
 
 ;; Convenience words
 

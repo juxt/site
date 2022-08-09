@@ -28,31 +28,34 @@
 (defn query-permissions [{:keys [db rules subject actions resource purpose] :as args}]
   (assert (or (nil? subject) (string? subject)))
   (assert (or (nil? resource) (string? resource)))
-  (xt/q
-   db
-   {:find '[(pull permission [*]) (pull action [*])]
-    :keys '[juxt.pass.alpha/permission juxt.pass.alpha/action]
-    :where
-    '[
-      [action ::site/type "https://meta.juxt.site/pass/action"]
+  (let [query {:find '[(pull permission [*]) (pull action [*])]
+               :keys '[juxt.pass.alpha/permission juxt.pass.alpha/action]
+               :where
+               '[
+                 [action ::site/type "https://meta.juxt.site/pass/action"]
 
-      ;; Only consider given actions
-      [(contains? actions action)]
+                 ;; Only consider given actions
+                 [(contains? actions action)]
 
-      ;; Only consider a permitted action
-      [permission ::site/type "https://meta.juxt.site/pass/permission"]
-      [permission ::pass/action action]
-      (allowed? subject resource permission)
+                 ;; Only consider a permitted action
+                 [permission ::site/type "https://meta.juxt.site/pass/permission"]
+                 [permission ::pass/action action]
+                 (allowed? subject resource permission)
 
-      ;; Only permissions that match our purpose
-      [permission ::pass/purpose purpose]
-      ]
+                 ;; Only permissions that match our purpose
+                 [permission ::pass/purpose purpose]
+                 ]
 
-    :rules rules
+               :rules rules
 
-    :in '[subject actions resource purpose]}
-
-   subject actions resource purpose))
+               :in '[subject actions resource purpose]}]
+    (try
+      (xt/q
+       db
+       query
+       subject actions resource purpose)
+      (catch Exception e
+        (throw (ex-info "Failed to query permissions" {:query query} e))))))
 
 (defn check-permissions
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
@@ -216,7 +219,7 @@
              (group-by :xt/id))]
     (map #(update % join-key (comp first idx)) coll)))
 
-(defn do-action*
+(defn do-action-in-tx-fn
   "This function is applied within a transaction function. It should be fast, but
   at least doesn't have to worry about the database being stale!"
   [xt-ctx
@@ -231,8 +234,8 @@
         tx (xt/indexing-tx xt-ctx)]
     (try
       (assert base-uri "The base-uri must be provided")
-      (assert (or (nil? subject) (string? subject)) "Subject to do-action* expected to be a string, or null")
-      (assert (or (nil? resource) (string? resource)) "Resource to do-action* expected to be a string, or null")
+      (assert (or (nil? subject) (string? subject)) "Subject to do-action-in-tx-fn expected to be a string, or null")
+      (assert (or (nil? resource) (string? resource)) "Resource to do-action-in-tx-fn expected to be a string, or null")
 
       ;; Check that we /can/ call the action
       (let [check-permissions-result
@@ -358,7 +361,7 @@
 (defn install-do-action-fn [uri]
   {:xt/id (str uri "/_site/do-action")
    :xt/fn '(fn [xt-ctx ctx & args]
-             (juxt.pass.alpha.actions/do-action* xt-ctx ctx args))})
+             (juxt.pass.alpha.actions/do-action-in-tx-fn xt-ctx ctx args))})
 
 ;; Remove anything in the ctx that will upset nippy. However, in the future
 ;; we'll definitely want to record all inputs to actions, so this is an
@@ -369,7 +372,7 @@
   (-> ctx
       (dissoc ::site/xt-node ::site/db)
       ;; We take the ids, because it saves on serialization cost and we only
-      ;; need the ids in do-action*
+      ;; need the ids in do-action-in-tx-fn
       (update ::pass/subject :xt/id)
       (update ::site/resource :xt/id)))
 

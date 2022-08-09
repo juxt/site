@@ -22,9 +22,8 @@
    [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.graphql :as graphql]
    [juxt.site.alpha.handler :as handler]
-   [juxt.site.alpha.init :as init :refer [config base-uri xt-node system put! do-action bootstrap!]]
+   [juxt.site.alpha.init :as init :refer [config base-uri xt-node system put! do-action]]
    [juxt.site.alpha.main :as main]
-   [juxt.site.alpha.repl :as repl]
    [juxt.site.alpha.util :as util]
    [selmer.parser :as selmer]
    [xtdb.api :as xt])
@@ -515,38 +514,8 @@
 ;; The REPL is having to construct the more usual network representation of a
 ;; request context.
 
-
-
-#_(defn do-action-with-purpose [action purpose & args]
-  (apply init/do-action-with-purpose (xt-node) action purpose args))
-
-#_(defn install-repl-user! []
-  (put! {:xt/id (repl-subject)
-         ::site/type "Subject"
-         ::pass/identity (repl-identity)})
-  (put! {:xt/id (repl-identity)
-         ::site/type "Identity"}))
-
 (defn check-permissions [actions options]
   (actions/check-permissions (db) actions options))
-
-#_(defn install-create-action! []
-  (init/install-create-action! (xt-node) (config)))
-
-#_(defn permit-create-action! []
-  (init/permit-create-action! (xt-node) (config)))
-
-#_(defn install-grant-permission-action! []
-  (init/install-grant-permission-action! (xt-node) (config)))
-
-#_(defn permit-grant-permission-action! []
-  (init/permit-grant-permission-action! (xt-node) (config)))
-
-#_(defn create-action! [action]
-  (init/create-action! (xt-node) (config) action))
-
-#_(defn grant-permission! [permission]
-  (init/grant-permission! (xt-node) (config) permission))
 
 (defn install-openid-provider! [issuer]
   (init/install-openid-provider! (xt-node) issuer))
@@ -554,88 +523,6 @@
 (defn install-openid-resources!
   [& options]
   (apply init/install-openid-resources! (xt-node) (config) options))
-
-;; Needs a review
-#_(defn bootstrap-actions! []
-  (install-do-action-fn!)
-  (install-repl-user!)
-  ;;(install-create-action!)
-  (permit-create-action!)
-  (install-grant-permission-action!)
-  (permit-grant-permission-action!))
-
-
-#_(defn example-bootstrap! []
-  (bootstrap-actions!)
-
-  ;; Create create-person action
-  (create-action!
-   {:xt/id (str (base-uri) "/actions/create-person")
-    :juxt.pass.alpha/scope "write:admin"
-
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:xt/id [:re (str (base-uri) "/people/\\p{Alpha}{2,}")]]
-      [:example/type [:= "Person"]]
-      [:example/name [:string]]]]
-
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0] 'merge {:example/type "Person"}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
-
-    ::pass/rules
-    '[
-      [(allowed? subject resource permission)
-       [permission ::pass/subject subject]]]})
-
-  (grant-permission!
-   {:xt/id (str (base-uri) "/permissions/repl/create-person")
-    ::pass/subject (me)
-    ::pass/action #{(str (base-uri) "/actions/create-person")}
-    ::pass/purpose nil})
-
-  (do-action
-   (str (base-uri) "/actions/create-person")
-   {:xt/id (str (base-uri) "/people/alice")
-    :example/name "Alice"})
-
-  ;; Create the create-identity action
-  (create-action!
-   {:xt/id (str (base-uri) "/actions/create-identity")
-    :juxt.pass.alpha/scope "write:admin"
-
-    :juxt.pass.alpha.malli/args-schema
-    [:tuple
-     [:map
-      [:juxt.site.alpha/type [:= "Identity"]]
-      [:example/person [:re (str (base-uri) "/people/\\p{Alpha}{2,}")]]]]
-
-    :juxt.pass.alpha/process
-    [
-     [:juxt.pass.alpha.process/update-in [0] 'merge {:juxt.site.alpha/type "Identity"}]
-     [:juxt.pass.alpha.malli/validate]
-     [:xtdb.api/put]]
-
-    :juxt.pass.alpha/rules
-    '[
-      [(allowed? subject resource permission)
-       [permission :juxt.pass.alpha/subject subject]]]})
-
-  (grant-permission!
-   {:xt/id (str (base-uri) "/permissions/repl/create-identity")
-    :juxt.pass.alpha/subject "urn:site:subjects:repl"
-    :juxt.pass.alpha/action #{(str (base-uri) "/actions/create-identity")}
-    :juxt.pass.alpha/purpose nil})
-
-  (do-action
-   (str (base-uri) "/actions/create-identity")
-   {:xt/id (str (base-uri) "/identities/alice")
-    :example/person "https://site.test/people/alice"
-    :juxt.pass.jwt/iss "https://juxt.eu.auth0.com/"
-    :juxt.pass.jwt/sub "github|123456"}))
 
 (defn factory-reset! []
   (apply evict! (->> (q '{:find [(pull e [:xt/id ::site/type])]

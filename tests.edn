@@ -1,5 +1,6 @@
 #kaocha/v1
 {:plugins [;;:kaocha.plugin.alpha/info
+           ;;:kaocha.plugin/cloverage
            ]
 
  :tests [{:id :test
@@ -7,6 +8,9 @@
           :ns-patterns ["juxt.book-test"
                         "juxt.site.graphql-compiler-test"
                         "juxt.site.graphql-auth-integration-test"
+                        "juxt.site.return-test"
+                        "juxt.site.cors-test"
+                        "juxt.pass.authorization-test"
                         ]}]
 
  :reporter kaocha.report/documentation}
