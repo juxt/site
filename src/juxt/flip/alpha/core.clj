@@ -534,20 +534,31 @@
 
 (defmethod word 'juxt.site.alpha/request-body-as-edn
   [stack [_ & queue] env]
-  [stack (concat `(:juxt.site.alpha/received-representation
-                   env :juxt.http.alpha/body
-                   of
-                   ;; TODO: Test if nil and throw an exception
-                   bytes-to-string
-                   juxt.flip.alpha.edn/read-string) queue) env])
+  [stack
+   (concat `(
+             (env :juxt.site.alpha/received-representation)
+             (of :juxt.http.alpha/body)
+             ;; TODO: Test if nil and throw an exception
+             bytes-to-string
+             juxt.flip.alpha.edn/read-string) queue)
+   env])
 
 (defmethod word 'juxt.site.alpha/request-body-as-json
   [stack [_ & queue] env]
-  [stack (concat `(:juxt.site.alpha/received-representation
-                   env :juxt.http.alpha/body
-                   of
-                   bytes-to-string
-                   jsonista.core/read-string) queue) env])
+  [stack
+   (concat `((env :juxt.site.alpha/received-representation)
+             (of :juxt.http.alpha/body)
+             bytes-to-string
+             jsonista.core/read-string) queue)
+   env])
+
+(defmethod word 'juxt.site.alpha/request-body-as-text
+  [stack [_ & queue] env]
+  [stack
+   (concat `((env :juxt.site.alpha/received-representation)
+             (of :juxt.http.alpha/body)
+             bytes-to-string))
+   env])
 
 #_(defmethod word 'juxt.site.alpha/request-query-string
   [stack [_ & queue] env]
