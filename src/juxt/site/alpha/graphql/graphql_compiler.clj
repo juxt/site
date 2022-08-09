@@ -1,10 +1,11 @@
 ;; Copyright © 2022, JUXT LTD.
 
 (ns juxt.site.alpha.graphql.graphql-compiler
-  (:require [juxt.grab.alpha.parser :as parser]
-            [juxt.grab.alpha.document :as document]
-            [juxt.grab.alpha.graphql :as-alias graphql]
-            [juxt.grab.alpha.schema :as schema]))
+  (:require
+   [juxt.grab.alpha.parser :as parser]
+   [juxt.grab.alpha.document :as document]
+   [juxt.grab.alpha.graphql :as-alias graphql]
+   [juxt.grab.alpha.schema :as schema]))
 
 (defn selection->action-id
   [{::graphql/keys [name] ::document/keys [scoped-type-name] :as _selection} schema]

@@ -6,6 +6,7 @@
    [ring.util.codec :as codec]
    [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]
+   [juxt.site.alpha.graphql.flip :as graphql-flip]
    [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.site.alpha :as-alias site]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
@@ -1491,6 +1492,7 @@ Password: <input name=password type=password>
        `(
          (site/with-fx-acc
            [
+            ;; graphql-flip/compile-schema ;;;;;;;
             ;; Return a 201 if there is no existing schema
             (site/set-status 201) f/swap site/push-fx
             ;; TODO: Otherwise return a 200.
