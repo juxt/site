@@ -5,6 +5,7 @@
   ;; dependencies:
   (:refer-clojure :exclude [+ first second symbol drop keep when str ex-info any? filter map])
   (:require
+   [clojure.core :as cc]
    [clojure.edn :as edn]
    [clojure.string :as str]
    jsonista.core
@@ -35,24 +36,28 @@
     [stack (concat quotation queue) env]
     ;; Don't apply, simply treat as a symbol. We might be in the process of
     ;; defining a word.
-    (clojure.core/or
+    (cc/or
 
      ;; Clojure interop - but should be subject to a whitelist!!
-     #_(clojure.core/when-let [var (requiring-resolve name)]
-       (clojure.core/when-let [arglists (:arglists (clojure.core/meta var))]
-         (if (= (clojure.core/count arglists) 1)
-           (let [[args stack] (clojure.core/split-at (clojure.core/count (clojure.core/first arglists)) stack)]
-             [(clojure.core/cons (clojure.core/apply var (clojure.core/reverse args)) stack) queue env])
-           (throw (clojure.core/ex-info (format "Clojure function has multiple forms: %s" name) {:symbol name})))))
+     #_(cc/when-let [var (requiring-resolve name)]
+       (cc/when-let [arglists (:arglists (cc/meta var))]
+         (if (= (cc/count arglists) 1)
+           (let [[args stack] (cc/split-at (cc/count (cc/first arglists)) stack)]
+             [(cc/cons (cc/apply var (cc/reverse args)) stack) queue env])
+           (throw (cc/ex-info (format "Clojure function has multiple forms: %s" name) {:symbol name})))))
 
      ;; define
-     (clojure.core/when
-         (clojure.core/and
-          (clojure.core/vector? (clojure.core/first queue))
-          (= (clojure.core/second queue) 'juxt.flip.alpha.core/define))
-         [(cons name stack) queue env])
+     (cc/when
+         (cc/and
+          (cc/vector? (cc/first queue))
+          (= (cc/second queue) 'juxt.flip.alpha.core/define))
+       [(cons name stack) queue env])
 
-     (throw (clojure.core/ex-info (format "Symbol not defined: %s" name) {:symbol name})))))
+     ;; HTML/XML tag
+     #_(when-let [[_ tag] (re-matches #"<(\w+)>" (cc/str (cc/name name)))]
+       [(cons {:tag (keyword tag), :attrs nil, :content nil} stack) queue env])
+
+     (throw (cc/ex-info (format "Symbol not defined: %s" name) {:symbol name})))))
 
 (def break 'juxt.flip.alpha.core/break)
 (defmethod word 'juxt.flip.alpha.core/break [stack [_ & queue] env]
@@ -486,6 +491,16 @@
         [(eval-quotation (cons error stack) recovery env) queue env]
         (throw e)))))
 
+;; XML
+
+(defmethod word 'juxt.flip.alpha.xml/<tag>
+  [[children attrs name & stack] [_ & queue] env]
+  [(cons {:tag (keyword name) :attrs attrs :content children} stack) queue env])
+
+(defmethod word 'juxt.flip.alpha.xml/<contained-tag>
+  [[attrs name & stack] [_ & queue] env]
+  [(cons {:tag (keyword name) :attrs attrs} stack) queue env])
+
 ;; XTDB
 
 (defmethod word 'juxt.flip.alpha.xtdb/q
@@ -668,6 +683,7 @@
         (or (ex-data t) {})
         t)))))
 
+;; TODO: Tempted to rename to just 'eval'
 (defn eval-quotation
   ;; Naiive implementation. A production implementation would put an upper limit
   ;; on the number of iterations to prevent overly long running transactions.

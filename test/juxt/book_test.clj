@@ -14,7 +14,9 @@
    [ring.util.codec :as codec]
    [xtdb.api :as xt]
    [juxt.site.alpha.repl :as repl]
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [clojure.java.io :as io]
+   [xtdb.api :as xt])
   (:import (clojure.lang ExceptionInfo)))
 
 (defn with-handler [f]
@@ -634,6 +636,7 @@
           #_#__ (is (= 200 (:ring.response/status put-response)))
           ]
 
+
       put-response
 
       (repl/e "https://site.test/graphql")
@@ -652,3 +655,15 @@
 
 (comment
   (p/register! #'repl/e))
+
+(comment
+  (require '[juxt.flip.alpha.xml :as-alias x])
+
+  (f/eval-quotation
+   []
+   `(
+
+     (x/<contained-tag> "html" {}))
+   {}
+   )
+  (require '[hiccup2.core :as h2]))
