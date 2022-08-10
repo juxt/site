@@ -8,6 +8,7 @@
    [clojure.core :as cc]
    [clojure.edn :as edn]
    [clojure.string :as str]
+   [clojure.walk :refer [postwalk prewalk]]
    jsonista.core
    juxt.pass.alpha.util
    [juxt.site.alpha :as-alias site]
@@ -457,6 +458,18 @@
   [[size & stack] [_ & queue] env]
   [(cons (juxt.pass.alpha.util/make-nonce size) stack) queue env])
 
+;; Post walk processing structures
+(defmethod word 'juxt.flip.alpha.core/eval-embedded-quotations
+  [[form & stack] [_ & queue] env]
+  (let [processed
+        (prewalk
+         (fn [x]
+           (if (seq? x)
+             (clojure.core/first (eval-quotation stack x env))
+             x))
+         form)]
+    [(cons processed stack) queue env]))
+
 ;; Errors
 
 (def ex-info 'juxt.flip.alpha.core/ex-info)
@@ -682,6 +695,11 @@
         (format "Failure in quotation: %s" (.getMessage t))
         (or (ex-data t) {})
         t)))))
+
+(set! *default-data-reader-fn* tagged-literal)
+
+(defmethod print-dup clojure.lang.TaggedLiteral [o w]
+  (.write w (format "#%s %s" (:tag o) (pr-str (:form o)))))
 
 ;; TODO: Tempted to rename to just 'eval'
 (defn eval-quotation

@@ -16,7 +16,8 @@
    [juxt.site.alpha.repl :as repl]
    [clojure.string :as str]
    [clojure.java.io :as io]
-   [xtdb.api :as xt])
+   [xtdb.api :as xt]
+   [java-http-clj.core :as hc])
   (:import (clojure.lang ExceptionInfo)))
 
 (defn with-handler [f]
@@ -658,13 +659,41 @@
   (p/register! #'repl/e))
 
 (comment
-  (require '[juxt.flip.alpha.xml :as-alias x])
+  (require '[juxt.flip.alpha.hiccup :as-alias hc])
 
   (f/eval-quotation
-   []
+   [{:title "My title"
+     :fruits [{:name "apple" :count 10}
+              {:name "banana" :count 12}
+              {:name "kiwi" :count 5}]}]
    `(
+     (hc/html
+      (f/eval-embedded-quotations
+       [:html
+        [:body
+         [:div
+          (
+           (juxt.pass.alpha/make-nonce 12)
+           )]
+         [:div#foo.bar.baz
+          [:h1
+           (
+            ((f/of :title))
+            )]
+          [:p "Text"]
+          [:table
+           (
+            (f/map
+             (f/of :fruits)
+             [(f/eval-embedded-quotations
+               [:tr
+                [:td ((f/of :name))]
+                [:td ((f/of :count) "" f/str)]])]
+             ))
+           ]
+          ]]]))
+     f/nip)
+   {})
 
-     (x/<contained-tag> "html" {}))
-   {}
-   )
-  (require '[hiccup2.core :as h2]))
+
+  )
