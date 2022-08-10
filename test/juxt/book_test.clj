@@ -578,11 +578,12 @@
 
 ;;with-fixtures
 (deftest put-graphql-schema
-  (with-resources #{"https://site.test/graphql"
-                    "https://site.test/actions/put-graphql-schema"
-                    "https://site.test/permissions/alice/put-graphql-schema"
-                    "https://site.test/actions/get-graphql-schema"
-                    "https://site.test/permissions/alice/get-graphql-schema"}
+  (with-resources
+    #{"https://site.test/graphql"
+      "https://site.test/actions/put-graphql-schema"
+      "https://site.test/permissions/alice/put-graphql-schema"
+      "https://site.test/actions/get-graphql-schema"
+      "https://site.test/permissions/alice/get-graphql-schema"}
     (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
           {access-token "access_token"
            error "error"}
@@ -632,7 +633,7 @@
 
 
           #_#_put-response (*handler* (-> put-request
-                                      (book/with-body (.getBytes "type Query { myName: String }"))))
+                                          (book/with-body (.getBytes "type Query { myName: String }"))))
           #_#__ (is (= 200 (:ring.response/status put-response)))
           ]
 
