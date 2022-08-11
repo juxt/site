@@ -246,6 +246,11 @@
   [[k m & stack] [_ & queue] env]
   [(cons (get m k) stack) queue env])
 
+(def at 'juxt.flip.alpha.core/at)
+(defmethod word 'juxt.flip.alpha.core/at
+  [[key assoc & stack] [_ & queue] env]
+  [(cc/cons (get assoc key) stack) queue env])
+
 (def rot 'juxt.flip.alpha.core/rot)
 (defmethod word 'juxt.flip.alpha.core/rot
   [[z y x & stack] [_ & queue] env]
@@ -269,6 +274,16 @@
 (defmethod word 'juxt.flip.alpha.core/keep
   [[quot x & stack] [_ & queue] env]
   [(cons x (eval-quotation (cons x stack) quot env)) queue env])
+
+(def _2keep 'juxt.flip.alpha.core/_2keep)
+(defmethod word 'juxt.flip.alpha.core/_2keep
+  [[quot y x & stack] [_ & queue] env]
+  [(cons y (cons x (eval-quotation (cons y (cons x stack)) quot env))) queue env])
+
+(def dupd `dupd)
+(defmethod word `dupd
+  [[y x & stack] [_ & queue] env]
+  [(cons y (cons x (cons x stack))) queue env])
 
 (def if 'juxt.flip.alpha.core/if)
 (defmethod word 'juxt.flip.alpha.core/if

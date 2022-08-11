@@ -631,13 +631,10 @@
           _ (is (= 201 (:ring.response/status put-response)))
           _ (is (nil? (get-in put-response [:ring.response/headers "location"])))
 
-
-
           #_#_put-response (*handler* (-> put-request
                                           (book/with-body (.getBytes "type Query { myName: String }"))))
           #_#__ (is (= 200 (:ring.response/status put-response)))
           ]
-
 
       put-response
 
@@ -697,79 +694,76 @@
   )
 
 
-#_#{"https://site.test/graphql"
-          "https://site.test/actions/put-graphql-schema"
-          "https://site.test/permissions/alice/put-graphql-schema"
-          "https://site.test/actions/get-graphql-schema"
-    "https://site.test/permissions/alice/get-graphql-schema"}
-
-#_(f/eval-quotation
- []
- `(
-   (f/define extract-input
-     [(f/set-at
-       (f/dip
-        [site/request-body-as-string
-         :input]))])
-
-   (f/define compile-input-to-schema
-     [(f/set-at
-       (f/keep
-        [(f/of :input)
-         graphql-flip/compile-schema
-         :compiled-schema]))])
-
-   (f/define create-resource
-     [(f/set-at
-       (f/keep
-        [{}
-         (f/set-at (f/dip ["GraphQL endpoint" ::site/description]))
-         (f/set-at (f/dip [(f/env ::site/resource) :xt/id]))
-         (f/set-at (f/dip [f/dup (f/of :input) ::site/content]))
-         (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))
-         f/nip                   ; we've got our map, let's nip the kept context
-         :new-resource]))])
-
-   (f/define push-resource
-     [(site/push-fx
-       (f/keep
-        [(f/of :new-resource)
-         xtdb.api/put]))])
-
-   #_(site/with-fx-acc
-       [extract-input
-        ;;compile-input-to-schema
-        ;;create-resource
-        ;;push-resource
-
-        ;; Return a 201 if there is no existing schema (how do we do this?)
-        ;;(site/set-status 201) f/swap site/push-fx
-        ;; TODO: Otherwise return a 200.
-        ])
-
-   #_(site/with-fx-acc
-     [(f/with-checks
-        [extract-input
-         create-resource])])
-
-   (site/with-fx-acc-with-checks
-     [extract-input
-      create-resource])
 
 
-   #_(site/with-fx-acc
-       (f/with-checks
+(with-fixtures
+  (with-resources
+    #{"https://site.test/graphql"
+      "https://site.test/actions/put-graphql-schema"
+      "https://site.test/permissions/alice/put-graphql-schema"
+      "https://site.test/actions/get-graphql-schema"
+      "https://site.test/permissions/alice/get-graphql-schema"}
+    (f/eval-quotation
+     []
+     `(
+       (f/define extract-input
+         [(f/set-at
+           (f/dip
+            [site/request-body-as-string
+             :input]))])
+
+       (f/define compile-input-to-schema
+         [(f/set-at
+           (f/keep
+            [(f/of :input)
+             graphql-flip/compile-schema
+             :compiled-schema]))])
+
+       (f/define update-base-resource
+         [(f/dip
+           [(site/entity (f/env ::site/resource))
+            (f/set-at (f/dip [f/dup (f/of :input) ::site/content]))
+            ;;             (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))
+            ])
+          f/rot
+          f/set-at])
+
+       (f/define push-resource
+         [
+          (f/push-at
+           (xtdb.api/put
+            f/dupd
+            f/of
+            (f/unless* [(f/throw-exception (f/ex-info "No object to push as an fx" {}))]))
+           ::site/fx
+           f/rot)])
+
+       (site/with-fx-acc ;;-with-checks
          [extract-input
           ;;compile-input-to-schema
-          ;;create-resource
-          ;;push-resource
+          (update-base-resource :new-resource)
+          (push-resource :new-resource)
 
           ;; Return a 201 if there is no existing schema (how do we do this?)
           ;;(site/set-status 201) f/swap site/push-fx
           ;; TODO: Otherwise return a 200.
-          ])))
- {::site/received-representation {:juxt.http.alpha/body (.getBytes "type Query { myName: String }")}
-  ::site/resource "https://example.org/graphql"})
+          ])
+
+       #_(site/with-fx-acc
+           (f/with-checks
+             [extract-input
+              ;;compile-input-to-schema
+              ;;create-resource
+              ;;push-resource
+
+              ;; Return a 201 if there is no existing schema (how do we do this?)
+              ;;(site/set-status 201) f/swap site/push-fx
+              ;; TODO: Otherwise return a 200.
+              ])))
+
+     {::site/received-representation {:juxt.http.alpha/body (.getBytes "type Query { myName: String }")}
+      ::site/resource "https://site.test/graphql"
+      ::site/db (xt/db *xt-node*)})))
 
 
 #_(f/eval-quotation
