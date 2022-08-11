@@ -2,21 +2,22 @@
 
 (ns juxt.book-test
   (:require
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
+   [clojure.string :as str]
    [juxt.book :as book]
-   [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.util :refer [make-nonce]]
-   [juxt.pass.alpha.session-scope :as session-scope]
-   [juxt.site.alpha :as-alias site]
    [juxt.flip.alpha.core :as f]
+   [juxt.flip.alpha.hiccup :as hc]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.pass.alpha.session-scope :as session-scope]
+   [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.site.alpha :as-alias site]
+   [juxt.site.alpha.graphql.flip :as graphql-flip]
    [juxt.site.alpha.init :as init]
+   [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
    [ring.util.codec :as codec]
-   [xtdb.api :as xt]
-   [juxt.site.alpha.repl :as repl]
-   juxt.flip.alpha.hiccup
-   [clojure.string :as str]
-   [clojure.java.io :as io])
+   [xtdb.api :as xt])
   (:import (clojure.lang ExceptionInfo)))
 
 (defn with-handler [f]
@@ -694,3 +695,100 @@
 
 
   )
+
+
+#_#{"https://site.test/graphql"
+          "https://site.test/actions/put-graphql-schema"
+          "https://site.test/permissions/alice/put-graphql-schema"
+          "https://site.test/actions/get-graphql-schema"
+    "https://site.test/permissions/alice/get-graphql-schema"}
+
+#_(f/eval-quotation
+ []
+ `(
+   (f/define extract-input
+     [(f/set-at
+       (f/dip
+        [site/request-body-as-string
+         :input]))])
+
+   (f/define compile-input-to-schema
+     [(f/set-at
+       (f/keep
+        [(f/of :input)
+         graphql-flip/compile-schema
+         :compiled-schema]))])
+
+   (f/define create-resource
+     [(f/set-at
+       (f/keep
+        [{}
+         (f/set-at (f/dip ["GraphQL endpoint" ::site/description]))
+         (f/set-at (f/dip [(f/env ::site/resource) :xt/id]))
+         (f/set-at (f/dip [f/dup (f/of :input) ::site/content]))
+         (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))
+         f/nip                   ; we've got our map, let's nip the kept context
+         :new-resource]))])
+
+   (f/define push-resource
+     [(site/push-fx
+       (f/keep
+        [(f/of :new-resource)
+         xtdb.api/put]))])
+
+   #_(site/with-fx-acc
+       [extract-input
+        ;;compile-input-to-schema
+        ;;create-resource
+        ;;push-resource
+
+        ;; Return a 201 if there is no existing schema (how do we do this?)
+        ;;(site/set-status 201) f/swap site/push-fx
+        ;; TODO: Otherwise return a 200.
+        ])
+
+   #_(site/with-fx-acc
+     [(f/with-checks
+        [extract-input
+         create-resource])])
+
+   (site/with-fx-acc-with-checks
+     [extract-input
+      create-resource])
+
+
+   #_(site/with-fx-acc
+       (f/with-checks
+         [extract-input
+          ;;compile-input-to-schema
+          ;;create-resource
+          ;;push-resource
+
+          ;; Return a 201 if there is no existing schema (how do we do this?)
+          ;;(site/set-status 201) f/swap site/push-fx
+          ;; TODO: Otherwise return a 200.
+          ])))
+ {::site/received-representation {:juxt.http.alpha/body (.getBytes "type Query { myName: String }")}
+  ::site/resource "https://example.org/graphql"})
+
+
+#_(f/eval-quotation
+ [{}]
+ `(
+   (f/define extract-input
+     [(f/set-at
+       (f/dip
+        [site/request-body-as-string
+         :input]))])
+
+   extract-input
+;;   f/break
+   f/assert-context
+   #_(f/with-checks
+     [extract-input
+      ;;create-resource
+      ;;push-resource
+      ]))
+
+ {::site/received-representation {:juxt.http.alpha/body (.getBytes "type Query { myName: String }")}
+  ::site/resource "https://example.org/graphql"})

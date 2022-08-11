@@ -17,7 +17,8 @@
    [malli.core :as m]
    [malli.error :a me]
    [ring.util.codec :as codec]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   [juxt.flip.alpha.core :as f]))
 
 ;; See Factor, https://factorcode.org/
 ;; See K's XY language, https://www.nsl.com/k/xy/xy.htm
@@ -73,6 +74,14 @@
 (defmethod word 'juxt.flip.alpha.core/no-op
   [stack [_ & queue] env]
   [stack queue env])
+
+(defmethod word `assert-context [stack [_ & queue] env]
+  (assert (cc/= 1 (cc/count stack)) (format "Stack has multiple elements (next: %s)" (cc/first queue)))
+  (assert (cc/map? (cc/first stack)) (format "Top of stack is not a context (el: %s, next: %s)" (cc/first stack) (cc/first queue)))
+  [stack queue env])
+
+(defmethod word `with-checks [[quot & stack] [_ & queue] env]
+  [stack (cc/concat (cc/interleave quot (cc/repeat `assert-context)) queue) env])
 
 ;; TODO: What is the Factor equivalent name?
 (def env 'juxt.flip.alpha.core/env)
@@ -614,6 +623,13 @@
    (concat `[[] ::site/fx <sorted-map> set-at ~quot call] queue)
    env])
 
+(defmethod word 'juxt.site.alpha/with-fx-acc-with-checks
+  [[quot & stack] [_ & queue] env]
+  (let [quot [(cc/interleave quot (cc/repeat `assert-context))]]
+    [stack
+     (concat `[[] ::site/fx <sorted-map> set-at ~quot call] queue)
+     env]))
+
 ;; Create an apply-to-request-context operation that sets a header
 ;; (header-name value -- op)
 (defmethod word 'juxt.site.alpha/set-header
@@ -677,6 +693,7 @@
   [stack queue (clojure.core/assoc-in env [:definitions n] quotation)])
 
 (defn word* [stack [w & queue] env]
+  (tap> {:stack stack :word w :remaining queue :env env})
   (cond
     (symbol? w)
     (word stack (clojure.core/cons w queue) env)

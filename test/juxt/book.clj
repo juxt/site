@@ -40,7 +40,7 @@
 
        :juxt.flip.alpha/quotation
        `(
-         (site/with-fx-acc
+         (site/with-fx-acc-with-checks
            [(site/push-fx
              (f/dip
               [site/request-body-as-edn
@@ -94,7 +94,7 @@
 
        :juxt.flip.alpha/quotation
        `(
-         (site/with-fx-acc
+         (site/with-fx-acc-with-checks
            [(site/push-fx
              (f/dip
               [(xtdb.api/put
