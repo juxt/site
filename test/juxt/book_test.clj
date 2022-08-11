@@ -14,10 +14,9 @@
    [ring.util.codec :as codec]
    [xtdb.api :as xt]
    [juxt.site.alpha.repl :as repl]
+   juxt.flip.alpha.hiccup
    [clojure.string :as str]
-   [clojure.java.io :as io]
-   [xtdb.api :as xt]
-   [java-http-clj.core :as hc])
+   [clojure.java.io :as io])
   (:import (clojure.lang ExceptionInfo)))
 
 (defn with-handler [f]
@@ -658,6 +657,7 @@
 (comment
   (p/register! #'repl/e))
 
+;; An experiment to produce HTML via flip
 (comment
   (require '[juxt.flip.alpha.hiccup :as-alias hc])
 
@@ -688,10 +688,7 @@
              [(f/eval-embedded-quotations
                [:tr
                 [:td ((f/of :name))]
-                [:td ((f/of :count) "" f/str)]])]
-             ))
-           ]
-          ]]]))
+                [:td ((f/of :count) f/number->string)]])]))]]]]))
      f/nip)
    {})
 

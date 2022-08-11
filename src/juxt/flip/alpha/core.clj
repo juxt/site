@@ -392,6 +392,11 @@
   [[s1 s2 & stack] [_ & queue] env]
   [(cons (clojure.core/str s1 s2) stack) queue env])
 
+(def number->string 'juxt.flip.alpha.core/number->string)
+(defmethod word 'juxt.flip.alpha.core/number->string
+  [[n & stack] [_ & queue] env]
+  [(cons (clojure.core/str n) stack) queue env])
+
 (defmethod word 'juxt.flip.alpha.core/form-decode
   [[encoded & stack] [_ & queue] env]
   (if encoded
@@ -695,11 +700,6 @@
         (format "Failure in quotation: %s" (.getMessage t))
         (or (ex-data t) {})
         t)))))
-
-(set! *default-data-reader-fn* tagged-literal)
-
-(defmethod print-dup clojure.lang.TaggedLiteral [o w]
-  (.write w (format "#%s %s" (:tag o) (pr-str (:form o)))))
 
 ;; TODO: Tempted to rename to just 'eval'
 (defn eval-quotation

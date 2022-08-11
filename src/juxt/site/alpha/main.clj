@@ -52,6 +52,10 @@
         system (ig/init system-config)]
     (log/infof "Configuration: %s" (pr-str system-config))
 
+    ;; This isn't yet used but here to allow some experimentation with using
+    ;; tagged literals to a) indicate types for flip literals (quotations), etc.
+    (set! *default-data-reader-fn* tagged-literal)
+
     (log/info "System started and ready...")
     (log/trace "TRACE on")
     (Thread/setDefaultUncaughtExceptionHandler
@@ -66,3 +70,6 @@
         (ig/halt! system))))
     (alter-var-root #'*system* (constantly system)))
   @(promise))
+
+(defmethod print-dup clojure.lang.TaggedLiteral [o w]
+  (.write w (format "#%s %s" (:tag o) (pr-str (:form o)))))
