@@ -729,8 +729,7 @@
           f/set-at])
 
        (f/define push-resource
-         [
-          (f/push-at
+         [(f/push-at
            (xtdb.api/put
             f/dupd
             f/of
@@ -738,7 +737,7 @@
            ::site/fx
            f/rot)])
 
-       (site/with-fx-acc ;;-with-checks
+       (site/with-fx-acc ;;-with-checks - adding -with-checks somehow messes things up! :(
          [extract-input
           ;;compile-input-to-schema
           (update-base-resource :new-resource)
@@ -747,19 +746,7 @@
           ;; Return a 201 if there is no existing schema (how do we do this?)
           ;;(site/set-status 201) f/swap site/push-fx
           ;; TODO: Otherwise return a 200.
-          ])
-
-       #_(site/with-fx-acc
-           (f/with-checks
-             [extract-input
-              ;;compile-input-to-schema
-              ;;create-resource
-              ;;push-resource
-
-              ;; Return a 201 if there is no existing schema (how do we do this?)
-              ;;(site/set-status 201) f/swap site/push-fx
-              ;; TODO: Otherwise return a 200.
-              ])))
+          ]))
 
      {::site/received-representation {:juxt.http.alpha/body (.getBytes "type Query { myName: String }")}
       ::site/resource "https://site.test/graphql"
