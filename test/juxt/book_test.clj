@@ -17,7 +17,8 @@
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
    [ring.util.codec :as codec]
-   [xtdb.api :as xt])
+   [xtdb.api :as xt]
+   [clojure.core.server :as s])
   (:import (clojure.lang ExceptionInfo)))
 
 (defn with-handler [f]
@@ -631,6 +632,13 @@
           _ (is (= 201 (:ring.response/status put-response)))
           _ (is (nil? (get-in put-response [:ring.response/headers "location"])))
 
+          put-request
+          (-> put-request
+              (book/with-body (.getBytes "type Query { myName: String }")))
+
+          put-response (*handler* put-request)
+          _ (is (= 200 (:ring.response/status put-response)))
+
           #_#_put-response (*handler* (-> put-request
                                           (book/with-body (.getBytes "type Query { myName: String }"))))
           #_#__ (is (= 200 (:ring.response/status put-response)))
@@ -638,7 +646,7 @@
 
       put-response
 
-      (repl/e "https://site.test/graphql")
+      #_(repl/e "https://site.test/graphql")
 
       )))
 
@@ -692,84 +700,3 @@
 
 
   )
-
-
-
-
-(with-fixtures
-  (with-resources
-    #{"https://site.test/graphql"
-      "https://site.test/actions/put-graphql-schema"
-      "https://site.test/permissions/alice/put-graphql-schema"
-      "https://site.test/actions/get-graphql-schema"
-      "https://site.test/permissions/alice/get-graphql-schema"}
-    (f/eval-quotation
-     []
-     `(
-       (f/define extract-input
-         [(f/set-at
-           (f/dip
-            [site/request-body-as-string
-             :input]))])
-
-       (f/define compile-input-to-schema
-         [(f/set-at
-           (f/keep
-            [(f/of :input)
-             graphql-flip/compile-schema
-             :compiled-schema]))])
-
-       (f/define update-base-resource
-         [(f/dip
-           [(site/entity (f/env ::site/resource))
-            (f/set-at (f/dip [f/dup (f/of :input) ::site/content]))
-            ;;             (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))
-            ])
-          f/rot
-          f/set-at])
-
-       (f/define push-resource
-         [(f/push-at
-           (xtdb.api/put
-            f/dupd
-            f/of
-            (f/unless* [(f/throw-exception (f/ex-info "No object to push as an fx" {}))]))
-           ::site/fx
-           f/rot)])
-
-       (site/with-fx-acc ;;-with-checks - adding -with-checks somehow messes things up! :(
-         [extract-input
-          ;;compile-input-to-schema
-          (update-base-resource :new-resource)
-          (push-resource :new-resource)
-
-          ;; Return a 201 if there is no existing schema (how do we do this?)
-          ;;(site/set-status 201) f/swap site/push-fx
-          ;; TODO: Otherwise return a 200.
-          ]))
-
-     {::site/received-representation {:juxt.http.alpha/body (.getBytes "type Query { myName: String }")}
-      ::site/resource "https://site.test/graphql"
-      ::site/db (xt/db *xt-node*)})))
-
-
-#_(f/eval-quotation
- [{}]
- `(
-   (f/define extract-input
-     [(f/set-at
-       (f/dip
-        [site/request-body-as-string
-         :input]))])
-
-   extract-input
-;;   f/break
-   f/assert-context
-   #_(f/with-checks
-     [extract-input
-      ;;create-resource
-      ;;push-resource
-      ]))
-
- {::site/received-representation {:juxt.http.alpha/body (.getBytes "type Query { myName: String }")}
-  ::site/resource "https://example.org/graphql"})

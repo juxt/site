@@ -416,6 +416,11 @@
   [[s1 s2 & stack] [_ & queue] env]
   [(cons (clojure.core/str s1 s2) stack) queue env])
 
+(def pr-str 'juxt.flip.alpha.core/pr-str)
+(defmethod word 'juxt.flip.alpha.core/pr-str
+  [[el & stack] [_ & queue] env]
+  [(cons (clojure.core/pr-str el) stack) queue env])
+
 (def number->string 'juxt.flip.alpha.core/number->string)
 (defmethod word 'juxt.flip.alpha.core/number->string
   [[n & stack] [_ & queue] env]

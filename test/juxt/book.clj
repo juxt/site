@@ -9,6 +9,7 @@
    [juxt.site.alpha.graphql.flip :as graphql-flip]
    [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.site.alpha :as-alias site]
+   [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
    [juxt.test.util :refer [*handler*]]
    [malli.core :as malli]
@@ -1491,45 +1492,75 @@ Password: <input name=password type=password>
        ;; with a custom word.
        :juxt.flip.alpha/quotation
        `(
-         (f/define extract-input
-           [(f/set-at
-             (f/dip
-              [site/request-body-as-string
-               :input]))])
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} extract-input
+         [(f/set-at
+           (f/dip
+            [site/request-body-as-string
+             :input]))])
 
-         (f/define compile-input-to-schema
-           [(f/set-at
-             (f/keep
-              [(f/of :input)
-               graphql-flip/compile-schema
-               :compiled-schema]))])
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} compile-input-to-schema
+         [(f/set-at
+           (f/keep
+            [(f/of :input)
+             graphql-flip/compile-schema
+             :compiled-schema]))])
 
-         (f/define create-resource
-           [(f/set-at
-             (f/keep
-              [{}
-               (f/set-at (f/dip ["GraphQL endpoint" ::site/description]))
-               (f/set-at (f/dip [(f/env ::site/resource) :xt/id]))
-               (f/set-at (f/dip [f/dup (f/of :input) ::site/content]))
-               (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))
-               :new-resource]))])
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} update-base-resource
+         [(f/dip
+           [(site/entity (f/env ::site/resource))
+            (f/set-at (f/dip [f/dup (f/of :input) ::http/content]))
+            (f/set-at (f/dip ["application/graphql" ::http/content-type]))
+            (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))])
+          f/rot
+          f/set-at])
 
-         (f/define push-resource
-           [(site/push-fx
-             (f/keep
-              [(f/of :new-resource)
-               xtdb.api/put]))])
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} create-edn-resource
+         [(f/dip
+           ;; Perhaps could we use a template with eval-embedded-quotations?
+           [{}
+            (f/set-at (f/dip ["application/edn" ::http/content-type]))
+            (f/set-at (f/dip [(f/env ::site/resource) ".edn" f/swap f/str :xt/id]))
+            (f/set-at (f/dip [(f/env ::site/resource) ::site/variant-of]))
+            (f/set-at (f/dip [f/dup (f/of :compiled-schema) f/pr-str ::http/content]))])
+          f/rot
+          f/set-at])
 
-         (site/with-fx-acc
-           [extract-input
-            compile-input-to-schema
-            create-resource
-            push-resource
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} push-resource
+         [(f/push-at
+           (xtdb.api/put
+            f/dupd
+            f/of
+            (f/unless* [(f/throw-exception (f/ex-info "No object to push as an fx" {}))]))
+           ::site/fx
+           f/rot)])
 
-            ;; Return a 201 if there is no existing schema (how do we do this?)
-            (site/set-status 201) f/swap site/push-fx
-            ;; TODO: Otherwise return a 200.
-            ]))
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} determine-status
+         [(f/of (site/entity (f/env ::site/resource)) ::http/content)
+          [200 :status f/rot f/set-at]
+          [201 :status f/rot f/set-at]
+          f/if])
+
+       (site/with-fx-acc ;;-with-checks - adding -with-checks somehow messes things up! :(
+         [
+          ;; The following can be done in advance of the fx-fn.
+          extract-input
+          compile-input-to-schema
+
+          ;; The remainder would need to be done in the tx-fn because it looks
+          ;; up the /graphql resource in order to update it.
+          (update-base-resource :new-resource)
+          (push-resource :new-resource)
+
+          ;; The application/edn resource serves the compiled version
+          (create-edn-resource :edn-resource)
+          (push-resource :edn-resource)
+
+          ;; Return a 201 if there is no existing schema, 200 otherwise
+          determine-status
+          (site/set-status f/dup (f/of :status))
+          f/swap
+          site/push-fx
+          ]))
 
        :juxt.pass.alpha/rules
        '[
