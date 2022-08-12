@@ -12,6 +12,7 @@
    [juxt.pass.alpha.session-scope :as session-scope]
    [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.site.alpha :as-alias site]
+   [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.graphql.flip :as graphql-flip]
    [juxt.site.alpha.init :as init]
    [juxt.site.alpha.repl :as repl]
@@ -578,8 +579,43 @@
       (testing "Attempting for an unauthorized user to PUT a graphql schema"
         (is (= 403 (:ring.response/status response)))))))
 
-;;with-fixtures
-(deftest put-graphql-schema
+;; An experiment to produce HTML via flip
+(comment
+  (require '[juxt.flip.alpha.hiccup :as-alias hc])
+
+  (f/eval-quotation
+   [{:title "My title"
+     :fruits [{:name "apple" :count 10}
+              {:name "banana" :count 12}
+              {:name "kiwi" :count 5}]}]
+   `(
+     (hc/html
+      (f/eval-embedded-quotations
+       [:html
+        [:body
+         [:div
+          (
+           (juxt.pass.alpha/make-nonce 12)
+           )]
+         [:div#foo.bar.baz
+          [:h1
+           (
+            ((f/of :title))
+            )]
+          [:p "Text"]
+          [:table
+           (
+            (f/map
+             (f/of :fruits)
+             [(f/eval-embedded-quotations
+               [:tr
+                [:td ((f/of :name))]
+                [:td ((f/of :count) f/number->string)]])]))]]]]))
+     f/nip)
+   {}))
+
+;;deftest put-graphql-schema
+(with-fixtures
   (with-resources
     #{"https://site.test/graphql"
       "https://site.test/actions/put-graphql-schema"
@@ -637,18 +673,104 @@
               (book/with-body (.getBytes "type Query { myName: String }")))
 
           put-response (*handler* put-request)
-          _ (is (= 200 (:ring.response/status put-response)))
-
-          #_#_put-response (*handler* (-> put-request
-                                          (book/with-body (.getBytes "type Query { myName: String }"))))
-          #_#__ (is (= 200 (:ring.response/status put-response)))
-          ]
+          _ (is (= 200 (:ring.response/status put-response)))]
 
       put-response
 
       #_(repl/e "https://site.test/graphql")
 
+      ;; What if there are errors?
+      ;; How to communicate these
+
       )))
+
+;; Keep this as an example of how to set up a database, initialize a request and
+;; eval a quotation.
+#_(with-fixtures
+  (with-resources
+    #{"https://site.test/graphql"
+      "https://site.test/actions/put-graphql-schema"
+      "https://site.test/permissions/alice/put-graphql-schema"
+      "https://site.test/actions/get-graphql-schema"
+      "https://site.test/permissions/alice/get-graphql-schema"}
+    (f/eval-quotation
+     []
+     `(
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} extract-input
+         [(f/set-at
+           (f/dip
+            [site/request-body-as-string
+             :input]))])
+
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} compile-input-to-schema
+         [(f/set-at
+           (f/keep
+            [(f/of :input)
+             ;; TODO: Catch errors and create an effect which binds them to the
+             ;; request context, along with a 400 status code.
+             graphql-flip/compile-schema
+             :compiled-schema]))])
+
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} update-base-resource
+         [(f/dip
+           [(site/entity (f/env ::site/resource))
+            (f/set-at (f/dip [f/dup (f/of :input) ::http/content]))
+            (f/set-at (f/dip ["application/graphql" ::http/content-type]))
+            (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))])
+          f/rot
+          f/set-at])
+
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} create-edn-resource
+         [(f/dip
+           ;; Perhaps could we use a template with eval-embedded-quotations?
+           [{}
+            (f/set-at (f/dip ["application/edn" ::http/content-type]))
+            (f/set-at (f/dip [(f/env ::site/resource) ".edn" f/swap f/str :xt/id]))
+            (f/set-at (f/dip [(f/env ::site/resource) ::site/variant-of]))
+            (f/set-at (f/dip [f/dup (f/of :compiled-schema) f/pr-str ::http/content]))])
+          f/rot
+          f/set-at])
+
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} push-resource
+         [(f/push-at
+           (xtdb.api/put
+            f/dupd
+            f/of
+            (f/unless* [(f/throw-exception (f/ex-info "No object to push as an fx" {}))]))
+           ::site/fx
+           f/rot)])
+
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} determine-status
+         [(f/of (site/entity (f/env ::site/resource)) ::http/content)
+          [200 :status f/rot f/set-at]
+          [201 :status f/rot f/set-at]
+          f/if])
+
+       (site/with-fx-acc ;;-with-checks - adding -with-checks somehow messes things up! :(
+         [
+          ;; The following can be done in advance of the fx-fn.
+          extract-input
+          compile-input-to-schema
+
+          ;; The remainder would need to be done in the tx-fn because it looks
+          ;; up the /graphql resource in order to update it.
+          (update-base-resource :new-resource)
+          (push-resource :new-resource)
+
+          ;; The application/edn resource serves the compiled version
+          (create-edn-resource :edn-resource)
+          (push-resource :edn-resource)
+
+          ;; Return a 201 if there is no existing schema, 200 otherwise
+          determine-status
+          (site/set-status f/dup (f/of :status))
+          f/swap
+          site/push-fx
+          ]))
+     {::site/db (xt/db *xt-node*)
+      ::site/received-representation
+      {::http/body (.getBytes "type Query { myName String }")
+       }})))
 
 
 ;; Portal
@@ -662,41 +784,3 @@
 
 (comment
   (p/register! #'repl/e))
-
-;; An experiment to produce HTML via flip
-(comment
-  (require '[juxt.flip.alpha.hiccup :as-alias hc])
-
-  (f/eval-quotation
-   [{:title "My title"
-     :fruits [{:name "apple" :count 10}
-              {:name "banana" :count 12}
-              {:name "kiwi" :count 5}]}]
-   `(
-     (hc/html
-      (f/eval-embedded-quotations
-       [:html
-        [:body
-         [:div
-          (
-           (juxt.pass.alpha/make-nonce 12)
-           )]
-         [:div#foo.bar.baz
-          [:h1
-           (
-            ((f/of :title))
-            )]
-          [:p "Text"]
-          [:table
-           (
-            (f/map
-             (f/of :fruits)
-             [(f/eval-embedded-quotations
-               [:tr
-                [:td ((f/of :name))]
-                [:td ((f/of :count) f/number->string)]])]))]]]]))
-     f/nip)
-   {})
-
-
-  )
