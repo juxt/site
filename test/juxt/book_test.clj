@@ -679,11 +679,13 @@
       ;; output. Possibly this can be Selmer templated in the future.
 
 
-      (call-handler
-       {:ring.request/method :get
-        :ring.request/path "/graphql"
-        :ring.request/headers
-        {"authorization" (format "Bearer %s" access-token)}})
+      (->
+       (call-handler
+        {:ring.request/method :get
+         :ring.request/path "/graphql"
+         :ring.request/headers
+         {"authorization" (format "Bearer %s" access-token)}})
+       (select-keys [:ring.response/status :ring.response/headers :ring/response/body]))
 
 
       ;; Where's the body?
