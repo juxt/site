@@ -1734,9 +1734,11 @@ Password: <input name=password type=password>
       :juxt.pass.alpha/login-uri "https://example.org/login"}))))
 
 (defn with-body [req body-bytes]
-  (-> req
-      (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
-      (assoc :ring.request/body (io/input-stream body-bytes))))
+  (if body-bytes
+    (-> req
+        (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
+        (assoc :ring.request/body (io/input-stream body-bytes)))
+    req))
 
 (defn login-with-form!
   "Return a session id (or nil) given a map of fields."

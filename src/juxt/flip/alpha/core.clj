@@ -713,7 +713,6 @@
   [stack queue (clojure.core/assoc-in env [:definitions n] quotation)])
 
 (defn word* [stack [w & queue] env]
-  (tap> {:stack stack :word w :remaining queue :env env})
   (cond
     (symbol? w)
     (word stack (clojure.core/cons w queue) env)

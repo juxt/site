@@ -30,6 +30,9 @@
               ::site/uri-prefix "https://site.test"})]
     (f)))
 
+(defn call-handler [request]
+  (*handler* (book/with-body request (::body-bytes request))))
+
 (use-fixtures :each with-system-xt with-handler)
 
 ;; This is useful when developing tests at the REPL.
@@ -55,7 +58,7 @@
     (let [req {:ring.request/method :get
                :ring.request/path "/hello"}
           invalid-req (assoc req :ring.request/path "/not-hello")]
-      (is (= 404 (:ring.response/status (*handler* invalid-req)))))))
+      (is (= 404 (:ring.response/status (call-handler invalid-req)))))))
 
 (deftest public-resource-test
   (with-resources #{::init/system
@@ -71,7 +74,7 @@
                :ring.request/path "/hello"}]
 
       (testing "Can retrieve a public immutable resource"
-        (let [{:ring.response/keys [status body]} (*handler* req)]
+        (let [{:ring.response/keys [status body]} (call-handler req)]
           (is (= 200 status))
           (is (= "Hello World!\r\n" body))))
 
@@ -513,10 +516,9 @@
                :ring.request/path "/actions/install-graphql-endpoint"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/edn"}}
-              response (-> request
-                           (book/with-body (.getBytes (pr-str {:xt/id "https://site.test/graphql"})))
-                           *handler*)]
+                "content-type" "application/edn"}
+               ::body-bytes (.getBytes (pr-str {:xt/id "https://site.test/graphql"}))}
+              response (call-handler request)]
           (is (= 403 (:ring.response/status response)))))
 
       (testing "Installation at wrong endpoint denied"
@@ -533,8 +535,9 @@
                :ring.request/path "/actions/install-graphql-endpoint"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/edn"}}
-              response (*handler* (book/with-body request (.getBytes (pr-str {:xt/id "https://site.test/wrong-graphql"}))))]
+                "content-type" "application/edn"}
+               ::body-bytes (.getBytes (pr-str {:xt/id "https://site.test/wrong-graphql"}))}
+              response (call-handler request)]
           (is (= 403 (:ring.response/status response)))))
 
       (testing "Installation successful"
@@ -551,8 +554,9 @@
                :ring.request/path "/actions/install-graphql-endpoint"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/edn"}}
-              response (*handler* (book/with-body request (.getBytes (pr-str {:xt/id "https://site.test/graphql"}))))]
+                "content-type" "application/edn"}
+               ::body-bytes (.getBytes (pr-str {:xt/id "https://site.test/graphql"}))}
+              response (call-handler request)]
           (is (= 201 (:ring.response/status response))))))))
 
 (deftest install-graphql-schema-with-wrong-user
@@ -571,11 +575,10 @@
                :ring.request/path "/graphql"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/graphql"}})
+                "content-type" "application/graphql"}
+               ::body-bytes (.getBytes "schema { }")})
 
-          response (*handler*
-                    (-> request
-                        (book/with-body (.getBytes "schema { }"))))]
+          response (call-handler request)]
       (testing "Attempting for an unauthorized user to PUT a graphql schema"
         (is (= 403 (:ring.response/status response)))))))
 
@@ -645,42 +648,44 @@
           _ (is (= 404 (:ring.response/status get-response)))
 
           put-response-bad-content
-          (*handler*
-           (-> {:ring.request/method :put
-                :ring.request/path "/graphql"
-                :ring.request/headers
-                {"authorization" (format "Bearer %s" access-token)
-                 "content-type" "text/csv"}}
-               (book/with-body (.getBytes "schema { }"))))
+          (call-handler
+           {:ring.request/method :put
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)
+             "content-type" "text/csv"}
+            ::body-bytes (.getBytes "schema { }")})
 
           _ (is (= 415 (:ring.response/status put-response-bad-content)))
 
           put-request
-          (-> {:ring.request/method :put
-               :ring.request/path "/graphql"
-               :ring.request/headers
-               {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/graphql"}}
-              (book/with-body (.getBytes "type Query { myName: String }")))
+          {:ring.request/method :put
+           :ring.request/path "/graphql"
+           :ring.request/headers
+           {"authorization" (format "Bearer %s" access-token)
+            "content-type" "application/graphql"}
+           ::body-bytes (.getBytes "type Query { myName: String }")}
 
-          put-response (*handler* put-request)
+          put-response (call-handler put-request)
 
           _ (is (= 201 (:ring.response/status put-response)))
           _ (is (nil? (get-in put-response [:ring.response/headers "location"])))
 
-          put-request
-          (-> put-request
-              (book/with-body (.getBytes "type Query { myName: String }")))
-
-          put-response (*handler* put-request)
+          put-response (call-handler put-request)
           _ (is (= 200 (:ring.response/status put-response)))]
 
-      put-response
+      ;; What if there are errors?  How to communicate these? - for now, via the
+      ;; link to the request which should be generated as part of the error
+      ;; output. Possibly this can be Selmer templated in the future.
 
-      #_(repl/e "https://site.test/graphql")
+      #_(tap>
+       (call-handler
+        {:ring.request/method :get
+         :ring.request/path "/graphql"
+         :ring.request/headers
+         {"authorization" (format "Bearer %s" access-token)}}))
 
-      ;; What if there are errors?
-      ;; How to communicate these
+      (repl/e "https://site.test/graphql")
 
       )))
 
