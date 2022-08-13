@@ -35,15 +35,14 @@
          vary ::pick/vary}
         (pick-with-vary req representations)]
 
-    #_(when (contains? #{:get :head} (:ring.request/method request))
-        (when-not selected-representation
-          (throw
-           (ex-info
-            "Not Acceptable"
-            ;; TODO: Must add list of available representations
-            ;; TODO: Add to req with into
-            {:ring.response/status 406
-             }))))
+    (when (contains? #{:get :head} (:ring.request/method req))
+      (when-not selected-representation
+        (throw
+         (ex-info
+          "Not Acceptable"
+          ;; TODO: Must add list of available representations
+          ;; TODO: Add to req with into
+          {::site/request-context (assoc req :ring.response/status 406)}))))
 
     #_(log/debug "result of negotiate-representation" (dissoc selected-representation ::http/body ::http/content))
 
@@ -52,6 +51,10 @@
     (cond-> selected-representation
       (not-empty vary) (assoc ::http/vary (str/join ", " vary)))))
 
+(defn negotiate-error-representation [req representations]
+  (let [{selected-representation ::pick/representation}
+        (pick-with-vary req representations)]
+    selected-representation))
 
 (defn find-variants [{::site/keys [resource uri db]}]
 

@@ -2,7 +2,6 @@
 
 (ns juxt.book-test
   (:require
-   [portal.api :as p]
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [clojure.string :as str]
@@ -699,7 +698,23 @@
           _ (is (empty? errors))
           _ (is (= "application/edn" (get-in get-response [:ring.response/headers "content-type"])))
 
+          get-response
+          (call-handler
+           {:ring.request/method :get
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)
+             "accept" "application/json"}})
+
+          _ (is (= 406 (:ring.response/status get-response)))
+
           ]
+
+
+
+
+      #_(doseq [tap @(deref #'clojure.core/tapset)]
+          (remove-tap tap))
 
       ;; What if there are errors?  How to communicate these? - for now, via the
       ;; link to the request which should be generated as part of the error
@@ -707,6 +722,13 @@
 
 
       )))
+
+(comment
+  (doseq [tap @(deref #'clojure.core/tapset)]
+    (remove-tap tap)))
+
+(comment
+  (deref (deref #'clojure.core/tapset)))
 
 ;; Wrapping in a tap
 #_(try
@@ -721,7 +743,7 @@
 
          )
         (finally
-           (doseq [tap @(deref #'clojure.core/tapset)]
+          (doseq [tap @(deref #'clojure.core/tapset)]
              (remove-tap tap))))
 
 ;; Keep this as an example of how to set up a database, initialize a request and
