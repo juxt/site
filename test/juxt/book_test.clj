@@ -678,14 +678,17 @@
       ;; link to the request which should be generated as part of the error
       ;; output. Possibly this can be Selmer templated in the future.
 
-      #_(tap>
-       (call-handler
-        {:ring.request/method :get
-         :ring.request/path "/graphql"
-         :ring.request/headers
-         {"authorization" (format "Bearer %s" access-token)}}))
 
-      (repl/e "https://site.test/graphql")
+      (call-handler
+       {:ring.request/method :get
+        :ring.request/path "/graphql"
+        :ring.request/headers
+        {"authorization" (format "Bearer %s" access-token)}})
+
+
+      ;; Where's the body?
+
+      ;;(repl/e "https://site.test/graphql")
 
       )))
 

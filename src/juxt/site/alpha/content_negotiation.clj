@@ -62,6 +62,8 @@
     (when (pos? (count variants))
       (cond-> (for [[v] variants]
                 (assoc v ::http/content-location (:xt/id v)))
+        ;; If the resource has a content-type (or template), then add it as an
+        ;; additional representation.
         (or (::http/content-type resource) (::site/template resource))
         (conj resource)))))
 

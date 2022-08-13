@@ -171,6 +171,9 @@
 (defn add-payload [{::site/keys [selected-representation db]
                     :ring.request/keys [method]
                     :as req}]
+  (tap> {:step "adding payload"
+         :req req})
+
   ;; Should not be called if method is HEAD
   (assert (not= method :head))
 
