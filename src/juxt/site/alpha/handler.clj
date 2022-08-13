@@ -412,6 +412,7 @@
   (fn [{:ring.request/keys [method] :as req}]
     (if (#{:get :head :put} method)
       (let [cur-reps (seq (conneg/current-representations req))]
+        (tap> cur-reps)
         (when (and (#{:get :head} method) (empty? cur-reps))
           (throw
            (ex-info

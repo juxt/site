@@ -2,6 +2,7 @@
 
 (ns juxt.book-test
   (:require
+   [portal.api :as p]
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [clojure.string :as str]
@@ -19,7 +20,8 @@
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
    [ring.util.codec :as codec]
    [xtdb.api :as xt]
-   [clojure.core.server :as s])
+   [clojure.core.server :as s]
+   [clojure.edn :as edn])
   (:import (clojure.lang ExceptionInfo)))
 
 (defn with-handler [f]
@@ -617,8 +619,8 @@
      f/nip)
    {}))
 
-;;deftest put-graphql-schema
-(with-fixtures
+;;with-fixtures
+(deftest put-graphql-schema
   (with-resources
     #{"https://site.test/graphql"
       "https://site.test/actions/put-graphql-schema"
@@ -672,27 +674,55 @@
           _ (is (nil? (get-in put-response [:ring.response/headers "location"])))
 
           put-response (call-handler put-request)
-          _ (is (= 200 (:ring.response/status put-response)))]
+          _ (is (= 200 (:ring.response/status put-response)))
+
+          get-response
+          (call-handler
+           {:ring.request/method :get
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)}})
+          _ (is (= 200 (:ring.response/status put-response)))
+          _ (is (= "type Query { myName: String }" (:ring.response/body get-response)))
+          _ (is (= "application/graphql" (get-in get-response [:ring.response/headers "content-type"])))
+
+          get-response
+          (call-handler
+           {:ring.request/method :get
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)
+             "accept" "application/edn"}})
+          _ (is (= 200 (:ring.response/status put-response)))
+
+          errors (:errors (edn/read-string (:ring.response/body get-response)))
+          _ (is (empty? errors))
+          _ (is (= "application/edn" (get-in get-response [:ring.response/headers "content-type"])))
+
+          ]
 
       ;; What if there are errors?  How to communicate these? - for now, via the
       ;; link to the request which should be generated as part of the error
       ;; output. Possibly this can be Selmer templated in the future.
 
 
-      (->
-       (call-handler
-        {:ring.request/method :get
-         :ring.request/path "/graphql"
-         :ring.request/headers
-         {"authorization" (format "Bearer %s" access-token)}})
-       (select-keys [:ring.response/status :ring.response/headers :ring/response/body]))
-
-
-      ;; Where's the body?
-
-      ;;(repl/e "https://site.test/graphql")
-
       )))
+
+;; Wrapping in a tap
+#_(try
+        (portal.api/tap)
+        (->
+         (call-handler
+          {:ring.request/method :get
+           :ring.request/path "/graphql"
+           :ring.request/headers
+           {"authorization" (format "Bearer %s" access-token)}})
+         (select-keys [:ring.response/status :ring.response/headers :ring.response/body])
+
+         )
+        (finally
+           (doseq [tap @(deref #'clojure.core/tapset)]
+             (remove-tap tap))))
 
 ;; Keep this as an example of how to set up a database, initialize a request and
 ;; eval a quotation.

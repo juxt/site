@@ -1593,7 +1593,6 @@ Password: <input name=password type=password>
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/get-graphql-schema"
        :juxt.pass.alpha/scope "https://example.org/oauth/scope/graphql/develop"
-       :juxt.flip.alpha/quotation '()
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
