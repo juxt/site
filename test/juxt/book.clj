@@ -1584,6 +1584,21 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/purpose nil
        :juxt.site.alpha/resource "https://example.org/graphql"})))))
 
+(defn grant-permission-get-graphql-schema-to-alice! []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      ;; TODO: We need a specialist grant-permission for this because we want to
+      ;; documnent/validate the ::site/resource
+      {:xt/id "https://example.org/permissions/alice/get-graphql-schema"
+       :juxt.pass.alpha/user "https://example.org/users/alice"
+       :juxt.pass.alpha/action "https://example.org/actions/get-graphql-schema"
+       :juxt.pass.alpha/purpose nil
+       :juxt.site.alpha/resource "https://example.org/graphql"})))))
+
 (defn create-action-get-graphql-schema []
   (eval
    (substitute-actual-base-uri
@@ -1600,20 +1615,30 @@ Password: <input name=password type=password>
           [id :juxt.pass.alpha/user user]
           [permission :juxt.pass.alpha/user user]]]})))))
 
-(defn grant-permission-get-graphql-schema-to-alice! []
+(defn create-action-graphql-request []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/graphql-request"
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [permission :xt/id "https://example.org/permissions/graphql-access-to-known-subjects"]
+          [subject :xt/id]]]})))))
+
+(defn grant-permission-graphql-request-to-known-subjects []
   (eval
    (substitute-actual-base-uri
     (quote
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      ;; TODO: We need a specialist grant-permission for this because we want to
-      ;; documnent/validate the ::site/resource
-      {:xt/id "https://example.org/permissions/alice/get-graphql-schema"
-       :juxt.pass.alpha/user "https://example.org/users/alice"
-       :juxt.pass.alpha/action "https://example.org/actions/get-graphql-schema"
-       :juxt.pass.alpha/purpose nil
-       :juxt.site.alpha/resource "https://example.org/graphql"})))))
+      {:xt/id "https://example.org/permissions/graphql-access-to-known-subjects"
+       :juxt.pass.alpha/action "https://example.org/actions/graphql-request"
+       :juxt.pass.alpha/purpose nil})))))
 
 ;; Other stuff
 
@@ -2124,17 +2149,25 @@ Password: <input name=password type=password>
    {:deps #{::init/system}
     :create #'create-action-put-graphql-schema}
 
-   "https://example.org/permissions/alice/put-graphql-schema"
-   {:deps #{::init/system}
-    :create #'grant-permission-put-graphql-schema-to-alice!}
-
    "https://example.org/actions/get-graphql-schema"
    {:deps #{::init/system}
     :create #'create-action-get-graphql-schema}
 
+   "https://example.org/actions/graphql-request"
+   {:deps #{::init/system}
+    :create #'create-action-graphql-request}
+
+   "https://example.org/permissions/alice/put-graphql-schema"
+   {:deps #{::init/system}
+    :create #'grant-permission-put-graphql-schema-to-alice!}
+
    "https://example.org/permissions/alice/get-graphql-schema"
    {:deps #{::init/system}
     :create #'grant-permission-get-graphql-schema-to-alice!}
+
+   "https://example.org/permissions/graphql-access-to-known-subjects"
+   {:deps #{::init/system}
+    :create #'grant-permission-graphql-request-to-known-subjects}
 
    "https://example.org/graphql"
    {:deps #{::init/system
@@ -2148,10 +2181,15 @@ Password: <input name=password type=password>
 
             "https://example.org/actions/install-graphql-endpoint"
             "https://example.org/permissions/alice/install-graphql-endpoint"
-            "https://example.org/actions/put-graphql-schema"
 
             "https://example.org/oauth/scope/graphql/administer"
-            "https://example.org/oauth/scope/graphql/develop"}
+            "https://example.org/oauth/scope/graphql/develop"
+
+            ;; Actions referred to by the /graphql resource
+            "https://example.org/actions/put-graphql-schema"
+            "https://example.org/actions/get-graphql-schema"
+            "https://example.org/actions/graphql-request"
+            "https://example.org/permissions/graphql-access-to-known-subjects"}
 
     :create #'create-graphql-endpoint
     }

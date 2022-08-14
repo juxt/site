@@ -622,9 +622,7 @@
 (deftest put-graphql-schema
   (with-resources
     #{"https://site.test/graphql"
-      "https://site.test/actions/put-graphql-schema"
       "https://site.test/permissions/alice/put-graphql-schema"
-      "https://site.test/actions/get-graphql-schema"
       "https://site.test/permissions/alice/get-graphql-schema"}
     (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
           {access-token "access_token"
@@ -708,9 +706,24 @@
 
           _ (is (= 406 (:ring.response/status get-response)))
 
+          post-response
+          (call-handler
+           {:ring.request/method :post
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)
+             "content-type" "application/graphql"}
+            ::body-bytes (.getBytes "query { myName }")})
+
+          _ (is (= 200 (:ring.response/status post-response)))
+
           ]
 
+      (tap> post-response)
 
+      (tap> (repl/ls))
+
+      ;; Why is post-request forbidden?
 
 
       #_(doseq [tap @(deref #'clojure.core/tapset)]
@@ -843,6 +856,7 @@
 
 (comment
   (p/tap))
+
 
 (comment
   (p/register! #'repl/e))
