@@ -719,16 +719,6 @@
 
           ]
 
-      (tap> post-response)
-
-      (tap> (repl/ls))
-
-      ;; Why is post-request forbidden?
-
-
-      #_(doseq [tap @(deref #'clojure.core/tapset)]
-          (remove-tap tap))
-
       ;; What if there are errors?  How to communicate these? - for now, via the
       ;; link to the request which should be generated as part of the error
       ;; output. Possibly this can be Selmer templated in the future.

@@ -1374,7 +1374,7 @@ Password: <input name=password type=password>
                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-graphql-schema"}}
                  :put {:juxt.pass.alpha/actions #{"https://example.org/actions/put-graphql-schema"}
                        :juxt.site.alpha/acceptable {"accept" "application/graphql"}}
-                 :post {:juxt.pass.alpha/action "https://example.org/actions/graphql-request"}})
+                 :post {:juxt.pass.alpha/actions #{"https://example.org/actions/graphql-request"}}})
                (f/set-at (f/dip ["https://meta.juxt.site/site/graphql-endpoint" :juxt.site.alpha/type]))
                (f/set-at (f/dip ["GraphQL endpoint" :juxt.site.alpha/description]))
                :new-resource]))])
@@ -1623,6 +1623,7 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/graphql-request"
+       :juxt.flip.alpha/quotation `()
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
