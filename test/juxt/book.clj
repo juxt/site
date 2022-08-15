@@ -2185,6 +2185,9 @@ Password: <input name=password type=password>
 
             "https://example.org/oauth/scope/graphql/administer"
             "https://example.org/oauth/scope/graphql/develop"
+            "https://example.org/oauth/scope/graphql/query"
+            "https://example.org/oauth/scope/graphql/mutation"
+            "https://example.org/oauth/scope/graphql/subscription"
 
             ;; Actions referred to by the /graphql resource
             "https://example.org/actions/put-graphql-schema"
@@ -2219,17 +2222,23 @@ Password: <input name=password type=password>
             "https://example.org/permissions/system/create-oauth-scope"}
     :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/develop"))}
 
-   "https://example.org/oauth/scope/graphql/read"
+   "https://example.org/oauth/scope/graphql/query"
    {:deps #{::init/system
             "https://example.org/actions/create-oauth-scope"
             "https://example.org/permissions/system/create-oauth-scope"}
-    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/read"))}
+    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/query"))}
 
-   "https://example.org/oauth/scope/graphql/write"
+   "https://example.org/oauth/scope/graphql/mutation"
    {:deps #{::init/system
             "https://example.org/actions/create-oauth-scope"
             "https://example.org/permissions/system/create-oauth-scope"}
-    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/write"))}
+    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/mutation"))}
+
+   "https://example.org/oauth/scope/graphql/subscription"
+   {:deps #{::init/system
+            "https://example.org/actions/create-oauth-scope"
+            "https://example.org/permissions/system/create-oauth-scope"}
+    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/subscription"))}
 
    ;; Required by user-directory-test
 

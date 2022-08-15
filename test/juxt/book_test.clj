@@ -706,25 +706,70 @@
 
           _ (is (= 406 (:ring.response/status get-response)))
 
-          post-response
-          (call-handler
-           {:ring.request/method :post
-            :ring.request/path "/graphql"
-            :ring.request/headers
-            {"authorization" (format "Bearer %s" access-token)
-             "content-type" "application/graphql"}
-            ::body-bytes (.getBytes "query { myName }")})
 
-          _ (is (= 200 (:ring.response/status post-response)))
 
           ]
 
       ;; What if there are errors?  How to communicate these? - for now, via the
       ;; link to the request which should be generated as part of the error
       ;; output. Possibly this can be Selmer templated in the future.
+)))
 
+(defn deploy-schema [session-id ^String schema]
+  (let [{access-token "access_token"
+         error "error"}
+        (book/authorize!
+         :session-id session-id
+         "client_id" "local-terminal"
+         "scope" ["https://site.test/oauth/scope/graphql/develop"])
+        _ (is (nil? error) (format "OAuth2 grant error: %s" error))
+        put-request
+        {:ring.request/method :put
+         :ring.request/path "/graphql"
+         :ring.request/headers
+         {"authorization" (format "Bearer %s" access-token)
+          "content-type" "application/graphql"}
+         ::body-bytes (.getBytes schema)}
+        put-response (call-handler put-request)]
+    _ (is (= 201 (:ring.response/status put-response)))))
 
-      )))
+(defn graphql-query [^String access-token ^String query]
+  (let [post-response
+        (call-handler
+         {:ring.request/method :post
+          :ring.request/path "/graphql"
+          :ring.request/headers
+          {"authorization" (format "Bearer %s" access-token)
+           "content-type" "application/graphql"}
+          ::body-bytes (.getBytes query)})
+
+        _ (is (= 200 (:ring.response/status post-response)))]
+    (:ring.response/body post-response)))
+
+(deftest post-graphql-request
+  (with-resources
+    #{"https://site.test/graphql"
+      "https://site.test/permissions/alice/put-graphql-schema"
+      "https://site.test/permissions/alice/get-graphql-schema"}
+
+    (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+
+          _ (deploy-schema session-id "type Query { myName: String }")
+
+          {access-token "access_token"
+           error "error"}
+          (book/authorize!
+           :session-id session-id
+           "client_id" "local-terminal"
+           "scope" ["https://site.test/oauth/scope/graphql/query"])
+          _ (is (nil? error) (format "OAuth2 grant error: %s" error))]
+
+      (graphql-query access-token "query { myName }"))))
+
+;; TODO: Scopes !
+;; "https://example.org/oauth/scope/graphql/read"
+;; "https://example.org/oauth/scope/graphql/write"
+;; or  query/mutate/subscribe?
 
 (comment
   (doseq [tap @(deref #'clojure.core/tapset)]
