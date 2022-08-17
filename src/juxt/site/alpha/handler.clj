@@ -896,7 +896,7 @@
 
          ;; Some default representations for errors
          (some->
-          (conneg/negotiate-representation
+          (conneg/negotiate-error-representation
            req
            [(let [content
                   ;; We don't want to provide much information here, we don't
@@ -917,7 +917,13 @@
 
           ;; This is an error, it won't be cached, it isn't negotiable 'content'
           ;; so the Vary header isn't deemed applicable. Let's not set it.
-          (dissoc ::http/vary)))
+          (dissoc ::http/vary))
+
+         ;; A last ditch error in plain-text, even though plain-text is not acceptable, we override this
+         (let [content (.getBytes (str (status-message status) "\r\n") "US-ASCII")]
+           {::http/content-type "text/plain;charset=us-ascii"
+            ::http/content-length (count content)
+            ::http/content content}))
 
         error-resource (merge
                         {:ring.response/status 500
@@ -932,7 +938,7 @@
 
         response (try
                    (cond-> error-resource
-                       (not= method :head) response/add-payload)
+                     (not= method :head) response/add-payload)
                    (catch Exception e
                      (respond-internal-error req e)))]
 
