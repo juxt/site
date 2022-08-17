@@ -5,8 +5,10 @@
   ;; dependencies:
   (:refer-clojure :exclude [+ first second symbol drop keep when str ex-info any? filter map])
   (:require
+   [clojure.core :as cc]
    [clojure.edn :as edn]
    [clojure.string :as str]
+   [clojure.walk :refer [postwalk prewalk]]
    jsonista.core
    juxt.pass.alpha.util
    [juxt.site.alpha :as-alias site]
@@ -15,7 +17,8 @@
    [malli.core :as m]
    [malli.error :a me]
    [ring.util.codec :as codec]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   [juxt.flip.alpha.core :as f]))
 
 ;; See Factor, https://factorcode.org/
 ;; See K's XY language, https://www.nsl.com/k/xy/xy.htm
@@ -35,24 +38,28 @@
     [stack (concat quotation queue) env]
     ;; Don't apply, simply treat as a symbol. We might be in the process of
     ;; defining a word.
-    (clojure.core/or
+    (cc/or
 
      ;; Clojure interop - but should be subject to a whitelist!!
-     #_(clojure.core/when-let [var (requiring-resolve name)]
-       (clojure.core/when-let [arglists (:arglists (clojure.core/meta var))]
-         (if (= (clojure.core/count arglists) 1)
-           (let [[args stack] (clojure.core/split-at (clojure.core/count (clojure.core/first arglists)) stack)]
-             [(clojure.core/cons (clojure.core/apply var (clojure.core/reverse args)) stack) queue env])
-           (throw (clojure.core/ex-info (format "Clojure function has multiple forms: %s" name) {:symbol name})))))
+     #_(cc/when-let [var (requiring-resolve name)]
+       (cc/when-let [arglists (:arglists (cc/meta var))]
+         (if (= (cc/count arglists) 1)
+           (let [[args stack] (cc/split-at (cc/count (cc/first arglists)) stack)]
+             [(cc/cons (cc/apply var (cc/reverse args)) stack) queue env])
+           (throw (cc/ex-info (format "Clojure function has multiple forms: %s" name) {:symbol name})))))
 
      ;; define
-     (clojure.core/when
-         (clojure.core/and
-          (clojure.core/vector? (clojure.core/first queue))
-          (= (clojure.core/second queue) 'juxt.flip.alpha.core/define))
-         [(cons name stack) queue env])
+     (cc/when
+         (cc/and
+          (cc/vector? (cc/first queue))
+          (= (cc/second queue) 'juxt.flip.alpha.core/define))
+       [(cons name stack) queue env])
 
-     (throw (clojure.core/ex-info (format "Symbol not defined: %s" name) {:symbol name})))))
+     ;; HTML/XML tag
+     #_(when-let [[_ tag] (re-matches #"<(\w+)>" (cc/str (cc/name name)))]
+       [(cons {:tag (keyword tag), :attrs nil, :content nil} stack) queue env])
+
+     (throw (cc/ex-info (format "Symbol not defined: %s" name) {:symbol name})))))
 
 (def break 'juxt.flip.alpha.core/break)
 (defmethod word 'juxt.flip.alpha.core/break [stack [_ & queue] env]
@@ -67,6 +74,14 @@
 (defmethod word 'juxt.flip.alpha.core/no-op
   [stack [_ & queue] env]
   [stack queue env])
+
+(defmethod word `assert-context [stack [_ & queue] env]
+  (assert (cc/= 1 (cc/count stack)) (format "Stack has multiple elements (next: %s)" (cc/first queue)))
+  (assert (cc/map? (cc/first stack)) (format "Top of stack is not a context (el: %s, next: %s)" (cc/first stack) (cc/first queue)))
+  [stack queue env])
+
+(defmethod word `with-checks [[quot & stack] [_ & queue] env]
+  [stack (cc/concat (cc/interleave quot (cc/repeat `assert-context)) queue) env])
 
 ;; TODO: What is the Factor equivalent name?
 (def env 'juxt.flip.alpha.core/env)
@@ -231,6 +246,11 @@
   [[k m & stack] [_ & queue] env]
   [(cons (get m k) stack) queue env])
 
+(def at 'juxt.flip.alpha.core/at)
+(defmethod word 'juxt.flip.alpha.core/at
+  [[key assoc & stack] [_ & queue] env]
+  [(cc/cons (get assoc key) stack) queue env])
+
 (def rot 'juxt.flip.alpha.core/rot)
 (defmethod word 'juxt.flip.alpha.core/rot
   [[z y x & stack] [_ & queue] env]
@@ -254,6 +274,16 @@
 (defmethod word 'juxt.flip.alpha.core/keep
   [[quot x & stack] [_ & queue] env]
   [(cons x (eval-quotation (cons x stack) quot env)) queue env])
+
+(def _2keep 'juxt.flip.alpha.core/_2keep)
+(defmethod word 'juxt.flip.alpha.core/_2keep
+  [[quot y x & stack] [_ & queue] env]
+  [(cons y (cons x (eval-quotation (cons y (cons x stack)) quot env))) queue env])
+
+(def dupd `dupd)
+(defmethod word `dupd
+  [[y x & stack] [_ & queue] env]
+  [(cons y (cons x (cons x stack))) queue env])
 
 (def if 'juxt.flip.alpha.core/if)
 (defmethod word 'juxt.flip.alpha.core/if
@@ -386,6 +416,16 @@
   [[s1 s2 & stack] [_ & queue] env]
   [(cons (clojure.core/str s1 s2) stack) queue env])
 
+(def pr-str 'juxt.flip.alpha.core/pr-str)
+(defmethod word 'juxt.flip.alpha.core/pr-str
+  [[el & stack] [_ & queue] env]
+  [(cons (clojure.core/pr-str el) stack) queue env])
+
+(def number->string 'juxt.flip.alpha.core/number->string)
+(defmethod word 'juxt.flip.alpha.core/number->string
+  [[n & stack] [_ & queue] env]
+  [(cons (clojure.core/str n) stack) queue env])
+
 (defmethod word 'juxt.flip.alpha.core/form-decode
   [[encoded & stack] [_ & queue] env]
   (if encoded
@@ -452,6 +492,18 @@
   [[size & stack] [_ & queue] env]
   [(cons (juxt.pass.alpha.util/make-nonce size) stack) queue env])
 
+;; Post walk processing structures
+(defmethod word 'juxt.flip.alpha.core/eval-embedded-quotations
+  [[form & stack] [_ & queue] env]
+  (let [processed
+        (prewalk
+         (fn [x]
+           (if (seq? x)
+             (clojure.core/first (eval-quotation stack x env))
+             x))
+         form)]
+    [(cons processed stack) queue env]))
+
 ;; Errors
 
 (def ex-info 'juxt.flip.alpha.core/ex-info)
@@ -485,6 +537,16 @@
       (if-let [error (::error (ex-data e))]
         [(eval-quotation (cons error stack) recovery env) queue env]
         (throw e)))))
+
+;; XML
+
+(defmethod word 'juxt.flip.alpha.xml/<tag>
+  [[children attrs name & stack] [_ & queue] env]
+  [(cons {:tag (keyword name) :attrs attrs :content children} stack) queue env])
+
+(defmethod word 'juxt.flip.alpha.xml/<contained-tag>
+  [[attrs name & stack] [_ & queue] env]
+  [(cons {:tag (keyword name) :attrs attrs} stack) queue env])
 
 ;; XTDB
 
@@ -534,26 +596,31 @@
 
 (defmethod word 'juxt.site.alpha/request-body-as-edn
   [stack [_ & queue] env]
-  [stack (concat `(:juxt.site.alpha/received-representation
-                   env :juxt.http.alpha/body
-                   of
-                   ;; TODO: Test if nil and throw an exception
-                   bytes-to-string
-                   juxt.flip.alpha.edn/read-string) queue) env])
+  [stack
+   (concat `(
+             (env :juxt.site.alpha/received-representation)
+             (of :juxt.http.alpha/body)
+             ;; TODO: Test if nil and throw an exception
+             bytes-to-string
+             juxt.flip.alpha.edn/read-string) queue)
+   env])
 
 (defmethod word 'juxt.site.alpha/request-body-as-json
   [stack [_ & queue] env]
-  [stack (concat `(:juxt.site.alpha/received-representation
-                   env :juxt.http.alpha/body
-                   of
-                   bytes-to-string
-                   jsonista.core/read-string) queue) env])
+  [stack
+   (concat `((env :juxt.site.alpha/received-representation)
+             (of :juxt.http.alpha/body)
+             bytes-to-string
+             jsonista.core/read-string) queue)
+   env])
 
-#_(defmethod word 'juxt.site.alpha/request-query-string
+(defmethod word 'juxt.site.alpha/request-body-as-string
   [stack [_ & queue] env]
-  [stack (concat `( :ring.request/query env
-
-                   jsonista.core/read-string) queue) env])
+  [stack
+   (concat `((env :juxt.site.alpha/received-representation)
+             (of :juxt.http.alpha/body)
+             bytes-to-string) queue)
+   env])
 
 (defmethod word 'juxt.site.alpha/apply-to-request-context
   [stack [_ & queue] env]
@@ -575,6 +642,13 @@
   [stack
    (concat `[[] ::site/fx <sorted-map> set-at ~quot call] queue)
    env])
+
+(defmethod word 'juxt.site.alpha/with-fx-acc-with-checks
+  [[quot & stack] [_ & queue] env]
+  (let [quot [(cc/interleave quot (cc/repeat `assert-context))]]
+    [stack
+     (concat `[[] ::site/fx <sorted-map> set-at ~quot call] queue)
+     env]))
 
 ;; Create an apply-to-request-context operation that sets a header
 ;; (header-name value -- op)
@@ -663,6 +737,7 @@
         (or (ex-data t) {})
         t)))))
 
+;; TODO: Tempted to rename to just 'eval'
 (defn eval-quotation
   ;; Naiive implementation. A production implementation would put an upper limit
   ;; on the number of iterations to prevent overly long running transactions.
