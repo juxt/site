@@ -6,8 +6,10 @@
    [ring.util.codec :as codec]
    [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]
+   [juxt.site.alpha.graphql.flip :as graphql-flip]
    [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.site.alpha :as-alias site]
+   [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
    [juxt.test.util :refer [*handler*]]
    [malli.core :as malli]
@@ -39,7 +41,7 @@
 
        :juxt.flip.alpha/quotation
        `(
-         (site/with-fx-acc
+         (site/with-fx-acc-with-checks
            [(site/push-fx
              (f/dip
               [site/request-body-as-edn
@@ -93,7 +95,7 @@
 
        :juxt.flip.alpha/quotation
        `(
-         (site/with-fx-acc
+         (site/with-fx-acc-with-checks
            [(site/push-fx
              (f/dip
               [(xtdb.api/put
@@ -1345,7 +1347,7 @@ Password: <input name=password type=password>
          (f/define extract-permissions
            [(f/set-at (f/dip [(f/env ::pass/permissions) :permissions]))])
 
-         (f/define determine-if-match
+         (f/define determine-if-match-resource-pattern
            ;; We check that the permission resource matches the xt/id
            [(f/set-at
              (f/keep
@@ -1372,7 +1374,7 @@ Password: <input name=password type=password>
                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-graphql-schema"}}
                  :put {:juxt.pass.alpha/actions #{"https://example.org/actions/put-graphql-schema"}
                        :juxt.site.alpha/acceptable {"accept" "application/graphql"}}
-                 :post {:juxt.pass.alpha/action "https://example.org/actions/graphql-request"}})
+                 :post {:juxt.pass.alpha/actions #{"https://example.org/actions/graphql-request"}}})
                (f/set-at (f/dip ["https://meta.juxt.site/site/graphql-endpoint" :juxt.site.alpha/type]))
                (f/set-at (f/dip ["GraphQL endpoint" :juxt.site.alpha/description]))
                :new-resource]))])
@@ -1418,8 +1420,9 @@ Password: <input name=password type=password>
 
          (site/with-fx-acc
            [extract-input
+
             extract-permissions
-            determine-if-match
+            determine-if-match-resource-pattern
             throw-if-not-match
 
             create-resource
@@ -1489,12 +1492,75 @@ Password: <input name=password type=password>
        ;; with a custom word.
        :juxt.flip.alpha/quotation
        `(
-         (site/with-fx-acc
-           [
-            ;; Return a 201 if there is no existing schema
-            (site/set-status 201) f/swap site/push-fx
-            ;; TODO: Otherwise return a 200.
-            ]))
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} extract-input
+         [(f/set-at
+           (f/dip
+            [site/request-body-as-string
+             :input]))])
+
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} compile-input-to-schema
+         [(f/set-at
+           (f/keep
+            [(f/of :input)
+             graphql-flip/compile-schema
+             :compiled-schema]))])
+
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} update-base-resource
+         [(f/dip
+           [(site/entity (f/env ::site/resource))
+            (f/set-at (f/dip [f/dup (f/of :input) ::http/content]))
+            (f/set-at (f/dip ["application/graphql" ::http/content-type]))
+            (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))])
+          f/rot
+          f/set-at])
+
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} create-edn-resource
+         [(f/dip
+           ;; Perhaps could we use a template with eval-embedded-quotations?
+           [{}
+            (f/set-at (f/dip ["application/edn" ::http/content-type]))
+            (f/set-at (f/dip [(f/env ::site/resource) ".edn" f/swap f/str :xt/id]))
+            (f/set-at (f/dip [(f/env ::site/resource) ::site/variant-of]))
+            (f/set-at (f/dip [f/dup (f/of :compiled-schema) f/pr-str ::http/content]))])
+          f/rot
+          f/set-at])
+
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} push-resource
+         [(f/push-at
+           (xtdb.api/put
+            f/dupd
+            f/of
+            (f/unless* [(f/throw-exception (f/ex-info "No object to push as an fx" {}))]))
+           ::site/fx
+           f/rot)])
+
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} determine-status
+         [(f/of (site/entity (f/env ::site/resource)) ::http/content)
+          [200 :status f/rot f/set-at]
+          [201 :status f/rot f/set-at]
+          f/if])
+
+       (site/with-fx-acc ;;-with-checks - adding -with-checks somehow messes things up! :(
+         [
+          ;; The following can be done in advance of the fx-fn.
+          extract-input
+          compile-input-to-schema
+
+          ;; The remainder would need to be done in the tx-fn because it looks
+          ;; up the /graphql resource in order to update it.
+          (update-base-resource :new-resource)
+          (push-resource :new-resource)
+
+          ;; The application/edn resource serves the compiled version
+          (create-edn-resource :edn-resource)
+          (push-resource :edn-resource)
+
+          ;; Return a 201 if there is no existing schema, 200 otherwise
+          determine-status
+          (site/set-status f/dup (f/of :status))
+          f/swap
+          site/push-fx
+          ]))
 
        :juxt.pass.alpha/rules
        '[
@@ -1518,23 +1584,6 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/purpose nil
        :juxt.site.alpha/resource "https://example.org/graphql"})))))
 
-(defn create-action-get-graphql-schema []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/get-graphql-schema"
-       :juxt.pass.alpha/scope "https://example.org/oauth/scope/graphql/develop"
-       :juxt.flip.alpha/quotation '()
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})))))
-
 (defn grant-permission-get-graphql-schema-to-alice! []
   (eval
    (substitute-actual-base-uri
@@ -1549,6 +1598,48 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/action "https://example.org/actions/get-graphql-schema"
        :juxt.pass.alpha/purpose nil
        :juxt.site.alpha/resource "https://example.org/graphql"})))))
+
+(defn create-action-get-graphql-schema []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/get-graphql-schema"
+       :juxt.pass.alpha/scope "https://example.org/oauth/scope/graphql/develop"
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [subject :juxt.pass.alpha/user-identity id]
+          [id :juxt.pass.alpha/user user]
+          [permission :juxt.pass.alpha/user user]]]})))))
+
+(defn create-action-graphql-request []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/graphql-request"
+       :juxt.flip.alpha/quotation `()
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [permission :xt/id "https://example.org/permissions/graphql-access-to-known-subjects"]
+          [subject :xt/id]]]})))))
+
+(defn grant-permission-graphql-request-to-known-subjects []
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/graphql-access-to-known-subjects"
+       :juxt.pass.alpha/action "https://example.org/actions/graphql-request"
+       :juxt.pass.alpha/purpose nil})))))
 
 ;; Other stuff
 
@@ -1668,9 +1759,11 @@ Password: <input name=password type=password>
       :juxt.pass.alpha/login-uri "https://example.org/login"}))))
 
 (defn with-body [req body-bytes]
-  (-> req
-      (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
-      (assoc :ring.request/body (io/input-stream body-bytes))))
+  (if body-bytes
+    (-> req
+        (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
+        (assoc :ring.request/body (io/input-stream body-bytes)))
+    req))
 
 (defn login-with-form!
   "Return a session id (or nil) given a map of fields."
@@ -2057,17 +2150,25 @@ Password: <input name=password type=password>
    {:deps #{::init/system}
     :create #'create-action-put-graphql-schema}
 
-   "https://example.org/permissions/alice/put-graphql-schema"
-   {:deps #{::init/system}
-    :create #'grant-permission-put-graphql-schema-to-alice!}
-
    "https://example.org/actions/get-graphql-schema"
    {:deps #{::init/system}
     :create #'create-action-get-graphql-schema}
 
+   "https://example.org/actions/graphql-request"
+   {:deps #{::init/system}
+    :create #'create-action-graphql-request}
+
+   "https://example.org/permissions/alice/put-graphql-schema"
+   {:deps #{::init/system}
+    :create #'grant-permission-put-graphql-schema-to-alice!}
+
    "https://example.org/permissions/alice/get-graphql-schema"
    {:deps #{::init/system}
     :create #'grant-permission-get-graphql-schema-to-alice!}
+
+   "https://example.org/permissions/graphql-access-to-known-subjects"
+   {:deps #{::init/system}
+    :create #'grant-permission-graphql-request-to-known-subjects}
 
    "https://example.org/graphql"
    {:deps #{::init/system
@@ -2081,10 +2182,18 @@ Password: <input name=password type=password>
 
             "https://example.org/actions/install-graphql-endpoint"
             "https://example.org/permissions/alice/install-graphql-endpoint"
-            "https://example.org/actions/put-graphql-schema"
 
             "https://example.org/oauth/scope/graphql/administer"
-            "https://example.org/oauth/scope/graphql/develop"}
+            "https://example.org/oauth/scope/graphql/develop"
+            "https://example.org/oauth/scope/graphql/query"
+            "https://example.org/oauth/scope/graphql/mutation"
+            "https://example.org/oauth/scope/graphql/subscription"
+
+            ;; Actions referred to by the /graphql resource
+            "https://example.org/actions/put-graphql-schema"
+            "https://example.org/actions/get-graphql-schema"
+            "https://example.org/actions/graphql-request"
+            "https://example.org/permissions/graphql-access-to-known-subjects"}
 
     :create #'create-graphql-endpoint
     }
@@ -2113,17 +2222,23 @@ Password: <input name=password type=password>
             "https://example.org/permissions/system/create-oauth-scope"}
     :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/develop"))}
 
-   "https://example.org/oauth/scope/graphql/read"
+   "https://example.org/oauth/scope/graphql/query"
    {:deps #{::init/system
             "https://example.org/actions/create-oauth-scope"
             "https://example.org/permissions/system/create-oauth-scope"}
-    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/read"))}
+    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/query"))}
 
-   "https://example.org/oauth/scope/graphql/write"
+   "https://example.org/oauth/scope/graphql/mutation"
    {:deps #{::init/system
             "https://example.org/actions/create-oauth-scope"
             "https://example.org/permissions/system/create-oauth-scope"}
-    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/write"))}
+    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/mutation"))}
+
+   "https://example.org/oauth/scope/graphql/subscription"
+   {:deps #{::init/system
+            "https://example.org/actions/create-oauth-scope"
+            "https://example.org/permissions/system/create-oauth-scope"}
+    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/subscription"))}
 
    ;; Required by user-directory-test
 

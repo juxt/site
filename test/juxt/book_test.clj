@@ -2,20 +2,25 @@
 
 (ns juxt.book-test
   (:require
-   [portal.api :as p]
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
+   [clojure.string :as str]
    [juxt.book :as book]
-   [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.util :refer [make-nonce]]
-   [juxt.pass.alpha.session-scope :as session-scope]
-   [juxt.site.alpha :as-alias site]
    [juxt.flip.alpha.core :as f]
+   [juxt.flip.alpha.hiccup :as hc]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.pass.alpha.session-scope :as session-scope]
+   [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.site.alpha :as-alias site]
+   [juxt.http.alpha :as-alias http]
+   [juxt.site.alpha.graphql.flip :as graphql-flip]
    [juxt.site.alpha.init :as init]
+   [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
    [ring.util.codec :as codec]
    [xtdb.api :as xt]
-   [juxt.site.alpha.repl :as repl]
-   [clojure.string :as str])
+   [clojure.core.server :as s]
+   [clojure.edn :as edn])
   (:import (clojure.lang ExceptionInfo)))
 
 (defn with-handler [f]
@@ -25,6 +30,9 @@
               ::site/base-uri "https://site.test"
               ::site/uri-prefix "https://site.test"})]
     (f)))
+
+(defn call-handler [request]
+  (*handler* (book/with-body request (::body-bytes request))))
 
 (use-fixtures :each with-system-xt with-handler)
 
@@ -51,7 +59,7 @@
     (let [req {:ring.request/method :get
                :ring.request/path "/hello"}
           invalid-req (assoc req :ring.request/path "/not-hello")]
-      (is (= 404 (:ring.response/status (*handler* invalid-req)))))))
+      (is (= 404 (:ring.response/status (call-handler invalid-req)))))))
 
 (deftest public-resource-test
   (with-resources #{::init/system
@@ -67,7 +75,7 @@
                :ring.request/path "/hello"}]
 
       (testing "Can retrieve a public immutable resource"
-        (let [{:ring.response/keys [status body]} (*handler* req)]
+        (let [{:ring.response/keys [status body]} (call-handler req)]
           (is (= 200 status))
           (is (= "Hello World!\r\n" body))))
 
@@ -342,7 +350,6 @@
           (is access-token)
           (is (nil? error)))))))
 
-;;with-fixtures
 (deftest authorization-server-implicit-grant-invalid-response-type
   (with-resources #{"https://site.test/oauth/authorize"
                     "https://site.test/session-scopes/oauth"
@@ -510,10 +517,9 @@
                :ring.request/path "/actions/install-graphql-endpoint"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/edn"}}
-              response (-> request
-                           (book/with-body (.getBytes (pr-str {:xt/id "https://site.test/graphql"})))
-                           *handler*)]
+                "content-type" "application/edn"}
+               ::body-bytes (.getBytes (pr-str {:xt/id "https://site.test/graphql"}))}
+              response (call-handler request)]
           (is (= 403 (:ring.response/status response)))))
 
       (testing "Installation at wrong endpoint denied"
@@ -530,8 +536,9 @@
                :ring.request/path "/actions/install-graphql-endpoint"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/edn"}}
-              response (*handler* (book/with-body request (.getBytes (pr-str {:xt/id "https://site.test/my-graphql"}))))]
+                "content-type" "application/edn"}
+               ::body-bytes (.getBytes (pr-str {:xt/id "https://site.test/wrong-graphql"}))}
+              response (call-handler request)]
           (is (= 403 (:ring.response/status response)))))
 
       (testing "Installation successful"
@@ -548,8 +555,9 @@
                :ring.request/path "/actions/install-graphql-endpoint"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/edn"}}
-              response (*handler* (book/with-body request (.getBytes (pr-str {:xt/id "https://site.test/graphql"}))))]
+                "content-type" "application/edn"}
+               ::body-bytes (.getBytes (pr-str {:xt/id "https://site.test/graphql"}))}
+              response (call-handler request)]
           (is (= 201 (:ring.response/status response))))))))
 
 (deftest install-graphql-schema-with-wrong-user
@@ -568,34 +576,70 @@
                :ring.request/path "/graphql"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/graphql"}})
+                "content-type" "application/graphql"}
+               ::body-bytes (.getBytes "schema { }")})
 
-          response (*handler*
-                    (-> request
-                        (book/with-body (.getBytes "schema { }"))))]
+          response (call-handler request)]
       (testing "Attempting for an unauthorized user to PUT a graphql schema"
         (is (= 403 (:ring.response/status response)))))))
 
+;; An experiment to produce HTML via flip
+(comment
+  (require '[juxt.flip.alpha.hiccup :as-alias hc])
+
+  (f/eval-quotation
+   [{:title "My title"
+     :fruits [{:name "apple" :count 10}
+              {:name "banana" :count 12}
+              {:name "kiwi" :count 5}]}]
+   `(
+     (hc/html
+      (f/eval-embedded-quotations
+       [:html
+        [:body
+         [:div
+          (
+           (juxt.pass.alpha/make-nonce 12)
+           )]
+         [:div#foo.bar.baz
+          [:h1
+           (
+            ((f/of :title))
+            )]
+          [:p "Text"]
+          [:table
+           (
+            (f/map
+             (f/of :fruits)
+             [(f/eval-embedded-quotations
+               [:tr
+                [:td ((f/of :name))]
+                [:td ((f/of :count) f/number->string)]])]))]]]]))
+     f/nip)
+   {}))
+
+;;with-fixtures
 (deftest put-graphql-schema
-  (with-resources #{"https://site.test/graphql"
-                    "https://site.test/actions/put-graphql-schema"
-                    "https://site.test/permissions/alice/put-graphql-schema"
-                    "https://site.test/actions/get-graphql-schema"
-                    "https://site.test/permissions/alice/get-graphql-schema"}
+  (with-resources
+    #{"https://site.test/graphql"
+      "https://site.test/permissions/alice/put-graphql-schema"
+      "https://site.test/permissions/alice/get-graphql-schema"}
     (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
           {access-token "access_token"
            error "error"}
-          (book/authorize! :session-id session-id
-                           "client_id" "local-terminal"
-                           "scope" ["https://site.test/oauth/scope/graphql/develop"])
+          (book/authorize!
+           :session-id session-id
+           "client_id" "local-terminal"
+           ;; The graphql/develop scope is going to let us perform
+           ;; put-graphql-schema and get-graphql-schema.
+           "scope" ["https://site.test/oauth/scope/graphql/develop"])
           _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
           get-request
           (-> {:ring.request/method :get
                :ring.request/path "/graphql"
                :ring.request/headers
-               {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/graphql"}})
+               {"authorization" (format "Bearer %s" access-token)}})
 
           get-response (*handler* get-request)
           ;; Confirm there are no representations for /graphql before attempting
@@ -603,27 +647,246 @@
           _ (is (= 404 (:ring.response/status get-response)))
 
           put-response-bad-content
-          (*handler* (-> {:ring.request/method :put
-                          :ring.request/path "/graphql"
-                          :ring.request/headers
-                          {"authorization" (format "Bearer %s" access-token)
-                           "content-type" "text/csv"}}
-                         (book/with-body (.getBytes "schema { }"))))
+          (call-handler
+           {:ring.request/method :put
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)
+             "content-type" "text/csv"}
+            ::body-bytes (.getBytes "schema { }")})
 
           _ (is (= 415 (:ring.response/status put-response-bad-content)))
 
           put-request
-          (-> {:ring.request/method :put
-               :ring.request/path "/graphql"
-               :ring.request/headers
-               {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/graphql"}}
-              (book/with-body (.getBytes "schema { }")))
+          {:ring.request/method :put
+           :ring.request/path "/graphql"
+           :ring.request/headers
+           {"authorization" (format "Bearer %s" access-token)
+            "content-type" "application/graphql"}
+           ::body-bytes (.getBytes "type Query { myName: String }")}
 
-          put-response (*handler* put-request)
+          put-response (call-handler put-request)
 
           _ (is (= 201 (:ring.response/status put-response)))
-          _ (is (nil? (get-in put-response [:ring.response/headers "location"])))])))
+          _ (is (nil? (get-in put-response [:ring.response/headers "location"])))
+
+          put-response (call-handler put-request)
+          _ (is (= 200 (:ring.response/status put-response)))
+
+          get-response
+          (call-handler
+           {:ring.request/method :get
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)}})
+          _ (is (= 200 (:ring.response/status put-response)))
+          _ (is (= "type Query { myName: String }" (:ring.response/body get-response)))
+          _ (is (= "application/graphql" (get-in get-response [:ring.response/headers "content-type"])))
+
+          get-response
+          (call-handler
+           {:ring.request/method :get
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)
+             "accept" "application/edn"}})
+          _ (is (= 200 (:ring.response/status put-response)))
+
+          errors (:errors (edn/read-string (:ring.response/body get-response)))
+          _ (is (empty? errors))
+          _ (is (= "application/edn" (get-in get-response [:ring.response/headers "content-type"])))
+
+          get-response
+          (call-handler
+           {:ring.request/method :get
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)
+             "accept" "application/json"}})
+
+          _ (is (= 406 (:ring.response/status get-response)))
+
+
+
+          ]
+
+      ;; What if there are errors?  How to communicate these? - for now, via the
+      ;; link to the request which should be generated as part of the error
+      ;; output. Possibly this can be Selmer templated in the future.
+)))
+
+(defn deploy-schema [session-id ^String schema]
+  (let [{access-token "access_token"
+         error "error"}
+        (book/authorize!
+         :session-id session-id
+         "client_id" "local-terminal"
+         "scope" ["https://site.test/oauth/scope/graphql/develop"])
+        _ (is (nil? error) (format "OAuth2 grant error: %s" error))
+        put-request
+        {:ring.request/method :put
+         :ring.request/path "/graphql"
+         :ring.request/headers
+         {"authorization" (format "Bearer %s" access-token)
+          "content-type" "application/graphql"}
+         ::body-bytes (.getBytes schema)}
+        put-response (call-handler put-request)]
+    _ (is (= 201 (:ring.response/status put-response)))))
+
+(defn graphql-query [^String access-token ^String query]
+  (let [post-response
+        (call-handler
+         {:ring.request/method :post
+          :ring.request/path "/graphql"
+          :ring.request/headers
+          {"authorization" (format "Bearer %s" access-token)
+           "content-type" "application/graphql"}
+          ::body-bytes (.getBytes query)})
+
+        _ (is (= 200 (:ring.response/status post-response)))]
+    (:ring.response/body post-response)))
+
+(deftest post-graphql-request
+  (with-resources
+    #{"https://site.test/graphql"
+      "https://site.test/permissions/alice/put-graphql-schema"
+      "https://site.test/permissions/alice/get-graphql-schema"}
+
+    (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+
+          _ (deploy-schema session-id "type Query { myName: String }")
+
+          {access-token "access_token"
+           error "error"}
+          (book/authorize!
+           :session-id session-id
+           "client_id" "local-terminal"
+           "scope" ["https://site.test/oauth/scope/graphql/query"])
+          _ (is (nil? error) (format "OAuth2 grant error: %s" error))]
+
+      ;; Ready for implementation
+      ;;(is (graphql-query access-token "query { myName }"))
+      )))
+
+;; A post to /graphql selects the action relating to 'query', 'mutation' or
+;; 'subscription'
+
+;; Do we need to rethink scopes? No, but the /graphql POST handler needs to
+;; programmatically check the query is of the correct scope before
+;; proceeding. This is an exceptional example where custom code is required to
+;; meet a requirement which should not be met by extending Site's design surface
+;; to cover such cases.
+
+(comment
+  (doseq [tap @(deref #'clojure.core/tapset)]
+    (remove-tap tap)))
+
+(comment
+  (deref (deref #'clojure.core/tapset)))
+
+;; Wrapping in a tap
+#_(try
+        (portal.api/tap)
+        (->
+         (call-handler
+          {:ring.request/method :get
+           :ring.request/path "/graphql"
+           :ring.request/headers
+           {"authorization" (format "Bearer %s" access-token)}})
+         (select-keys [:ring.response/status :ring.response/headers :ring.response/body])
+
+         )
+        (finally
+          (doseq [tap @(deref #'clojure.core/tapset)]
+             (remove-tap tap))))
+
+;; Keep this as an example of how to set up a database, initialize a request and
+;; eval a quotation.
+#_(with-fixtures
+  (with-resources
+    #{"https://site.test/graphql"
+      "https://site.test/actions/put-graphql-schema"
+      "https://site.test/permissions/alice/put-graphql-schema"
+      "https://site.test/actions/get-graphql-schema"
+      "https://site.test/permissions/alice/get-graphql-schema"}
+    (f/eval-quotation
+     []
+     `(
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} extract-input
+         [(f/set-at
+           (f/dip
+            [site/request-body-as-string
+             :input]))])
+
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} compile-input-to-schema
+         [(f/set-at
+           (f/keep
+            [(f/of :input)
+             ;; TODO: Catch errors and create an effect which binds them to the
+             ;; request context, along with a 400 status code.
+             graphql-flip/compile-schema
+             :compiled-schema]))])
+
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} update-base-resource
+         [(f/dip
+           [(site/entity (f/env ::site/resource))
+            (f/set-at (f/dip [f/dup (f/of :input) ::http/content]))
+            (f/set-at (f/dip ["application/graphql" ::http/content-type]))
+            (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))])
+          f/rot
+          f/set-at])
+
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} create-edn-resource
+         [(f/dip
+           ;; Perhaps could we use a template with eval-embedded-quotations?
+           [{}
+            (f/set-at (f/dip ["application/edn" ::http/content-type]))
+            (f/set-at (f/dip [(f/env ::site/resource) ".edn" f/swap f/str :xt/id]))
+            (f/set-at (f/dip [(f/env ::site/resource) ::site/variant-of]))
+            (f/set-at (f/dip [f/dup (f/of :compiled-schema) f/pr-str ::http/content]))])
+          f/rot
+          f/set-at])
+
+       (f/define ^{:f/stack-effect '[ctx key -- ctx]} push-resource
+         [(f/push-at
+           (xtdb.api/put
+            f/dupd
+            f/of
+            (f/unless* [(f/throw-exception (f/ex-info "No object to push as an fx" {}))]))
+           ::site/fx
+           f/rot)])
+
+       (f/define ^{:f/stack-effect '[ctx -- ctx]} determine-status
+         [(f/of (site/entity (f/env ::site/resource)) ::http/content)
+          [200 :status f/rot f/set-at]
+          [201 :status f/rot f/set-at]
+          f/if])
+
+       (site/with-fx-acc ;;-with-checks - adding -with-checks somehow messes things up! :(
+         [
+          ;; The following can be done in advance of the fx-fn.
+          extract-input
+          compile-input-to-schema
+
+          ;; The remainder would need to be done in the tx-fn because it looks
+          ;; up the /graphql resource in order to update it.
+          (update-base-resource :new-resource)
+          (push-resource :new-resource)
+
+          ;; The application/edn resource serves the compiled version
+          (create-edn-resource :edn-resource)
+          (push-resource :edn-resource)
+
+          ;; Return a 201 if there is no existing schema, 200 otherwise
+          determine-status
+          (site/set-status f/dup (f/of :status))
+          f/swap
+          site/push-fx
+          ]))
+     {::site/db (xt/db *xt-node*)
+      ::site/received-representation
+      {::http/body (.getBytes "type Query { myName String }")
+       }})))
 
 
 ;; Portal
@@ -634,6 +897,7 @@
 
 (comment
   (p/tap))
+
 
 (comment
   (p/register! #'repl/e))
