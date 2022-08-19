@@ -10,3 +10,6 @@ The healthcare example has been chosen because:
 
 * There are easily-understood examples of both analytical and real-time data,
   exercising query, mutation and subscriptions in GraphQL.
+
+* Where GraphQL, as a form layer, can present a simplified view of a complex and
+  technical data layer.

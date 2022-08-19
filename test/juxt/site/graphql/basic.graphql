@@ -1,0 +1,16 @@
+directive @site(
+  action: [String!]
+) on FIELD_DEFINITION
+
+schema {
+  query: Query
+}
+
+type Query {
+  patients: [Patient] @site(action: ["https://site.test/actions/get-patients"])
+}
+
+type Patient {
+  name: String
+  heartRate: Int @site(action: ["https://site.test/actions/read-vitals"])
+}
