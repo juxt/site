@@ -48,7 +48,7 @@
        (string? s) (str/replace "https://example.org" (base-uri))))
    form))
 
-(defn install-system-subject! []
+(defn install-system-subject! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -60,7 +60,7 @@
       ;; end::install-system-subject![]
       )))))
 
-(defn install-create-action! []
+(defn install-create-action! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -95,7 +95,7 @@
       ;; end::install-create-action![]
       )))))
 
-(defn install-system-permissions! []
+(defn install-system-permissions! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -111,7 +111,7 @@
       ;; end::install-system-permissions![]
       )))))
 
-(defn install-do-action-fn! []
+(defn install-do-action-fn! [_]
   (put! (actions/install-do-action-fn (base-uri))))
 
 (defn make-repl-request-context [subject action edn-arg]
@@ -134,7 +134,7 @@
      (actions/do-action
       (make-repl-request-context subject action-id edn-arg)))))
 
-(defn create-grant-permission-action! []
+(defn create-grant-permission-action! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -174,7 +174,7 @@
      ;; end::create-grant-permission-action![]
      ))))
 
-(defn create-action-get-not-found! []
+(defn create-action-get-not-found! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -187,7 +187,7 @@
         ['(allowed? subject resource permission)
          ['permission :xt/id]]]})))))
 
-(defn create-action-install-not-found! []
+(defn create-action-install-not-found! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -214,7 +214,7 @@
         ['(allowed? subject resource permission)
          '[permission :juxt.pass.alpha/subject subject]]]})))))
 
-(defn grant-permission-install-not-found! []
+(defn grant-permission-install-not-found! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -226,7 +226,7 @@
        :juxt.pass.alpha/action "https://example.org/actions/install-not-found"
        :juxt.pass.alpha/purpose nil})))))
 
-(defn install-not-found-resource! []
+(defn install-not-found-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -236,7 +236,7 @@
         "https://example.org/actions/install-not-found"
         {:xt/id "https://example.org/_site/not-found"}))))))
 
-(defn grant-permission-get-not-found! []
+(defn grant-permission-get-not-found! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -248,7 +248,7 @@
          :juxt.pass.alpha/action "https://example.org/actions/get-not-found"
          :juxt.pass.alpha/purpose nil}))))))
 
-(defn ^{:deprecated "This is the original function prior to adding the dependency graph approach."}
+#_(defn ^{:deprecated "This is the original function prior to adding the dependency graph approach."}
   install-not-found
   "Install an action to perform on '404'."
   []
@@ -261,7 +261,7 @@
 ;; TODO: In the context of an application, rename 'put' to 'register'
 (defn create-action-register-application!
   "Install an action to register an application"
-  []
+  [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -301,7 +301,7 @@
           [user :role role]
           [permission :role role]]]})))))
 
-(defn grant-permission-to-invoke-action-register-application! []
+(defn grant-permission-to-invoke-action-register-application! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -662,7 +662,7 @@
         (fn [acc [id {:keys [create params] :as v}]]
           (when-not create (throw (ex-info (format "No creator for %s" id) {:id id})))
           (conj acc (try
-                      (let [{::pass/keys [puts] :as result} (if params (create v) (create))]
+                      (let [{::pass/keys [puts] :as result} (create v)]
                         (when (and puts (not (contains? (set puts) id)))
                           (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
                         {:id id :status :created :result result})

@@ -30,7 +30,7 @@
 
 ;; User actions
 
-(defn create-action-put-user! []
+(defn create-action-put-user! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -69,7 +69,7 @@
           [user :role role]
           [permission :role role]]]})))))
 
-(defn grant-permission-to-invoke-action-put-user! []
+(defn grant-permission-to-invoke-action-put-user! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -84,7 +84,7 @@
      ;; end::grant-permission-to-invoke-action-put-user![]
      ))))
 
-(defn create-action-put-basic-user-identity! []
+(defn create-action-put-basic-user-identity! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -146,7 +146,7 @@
           [user :role role]
           [permission :role role]]]})))))
 
-(defn grant-permission-to-invoke-action-put-basic-user-identity! []
+(defn grant-permission-to-invoke-action-put-basic-user-identity! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -158,7 +158,7 @@
        :juxt.pass.alpha/action "https://example.org/actions/put-basic-user-identity"
        :juxt.pass.alpha/purpose nil})))))
 
-(defn create-action-put-subject! []
+(defn create-action-put-subject! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -194,7 +194,7 @@
        ;; end::create-action-put-subject![]
      ))))
 
-(defn grant-permission-to-invoke-action-put-subject! []
+(defn grant-permission-to-invoke-action-put-subject! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -233,7 +233,7 @@
 
 ;; Hello World!
 
-(defn create-action-put-immutable-public-resource! []
+(defn create-action-put-immutable-public-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -274,7 +274,7 @@
      ;; end::create-action-put-immutable-public-resource![]
      ))))
 
-(defn grant-permission-to-invoke-action-put-immutable-public-resource! []
+(defn grant-permission-to-invoke-action-put-immutable-public-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -289,7 +289,7 @@
      ;; end::grant-permission-to-invoke-action-put-immutable-public-resource![]
      ))))
 
-(defn create-action-get-public-resource! []
+(defn create-action-get-public-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -307,7 +307,7 @@
        ;; end::create-action-get-public-resource![]
      ))))
 
-(defn grant-permission-to-invoke-get-public-resource! []
+(defn grant-permission-to-invoke-get-public-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -321,7 +321,7 @@
      ;; end::grant-permission-to-invoke-get-public-resource![]
      ))))
 
-(defn create-hello-world-resource! []
+(defn create-hello-world-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -337,7 +337,7 @@
 
 ;; Representations
 
-(defn create-hello-world-html-representation! []
+(defn create-hello-world-html-representation! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -353,7 +353,7 @@
      ;; end::create-hello-world-html-representation![]
      ))))
 
-(defn grant-permission-to-invoke-action-put-template! []
+(defn grant-permission-to-invoke-action-put-template! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -368,7 +368,7 @@
      ;; end::grant-permission-to-invoke-action-put-template![]
      ))))
 
-(defn create-hello-world-html-template! []
+(defn create-hello-world-html-template! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -382,7 +382,7 @@
      ;; end::create-hello-world-html-template![]
      ))))
 
-(defn create-hello-world-with-html-template! []
+(defn create-hello-world-with-html-template! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -398,7 +398,7 @@
 
 ;; Protecting Resources
 
-(defn create-action-put-immutable-protected-resource! []
+(defn create-action-put-immutable-protected-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -440,7 +440,7 @@
      ;; end::create-action-put-immutable-protected-resource![]
      ))))
 
-(defn grant-permission-to-put-immutable-protected-resource! []
+(defn grant-permission-to-put-immutable-protected-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -455,7 +455,7 @@
      ;; end::grant-permission-to-put-immutable-protected-resource![]
      ))))
 
-(defn create-action-get-protected-resource! []
+(defn create-action-get-protected-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -478,7 +478,7 @@
 
 ;; Protection Spaces
 
-(defn create-action-put-protection-space! []
+(defn create-action-put-protection-space! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -517,7 +517,7 @@
      ;; end::create-action-put-protection-space![]
      ))))
 
-(defn grant-permission-to-put-protection-space! []
+(defn grant-permission-to-put-protection-space! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -534,7 +534,7 @@
 
 ;; HTTP Basic Auth
 
-(defn create-resource-protected-by-basic-auth! []
+(defn create-resource-protected-by-basic-auth! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -549,7 +549,7 @@
      ;; end::create-resource-protected-by-basic-auth![]
      ))))
 
-(defn grant-permission-to-resource-protected-by-basic-auth! []
+(defn grant-permission-to-resource-protected-by-basic-auth! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -566,7 +566,7 @@
      ;; end::grant-permission-to-resource-protected-by-basic-auth![]
      ))))
 
-(defn put-basic-protection-space! []
+(defn put-basic-protection-space! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -606,7 +606,7 @@
 
 ;; HTTP Bearer Auth
 
-(defn create-resource-protected-by-bearer-auth! []
+(defn create-resource-protected-by-bearer-auth! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -621,7 +621,7 @@
        ;; end::create-resource-protected-by-bearer-auth![]
      ))))
 
-(defn grant-permission-to-resource-protected-by-bearer-auth! []
+(defn grant-permission-to-resource-protected-by-bearer-auth! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -638,7 +638,7 @@
        ;; end::grant-permission-to-resource-protected-by-bearer-auth![]
      ))))
 
-(defn put-bearer-protection-space! []
+(defn put-bearer-protection-space! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -656,7 +656,7 @@
 
 ;; Session Scopes Preliminaries
 
-(defn create-action-put-session-scope! []
+(defn create-action-put-session-scope! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -694,7 +694,7 @@
      ;; end::create-action-put-session-scope![]
      ))))
 
-(defn grant-permission-to-put-session-scope! []
+(defn grant-permission-to-put-session-scope! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -711,7 +711,7 @@
 
 ;; Session Scope Example
 
-(defn create-resource-protected-by-session-scope! []
+(defn create-resource-protected-by-session-scope! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -726,7 +726,7 @@
      ;; end::create-resource-protected-by-session-scope![]
      ))))
 
-(defn grant-permission-to-resource-protected-by-session-scope! []
+(defn grant-permission-to-resource-protected-by-session-scope! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -745,7 +745,7 @@
 
 ;; TODO: Poorly named since it only creates a session scope around /protected-by-session-scope/
 (defn
-  create-session-scope! []
+  create-session-scope! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -761,7 +761,7 @@
      ;; end::create-session-scope![]
      ))))
 
-(defn create-internal-resource! []
+(defn create-internal-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -772,7 +772,7 @@
        :juxt.http.alpha/content-type "text/plain"
        :juxt.http.alpha/content "Internal message"})))))
 
-(defn grant-alice-permission-to-internal-resource! []
+(defn grant-alice-permission-to-internal-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -789,7 +789,7 @@
   "A very specific action that creates a login form."
   ;; TODO: We could make the HTML content a parameter, but it helps security if
   ;; the http methods remain unconfigurable.
-  []
+  [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -839,7 +839,7 @@ Password: <input name=password type=password>
          [(allowed? subject resource permission)
           [permission :xt/id]]]})))))
 
-(defn grant-permission-to-create-login-resource! []
+(defn grant-permission-to-create-login-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -855,7 +855,7 @@ Password: <input name=password type=password>
      ;; end::grant-permission-to-create-login-resource![]
      ))))
 
-(defn create-login-resource! []
+(defn create-login-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -864,7 +864,7 @@ Password: <input name=password type=password>
       "https://example.org/actions/create-login-resource"
       {})))))
 
-(defn create-action-login! []
+(defn create-action-login! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1049,7 +1049,7 @@ Password: <input name=password type=password>
          [(allowed? subject resource permission)
           [permission :xt/id]]]})))))
 
-(defn grant-permission-to-invoke-action-login! []
+(defn grant-permission-to-invoke-action-login! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1062,7 +1062,7 @@ Password: <input name=password type=password>
 
 ;; Applications
 
-(defn create-action-oauth-authorize! []
+(defn create-action-oauth-authorize! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1250,7 +1250,7 @@ Password: <input name=password type=password>
 
 ;; Authorization Server
 
-(defn create-action-install-authorization-server! []
+(defn create-action-install-authorization-server! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1274,7 +1274,7 @@ Password: <input name=password type=password>
          [(allowed? subject resource permission)
           [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]]})))))
 
-(defn grant-permission-install-authorization-server! []
+(defn grant-permission-install-authorization-server! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1286,7 +1286,7 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/action "https://example.org/actions/install-authorization-server"
        :juxt.pass.alpha/purpose nil})))))
 
-(defn install-authorization-server! []
+(defn install-authorization-server! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1299,7 +1299,7 @@ Password: <input name=password type=password>
 
 ;; First Application
 
-(defn register-example-application! []
+(defn register-example-application! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1316,7 +1316,7 @@ Password: <input name=password type=password>
 
 ;; Someone who has permission to perform the install-graphql-endpoint action can
 ;; put a GraphQL schema wherever the granted permission allows.
-(defn create-action-install-graphql-endpoint! []
+(defn create-action-install-graphql-endpoint! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1460,7 +1460,7 @@ Password: <input name=password type=password>
           [id :juxt.pass.alpha/user user]
           [permission :juxt.pass.alpha/user user]]]})))))
 
-(defn grant-permission-install-graphql-endpoint-to-alice! []
+(defn grant-permission-install-graphql-endpoint-to-alice! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1476,7 +1476,7 @@ Password: <input name=password type=password>
        :juxt.site.alpha/resource-pattern "\\Qhttps://example.org/graphql\\E"
        :juxt.pass.alpha/purpose nil})))))
 
-(defn create-action-put-graphql-schema []
+(defn create-action-put-graphql-schema [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1569,7 +1569,7 @@ Password: <input name=password type=password>
           [id :juxt.pass.alpha/user user]
           [permission :juxt.pass.alpha/user user]]]})))))
 
-(defn grant-permission-put-graphql-schema-to-alice! []
+(defn grant-permission-put-graphql-schema-to-alice! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1584,7 +1584,7 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/purpose nil
        :juxt.site.alpha/resource "https://example.org/graphql"})))))
 
-(defn grant-permission-get-graphql-schema-to-alice! []
+(defn grant-permission-get-graphql-schema-to-alice! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1599,7 +1599,7 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/purpose nil
        :juxt.site.alpha/resource "https://example.org/graphql"})))))
 
-(defn create-action-get-graphql-schema []
+(defn create-action-get-graphql-schema [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1615,7 +1615,7 @@ Password: <input name=password type=password>
           [id :juxt.pass.alpha/user user]
           [permission :juxt.pass.alpha/user user]]]})))))
 
-(defn create-action-graphql-request []
+(defn create-action-graphql-request [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1630,7 +1630,7 @@ Password: <input name=password type=password>
           [permission :xt/id "https://example.org/permissions/graphql-access-to-known-subjects"]
           [subject :xt/id]]]})))))
 
-(defn grant-permission-graphql-request-to-known-subjects []
+(defn grant-permission-graphql-request-to-known-subjects [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1643,7 +1643,7 @@ Password: <input name=password type=password>
 
 ;; Other stuff
 
-(defn grant-permission-to-put-error-resource! []
+(defn grant-permission-to-put-error-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1658,7 +1658,7 @@ Password: <input name=password type=password>
      ;; end::grant-permission-to-put-error-resource![]
      ))))
 
-(defn put-unauthorized-error-resource! []
+(defn put-unauthorized-error-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1672,7 +1672,7 @@ Password: <input name=password type=password>
      ;; end::put-unauthorized-error-resource![]
      ))))
 
-(defn put-unauthorized-error-representation-for-html! []
+(defn put-unauthorized-error-representation-for-html! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1687,7 +1687,7 @@ Password: <input name=password type=password>
      ;; end::put-unauthorized-error-representation-for-html![]
      ))))
 
-(defn put-unauthorized-error-representation-for-html-with-login-link! []
+(defn put-unauthorized-error-representation-for-html-with-login-link! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1716,7 +1716,7 @@ Password: <input name=password type=password>
        ::pass/user (format "https://example.org/users/%s" ~(str/lower-case username))
        ::pass/purpose nil}))))
 
-(defn create-bearer-protection-space []
+(defn create-bearer-protection-space [_]
   (eval
    (substitute-actual-base-uri
     `(init/do-action
@@ -1731,7 +1731,7 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
        }))))
 
-(defn create-basic-protection-space []
+(defn create-basic-protection-space [_]
   (eval
    (substitute-actual-base-uri
     `(init/do-action
@@ -1746,7 +1746,7 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
        }))))
 
-(defn create-oauth-session-scope []
+(defn create-oauth-session-scope [_]
   (eval
    (substitute-actual-base-uri
     `(init/do-action
@@ -1835,7 +1835,7 @@ Password: <input name=password type=password>
 
     (codec/form-decode encoded)))
 
-(defn create-graphql-endpoint []
+(defn create-graphql-endpoint [_]
   (let [session-id (login-with-form! {"username" "ALICE" "password" "garden"})
         {access-token "access_token"
          error "error"}
@@ -1856,7 +1856,7 @@ Password: <input name=password type=password>
         (pr-str
          {:xt/id (format "%s/graphql" (substitute-actual-base-uri "https://example.org"))}))))))
 
-(defn create-action-create-oauth-scope! []
+(defn create-action-create-oauth-scope! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1882,7 +1882,7 @@ Password: <input name=password type=password>
          [(allowed? subject resource permission)
           [permission :juxt.pass.alpha/subject subject]]]})))))
 
-(defn grant-permission-to-invoke-action-create-oauth-scope! []
+(defn grant-permission-to-invoke-action-create-oauth-scope! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1902,7 +1902,7 @@ Password: <input name=password type=password>
       "https://example.org/actions/create-oauth-scope"
       {:xt/id ~scope}))))
 
-(defn create-action-put-user-owned-content! []
+(defn create-action-put-user-owned-content! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1991,13 +1991,13 @@ Password: <input name=password type=password>
     :deps #{::init/system}}
 
    "https://example.org/users/alice"
-   {:create (fn [] (create-user! {:username "alice" :name "Alice"}))
+   {:create (fn [_] (create-user! {:username "alice" :name "Alice"}))
     :deps #{::init/system
             "https://example.org/actions/put-user"
             "https://example.org/permissions/repl/put-user"}}
 
    "https://example.org/user-identities/alice/basic"
-   {:create (fn [] (create-basic-user-identity!
+   {:create (fn [_] (create-basic-user-identity!
                     {::pass/username "alice" ::pass/password "garden" ::pass/realm "Wonderland"}))
     :deps #{::init/system
             "https://example.org/actions/put-basic-user-identity"
@@ -2005,13 +2005,13 @@ Password: <input name=password type=password>
             "https://example.org/users/alice"}}
 
    "https://example.org/users/bob"
-   {:create (fn [] (create-user! {:username "bob" :name "Bob"}))
+   {:create (fn [_] (create-user! {:username "bob" :name "Bob"}))
     :deps #{::init/system
             "https://example.org/actions/put-user"
             "https://example.org/permissions/repl/put-user"}}
 
    "https://example.org/user-identities/bob/basic"
-   {:create (fn [] (create-basic-user-identity!
+   {:create (fn [_] (create-basic-user-identity!
                     #::pass{:username "bob" :password "walrus" :realm "Wonderland"}))
     :deps #{::init/system
             "https://example.org/actions/put-basic-user-identity"
@@ -2083,13 +2083,13 @@ Password: <input name=password type=password>
             "https://example.org/permissions/system/create-login-resource"}}
 
    "https://example.org/permissions/alice-can-authorize"
-   {:create (fn [] (grant-permission-to-authorize! :username "alice"))
+   {:create (fn [_] (grant-permission-to-authorize! :username "alice"))
     :deps #{::init/system
             "https://example.org/actions/oauth/authorize"
             "https://example.org/users/alice"}}
 
    "https://example.org/permissions/bob-can-authorize"
-   {:create (fn [] (grant-permission-to-authorize! :username "bob"))
+   {:create (fn [_] (grant-permission-to-authorize! :username "bob"))
     :deps #{::init/system
             "https://example.org/actions/oauth/authorize"
             "https://example.org/users/bob"}}
@@ -2214,31 +2214,31 @@ Password: <input name=password type=password>
    {:deps #{::init/system
             "https://example.org/actions/create-oauth-scope"
             "https://example.org/permissions/system/create-oauth-scope"}
-    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/administer"))}
+    :create (fn [_] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/administer"))}
 
    "https://example.org/oauth/scope/graphql/develop"
    {:deps #{::init/system
             "https://example.org/actions/create-oauth-scope"
             "https://example.org/permissions/system/create-oauth-scope"}
-    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/develop"))}
+    :create (fn [_] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/develop"))}
 
    "https://example.org/oauth/scope/graphql/query"
    {:deps #{::init/system
             "https://example.org/actions/create-oauth-scope"
             "https://example.org/permissions/system/create-oauth-scope"}
-    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/query"))}
+    :create (fn [_] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/query"))}
 
    "https://example.org/oauth/scope/graphql/mutation"
    {:deps #{::init/system
             "https://example.org/actions/create-oauth-scope"
             "https://example.org/permissions/system/create-oauth-scope"}
-    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/mutation"))}
+    :create (fn [_] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/mutation"))}
 
    "https://example.org/oauth/scope/graphql/subscription"
    {:deps #{::init/system
             "https://example.org/actions/create-oauth-scope"
             "https://example.org/permissions/system/create-oauth-scope"}
-    :create (fn [] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/subscription"))}
+    :create (fn [_] (#'create-oauth-scope! "https://example.org/oauth/scope/graphql/subscription"))}
 
    ;; Required by user-directory-test
 
@@ -2248,10 +2248,10 @@ Password: <input name=password type=password>
 
    "https://example.org/permissions/alice/put-user-owned-content"
    {:deps #{::init/system}
-    :create (fn [] (#'grant-permission-to-put-user-owned-content! "alice"))}
+    :create (fn [_] (#'grant-permission-to-put-user-owned-content! "alice"))}
 
    "https://example.org/permissions/bob/put-user-owned-content"
    {:deps #{::init/system}
-    :create (fn [] (#'grant-permission-to-put-user-owned-content! "bob"))}
+    :create (fn [_] (#'grant-permission-to-put-user-owned-content! "bob"))}
    }
   )
