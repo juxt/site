@@ -7,6 +7,7 @@
    [jsonista.core :as json]
    [malli.core :as malli]
    [juxt.pass.alpha :as-alias pass]
+   [juxt.site.alpha.locator :refer [to-regex]]
    [juxt.pass.alpha.actions :as actions]
    [juxt.flip.alpha.core :as f]
    [juxt.reap.alpha.combinators :as p]
@@ -620,6 +621,22 @@
    {:create grant-permission-to-invoke-action-register-application!
     :deps #{::system}}})
 
+
+(defn lookup [g id]
+  (or
+   (when-let [v (get g id)] (assoc v :id id))
+   (some (fn [[k v]]
+           (when-let [matches (re-matches (to-regex k) id)]
+             (assoc v
+                    :id id
+                    :params
+                    (zipmap
+                     (map second (re-seq #"\{(\p{Alpha}+)\}" k))
+                     (next matches)))))
+         g)))
+
+;;(lookup {"foo{bar}" {}} "foozip")
+
 (defn converge!
   "Given a set of resource ids and a dependency graph, create resources and their
   dependencies."
@@ -637,15 +654,15 @@
                  (->> r
                       (tree-seq some? (comp :deps graph))
                       (keep (fn [id]
-                              (if-let [v (graph id)]
+                              (if-let [v (lookup graph id)]
                                 (when-not (keyword? id) [id v])
                                 (throw (ex-info (format "No dependency graph entry for %s" id) {:id id}))))))))
        reverse distinct
        (reduce
-        (fn [acc [id {:keys [create]}]]
+        (fn [acc [id {:keys [create params] :as v}]]
           (when-not create (throw (ex-info (format "No creator for %s" id) {:id id})))
           (conj acc (try
-                      (let [{::pass/keys [puts] :as result} (create)]
+                      (let [{::pass/keys [puts] :as result} (if params (create v) (create))]
                         (when (and puts (not (contains? (set puts) id)))
                           (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
                         {:id id :status :created :result result})

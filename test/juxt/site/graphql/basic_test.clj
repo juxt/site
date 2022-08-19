@@ -82,6 +82,21 @@
           [permission :xt/id]
           ]]})))))
 
+(defn register-patient! [args]
+  (throw (ex-info "TODO: register patient" {:args args}))
+  (eval
+   (init/substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/register-patient"
+      {:xt/id "https://example.org/patients/001"
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [permission :xt/id]
+          ]]})))))
+
 (def dependency-graph
   {"https://example.org/actions/register-patient"
    {:create #'create-action-register-patient!
@@ -92,6 +107,11 @@
    "https://example.org/actions/get-patients"
    {:create #'create-action-get-patients!
     :deps #{::init/system}}
+   "https://example.org/patients/{pid}"
+   {:create #'register-patient!
+    :deps #{::init/system
+            "https://example.org/actions/register-patient"
+            "https://site.test/permissions/system/register-patient"}}
    "https://example.org/actions/read-vitals"
    {:create #'create-action-read-vitals!
     :deps #{::init/system}}})
