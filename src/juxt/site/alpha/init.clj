@@ -649,8 +649,8 @@
              [:status :keyword]
              [:error {:optional true} :any]]] %)]}
   (->> ids
-       (mapcat (fn [r]
-                 (->> r
+       (mapcat (fn [id]
+                 (->> id
                       (tree-seq some?
                                 (fn [id]
                                   (let [{:keys [deps params]} (lookup graph id)]
