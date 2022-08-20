@@ -552,9 +552,14 @@
        [:map-of [:or :string :keyword]
         [:map
          [:create {:optional true} :any]
-         [:deps {:optional true} [:or
-                                  [:set [:or :string :keyword]]
-                                  [:=> [:cat [:map-of :string :string]] [:set [:or :string :keyword]]]]]]]}
+         [:deps {:optional true}
+          ;; :deps can be a set, but also, where necessary a function.
+          [:or
+           [:set [:or :string :keyword]]
+           [:=> [:cat
+                 [:map-of :string :string]
+                 [:map {::site/base-uri :string}]]
+            [:set [:or :string :keyword]]]]]]]}
   dependency-graph
   {"https://example.org/_site/do-action"
    {:create install-do-action-fn!}
@@ -659,7 +664,7 @@
                                   (let [{:keys [deps params]} (lookup graph id)]
                                     (cond
                                       (nil? deps) nil
-                                      (fn? deps) (deps params)
+                                      (fn? deps) (deps params {::site/base-uri (base-uri)})
                                       (set? deps) deps
                                       :else (throw (ex-info "Unexpected deps type" {:deps deps}))))))
                       (keep (fn [id]

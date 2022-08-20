@@ -1990,33 +1990,30 @@ Password: <input name=password type=password>
    {:create #'grant-permission-to-invoke-action-put-basic-user-identity!
     :deps #{::init/system}}
 
-   "https://example.org/users/alice"
-   {:create (fn [_] (create-user! {:username "alice" :name "Alice"}))
+   "https://example.org/users/{username}"
+   {:create (fn [{:keys [params]}]
+              (let [username (get params "username")]
+                (create-user!
+                 {:username username
+                  :name (str (str/upper-case (first username)) (subs username 1))})))
     :deps #{::init/system
             "https://example.org/actions/put-user"
             "https://example.org/permissions/repl/put-user"}}
 
-   "https://example.org/user-identities/alice/basic"
-   {:create (fn [_] (create-basic-user-identity!
-                     {::pass/username "alice" ::pass/password "garden" ::pass/realm "Wonderland"}))
-    :deps #{::init/system
-            "https://example.org/actions/put-basic-user-identity"
-            "https://example.org/permissions/repl/put-basic-user-identity"
-            "https://example.org/users/alice"}}
-
-   "https://example.org/users/bob"
-   {:create (fn [_] (create-user! {:username "bob" :name "Bob"}))
-    :deps #{::init/system
-            "https://example.org/actions/put-user"
-            "https://example.org/permissions/repl/put-user"}}
-
-   "https://example.org/user-identities/bob/basic"
-   {:create (fn [_] (create-basic-user-identity!
-                     #::pass{:username "bob" :password "walrus" :realm "Wonderland"}))
-    :deps #{::init/system
-            "https://example.org/actions/put-basic-user-identity"
-            "https://example.org/permissions/repl/put-basic-user-identity"
-            "https://example.org/users/bob"}}
+   "https://example.org/user-identities/{username}/basic"
+   {:create (fn [{:keys [params]}]
+              (let [username (get params "username")]
+                (create-basic-user-identity!
+                 {::pass/username username
+                  ::pass/password (case username
+                                    "alice" "garden"
+                                    "bob" "walrus")
+                  ::pass/realm "Wonderland"})))
+    :deps (fn [{:strs [username]} {::site/keys [base-uri]}]
+            #{::init/system
+              (format "%s/actions/put-basic-user-identity" base-uri)
+              (format "%s/permissions/repl/put-basic-user-identity" base-uri)
+              (format "%s/users/%s" base-uri username)})}
 
    "https://example.org/protected-by-session-scope/document.html"
    {:create #'create-resource-protected-by-session-scope!
