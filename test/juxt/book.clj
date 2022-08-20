@@ -2079,17 +2079,13 @@ Password: <input name=password type=password>
             "https://example.org/actions/create-login-resource"
             "https://example.org/permissions/system/create-login-resource"}}
 
-   "https://example.org/permissions/alice-can-authorize"
-   {:create (fn [_] (grant-permission-to-authorize! :username "alice"))
-    :deps #{::init/system
-            "https://example.org/actions/oauth/authorize"
-            "https://example.org/users/alice"}}
-
-   "https://example.org/permissions/bob-can-authorize"
-   {:create (fn [_] (grant-permission-to-authorize! :username "bob"))
-    :deps #{::init/system
-            "https://example.org/actions/oauth/authorize"
-            "https://example.org/users/bob"}}
+   "https://example.org/permissions/{username}-can-authorize"
+   {:create (fn [{:keys [params]}]
+              (grant-permission-to-authorize! :username (get params "username")))
+    :deps (fn [{:strs [username]} {::site/keys [base-uri]}]
+            #{::init/system
+              (format "%s/actions/oauth/authorize" base-uri)
+              (format "%s/users/%s" base-uri username)})}
 
    "https://example.org/applications/local-terminal"
    {:create #'register-example-application!
