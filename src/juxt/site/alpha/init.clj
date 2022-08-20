@@ -652,7 +652,7 @@
   (->> ids
        (mapcat (fn [r]
                  (->> r
-                      (tree-seq some? (comp :deps graph))
+                      (tree-seq some? (comp :deps #(lookup graph %)))
                       (keep (fn [id]
                               (if-let [v (lookup graph id)]
                                 (when-not (keyword? id) [id v])

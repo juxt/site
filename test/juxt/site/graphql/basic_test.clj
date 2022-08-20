@@ -5,6 +5,8 @@
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [clojure.java.io :as io]
    [juxt.book :as book]
+   [juxt.flip.alpha.core :as f]
+   [juxt.site.alpha.repl :as repl]
    [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]
    [juxt.site.alpha :as-alias site]
    [juxt.site.alpha.init :as init]
@@ -30,20 +32,37 @@
   `((t/join-fixtures [with-system-xt with-handler])
     (fn [] ~@body)))
 
-(defn create-action-register-patient! []
-  (eval
-   (init/substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/register-patient"
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]]})))))
+(defn create-action-register-patient! [_]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/register-patient"
 
-(defn grant-permission-to-invoke-action-register-patient! []
+    :juxt.flip.alpha/quotation
+    `(
+      (site/with-fx-acc-with-checks
+        [(site/push-fx
+          (f/dip
+           [site/request-body-as-edn
+            (site/validate
+             [:map
+              [:xt/id [:re "https://site.test/patients/.*"]]])
+
+            (site/set-type "https://site.test/types/patient")
+
+            (site/set-methods
+             {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
+              :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
+              :options {}})
+
+            xtdb.api/put]))]))
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject subject]]]}))
+
+(defn grant-permission-to-invoke-action-register-patient! [_]
   (eval
    (init/substitute-actual-base-uri
     (quote
@@ -55,7 +74,7 @@
        :juxt.pass.alpha/action "https://example.org/actions/register-patient"
        :juxt.pass.alpha/purpose nil})))))
 
-(defn create-action-get-patients! []
+(defn create-action-get-patients! [_]
   (eval
    (init/substitute-actual-base-uri
     (quote
@@ -68,7 +87,7 @@
          [(allowed? subject resource permission)
           [permission :xt/id]]]})))))
 
-(defn create-action-read-vitals! []
+(defn create-action-read-vitals! [_]
   (eval
    (init/substitute-actual-base-uri
     (quote
@@ -82,76 +101,122 @@
           [permission :xt/id]
           ]]})))))
 
-(defn register-patient! [args]
-  (throw (ex-info "TODO: register patient" {:args args}))
-  (eval
-   (init/substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/register-patient"
-      {:xt/id "https://example.org/patients/001"
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :xt/id]
-          ]]})))))
+(def PATIENT_NAMES
+  {
+   "001" "Terry Levine",
+   "002" "Jeannie Finley",
+   "003" "Jewel Blackburn",
+   "004" "Lila Dickson",
+   "005" "Angie Solis",
+   "006" "Floyd Castro",
+   "007" "Melanie Black",
+   "008" "Beulah Leonard",
+   "009" "Monica Russell",
+   "010" "Sondra Richardson"
+   "011" "Kim Robles",
+   "012" "Mark Richard",
+   "013" "Hazel Huynh",
+   "014" "Francesco Casey",
+   "015" "Moshe Lynch",
+   "016" "Darrel Schwartz",
+   "017" "Blanca Lindsey",
+   "018" "Rudy King",
+   "019" "Valarie Campos",
+   "020" "Elisabeth Riddle"
+   })
+
+(defn register-patient! [{:keys [id params]}]
+  (let [pid (get params "pid")
+        name (get PATIENT_NAMES pid)]
+    (assert name (format "No name found for pid: %s" pid))
+    (init/do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/register-patient"
+     {:xt/id id
+      :name name
+      })))
 
 (def dependency-graph
-  {"https://example.org/actions/register-patient"
+  {"https://site.test/actions/register-patient"
    {:create #'create-action-register-patient!
     :deps #{::init/system}}
    "https://site.test/permissions/system/register-patient"
    {:create #'grant-permission-to-invoke-action-register-patient!
     :deps #{::init/system}}
-   "https://example.org/actions/get-patients"
+   "https://site.test/actions/get-patients"
    {:create #'create-action-get-patients!
     :deps #{::init/system}}
-   "https://example.org/patients/{pid}"
+   "https://site.test/patients/{pid}"
    {:create #'register-patient!
     :deps #{::init/system
-            "https://example.org/actions/register-patient"
+            "https://site.test/actions/register-patient"
             "https://site.test/permissions/system/register-patient"}}
-   "https://example.org/actions/read-vitals"
+   "https://site.test/actions/read-vitals"
    {:create #'create-action-read-vitals!
     :deps #{::init/system}}})
 
 (defmacro with-resources [resources & body]
   `(do
-     (init/converge!
-      ~(conj resources ::init/system)
-      (init/substitute-actual-base-uri
-       (merge init/dependency-graph book/dependency-graph dependency-graph)))
+     (let [resources# ~resources]
+       (init/converge!
+        (conj resources# ::init/system)
+        (init/substitute-actual-base-uri
+         (merge init/dependency-graph book/dependency-graph dependency-graph))))
      ~@body))
 
 (with-fixtures
-  (with-resources
-    #{::init/system
-      "https://site.test/graphql"
-      "https://site.test/actions/get-patients"
-      #_"https://site.test/actions/read-vitals"
-      "https://site.test/actions/register-patient"
-      "https://site.test/permissions/system/register-patient"
-      "https://site.test/patients/001"
+  (let [resources
+        (->
+         #{::init/system
+           "https://site.test/graphql"
+           "https://site.test/actions/get-patients"
+           #_"https://site.test/actions/read-vitals"
+           "https://site.test/actions/register-patient"
+           "https://site.test/permissions/system/register-patient"
 
-      ;; Add some users
-      ;; Alice can read patients
-      ;; Carlos cannot patients
+           }
+         ;; Add some users
+         (into
+          (for [i (range 1 (inc 20))]
+            (format "https://site.test/patients/%03d" i))))]
+
+    ;; Alice can read patients
+    ;; Carlos cannot patients
 
 
-      }
+    (with-resources
+      resources
 
-    (let [db (xt/db *xt-node*)
-          compiled-schema
-          (->
-           "juxt/site/graphql/basic.graphql"
-           io/resource
-           slurp
-           gcompiler/compile-schema)
+      (repl/ls)
 
-          ]
+      #_(let [db (xt/db *xt-node*)
+            compiled-schema
+            (->
+             "juxt/site/graphql/basic.graphql"
+             io/resource
+             slurp
+             gcompiler/compile-schema)
 
-      (gqp/graphql-query->xtdb-query
-       "query { patients { name heartRate } }"
-       compiled-schema
-       db))))
+            ]
+
+        (gqp/graphql-query->xtdb-query
+         "query { patients { name heartRate } }"
+         compiled-schema
+         db)))))
+
+
+#_(into
+ #{::init/system
+   "https://site.test/graphql"
+   "https://site.test/actions/get-patients"
+   #_"https://site.test/actions/read-vitals"
+   "https://site.test/actions/register-patient"
+   "https://site.test/permissions/system/register-patient"
+   "https://site.test/patients/001"
+   "https://site.test/patients/002"
+
+   ;; Add some users
+   ;; Alice can read patients
+   ;; Carlos cannot patients
+   }
+ (for [i (range 20)] (format "https://site.test/patients/%03d" i)))

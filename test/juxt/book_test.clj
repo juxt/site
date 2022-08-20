@@ -43,10 +43,11 @@
 
 (defmacro with-resources [resources & body]
   `(do
-     (init/converge!
-      ~(conj resources ::init/system)
-      (init/substitute-actual-base-uri
-       (merge init/dependency-graph book/dependency-graph)))
+     (let [resources# ~resources]
+       (init/converge!
+        (conj resources# ::init/system)
+        (init/substitute-actual-base-uri
+         (merge init/dependency-graph book/dependency-graph))))
      ~@body))
 
 (defn encode-basic-authorization [user password]
