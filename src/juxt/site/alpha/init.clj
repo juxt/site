@@ -635,11 +635,10 @@
                      (next matches)))))
          g)))
 
-;;(lookup {"foo{bar}" {}} "foozip")
-
 (defn converge!
   "Given a set of resource ids and a dependency graph, create resources and their
-  dependencies."
+  dependencies. A resource id that is a keyword is a proxy for a set of
+  resources that are included together but where there is no common dependant."
   [ids graph]
   {:pre [(malli/validate [:or [:set [:or :string :keyword]] [:sequential [:or :string :keyword]]] ids)
          (malli/validate (::malli/schema (meta #'dependency-graph)) graph)]
@@ -652,7 +651,14 @@
   (->> ids
        (mapcat (fn [r]
                  (->> r
-                      (tree-seq some? (comp :deps #(lookup graph %)))
+                      (tree-seq some?
+                                (fn [id]
+                                  (let [{:keys [deps params]} (lookup graph id)]
+                                    (cond
+                                      (nil? deps) nil
+                                      (fn? deps) (deps params)
+                                      (set? deps) deps
+                                      :else (throw (ex-info "Unexpected deps type" {:deps deps}))))))
                       (keep (fn [id]
                               (if-let [v (lookup graph id)]
                                 (when-not (keyword? id) [id v])

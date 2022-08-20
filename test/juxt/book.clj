@@ -1998,7 +1998,7 @@ Password: <input name=password type=password>
 
    "https://example.org/user-identities/alice/basic"
    {:create (fn [_] (create-basic-user-identity!
-                    {::pass/username "alice" ::pass/password "garden" ::pass/realm "Wonderland"}))
+                     {::pass/username "alice" ::pass/password "garden" ::pass/realm "Wonderland"}))
     :deps #{::init/system
             "https://example.org/actions/put-basic-user-identity"
             "https://example.org/permissions/repl/put-basic-user-identity"
@@ -2012,7 +2012,7 @@ Password: <input name=password type=password>
 
    "https://example.org/user-identities/bob/basic"
    {:create (fn [_] (create-basic-user-identity!
-                    #::pass{:username "bob" :password "walrus" :realm "Wonderland"}))
+                     #::pass{:username "bob" :password "walrus" :realm "Wonderland"}))
     :deps #{::init/system
             "https://example.org/actions/put-basic-user-identity"
             "https://example.org/permissions/repl/put-basic-user-identity"
