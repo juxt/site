@@ -665,7 +665,7 @@
                                 (throw (ex-info (format "No dependency graph entry for %s" id) {:id id}))))))))
        reverse distinct
        (reduce
-        (fn [acc [id {:keys [create params] :as v}]]
+        (fn [acc [id {:keys [create] :as v}]]
           (when-not create (throw (ex-info (format "No creator for %s" id) {:id id})))
           (conj acc (try
                       (let [{::pass/keys [puts] :as result} (create v)]
