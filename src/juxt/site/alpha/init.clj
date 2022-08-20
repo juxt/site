@@ -548,10 +548,13 @@
       {:login-uri (get-in login [::pass/puts 0])
        :callback-uri (get-in callback [::pass/puts 0])})))
 
-(def ^{::malli/schema [:map-of [:or :string :keyword]
-                       [:map
-                        [:create {:optional true} :any]
-                        [:deps {:optional true} [:set [:or :string :keyword]]]]]}
+(def ^{::malli/schema
+       [:map-of [:or :string :keyword]
+        [:map
+         [:create {:optional true} :any]
+         [:deps {:optional true} [:or
+                                  [:set [:or :string :keyword]]
+                                  [:=> [:cat [:map-of :string :string]] [:set [:or :string :keyword]]]]]]]}
   dependency-graph
   {"https://example.org/_site/do-action"
    {:create install-do-action-fn!}
