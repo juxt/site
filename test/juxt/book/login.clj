@@ -7,6 +7,15 @@
    [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]))
 
+;; Note: It might be considered a good idea to create unit tests around this
+;; quotation, but think carefully before doing so. The point of a quotation is
+;; that it runs in the context of an existing database and is very sensitive to
+;; both the current state of the database and the contents of a given
+;; request. Therefore, the best way of testing a quotation is with an
+;; integration test. The danger of creating smaller tests is that the setup
+;; required will be brittle in the face of code changes and possibly lose
+;; accuracy, providing false test positives.
+
 (def login-quotation
   (substitute-actual-base-uri
    {:juxt.flip.alpha/quotation

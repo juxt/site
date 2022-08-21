@@ -47,9 +47,10 @@
 
 (defn with-handler [f]
   (binding [*handler* (make-handler
-                       {::site/xt-node *xt-node*
-                        ::site/base-uri "https://example.org"
-                        ::site/uri-prefix "https://example.org"})]
+                       (init/substitute-actual-base-uri
+                        {::site/xt-node *xt-node*
+                         ::site/base-uri "https://example.org"
+                         ::site/uri-prefix "https://example.org"}))]
     (f)))
 
 (defn with-timing [f]
