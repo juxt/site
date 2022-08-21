@@ -32,6 +32,8 @@
     (f)))
 
 (defn call-handler [request]
+  ;; TODO: This function does too much, it should be renamed to
+  ;; 'finalize-request' or similar, just returning the modified request.
   (*handler* (book/with-body request (::body-bytes request))))
 
 (use-fixtures :each with-system-xt with-handler)

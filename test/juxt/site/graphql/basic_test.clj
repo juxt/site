@@ -168,11 +168,11 @@
   (let [resources
         (->
          #{::init/system
-           "https://site.test/graphql"
+
            "https://site.test/actions/get-patients"
-           #_"https://site.test/actions/read-vitals"
-           "https://site.test/actions/register-patient"
-           "https://site.test/permissions/system/register-patient"
+           "https://site.test/login"
+
+
 
            }
          ;; Add some users
@@ -184,28 +184,75 @@
     ;; Carlos cannot patients
 
 
+    #_{:name "Sondra Richardson",
+       :juxt.site.alpha/type "https://site.test/types/patient",
+       :juxt.site.alpha/methods
+       {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/get-patient"}},
+        :head #:juxt.pass.alpha{:actions #{"https://site.test/actions/get-patient"}},
+        :options {}},
+       :xt/id "https://site.test/patients/010"}
+
     (with-resources
       resources
 
-      (repl/ls)
+      (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+            {access-token "access_token"
+             error "error"}
+            (book/authorize!
+             :session-id session-id
+             "client_id" "local-terminal"
+             "scope" ["https://site.test/oauth/scope/read-personal-data"])
+            _ (is (nil? error) (format "OAuth2 grant error: %s" error))]
+        (*handler*
+         {:ring.request/method :get
+          :ring.request/path "/patients"
+          :ring.request/headers
+          {"authorization" (format "Bearer %s" access-token)
+           "accept" "application/edn"}}))
 
-      (repl/e "https://site.test/patients/010")
+      #_(repl/ls)
+      #_(repl/e "https://site.test/patients/010")
 
-      #_(let [db (xt/db *xt-node*)
-            compiled-schema
-            (->
-             "juxt/site/graphql/basic.graphql"
-             io/resource
-             slurp
-             gcompiler/compile-schema)
+      #_(let [db (xt/db *xt-node*)]
 
-            ]
+          (xt/q
+           db
+           '{:find [(pull e [:name])]
+             :where [[e ::site/type "https://site.test/types/patient"]]
+             })
 
-        (gqp/graphql-query->xtdb-query
-         "query { patients { name heartRate } }"
-         compiled-schema
-         db)))))
+          #_(let [compiled-schema
+                  (->
+                   "juxt/site/graphql/basic.graphql"
+                   io/resource
+                   slurp
+                   gcompiler/compile-schema)]
 
+              (gqp/graphql-query->xtdb-query
+               "query { patients { name heartRate } }"
+               compiled-schema
+               db))))
+
+
+    ))
+
+#_{:find [e (pull e [:name :heartRate])],
+ :where
+ [[e :xt/id _]
+  [action :juxt.site.alpha/type "https://meta.juxt.site/pass/action"]
+  [action :xt/id #{"https://site.test/actions/get-patients"}]
+  [permission :juxt.site.alpha/type "https://meta.juxt.site/pass/permission"]
+  [permission
+   :juxt.pass.alpha/action
+   #{"https://site.test/actions/get-patients"}]
+  [permission :juxt.pass.alpha/purpose purpose]
+  (allowed? permission subject action e)
+  (include? action e)],
+ :rules
+ [[(allowed? subject resource permission)
+   [permission :xt/id]
+   [action :xt/id "https://site.test/actions/get-patients"]]],
+   :in [subject purpose]}
 
 #_(into
  #{::init/system

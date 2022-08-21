@@ -1769,7 +1769,8 @@ Password: <input name=password type=password>
         response (*handler* req)
         {:strs [set-cookie]} (:ring.response/headers response)
         [_ id] (when set-cookie (re-matches #"id=(.*?);.*" set-cookie))]
-    (when-not id (throw (ex-info "Login failed" args)))
+    (when-not id (throw (ex-info "Login failed" {:args args
+                                                 :response response})))
     id))
 
 (defn authorize-response!
