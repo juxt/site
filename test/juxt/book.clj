@@ -216,21 +216,6 @@
        :name ~name
        :role ~(or role "User")}))))
 
-(defn install-user-identity-no-credentials-for-alice!
-  "Put a minimal user-identity for Alice, which has no credentials. There is no
-  action because this is only for education and testing from the SYSTEM."
-  []
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::install-user-identity-no-credentials-for-alice![]
-     (juxt.site.alpha.init/put!
-      {:xt/id "https://example.org/user-identities/alice"
-       :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"
-       :juxt.pass.alpha/user "https://example.org/users/alice"})
-     ;; end::install-user-identity-no-credentials-for-alice![]
-     ))))
-
 ;; Hello World!
 
 (defn create-action-put-immutable-public-resource! [_]

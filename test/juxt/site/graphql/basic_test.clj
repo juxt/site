@@ -189,6 +189,8 @@
 
       (repl/ls)
 
+      (repl/e "https://site.test/patients/010")
+
       #_(let [db (xt/db *xt-node*)
             compiled-schema
             (->
