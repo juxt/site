@@ -16,7 +16,7 @@
    [juxt.site.alpha.graphql.flip :as graphql-flip]
    [juxt.site.alpha.init :as init]
    [juxt.site.alpha.repl :as repl]
-   [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
+   [juxt.test.util :refer [with-system-xt *xt-node* *handler* with-fixtures with-resources] :as tutil]
    [ring.util.codec :as codec]
    [xtdb.api :as xt]
    [clojure.core.server :as s]
@@ -37,20 +37,6 @@
   (*handler* (book/with-body request (::body-bytes request))))
 
 (use-fixtures :each with-system-xt with-handler)
-
-;; This is useful when developing tests at the REPL.
-(defmacro with-fixtures [& body]
-  `((t/join-fixtures [with-system-xt with-handler])
-    (fn [] ~@body)))
-
-(defmacro with-resources [resources & body]
-  `(do
-     (let [resources# ~resources]
-       (init/converge!
-        (conj resources# ::init/system)
-        (init/substitute-actual-base-uri
-         (merge init/dependency-graph book/dependency-graph))))
-     ~@body))
 
 (defn encode-basic-authorization [user password]
   (format "Basic %s" (String. (.encode (java.util.Base64/getEncoder) (.getBytes (format "%s:%s" user password))))))
