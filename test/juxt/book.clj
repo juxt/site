@@ -139,7 +139,7 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
+          [permission :juxt.pass.alpha/subject subject]]
 
          [(allowed? subject resource permission)
           [subject :juxt.pass.alpha/user-identity id]
@@ -185,7 +185,7 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
+          [permission :juxt.pass.alpha/subject subject]]
 
          [(allowed? subject resource permission)
           [subject :juxt.pass.alpha/user-identity id]
@@ -250,7 +250,7 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
+          [permission :juxt.pass.alpha/subject subject]]
 
          [(allowed? subject resource permission) ; <3>
           [subject :juxt.pass.alpha/user-identity id]
@@ -416,7 +416,7 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
+          [permission :juxt.pass.alpha/subject subject]]
 
          [(allowed? subject resource permission) ; <3>
           [subject :juxt.pass.alpha/user-identity id]
@@ -493,7 +493,7 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
+          [permission :juxt.pass.alpha/subject subject]]
 
          [(allowed? subject resource permission)
           [subject :juxt.pass.alpha/user-identity id]
@@ -670,7 +670,7 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
+          [permission :juxt.pass.alpha/subject subject]]
 
          [(allowed? subject resource permission)
           [subject :juxt.pass.alpha/user-identity id]
@@ -1088,7 +1088,7 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]]})))))
+          [permission :juxt.pass.alpha/subject subject]]]})))))
 
 (defn grant-permission-install-authorization-server! [_]
   (eval

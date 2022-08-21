@@ -169,8 +169,17 @@
         (->
          #{::init/system
 
-           "https://site.test/actions/get-patients"
            "https://site.test/login"
+           "https://site.test/user-identities/alice/basic"
+           "https://site.test/oauth/authorize"
+           "https://site.test/session-scopes/oauth"
+           "https://site.test/permissions/alice-can-authorize"
+           "https://site.test/applications/local-terminal"
+
+           "https://site.test/actions/put-immutable-public-resource"
+           "https://site.test/permissions/repl/put-immutable-public-resource"
+
+           "https://site.test/actions/get-patients"
 
 
 
@@ -179,6 +188,14 @@
          (into
           (for [i (range 1 (inc 20))]
             (format "https://site.test/patients/%03d" i))))]
+
+    ;; Add /patients - via an action that allows us to put a public resource
+    (juxt.site.alpha.init/do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/put-immutable-public-resource"
+     {:xt/id "https://site.test/patients"
+      :juxt.http.alpha/content-type "text/plain"
+      :juxt.http.alpha/content "Hello World!\r\n"})
 
     ;; Alice can read patients
     ;; Carlos cannot patients
