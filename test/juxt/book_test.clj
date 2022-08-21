@@ -228,7 +228,11 @@
          (book/login-with-form! {"username" "ALICE" "password" "badpassword"})))
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo #"Login failed"
-         (book/login-with-form! {"username" "bob" "password" "garden"})))))
+         (book/login-with-form! {"username" "bob" "password" "garden"})))
+    (try
+      (book/login-with-form! {"username" "bob" "password" "walrus"})
+      (catch clojure.lang.ExceptionInfo e
+        (is (= 400 (-> e ex-data :response :ring.response/status)))))))
 
 (deftest authorization-server-anonymous-access-forbidden
   (with-resources #{"https://site.test/oauth/authorize"}

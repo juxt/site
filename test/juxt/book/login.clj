@@ -56,7 +56,7 @@
                 ;; stack order
                 :in [password username]})
             f/first
-            (f/unless* [(f/throw-exception (f/ex-info "Login failed" {}))])
+            (f/unless* [(f/throw-exception (f/ex-info "Login failed" {:ring.response/status 400}))])
             :matched-user]))])
 
       (f/define make-subject
