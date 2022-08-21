@@ -734,7 +734,7 @@
       (throw
        (clojure.core/ex-info
         (format "Failure in quotation: %s" (.getMessage t))
-        (or (ex-data t) {})
+        (into {::stack stack ::queue queue} (ex-data t))
         t)))))
 
 ;; TODO: Tempted to rename to just 'eval'
