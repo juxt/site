@@ -9,6 +9,8 @@
    [juxt.site.alpha.repl :as repl]
    [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]
    [juxt.site.alpha :as-alias site]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
    [juxt.site.alpha.graphql.graphql-query-processor :as gqp]))
@@ -73,6 +75,32 @@
        :juxt.pass.alpha/subject "https://example.org/subjects/system"
        :juxt.pass.alpha/action "https://example.org/actions/register-patient"
        :juxt.pass.alpha/purpose nil})))))
+
+(defn create-action-get-patient! [_]
+  (eval
+   (init/substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/get-patient"
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [permission :xt/id]]]})))))
+
+(defn grant-permission-to-get-patient! [username]
+  (eval
+   (init/substitute-actual-base-uri
+    `(init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/alice/get-patient"
+       :juxt.pass.alpha/action "https://example.org/actions/get-patient"
+       :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
+       ;; TODO: Reference particular patient
+       :juxt.pass.alpha/purpose nil
+       }))))
 
 (defn create-action-get-patients! [_]
   (eval
@@ -146,6 +174,13 @@
    "https://site.test/actions/get-patients"
    {:create #'create-action-get-patients!
     :deps #{::init/system}}
+   "https://site.test/actions/get-patient"
+   {:create #'create-action-get-patient!
+    :deps #{::init/system}}
+   "https://site.test/permissions/{username}/get-patient"
+   {:create (fn [{:keys [params]}]
+              (grant-permission-to-get-patient! (get params "username")))
+    :deps #{::init/system}}
    "https://site.test/patients/{pid}"
    {:create #'register-patient!
     :deps #{::init/system
@@ -176,12 +211,12 @@
            "https://site.test/permissions/alice-can-authorize"
            "https://site.test/applications/local-terminal"
 
-           "https://site.test/actions/put-immutable-public-resource"
-           "https://site.test/permissions/repl/put-immutable-public-resource"
+           "https://site.test/actions/install-api-resource"
+           "https://site.test/permissions/system/install-api-resource"
 
+           "https://site.test/actions/get-patient"
+           "https://site.test/permissions/alice/get-patient"
            "https://site.test/actions/get-patients"
-
-
 
            }
          ;; Add some users
@@ -189,17 +224,8 @@
           (for [i (range 1 (inc 20))]
             (format "https://site.test/patients/%03d" i))))]
 
-    ;; Add /patients - via an action that allows us to put a public resource
-    (juxt.site.alpha.init/do-action
-     "https://site.test/subjects/system"
-     "https://site.test/actions/put-immutable-public-resource"
-     {:xt/id "https://site.test/patients"
-      :juxt.http.alpha/content-type "text/plain"
-      :juxt.http.alpha/content "Hello World!\r\n"})
-
     ;; Alice can read patients
     ;; Carlos cannot patients
-
 
     #_{:name "Sondra Richardson",
        :juxt.site.alpha/type "https://site.test/types/patient",
@@ -218,14 +244,49 @@
             (book/authorize!
              :session-id session-id
              "client_id" "local-terminal"
-             "scope" ["https://site.test/oauth/scope/read-personal-data"])
+             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+             )
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))]
+
+        ;; Add a /patient/XXX resource to serve an individual patient.
+
+        (juxt.site.alpha.init/do-action
+         "https://site.test/subjects/system"
+         "https://site.test/actions/install-api-resource"
+         {:xt/id "https://site.test/patient/{pid}"
+          ::site/uri-template true
+          ::site/methods
+          {:get {::pass/actions #{"https://site.test/actions/get-patient"}}
+           :head {::pass/actions #{"https://site.test/actions/get-patient"}}
+           :options {}}
+          ::http/content-type "text/plain"
+          ::http/content "foo"})
+
         (*handler*
          {:ring.request/method :get
-          :ring.request/path "/patients"
+          :ring.request/path "/patient/005"
           :ring.request/headers
           {"authorization" (format "Bearer %s" access-token)
-           "accept" "application/edn"}}))
+           "accept" "application/edn,text/plain"}})
+
+        ;; Add /patients - via an action that allows us to put a public API resource
+
+        #_(juxt.site.alpha.init/do-action
+           "https://site.test/subjects/system"
+           "https://site.test/actions/install-api-resource"
+           {:xt/id "https://site.test/patients"
+            ::site/methods
+            {:get {::pass/actions #{"https://site.test/actions/get-patients"}}
+             :head {::pass/actions #{"https://site.test/actions/get-patients"}}
+             :options {}}
+            })
+
+        #_(*handler*
+           {:ring.request/method :get
+            :ring.request/path "/patients"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)
+             "accept" "application/edn"}}))
 
       #_(repl/ls)
       #_(repl/e "https://site.test/patients/010")

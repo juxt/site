@@ -1128,6 +1128,54 @@ Password: <input name=password type=password>
      ;; end::register-example-application![]
      ))))
 
+;; APIs
+
+(defn create-action-install-api-resource! [_]
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/install-api-resource"
+
+       :juxt.flip.alpha/quotation
+       `(
+         (site/with-fx-acc
+           [(site/push-fx
+             (f/dip
+              [juxt.site.alpha/request-body-as-edn
+
+               (site/validate
+                [:map
+                 [:xt/id [:re "https://example.org/(.+)"]]])
+
+               xtdb.api/put
+               ]))]))
+
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [permission :juxt.pass.alpha/subject subject]]
+
+         [(allowed? subject resource permission) ; <3>
+          [subject :juxt.pass.alpha/user-identity id]
+          [id :juxt.pass.alpha/user user]
+          [permission :role role]
+          [user :role role]]]})))))
+
+(defn grant-permission-to-install-api-resource! [_]
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/system/install-api-resource"
+       :juxt.pass.alpha/subject "https://example.org/subjects/system"
+       :juxt.pass.alpha/action "https://example.org/actions/install-api-resource"
+       :juxt.pass.alpha/purpose nil})))))
+
 ;; GraphQL
 
 ;; Someone who has permission to perform the install-graphql-endpoint action can
@@ -2063,5 +2111,14 @@ Password: <input name=password type=password>
    "https://example.org/permissions/bob/put-user-owned-content"
    {:deps #{::init/system}
     :create (fn [_] (#'grant-permission-to-put-user-owned-content! "bob"))}
+
+   "https://example.org/actions/install-api-resource"
+   {:deps #{::init/system}
+    :create #'create-action-install-api-resource!}
+
+   "https://example.org/permissions/system/install-api-resource"
+   {:deps #{::init/system}
+    :create #'grant-permission-to-install-api-resource!}
    }
+
   )
