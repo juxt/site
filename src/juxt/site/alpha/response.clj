@@ -176,9 +176,11 @@
 
   (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
         template (some->> selected-representation ::site/template (xt/entity db))
-        custom-handler (get-in req [::site/methods method ::site/handler])]
+        ;;custom-handler (get-in req [::site/methods method ::site/handler])
+        ]
     (cond
-      custom-handler
+      ;; This is not currently used, and predates Flip
+      #_#_custom-handler
       (if-let [f (cond-> custom-handler (symbol? custom-handler) requiring-resolve)]
         (do
           (log/debugf "Calling custom-handler: %s %s" custom-handler (type custom-handler))

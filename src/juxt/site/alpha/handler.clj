@@ -213,8 +213,8 @@
         (actions/do-action
          (cond-> req
            permitted-action (assoc ::pass/action (:xt/id permitted-action))
-           ;; A java.io.BufferedInputStream in the request can provke this
-           ;; error: "invalid tx-op: Unfreezable type: class
+           ;; A java.io.BufferedInputStream in the request can cause this error:
+           ;; "invalid tx-op: Unfreezable type: class
            ;; java.io.BufferedInputStream".
            (:ring.request/body req) (dissoc :ring.request/body)))
         (catch Exception e

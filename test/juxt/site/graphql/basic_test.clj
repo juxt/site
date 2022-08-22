@@ -260,7 +260,19 @@
            :head {::pass/actions #{"https://site.test/actions/get-patient"}}
            :options {}}
           ::http/content-type "text/plain"
-          ::http/content "foo"})
+          ::http/content "Patient"})
+
+        ;; https://site.test/actions/get-patient must perform an XT query.
+
+        ;; In the future, it would be good if the http request can include a
+        ;; header indicating the minimum required version in order to provide
+        ;; read-your-own-writes consistency. Perhaps use standard http
+        ;; conditional request headers for this.
+
+        ;; The GET pathway skips the tx-fn (in the non-serializable case),
+        ;; proceeding directly to calling add-payload, whereupon it can call
+        ;; either a custom handler, or body fn.
+
 
         (*handler*
          {:ring.request/method :get
