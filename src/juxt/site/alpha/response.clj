@@ -175,7 +175,7 @@
   (assert (not= method :head))
 
   (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
-        template (some->> selected-representation ::site/template (xt/entity db))
+        ;;template (some->> selected-representation ::site/template (xt/entity db))
         ;;custom-handler (get-in req [::site/methods method ::site/handler])
         ]
     (cond
@@ -191,7 +191,10 @@
           {:custom-handler custom-handler
            ::site/request-context (assoc req :ring.response/status 500)})))
 
-      body-fn
+      ;; Similarly we don't require references to Clojure functions since there
+      ;; is no way of getting these in to Site, except for as custom
+      ;; engineering.
+      #_#_body-fn
       (if-let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
         (do
           (log/debugf "Calling body-fn: %s %s" body-fn (type body-fn))
@@ -202,7 +205,7 @@
           {:body-fn body-fn
            ::site/request-context (assoc req :ring.response/status 500)})))
 
-      template (render-template req template)
+      #_#_template (render-template req template)
 
       content (assoc req :ring.response/body content)
       body (assoc req :ring.response/body body)
