@@ -273,11 +273,11 @@
     (with-resources
       resources
 
-      (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
-            {access-token "access_token"
+      (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+            {alice-access-token "access_token"
              error "error"}
             (book/authorize!
-             :session-id session-id
+             :session-id alice-session-id
              "client_id" "local-terminal"
              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
              )
@@ -331,7 +331,7 @@
          {:ring.request/method :get
           :ring.request/path "/patients/005"
           :ring.request/headers
-          {"authorization" (format "Bearer %s" access-token)
+          {"authorization" (format "Bearer %s" alice-access-token)
            "accept" "application/json"}})
 
         #_(repl/e "https://site.test/patients/005")
@@ -344,7 +344,7 @@
           :ring.request/path "/patients"
           :debug true
           :ring.request/headers
-          {"authorization" (format "Bearer %s" access-token)
+          {"authorization" (format "Bearer %s" alice-access-token)
            "accept" "application/json"}})
 
         ;;(repl/e "https://site.test/patients")
