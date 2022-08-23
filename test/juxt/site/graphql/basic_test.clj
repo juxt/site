@@ -378,11 +378,6 @@
           {"authorization" (format "Bearer %s" alice-access-token)
            "accept" "application/json"}})
 
-        #_(repl/e "https://site.test/patients/005")
-
-        ;; Add /patients - which is a resource that represents all the patients
-        ;; the subject can access.  In Alice's case, that's all of them.
-
         (*handler*
          {:ring.request/method :get
           :ring.request/path "/patients"
