@@ -92,18 +92,39 @@
           [subject :juxt.pass.alpha/user-identity id]
           [id :juxt.pass.alpha/user user]
           [permission :juxt.pass.alpha/user user]
-          [resource :juxt.site.alpha/type "https://example.org/types/patient"]]]})))))
+          [resource :juxt.site.alpha/type "https://example.org/types/patient"]
+          [permission :patient :all]]
 
-(defn grant-permission-to-get-patient! [username]
+         [(allowed? subject resource permission)
+          [subject :juxt.pass.alpha/user-identity id]
+          [id :juxt.pass.alpha/user user]
+          [permission :juxt.pass.alpha/user user]
+          [resource :juxt.site.alpha/type "https://example.org/types/patient"]
+          [permission :patient resource]]]})))))
+
+(defn grant-permission-to-get-any-patient! [username]
   (eval
    (init/substitute-actual-base-uri
     `(init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      {:xt/id ~(format "https://example.org/permissions/%s/get-patient" username)
+      {:xt/id ~(format "https://example.org/permissions/%s/get-any-patient" username)
        :juxt.pass.alpha/action "https://example.org/actions/get-patient"
        :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
-       ;; TODO: Reference particular patient
+       :patient :all
+       :juxt.pass.alpha/purpose nil
+       }))))
+
+(defn grant-permission-to-get-patient! [username pid]
+  (eval
+   (init/substitute-actual-base-uri
+    `(init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id ~(format "https://example.org/permissions/%s/get-patient/%s" username pid)
+       :juxt.pass.alpha/action "https://example.org/actions/get-patient"
+       :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
+       :patient ~(format "https://example.org/patients/%s" pid)
        :juxt.pass.alpha/purpose nil
        }))))
 
@@ -201,9 +222,14 @@
    {:create #'create-action-get-patient!
     :deps #{::init/system}}
 
-   "https://site.test/permissions/{username}/get-patient"
+   "https://site.test/permissions/{username}/get-any-patient"
    {:create (fn [{:keys [params]}]
-              (grant-permission-to-get-patient! (get params "username")))
+              (grant-permission-to-get-any-patient! (get params "username")))
+    :deps #{::init/system}}
+
+   "https://site.test/permissions/{username}/get-patient/{pid}"
+   {:create (fn [{:keys [params]}]
+              (grant-permission-to-get-patient! (get params "username") (get params "pid")))
     :deps #{::init/system}}
 
    "https://site.test/permissions/{username}/list-patients"
@@ -258,8 +284,10 @@
            ;;"https://site.test/permissions/system/install-api-resource"
 
            "https://site.test/actions/get-patient"
-           "https://site.test/permissions/alice/get-patient"
-           "https://site.test/permissions/bob/get-patient"
+           "https://site.test/permissions/alice/get-any-patient"
+           "https://site.test/permissions/bob/get-patient/004"
+           "https://site.test/permissions/bob/get-patient/009"
+           "https://site.test/permissions/bob/get-patient/010"
            "https://site.test/actions/list-patients"
            "https://site.test/permissions/alice/list-patients"
            "https://site.test/permissions/bob/list-patients"
