@@ -2112,6 +2112,10 @@ Password: <input name=password type=password>
    {:deps #{::init/system}
     :create (fn [_] (#'grant-permission-to-put-user-owned-content! "bob"))}
 
+   ;; Let's be careful before treating 'api resources' differently from 'normal'
+   ;; Site resources. They're the same thing really. The below should be treated
+   ;; with suspicion!
+
    "https://example.org/actions/install-api-resource"
    {:deps #{::init/system}
     :create #'create-action-install-api-resource!}

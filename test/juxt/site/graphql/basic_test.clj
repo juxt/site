@@ -329,7 +329,7 @@
 
         ;; Add a /patient/XXX resource to serve an individual patient.
 
-        ;; Lets be careful before treating 'api resources' differently from
+        ;; Let's be careful before treating 'api resources' differently from
         ;; 'normal' Site resources. They're the same thing really.
         #_(juxt.site.alpha.init/do-action
            "https://site.test/subjects/system"
