@@ -177,17 +177,19 @@
   ;; Should not be called if method is HEAD
   (assert (not= method :head))
 
-  (when (and (:debug req) (= 200 (:ring.response/status req)))
+  (when (and (:debug req) #_(= 200 (:ring.response/status req)))
     (throw
      (ex-info
       "DEBUG"
       {:debug-output
-       {:query
+       {:status-so-far (:ring.response/status req)
+        :query
         (when (seq (::pass/permitted-actions req))
           (try
             (actions/allowed-resources
              db
-             (set (map (comp :xt/id ::pass/action) (::pass/permitted-actions req)))
+             #{"https://site.test/actions/get-patient"}
+             #_(set (map (comp :xt/id ::pass/action) (::pass/permitted-actions req)))
              {::pass/subject (:xt/id subject)}
              ;; Add purpose (somehow, request header?)
              )

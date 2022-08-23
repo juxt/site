@@ -107,18 +107,31 @@
        :juxt.pass.alpha/purpose nil
        }))))
 
-(defn create-action-get-patients! [_]
+(defn create-action-list-patients! [_]
   (eval
    (init/substitute-actual-base-uri
     (quote
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/get-patients"
+      {:xt/id "https://example.org/actions/list-patients"
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :xt/id]]]})))))
+          [subject :juxt.pass.alpha/user-identity id]
+          [id :juxt.pass.alpha/user user]
+          [permission :juxt.pass.alpha/user user]]]})))))
+
+(defn grant-permission-to-list-patients! [username]
+  (eval
+   (init/substitute-actual-base-uri
+    `(init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/alice/list-patients"
+       :juxt.pass.alpha/action "https://example.org/actions/list-patients"
+       :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
+       :juxt.pass.alpha/purpose nil}))))
 
 (defn create-action-read-vitals! [_]
   (eval
@@ -175,24 +188,44 @@
   {"https://site.test/actions/register-patient"
    {:create #'create-action-register-patient!
     :deps #{::init/system}}
+
    "https://site.test/permissions/system/register-patient"
    {:create #'grant-permission-to-invoke-action-register-patient!
     :deps #{::init/system}}
-   "https://site.test/actions/get-patients"
-   {:create #'create-action-get-patients!
+
+   "https://site.test/actions/list-patients"
+   {:create #'create-action-list-patients!
     :deps #{::init/system}}
+
    "https://site.test/actions/get-patient"
    {:create #'create-action-get-patient!
     :deps #{::init/system}}
+
    "https://site.test/permissions/{username}/get-patient"
    {:create (fn [{:keys [params]}]
               (grant-permission-to-get-patient! (get params "username")))
     :deps #{::init/system}}
+
+   "https://site.test/permissions/{username}/list-patients"
+   {:create (fn [{:keys [params]}]
+              (grant-permission-to-list-patients! (get params "username")))
+    :deps #{::init/system}}
+
    "https://site.test/patients/{pid}"
    {:create #'register-patient!
     :deps #{::init/system
             "https://site.test/actions/register-patient"
             "https://site.test/permissions/system/register-patient"}}
+
+   "https://site.test/patients"
+   {:create (fn [_]
+              (init/put!
+               {:xt/id "https://site.test/patients"
+                ::site/methods
+                {:get
+                 {::pass/actions #{"https://site.test/actions/list-patients"}}}}))
+    :deps #{::init/system}}
+
    "https://site.test/actions/read-vitals"
    {:create #'create-action-read-vitals!
     :deps #{::init/system}}})
@@ -223,7 +256,10 @@
 
            "https://site.test/actions/get-patient"
            "https://site.test/permissions/alice/get-patient"
-           "https://site.test/actions/get-patients"
+           "https://site.test/actions/list-patients"
+           "https://site.test/permissions/alice/list-patients"
+
+           "https://site.test/patients"
 
            }
          ;; Add some users
@@ -300,7 +336,27 @@
 
         #_(repl/e "https://site.test/patients/005")
 
-        ;; Add /patients - via an action that allows us to put a public API resource
+        ;; Add /patients - which is a resource that represents all the patients
+        ;; the subject can access.  In Alice's case, that's all of them.
+
+        (*handler*
+         {:ring.request/method :get
+          :ring.request/path "/patients"
+          :debug true
+          :ring.request/headers
+          {"authorization" (format "Bearer %s" access-token)
+           "accept" "application/json"}})
+
+        ;;(repl/e "https://site.test/patients")
+
+        ;; list-patients is going to re-use the rule for get-patient.  In this
+        ;; sense, the action list-patients is a get-patient action applied
+        ;; across a set.
+
+        ;; TODO: Add Bob and see that Bob cannot see any patients.
+
+        ;; TODO: Experiment with get-patient and permissions to limit Bob's view
+        ;; to a handful subset of patients.
 
         #_(juxt.site.alpha.init/do-action
            "https://site.test/subjects/system"
