@@ -100,7 +100,7 @@
     `(init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/alice/get-patient"
+      {:xt/id ~(format "https://example.org/permissions/%s/get-patient" username)
        :juxt.pass.alpha/action "https://example.org/actions/get-patient"
        :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
        ;; TODO: Reference particular patient
@@ -128,7 +128,7 @@
     `(init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/alice/list-patients"
+      {:xt/id ~(format "https://example.org/permissions/%s/list-patients" username)
        :juxt.pass.alpha/action "https://example.org/actions/list-patients"
        :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
        :juxt.pass.alpha/purpose nil}))))
@@ -246,9 +246,12 @@
 
            "https://site.test/login"
            "https://site.test/user-identities/alice/basic"
+           "https://site.test/user-identities/bob/basic"
+
            "https://site.test/oauth/authorize"
            "https://site.test/session-scopes/oauth"
            "https://site.test/permissions/alice-can-authorize"
+           "https://site.test/permissions/bob-can-authorize"
            "https://site.test/applications/local-terminal"
 
            ;;"https://site.test/actions/install-api-resource"
@@ -256,8 +259,10 @@
 
            "https://site.test/actions/get-patient"
            "https://site.test/permissions/alice/get-patient"
+           "https://site.test/permissions/bob/get-patient"
            "https://site.test/actions/list-patients"
            "https://site.test/permissions/alice/list-patients"
+           "https://site.test/permissions/bob/list-patients"
 
            "https://site.test/patients"
 
@@ -281,7 +286,18 @@
              "client_id" "local-terminal"
              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
              )
-            _ (is (nil? error) (format "OAuth2 grant error: %s" error))]
+            _ (is (nil? error) (format "OAuth2 grant error: %s" error))
+
+            bob-session-id (book/login-with-form! {"username" "bob" "password" "walrus"})
+            {bob-access-token "access_token"
+             error "error"}
+            (book/authorize!
+             :session-id bob-session-id
+             "client_id" "local-terminal"
+             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+             )
+            _ (is (nil? error) (format "OAuth2 grant error: %s" error))
+            ]
 
         ;; Add a /patient/XXX resource to serve an individual patient.
 
@@ -345,6 +361,14 @@
           :debug true
           :ring.request/headers
           {"authorization" (format "Bearer %s" alice-access-token)
+           "accept" "application/json"}})
+
+        (*handler*
+         {:ring.request/method :get
+          :ring.request/path "/patients"
+          :debug true
+          :ring.request/headers
+          {"authorization" (format "Bearer %s" bob-access-token)
            "accept" "application/json"}})
 
         ;;(repl/e "https://site.test/patients")
