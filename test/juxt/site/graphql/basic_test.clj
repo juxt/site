@@ -2,6 +2,7 @@
 
 (ns juxt.site.graphql.basic-test
   (:require
+   [jsonista.core :as json]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [clojure.java.io :as io]
    [juxt.book :as book]
@@ -13,7 +14,8 @@
    [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
-   [juxt.site.alpha.graphql.graphql-query-processor :as gqp]))
+   [juxt.site.alpha.graphql.graphql-query-processor :as gqp]
+   [xtdb.api :as xt]))
 
 ;; TODO: Dedupe between this test ns and juxt.book-test
 
@@ -87,7 +89,10 @@
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :xt/id]]]})))))
+          [subject :juxt.pass.alpha/user-identity id]
+          [id :juxt.pass.alpha/user user]
+          [permission :juxt.pass.alpha/user user]
+          [resource :juxt.site.alpha/type "https://example.org/types/patient"]]]})))))
 
 (defn grant-permission-to-get-patient! [username]
   (eval
@@ -162,6 +167,8 @@
      "https://site.test/actions/register-patient"
      {:xt/id id
       :name name
+      ::http/content-type "application/json"
+      ::http/content (json/write-value-as-string {"name" name})
       })))
 
 (def dependency-graph
@@ -211,8 +218,8 @@
            "https://site.test/permissions/alice-can-authorize"
            "https://site.test/applications/local-terminal"
 
-           "https://site.test/actions/install-api-resource"
-           "https://site.test/permissions/system/install-api-resource"
+           ;;"https://site.test/actions/install-api-resource"
+           ;;"https://site.test/permissions/system/install-api-resource"
 
            "https://site.test/actions/get-patient"
            "https://site.test/permissions/alice/get-patient"
@@ -225,15 +232,7 @@
             (format "https://site.test/patients/%03d" i))))]
 
     ;; Alice can read patients
-    ;; Carlos cannot patients
-
-    #_{:name "Sondra Richardson",
-       :juxt.site.alpha/type "https://site.test/types/patient",
-       :juxt.site.alpha/methods
-       {:get #:juxt.pass.alpha{:actions #{"https://site.test/actions/get-patient"}},
-        :head #:juxt.pass.alpha{:actions #{"https://site.test/actions/get-patient"}},
-        :options {}},
-       :xt/id "https://site.test/patients/010"}
+    ;; Carlos cannot read patients
 
     (with-resources
       resources
@@ -250,17 +249,23 @@
 
         ;; Add a /patient/XXX resource to serve an individual patient.
 
-        (juxt.site.alpha.init/do-action
-         "https://site.test/subjects/system"
-         "https://site.test/actions/install-api-resource"
-         {:xt/id "https://site.test/patient/{pid}"
-          ::site/uri-template true
-          ::site/methods
-          {:get {::pass/actions #{"https://site.test/actions/get-patient"}}
-           :head {::pass/actions #{"https://site.test/actions/get-patient"}}
-           :options {}}
-          ::http/content-type "text/plain"
-          ::http/content "Patient"})
+        #_(juxt.site.alpha.init/do-action
+           "https://site.test/subjects/system"
+           "https://site.test/actions/install-api-resource"
+           ;; This is the API resource representing a given patient
+           {:xt/id "https://site.test/patient/{pid}"
+            ::site/uri-template true
+            ;; TODO: Scope can be specified here
+            ::site/methods
+            {:get {::pass/actions #{"https://site.test/actions/perform-api-operation"}
+                   ;; TODO: Scope can be specified here. For example, only
+                   ;; read-only API operations may be granted to an application.
+                   :juxt.site.openapi/description "Get a patient"
+                   :actions #{"https://site.test/actions/get-patient"}}
+             :head {::pass/actions #{"https://site.test/actions/perform-get-operation"}}
+             :options {}}
+            ::http/content-type "application/json"
+            })
 
         ;; https://site.test/actions/get-patient must perform an XT query.
 
@@ -270,16 +275,30 @@
         ;; conditional request headers for this.
 
         ;; The GET pathway skips the tx-fn (in the non-serializable case),
-        ;; proceeding directly to calling add-payload, whereupon it can call
-        ;; either a custom handler, or body fn.
+        ;; proceeding directly to calling add-payload.
+
+        ;; Note: it would be useful to research whether a Flip database query
+        ;; could be automatically limited by the actions in scope. This would
+        ;; make it safer to allow people to add their own Flip quotations.
+
+        ;; Here we have the conundrum: when the
+        ;; https://site.test/actions/get-patient action rule has the clause
+        ;; '[resource :juxt.site.alpha/type
+        ;; "https://example.org/types/patient"]' then it is not a permitted
+        ;; action. We must separate the actions that allow access to a
+        ;; uri-template'd resource and the actions that create the body
+        ;; payload.
 
 
+        ;; Alice can access a particular patient because she has the permission on get-every-patient-details
         (*handler*
          {:ring.request/method :get
-          :ring.request/path "/patient/005"
+          :ring.request/path "/patients/005"
           :ring.request/headers
           {"authorization" (format "Bearer %s" access-token)
-           "accept" "application/edn,text/plain"}})
+           "accept" "application/json"}})
+
+        #_(repl/e "https://site.test/patients/005")
 
         ;; Add /patients - via an action that allows us to put a public API resource
 

@@ -3,6 +3,7 @@
 (ns juxt.pass.alpha.actions
   (:require
    [clojure.tools.logging :as log]
+   [malli.core :as malli]
    [malli.error :a me]
    [ring.util.codec :as codec]
    [juxt.pass.alpha :as-alias pass]
@@ -12,14 +13,23 @@
    [juxt.flip.alpha :as-alias flip]
    [xtdb.api :as xt]))
 
+
+
+
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
   action."
   [db actions]
+  ;; Old version
+  (comment
+    (vec (for [action actions
+               :let [e (xt/entity db action)]
+               rule (::pass/rules e)]
+           (conj rule ['action :xt/id action]))))
   (mapv
    #(conj (second %) ['action :xt/id (first %)])
    (xt/q db {:find ['e 'rules]
-             :where [['e :xt/id actions]
+             :where [['e :xt/id (set actions)]
                      ['e ::pass/rules 'rules]]})))
 
 ;; This is broken out into its own function to assist debugging when
@@ -43,8 +53,7 @@
                  (allowed? subject resource permission)
 
                  ;; Only permissions that match our purpose
-                 [permission ::pass/purpose purpose]
-                 ]
+                 [permission ::pass/purpose purpose]]
 
                :rules rules
 
@@ -81,30 +90,42 @@
   "Given a set of possible actions, and possibly a subject and purpose, which
   resources are allowed?"
   [db actions {::pass/keys [subject purpose]}]
-  (let [rules (actions->rules db actions)]
-    (xt/q
-     db
-     {:find '[resource]
-      :where
-      '[
-        [action ::site/type "https://meta.juxt.site/pass/action"]
+  {:pre [(malli/validate [:set {:min 1} :string] actions)]}
 
-        ;; Only consider given actions
-        [(contains? actions action)]
+  (let [rules (actions->rules db actions)
+        query {:find '[resource]
+               :where
+               '[
+                 [action ::site/type "https://meta.juxt.site/pass/action"]
 
-        ;; Only consider a permitted action
-        [permission ::site/type "https://meta.juxt.site/pass/permission"]
-        [permission ::pass/action action]
-        (allowed? subject resource permission)
+                 ;; Only consider given actions
+                 [(contains? actions action)]
 
-        ;; Only permissions that match our purpose
-        [permission ::pass/purpose purpose]]
+                 ;; Only consider a permitted action
+                 [permission ::site/type "https://meta.juxt.site/pass/permission"]
+                 [permission ::pass/action action]
+                 (allowed? subject resource permission)
 
-      :rules rules
+                 ;; Only permissions that match our purpose
+                 [permission ::pass/purpose purpose]]
 
-      :in '[subject actions purpose]}
+               :rules rules
 
-      subject actions purpose)))
+               :in '[subject actions purpose]}]
+
+    (try
+      (xt/q db query subject actions purpose)
+      (catch Exception cause
+        (throw
+         (ex-info
+          "Actions query failed"
+          {:query query
+           :rules rules
+           :subject subject
+           :actions actions
+           :action-entities (doseq [a actions] (xt/entity db a))
+           :purpose purpose}
+          cause))))))
 
 ;; TODO: How is this call protected from unauthorized use? Must call this with
 ;; access-token to verify subject.
@@ -487,6 +508,8 @@
              ;; permission checking in case there's a specific permission for
              ;; this resource.
              resource (assoc ::site/resource (:xt/id resource))))]
+
+      (log/debugf "Permitted actions: %s" (pr-str permitted-actions) )
 
       (if (seq permitted-actions)
         (h (assoc req ::pass/permitted-actions permitted-actions))

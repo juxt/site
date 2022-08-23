@@ -226,6 +226,7 @@
                     (ex-data e))
              :permitted-action permitted-action}
             e))))
+
       :else
       (response/add-payload req))))
 
@@ -938,7 +939,7 @@
 
         response (try
                    (cond-> error-resource
-                     (not= method :head) response/add-payload)
+                     (not= method :head) response/add-error-payload)
                    (catch Exception e
                      (respond-internal-error req e)))]
 

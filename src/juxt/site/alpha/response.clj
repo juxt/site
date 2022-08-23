@@ -8,6 +8,8 @@
    [juxt.site.alpha.graphql.templating :as graphql-templating]
    [xtdb.api :as xt]
    [juxt.http.alpha :as-alias http]
+   [juxt.pass.alpha.actions :as actions]
+   [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]))
 
 (declare add-payload)
@@ -169,10 +171,35 @@
          ::site/request-context (assoc req :ring.response/status 500)})))))
 
 (defn add-payload [{::site/keys [selected-representation db]
+                    ::pass/keys [subject]
                     :ring.request/keys [method]
                     :as req}]
   ;; Should not be called if method is HEAD
   (assert (not= method :head))
+
+  (when (and (:debug req) (= 200 (:ring.response/status req)))
+    (throw
+     (ex-info
+      "DEBUG"
+      {:debug-output
+       {:query
+        (when (seq (::pass/permitted-actions req))
+          (try
+            (actions/allowed-resources
+             db
+             (set (map (comp :xt/id ::pass/action) (::pass/permitted-actions req)))
+             {::pass/subject (:xt/id subject)}
+             ;; Add purpose (somehow, request header?)
+             )
+            (catch Exception e
+              {:failed (ex-data e)
+               :message (.getMessage e)
+               :cause (.getCause e)})))
+        :subject subject
+        :actions (map (comp :xt/id ::pass/action) (::pass/permitted-actions req))}
+
+       ::site/request-context
+       req})))
 
   (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
         ;;template (some->> selected-representation ::site/template (xt/entity db))
@@ -211,6 +238,18 @@
       body (assoc req :ring.response/body body)
       :else req)))
 
+(defn add-error-payload [{::site/keys [selected-representation db]
+                          ::pass/keys [subject]
+                          :ring.request/keys [method]
+                          :as req}]
+  ;; Should not be called if method is HEAD
+  (assert (not= method :head))
+
+  (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation]
+    (cond
+      content (assoc req :ring.response/body content)
+      body (assoc req :ring.response/body body)
+      :else req)))
 
 (defn redirect [req status location]
   (-> req
