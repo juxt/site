@@ -204,12 +204,27 @@
 (defn GET [{::pass/keys [subject] :as req}]
   (conditional/evaluate-preconditions! req)
   (let [req (assoc req :ring.response/status 200)
-        permitted-action (::pass/action (first (::pass/permitted-actions req)))]
+        ;; This use of 'first' is worrisome. Perhaps we should be transacting
+        ;; every permitted action.
+        permitted-action (::pass/action (first (::pass/permitted-actions req)))
+        data-views (filter :juxt.site.alpha/data-view (distinct (map ::pass/action (::pass/permitted-actions req))))]
+
     (cond
-      ;; It's rare but sometimes a GET will call an action. For example, the
+      (seq data-views)
+      ;; OK, now we need to evaluate a data-view which will pull in data from
+      ;; get-patients.
+      (throw
+       (ex-info
+        "TODO: data views"
+        {:data-views data-views
+         ::site/request-context req}))
+
+      ;; It's rare but sometimes a GET will evaluate a quotation. For example, the
       ;; Authorization Request (RFC 6749 Section 4.2.1).
       (and permitted-action (::flip/quotation permitted-action))
       (try
+        ;; TODO: Perhaps needs to be something to indicate whether or not the
+        ;; action will produce effects.
         (actions/do-action
          (cond-> req
            permitted-action (assoc ::pass/action (:xt/id permitted-action))
@@ -226,6 +241,8 @@
                     (ex-data e))
              :permitted-action permitted-action}
             e))))
+
+      ;;(::pass/permitted-actions req)
 
       :else
       (response/add-payload req))))

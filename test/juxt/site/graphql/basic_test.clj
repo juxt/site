@@ -136,6 +136,24 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/list-patients"
+
+       ;; What if this was the resource will target with GET?
+       ;; The /patients is more simply an alias.
+
+       ;; Are actions just resources with ACL rules?
+       ;; Actions are already resources.
+       ;; Maybe any resource can be an action?
+
+       ;; What are our other examples of targeting actions?
+       ;; POST /actions/install-graphql-endpoint
+       ;; (book_test line ~500, book line ~1197)
+
+       ;; An action is capable of deriving a view of state across a set of
+       ;; resources.
+       :juxt.site.alpha/methods
+       {:get
+        {:juxt.pass.alpha/actions #{"https://example.org/actions/list-patients"}}}
+
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
@@ -244,12 +262,14 @@
             "https://site.test/permissions/system/register-patient"}}
 
    "https://site.test/patients"
-   {:create (fn [_]
-              (init/put!
-               {:xt/id "https://site.test/patients"
-                ::site/methods
-                {:get
-                 {::pass/actions #{"https://site.test/actions/list-patients"}}}}))
+   {:create
+    (fn [_]
+      (init/put!
+       {:xt/id "https://site.test/patients"
+        ::site/methods
+        {:get
+         {::pass/actions #{"https://site.test/actions/list-patients"}}}
+        ::http/content-type "application/json"}))
     :deps #{::init/system}}
 
    "https://site.test/actions/read-vitals"
@@ -380,6 +400,8 @@
           {"authorization" (format "Bearer %s" alice-access-token)
            "accept" "application/json"}})
 
+        #_(repl/ls)
+
         (*handler*
          {:ring.request/method :get
           :ring.request/path "/patients"
@@ -388,10 +410,15 @@
           {"authorization" (format "Bearer %s" alice-access-token)
            "accept" "application/json"}})
 
-        (*handler*
+        ;;(repl/ls)
+        ;;(repl/e "https://site.test/actions/list-patients")
+        ;;(repl/e "https://site.test/patients")
+        ;;(repl/e "https://site.test/permissions/alice/list-patients")
+
+        #_(*handler*
          {:ring.request/method :get
           :ring.request/path "/patients"
-          :debug true
+          ;;:debug true
           :ring.request/headers
           {"authorization" (format "Bearer %s" bob-access-token)
            "accept" "application/json"}})
