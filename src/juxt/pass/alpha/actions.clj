@@ -13,9 +13,6 @@
    [juxt.flip.alpha :as-alias flip]
    [xtdb.api :as xt]))
 
-
-
-
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
   action."
@@ -296,11 +293,15 @@
                    ::pass/permissions (map ::pass/permission check-permissions-result))
               [{::site/keys [fx]}]
               (cond
-                (::flip/quotation action-doc)
-                (eval-quotation
-                 (reverse args)         ; push the args to the stack
-                 (::flip/quotation action-doc)
-                 env)
+                (::site/transact action-doc)
+                (let [quotation (-> action-doc ::site/transact ::flip/quotation)]
+                  (cond
+                    quotation (eval-quotation
+                               (reverse args) ; push the args to the stack
+                               quotation
+                               env)
+                    :else
+                    (throw (ex-info "Unsupported transact content" {::site/transact (::site/transact action-doc)}))))
 
                 ;; There might be other strategies in the future (although the
                 ;; fewer the better really)

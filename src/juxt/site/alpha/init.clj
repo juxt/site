@@ -77,21 +77,22 @@
          [(allowed? subject resource permission) ; <1>
           [permission :juxt.pass.alpha/subject subject]]]
 
-       :juxt.flip.alpha/quotation
-       `(
-         (site/with-fx-acc
-           [(site/push-fx
-             (f/dip
-              [juxt.site.alpha/request-body-as-edn
+       :juxt.site.alpha/transact
+       {:juxt.flip.alpha/quotation
+        `(
+          (site/with-fx-acc
+            [(site/push-fx
+              (f/dip
+               [juxt.site.alpha/request-body-as-edn
 
-               (site/validate
-                [:map ; <2>
-                 [:xt/id [:re "https://example.org/actions/(.+)"]]
-                 [:juxt.pass.alpha/rules [:vector [:vector :any]]]])
+                (site/validate
+                 [:map                  ; <2>
+                  [:xt/id [:re "https://example.org/actions/(.+)"]]
+                  [:juxt.pass.alpha/rules [:vector [:vector :any]]]])
 
-               (site/set-type "https://meta.juxt.site/pass/action") ; <3>
+                (site/set-type "https://meta.juxt.site/pass/action") ; <3>
 
-               xtdb.api/put]))]))}
+                xtdb.api/put]))]))}}
       ;; end::install-create-action![]
       )))))
 
@@ -158,19 +159,20 @@
           [user :role role]
           [permission :role role]]]
 
-       :juxt.flip.alpha/quotation
-       `(
-         (site/with-fx-acc
-           [(site/push-fx
-             (f/dip
-              [juxt.site.alpha/request-body-as-edn
-               (juxt.site.alpha/validate
-                [:map
-                 [:xt/id [:re "https://example.org/permissions/(.+)"]]
-                 [:juxt.pass.alpha/action [:re "https://example.org/actions/(.+)"]]
-                 [:juxt.pass.alpha/purpose [:maybe :string]]])
-               (f/set-at (f/dip ["https://meta.juxt.site/pass/permission" :juxt.site.alpha/type]))
-               xtdb.api/put]))]))})
+       :juxt.site.alpha/transact
+       {:juxt.flip.alpha/quotation
+        `(
+          (site/with-fx-acc
+            [(site/push-fx
+              (f/dip
+               [juxt.site.alpha/request-body-as-edn
+                (juxt.site.alpha/validate
+                 [:map
+                  [:xt/id [:re "https://example.org/permissions/(.+)"]]
+                  [:juxt.pass.alpha/action [:re "https://example.org/actions/(.+)"]]
+                  [:juxt.pass.alpha/purpose [:maybe :string]]])
+                (f/set-at (f/dip ["https://meta.juxt.site/pass/permission" :juxt.site.alpha/type]))
+                xtdb.api/put]))]))}})
      ;; end::create-grant-permission-action![]
      ))))
 
@@ -195,20 +197,21 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/install-not-found"
-       :juxt.flip.alpha/quotation
-       `(
-         (site/with-fx-acc
-           [(site/push-fx
-             (f/dip
-              [site/request-body-as-edn
-               (site/validate
-                [:map
-                 [:xt/id [:re "https://example.org/.*"]]])
-               (site/set-type "https://meta.juxt.site/not-found")
-               (site/set-methods
-                {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}
-                 :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}})
-               xtdb.api/put]))]))
+       :juxt.site.alpha/transact
+       {:juxt.flip.alpha/quotation
+        `(
+          (site/with-fx-acc
+            [(site/push-fx
+              (f/dip
+               [site/request-body-as-edn
+                (site/validate
+                 [:map
+                  [:xt/id [:re "https://example.org/.*"]]])
+                (site/set-type "https://meta.juxt.site/not-found")
+                (site/set-methods
+                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}
+                  :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}})
+                xtdb.api/put]))]))}
        :juxt.pass.alpha/rules
        [
         ['(allowed? subject resource permission)
@@ -270,26 +273,27 @@
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/register-application"
 
-       :juxt.flip.alpha/quotation
-       `(
-         (site/with-fx-acc
-           [(site/push-fx
-             (f/dip
-              [site/request-body-as-edn
-               (site/validate
-                [:map
-                 [::pass/client-id [:re "[a-z-]{3,}"]]
-                 [::pass/redirect-uri [:re "https://"]]])
+       :juxt.site.alpha/transact
+       {:juxt.flip.alpha/quotation
+        `(
+          (site/with-fx-acc
+            [(site/push-fx
+              (f/dip
+               [site/request-body-as-edn
+                (site/validate
+                 [:map
+                  [::pass/client-id [:re "[a-z-]{3,}"]]
+                  [::pass/redirect-uri [:re "https://"]]])
 
-               (site/set-type "https://meta.juxt.site/pass/application")
-               (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes 20)) ::pass/client-secret]))
+                (site/set-type "https://meta.juxt.site/pass/application")
+                (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes 20)) ::pass/client-secret]))
 
-               (f/set-at
-                (f/keep
-                 [(f/of ::pass/client-id) "/applications/" f/str (f/env ::site/base-uri) f/str
-                  :xt/id]))
+                (f/set-at
+                 (f/keep
+                  [(f/of ::pass/client-id) "/applications/" f/str (f/env ::site/base-uri) f/str
+                   :xt/id]))
 
-               xtdb.api/put]))]))
+                xtdb.api/put]))]))}
 
        :juxt.pass.alpha/rules
        '[[(allowed? subject resource permission)

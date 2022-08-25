@@ -221,7 +221,7 @@
 
       ;; It's rare but sometimes a GET will evaluate a quotation. For example, the
       ;; Authorization Request (RFC 6749 Section 4.2.1).
-      (and permitted-action (::flip/quotation permitted-action))
+      (and permitted-action (-> permitted-action ::site/transact ::flip/quotation))
       (try
         ;; TODO: Perhaps needs to be something to indicate whether or not the
         ;; action will produce effects.
