@@ -10,6 +10,7 @@
    [juxt.site.alpha.repl :as repl]
    [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]
    [juxt.site.alpha :as-alias site]
+   [juxt.pass.alpha.actions :as actions]
    [juxt.pass.alpha :as-alias pass]
    [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init]
@@ -163,7 +164,12 @@
           [permission :juxt.pass.alpha/user user]]]
 
        :juxt.site.alpha/data-view
-       {:juxt.flip.alpha/quotation `(f/break)}
+       {:juxt.flip.alpha/quotation
+        `(
+          ;; Perform a query, using the rules in get-patient.
+          (actions/pull-allowed-resources
+           {:actions #{"https://example.org/actions/get-patient"}})
+          )}
        })))))
 
 (defn grant-permission-to-list-patients! [username]
@@ -317,9 +323,7 @@
            "https://site.test/permissions/alice/list-patients"
            "https://site.test/permissions/bob/list-patients"
 
-           "https://site.test/patients"
-
-           }
+           "https://site.test/patients"}
          ;; Add some users
          (into
           (for [i (range 1 (inc 20))]
@@ -406,7 +410,7 @@
 
         #_(repl/ls)
 
-        (*handler*
+        #_(*handler*
          {:ring.request/method :get
           :ring.request/path "/patients"
 ;;          :debug true
@@ -419,7 +423,7 @@
         ;;(repl/e "https://site.test/patients")
         ;;(repl/e "https://site.test/permissions/alice/list-patients")
 
-        #_(*handler*
+        (*handler*
          {:ring.request/method :get
           :ring.request/path "/patients"
           ;;:debug true

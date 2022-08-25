@@ -9,7 +9,7 @@
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
-   [juxt.flip.alpha.core :refer [eval-quotation]]
+   [juxt.flip.alpha.core :as f :refer [eval-quotation]]
    [juxt.flip.alpha :as-alias flip]
    [xtdb.api :as xt]))
 
@@ -569,3 +569,10 @@
                 (format "No anonymous permission for actions: %s" (pr-str actions))
                 {::site/request-context
                  (assoc req :ring.response/status 403)})))))))))
+
+
+(defmethod f/word 'juxt.pass.alpha/pull-allowed-resources
+  [[{:keys [actions] :as opts} & stack] [_ & queue] env]
+  (assert (::site/db env) "No database in environment")
+  (let [result (pull-allowed-resources (::site/db env) actions env)]
+    [(cons result stack) queue env]))

@@ -208,39 +208,35 @@
         ;; This use of 'first' is worrisome. Perhaps we should be transacting
         ;; every permitted action.
         permitted-action (::pass/action (first (::pass/permitted-actions req)))
-        permitted-actions-with-data-views (filter :juxt.site.alpha/data-view (distinct (map ::pass/action (::pass/permitted-actions req))))]
+        data-view (some :juxt.site.alpha/data-view (distinct (map ::pass/action (::pass/permitted-actions req))))]
 
     (cond
-      (seq permitted-actions-with-data-views)
-      ;; OK, now we need to evaluate a data-view which will pull in data from
-      ;; get-patients.
-
-      (throw
-       (ex-info
-        "TODO: data views"
-        {:data-views permitted-actions-with-data-views
-         :result
-         (apply
-          merge
-          (for [action permitted-actions-with-data-views
-                :let [quotation (-> action :juxt.site.alpha/data-view :juxt.flip.alpha/quotation)]]
-            (cond
-              quotation
-              (try
-                (first (f/eval-quotation '[] quotation {}))
-                (catch Exception cause
-                  (throw
-                   (ex-info
-                    "Failure running data view quotation"
-                    {::site/request-context req}
-                    cause))))
-              :else
-              (throw
-               (ex-info
-                "Data view must (currently) have a :juxt.flip.alpha/quotation entry"
-                {:data-view (-> action :juxt.site.alpha/data-view)
-                 ::site/request-context req})))))
-         ::site/request-context req}))
+      (:juxt.site.alpha/data-view permitted-action)
+      (assoc
+       req
+       :ring.response/body
+       ;; We now have a map, but where should the responsibility lie to convert
+       ;; the data to the content-type of the current (negotiated)
+       ;; representation? This feels like it should be the responsibility of
+       ;; the quotation, since that is the most flexible and otherwise we will
+       ;; require a slew of additional data conventions.
+       (let [quotation (-> permitted-action :juxt.site.alpha/data-view :juxt.flip.alpha/quotation)]
+         (cond
+           quotation
+           (try
+             (first (f/eval-quotation '[] quotation req))
+             (catch Exception cause
+               (throw
+                (ex-info
+                 "Failure running data view quotation"
+                 {::site/request-context req}
+                 cause))))
+           :else
+           (throw
+            (ex-info
+             "Data view must (currently) have a :juxt.flip.alpha/quotation entry"
+             {:data-view (:juxt.site.alpha/data-view permitted-action)
+              ::site/request-context req})))))
 
       ;; It's rare but sometimes a GET will evaluate a quotation. For example, the
       ;; Authorization Request (RFC 6749 Section 4.2.1).
