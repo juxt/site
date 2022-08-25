@@ -160,7 +160,11 @@
          [(allowed? subject resource permission)
           [subject :juxt.pass.alpha/user-identity id]
           [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})))))
+          [permission :juxt.pass.alpha/user user]]]
+
+       :juxt.site.alpha/data-view
+       {:juxt.flip.alpha/quotation `(f/break)}
+       })))))
 
 (defn grant-permission-to-list-patients! [username]
   (eval
@@ -345,8 +349,7 @@
              "client_id" "local-terminal"
              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
              )
-            _ (is (nil? error) (format "OAuth2 grant error: %s" error))
-            ]
+            _ (is (nil? error) (format "OAuth2 grant error: %s" error))]
 
         ;; Add a /patient/XXX resource to serve an individual patient.
 
@@ -406,7 +409,7 @@
         (*handler*
          {:ring.request/method :get
           :ring.request/path "/patients"
-          :debug true
+;;          :debug true
           :ring.request/headers
           {"authorization" (format "Bearer %s" alice-access-token)
            "accept" "application/json"}})

@@ -35,6 +35,7 @@
    [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]
    [juxt.flip.alpha :as-alias flip]
+   [juxt.flip.alpha.core :as f]
    [juxt.reap.alpha.rfc7230 :as-alias rfc7230]
    [ring.util.codec :as codec])
   (:import (java.net URI)))
@@ -207,16 +208,38 @@
         ;; This use of 'first' is worrisome. Perhaps we should be transacting
         ;; every permitted action.
         permitted-action (::pass/action (first (::pass/permitted-actions req)))
-        data-views (filter :juxt.site.alpha/data-view (distinct (map ::pass/action (::pass/permitted-actions req))))]
+        permitted-actions-with-data-views (filter :juxt.site.alpha/data-view (distinct (map ::pass/action (::pass/permitted-actions req))))]
 
     (cond
-      (seq data-views)
+      (seq permitted-actions-with-data-views)
       ;; OK, now we need to evaluate a data-view which will pull in data from
       ;; get-patients.
+
       (throw
        (ex-info
         "TODO: data views"
-        {:data-views data-views
+        {:data-views permitted-actions-with-data-views
+         :result
+         (apply
+          merge
+          (for [action permitted-actions-with-data-views
+                :let [quotation (-> action :juxt.site.alpha/data-view :juxt.flip.alpha/quotation)]]
+            (cond
+              quotation
+              (try
+                (first (f/eval-quotation '[] quotation {}))
+                (catch Exception cause
+                  (throw
+                   (ex-info
+                    "Failure running data view quotation"
+                    {::site/request-context req}
+                    cause))))
+              :else
+              (throw
+               (ex-info
+                "Data view must (currently) have a :juxt.flip.alpha/quotation entry"
+                {:data-view (-> action :juxt.site.alpha/data-view)
+                 ::site/request-context req})))))
          ::site/request-context req}))
 
       ;; It's rare but sometimes a GET will evaluate a quotation. For example, the
