@@ -306,8 +306,10 @@
                 ;; There might be other strategies in the future (although the
                 ;; fewer the better really)
                 :else
-                (throw (ex-info "All actions must have some processing steps"
-                                {:action action-doc})))
+                (throw
+                 (ex-info
+                  "Submitted actions should have a juxt.site.alpha/transact entry"
+                  {:action action-doc})))
 
               _ (log/infof "FX are %s" (pr-str fx))
 

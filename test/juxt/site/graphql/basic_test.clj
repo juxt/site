@@ -42,24 +42,25 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/register-patient"
 
-    :juxt.flip.alpha/quotation
-    `(
-      (site/with-fx-acc-with-checks
-        [(site/push-fx
-          (f/dip
-           [site/request-body-as-edn
-            (site/validate
-             [:map
-              [:xt/id [:re "https://site.test/patients/.*"]]])
+    :juxt.site.alpha/transact
+    {:juxt.flip.alpha/quotation
+     `(
+       (site/with-fx-acc-with-checks
+         [(site/push-fx
+           (f/dip
+            [site/request-body-as-edn
+             (site/validate
+              [:map
+               [:xt/id [:re "https://site.test/patients/.*"]]])
 
-            (site/set-type "https://site.test/types/patient")
+             (site/set-type "https://site.test/types/patient")
 
-            (site/set-methods
-             {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
-              :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
-              :options {}})
+             (site/set-methods
+              {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
+               :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
+               :options {}})
 
-            xtdb.api/put]))]))
+             xtdb.api/put]))]))}
 
     :juxt.pass.alpha/rules
     '[
