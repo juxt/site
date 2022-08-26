@@ -18,6 +18,7 @@
    [malli.error :a me]
    [ring.util.codec :as codec]
    [xtdb.api :as xt]
+   [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]))
 
 ;; See Factor, https://factorcode.org/
@@ -550,6 +551,9 @@
 
 ;; XTDB
 
+;; TODO: These should be restricted, as they allow direct access to the
+;; database, not via access control.
+
 (defmethod word 'juxt.flip.alpha.xtdb/q
   [[q & stack] [_ & queue] env]
   (assert (map? q))
@@ -569,6 +573,9 @@
 
 ;; Site
 
+;; TODO: These should be restricted, as they allow direct access to the
+;; database, not via access control.
+
 (defmethod word 'juxt.site.alpha/lookup
   [[val attr typ & stack] [_ & queue] env]
   [(cons {:find '[(pull e [*])]
@@ -579,6 +586,8 @@
 (defmethod word 'juxt.site.alpha/entity
   [[id & stack] [_ & queue] env]
   [(cons (xt/entity (::site/db env) id) stack) queue env])
+
+;; JSON
 
 (defmethod word 'jsonista.core/read-string
   [[s & stack] [_ & queue] env]
@@ -734,7 +743,7 @@
       (throw
        (clojure.core/ex-info
         (format "Failure in quotation: %s" (.getMessage t))
-        (or (ex-data t) {})
+        (into {::stack stack ::queue queue} (ex-data t))
         t)))))
 
 ;; TODO: Tempted to rename to just 'eval'

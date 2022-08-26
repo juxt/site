@@ -7,6 +7,7 @@
    [juxt.site.alpha.main :as main]
    [juxt.pass.alpha.actions :as authz]
    [juxt.apex.alpha :as-alias apex]
+   [juxt.site.alpha.init :as init]
    [juxt.http.alpha :as-alias http]
    [juxt.mail.alpha :as-alias mail]
    [juxt.pass.alpha :as-alias pass]
@@ -46,9 +47,10 @@
 
 (defn with-handler [f]
   (binding [*handler* (make-handler
-                       {::site/xt-node *xt-node*
-                        ::site/base-uri "https://example.org"
-                        ::site/uri-prefix "https://example.org"})]
+                       (init/substitute-actual-base-uri
+                        {::site/xt-node *xt-node*
+                         ::site/base-uri "https://example.org"
+                         ::site/uri-prefix "https://example.org"}))]
     (f)))
 
 (defn with-timing [f]
@@ -75,6 +77,21 @@
    ::pass/target '[]
    ::pass/effect ::pass/allow})
 
+(defmacro with-fixtures [& body]
+  `((t/join-fixtures [with-system-xt with-handler])
+    (fn [] ~@body)))
+
+(defmacro with-resources [resources & body]
+  `(do
+     (let [resources# ~resources]
+       (init/converge!
+        (conj resources# ::init/system)
+        (init/substitute-actual-base-uri
+         (merge init/dependency-graph book/dependency-graph))))
+     ~@body))
+
+
+
 ;; Deprecated
 (def access-all-apis
   {:xt/id "https://example.org/access-rule"
@@ -83,8 +100,7 @@
    ::pass/target '[[resource ::site/resource-provider ::apex/openapi-path]]
    ::pass/effect ::pass/allow})
 
-;; TODO: Rename this, it isn't very descriptive!
-(defn install-test-resources! []
+(defn ^:deprecated install-test-resources! []
   (submit-and-await!
    [
     ;; A tester

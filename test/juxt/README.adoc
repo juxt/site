@@ -1,0 +1,8 @@
+= Testing Site
+
+== Directories
+
+=== site
+
+* Handler tests - these test Site's core HTTP handler
+* GraphQL tests

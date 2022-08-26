@@ -35,6 +35,7 @@
    [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]
    [juxt.flip.alpha :as-alias flip]
+   [juxt.flip.alpha.core :as f]
    [juxt.reap.alpha.rfc7230 :as-alias rfc7230]
    [ring.util.codec :as codec])
   (:import (java.net URI)))
@@ -204,17 +205,50 @@
 (defn GET [{::pass/keys [subject] :as req}]
   (conditional/evaluate-preconditions! req)
   (let [req (assoc req :ring.response/status 200)
-        permitted-action (::pass/action (first (::pass/permitted-actions req)))]
+        ;; This use of 'first' is worrisome. Perhaps we should be transacting
+        ;; every permitted action.
+        permitted-action (::pass/action (first (::pass/permitted-actions req)))
+        data-view (some :juxt.site.alpha/data-view (distinct (map ::pass/action (::pass/permitted-actions req))))]
+
     (cond
-      ;; It's rare but sometimes a GET will call an action. For example, the
+      (:juxt.site.alpha/data-view permitted-action)
+      (assoc
+       req
+       :ring.response/body
+       ;; We now have a map, but where should the responsibility lie to convert
+       ;; the data to the content-type of the current (negotiated)
+       ;; representation? This feels like it should be the responsibility of
+       ;; the quotation, since that is the most flexible and otherwise we will
+       ;; require a slew of additional data conventions.
+       (let [quotation (-> permitted-action :juxt.site.alpha/data-view :juxt.flip.alpha/quotation)]
+         (cond
+           quotation
+           (try
+             (first (f/eval-quotation '[] quotation req))
+             (catch Exception cause
+               (throw
+                (ex-info
+                 "Failure running data view quotation"
+                 {::site/request-context req}
+                 cause))))
+           :else
+           (throw
+            (ex-info
+             "Data view must (currently) have a :juxt.flip.alpha/quotation entry"
+             {:data-view (:juxt.site.alpha/data-view permitted-action)
+              ::site/request-context req})))))
+
+      ;; It's rare but sometimes a GET will evaluate a quotation. For example, the
       ;; Authorization Request (RFC 6749 Section 4.2.1).
-      (and permitted-action (::flip/quotation permitted-action))
+      (and permitted-action (-> permitted-action ::site/transact ::flip/quotation))
       (try
+        ;; TODO: Perhaps needs to be something to indicate whether or not the
+        ;; action will produce effects.
         (actions/do-action
          (cond-> req
            permitted-action (assoc ::pass/action (:xt/id permitted-action))
-           ;; A java.io.BufferedInputStream in the request can provke this
-           ;; error: "invalid tx-op: Unfreezable type: class
+           ;; A java.io.BufferedInputStream in the request can cause this error:
+           ;; "invalid tx-op: Unfreezable type: class
            ;; java.io.BufferedInputStream".
            (:ring.request/body req) (dissoc :ring.request/body)))
         (catch Exception e
@@ -226,6 +260,9 @@
                     (ex-data e))
              :permitted-action permitted-action}
             e))))
+
+      ;;(::pass/permitted-actions req)
+
       :else
       (response/add-payload req))))
 
@@ -938,7 +975,7 @@
 
         response (try
                    (cond-> error-resource
-                     (not= method :head) response/add-payload)
+                     (not= method :head) response/add-error-payload)
                    (catch Exception e
                      (respond-internal-error req e)))]
 

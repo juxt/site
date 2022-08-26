@@ -8,6 +8,8 @@
    [juxt.site.alpha.graphql.templating :as graphql-templating]
    [xtdb.api :as xt]
    [juxt.http.alpha :as-alias http]
+   [juxt.pass.alpha.actions :as actions]
+   [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]))
 
 (declare add-payload)
@@ -169,16 +171,45 @@
          ::site/request-context (assoc req :ring.response/status 500)})))))
 
 (defn add-payload [{::site/keys [selected-representation db]
+                    ::pass/keys [subject]
                     :ring.request/keys [method]
                     :as req}]
   ;; Should not be called if method is HEAD
   (assert (not= method :head))
 
+  (when (and (:debug req) #_(= 200 (:ring.response/status req)))
+    (throw
+     (ex-info
+      "DEBUG"
+      {:debug-output
+       {:status-so-far (:ring.response/status req)
+        :query
+        (when (seq (::pass/permitted-actions req))
+          (try
+            (actions/allowed-resources
+             db
+             #{"https://site.test/actions/get-patient"}
+             #_(set (map (comp :xt/id ::pass/action) (::pass/permitted-actions req)))
+             {::pass/subject (:xt/id subject)}
+             ;; Add purpose (somehow, request header?)
+             )
+            (catch Exception e
+              {:failed (ex-data e)
+               :message (.getMessage e)
+               :cause (.getCause e)})))
+        :subject subject
+        :actions (map (comp :xt/id ::pass/action) (::pass/permitted-actions req))}
+
+       ::site/request-context
+       req})))
+
   (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
-        template (some->> selected-representation ::site/template (xt/entity db))
-        custom-handler (get-in req [::site/methods method ::site/handler])]
+        ;;template (some->> selected-representation ::site/template (xt/entity db))
+        ;;custom-handler (get-in req [::site/methods method ::site/handler])
+        ]
     (cond
-      custom-handler
+      ;; This is not currently used, and predates Flip
+      #_#_custom-handler
       (if-let [f (cond-> custom-handler (symbol? custom-handler) requiring-resolve)]
         (do
           (log/debugf "Calling custom-handler: %s %s" custom-handler (type custom-handler))
@@ -189,7 +220,10 @@
           {:custom-handler custom-handler
            ::site/request-context (assoc req :ring.response/status 500)})))
 
-      body-fn
+      ;; Similarly we don't require references to Clojure functions since there
+      ;; is no way of getting these in to Site, except for as custom
+      ;; engineering.
+      #_#_body-fn
       (if-let [f (cond-> body-fn (symbol? body-fn) requiring-resolve)]
         (do
           (log/debugf "Calling body-fn: %s %s" body-fn (type body-fn))
@@ -200,12 +234,24 @@
           {:body-fn body-fn
            ::site/request-context (assoc req :ring.response/status 500)})))
 
-      template (render-template req template)
+      #_#_template (render-template req template)
 
       content (assoc req :ring.response/body content)
       body (assoc req :ring.response/body body)
       :else req)))
 
+(defn add-error-payload [{::site/keys [selected-representation db]
+                          ::pass/keys [subject]
+                          :ring.request/keys [method]
+                          :as req}]
+  ;; Should not be called if method is HEAD
+  (assert (not= method :head))
+
+  (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation]
+    (cond
+      content (assoc req :ring.response/body content)
+      body (assoc req :ring.response/body body)
+      :else req)))
 
 (defn redirect [req status location]
   (-> req

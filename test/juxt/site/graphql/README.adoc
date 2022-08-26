@@ -1,0 +1,15 @@
+= GraphQL Tests
+
+These tests are built around a fictional hospital.
+
+The healthcare example has been chosen because:
+
+* Most people have direct experience, if only as a patient, of the domain.
+
+* There are complex confidentiality and privacy requirements to handle.
+
+* There are easily-understood examples of both analytical and real-time data,
+  exercising query, mutation and subscriptions in GraphQL.
+
+* Where GraphQL, as a form layer, can present a simplified view of a complex and
+  technical data layer.

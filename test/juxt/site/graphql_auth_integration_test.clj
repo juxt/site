@@ -304,3 +304,15 @@
            example-compiled-schema
            "subject"
            nil)))))
+
+(defmacro with-fixtures [& body]
+  `((t/join-fixtures fixtures)
+    (fn [] ~@body)))
+
+(comment
+  (with-fixtures
+    (graphql-proc/graphql-query->xtdb-query
+     "query findEmployeePhoneNumbers { employee { juxtcode, manager { projects { repositories { name } } } } }"
+     example-compiled-schema
+     (repl/db)
+     )))
