@@ -197,8 +197,9 @@
               (authz/check-permissions
                db
                #{(:xt/id GET_RESOURCE_ACTION)}
-               {::pass/subject (:xt/id subject)
-                ::site/resource (:xt/id resource)})]
+               (cond-> {}
+                 subject (assoc ::pass/subject subject)
+                 resource (assoc ::site/resource resource)))]
           (if expected
             (is (seq permissions))
             (is (not (seq permissions)))))
@@ -357,39 +358,39 @@
         (let [actual (authz/check-permissions
                       db
                       #{(:xt/id action)}
-                      {::pass/subject (:xt/id subject)
+                      {::pass/subject subject
                        ::site/resource resource})]
           (if ok? (is (seq actual)) (is (not (seq actual)))))
 
       ;; Alice can read her own private file.
       ALICE_SUBJECT
       READ_USER_DIR_ACTION
-      "https://example.org/~alice/private.txt"
+      ALICE_USER_DIR_PRIVATE_FILE
       true
 
       ;; Alice can read the file in her user directory which she has shared with
       ;; Bob.
       ALICE_SUBJECT
       READ_USER_DIR_ACTION
-      "https://example.org/~alice/shared.txt"
+      ALICE_USER_DIR_SHARED_FILE
       true
 
       ;; Bob cannot read Alice's private file.
       BOB_SUBJECT
       READ_USER_DIR_ACTION
-      "https://example.org/~alice/private.txt"
+      ALICE_USER_DIR_PRIVATE_FILE
       false
 
       ;; Bob can read the file Alice has shared with him.
       BOB_SUBJECT
       READ_SHARED_ACTION
-      "https://example.org/~alice/shared.txt"
+      ALICE_USER_DIR_SHARED_FILE
       true
 
       ;; Alice can put a file to her user directory
       ALICE_SUBJECT
       WRITE_USER_DIR_ACTION
-      "https://example.org/~alice/foo.txt"
+      {:xt/id "https://example.org/~alice/foo.txt"}
       true
 
       ;; Alice can't put a file to her user directory without write:resource
@@ -404,32 +405,32 @@
       ;; Alice can't put a file to Bob's user directory
       ALICE_SUBJECT
       WRITE_USER_DIR_ACTION
-      "https://example.org/~bob/foo.txt"
+      {:xt/id "https://example.org/~bob/foo.txt"}
       false
 
       ;; Alice can't put a file outside her user directory
       ALICE_SUBJECT
       WRITE_USER_DIR_ACTION
-      "https://example.org/index.html"
+      {:xt/id "https://example.org/index.html"}
       false
 
       ;; Bob can put a file to his user directory
       BOB_SUBJECT
       WRITE_USER_DIR_ACTION
-      "https://example.org/~bob/foo.txt"
+      {:xt/id "https://example.org/~bob/foo.txt"}
       true
 
       ;; Bob can't put a file to Alice's directory
       BOB_SUBJECT
       WRITE_USER_DIR_ACTION
-      "https://example.org/~alice/foo.txt"
+      {:xt/id "https://example.org/~alice/foo.txt"}
       false
 
       ;; Carlos cannot put a file to his user directory, as he hasn't been
       ;; granted the write-user-dir action.
       CARLOS_SUBJECT
       WRITE_USER_DIR_ACTION
-      "https://example.org/~carlos/foo.txt"
+      {:xt/id "https://example.org/~carlos/foo.txt"}
       false
       )
 
@@ -566,8 +567,8 @@
                 (authz/pull-allowed-resource
                  db
                  #{(:xt/id READ_USERNAME_ACTION) (:xt/id READ_SECRETS_ACTION)}
-                 (:xt/id ALICE)
-                 {::pass/subject (:xt/id subject)})]
+                 ALICE
+                 {::pass/subject subject})]
             (is (= expected actual)))
 
         BOB_SUBJECT {::username "alice" ::secret "foo"}
@@ -735,7 +736,7 @@
                db
                #{(:xt/id READ_MESSAGE_CONTENT_ACTION)
                  (:xt/id READ_MESSAGE_METADATA_ACTION)}
-               {::pass/subject (:xt/id subject)})))]
+               {::pass/subject subject})))]
 
       ;; Alice and Bob can read all the messages in the group
       (let [messages (get-messages ALICE_SUBJECT)]
@@ -765,7 +766,7 @@
                    db
                    #{(:xt/id READ_MESSAGE_CONTENT_ACTION)
                      (:xt/id READ_MESSAGE_METADATA_ACTION)}
-                   {::pass/subject (:xt/id ALICE_SUBJECT)
+                   {::pass/subject ALICE_SUBJECT
                     ::pass/include-rules [['(include? subject action message)
                                            ['message ::from (:xt/id ALICE)]]]}))))))))
 
@@ -835,7 +836,7 @@
               (authz/pull-allowed-resources
                db
                #{(:xt/id action)}
-               {::pass/subject (:xt/id subject)})))
+               {::pass/subject subject})))
 
           get-medical-record
           (fn [subject action]
@@ -843,8 +844,8 @@
               (authz/pull-allowed-resource
                db
                #{(:xt/id action)}
-               "https://example.org/alice/medical-record"
-               {::pass/subject (:xt/id subject)})))]
+               {:xt/id "https://example.org/alice/medical-record"}
+               {::pass/subject subject})))]
 
       (is (zero? (count (get-medical-records OSCAR_SUBJECT READ_MEDICAL_RECORD_ACTION))))
       (is (= 1 (count (get-medical-records OSCAR_SUBJECT EMERGENCY_READ_MEDICAL_RECORD_ACTION))))
@@ -909,7 +910,7 @@
               (authz/pull-allowed-resources
                db
                #{(:xt/id action)}
-               {::pass/subject (:xt/id subject)
+               {::pass/subject subject
                 ::pass/purpose purpose})))
 
           get-medical-record
@@ -918,8 +919,8 @@
               (authz/pull-allowed-resource
                db
                #{(:xt/id action)}
-               "https://example.org/alice/medical-record"
-               {::pass/subject (:xt/id subject)
+               {:xt/id "https://example.org/alice/medical-record"}
+               {::pass/subject subject
                 ::pass/purpose purpose})))]
 
       (is (zero? (count (get-medical-records OSCAR_SUBJECT READ_MEDICAL_RECORD_ACTION "https://example.org/purposes/marketing"))))
@@ -1266,7 +1267,7 @@
                 (authz/pull-allowed-resources
                  db
                  actions
-                 {::pass/subject subject
+                 {::pass/subject {:xt/id subject}
                   ::pass/purpose purpose})]
             (is (= expected (count resources)))
             (assert (= expected (count resources)))
@@ -1299,7 +1300,7 @@
           (authz/pull-allowed-resources
            db
            #{"https://example.org/actions/list-trades"}
-           {::pass/subject subject
+           {::pass/subject {:xt/id subject}
             ::pass/purpose "Trading"})
           result
           (->>
@@ -1308,7 +1309,7 @@
             trades
             ::trader
             #{"https://example.org/actions/get-trader-personal-info"}
-            {::pass/subject subject
+            {::pass/subject {:xt/id subject}
              ::pass/purpose "LineManagement"})
            (map (juxt :xt/id identity))
            (into {}))]

@@ -2,10 +2,15 @@
 
 (ns juxt.site.alpha.main
   (:require
+   juxt.pass.alpha.schema
+   juxt.site.alpha.schema
    [aero.core :as aero]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log]
-   [integrant.core :as ig]))
+   [integrant.core :as ig]
+   [malli.core :as m]
+   [malli.registry :as mr]
+   ))
 
 (def ^:dynamic *system* nil)
 
@@ -45,6 +50,12 @@
         system-config (:ig/system config)]
     (load-namespaces system-config)
     (ig/prep system-config)))
+
+(mr/set-default-registry!
+ (mr/composite-registry
+  (m/default-schemas)
+  juxt.pass.alpha.schema/schema-registry
+  juxt.site.alpha.schema/schema-registry))
 
 (defn -main [& _]
   (log/info "Starting system")

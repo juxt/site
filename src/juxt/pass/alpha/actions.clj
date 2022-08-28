@@ -32,7 +32,10 @@
 ;; This is broken out into its own function to assist debugging when
 ;; authorization is denied and we don't know why. A better authorization
 ;; debugger is definitely required.
-(defn query-permissions [{:keys [db rules subject actions resource purpose] :as args}]
+(defn
+  ^{:private true
+    }
+  query-permissions [{:keys [db rules subject actions resource purpose] :as args}]
   (assert (or (nil? subject) (string? subject)))
   (assert (or (nil? resource) (string? resource)))
   (let [query {:find '[(pull permission [*]) (pull action [*])]
@@ -63,12 +66,23 @@
       (catch Exception e
         (throw (ex-info "Failed to query permissions" {:query query} e))))))
 
-(defn check-permissions
+(defn
+  ^{:malli/schema
+    [:=> [:cat
+          :any
+          [:set :string]
+          [:map
+           [::pass/subject {:optional true}]
+           [::site/resource {:optional true}]
+           [::pass/purpose {:optional true}]]]
+     :any]}
+  check-permissions
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
   [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose}]
 
-  (assert (or (nil? subject) (string? subject)) "Subject expected to be a string, or null")
-  (assert (or (nil? resource) (string? resource)) "Resource expected to be a string, or null")
+  ;; TODO: These asserts have been replaced by Malli schema instrumentation
+  (assert (or (nil? subject) (map? subject)) "Subject expected to be a map, or null")
+  (assert (or (nil? resource) (map? resource)) "Resource expected to be a map, or null")
 
   (let [rules (actions->rules db actions)]
     (when (seq rules)
@@ -76,14 +90,23 @@
             (query-permissions
              {:db db
               :rules rules
-              :subject subject
+              :subject (:xt/id subject)
               :actions actions
-              :resource resource
+              :resource (:xt/id resource)
               :purpose purpose})]
         ;;(log/debugf "Returning permissions: %s" (pr-str permissions))
         permissions))))
 
-(defn allowed-resources
+(defn
+  ^{:malli/schema
+    [:=> [:cat
+          :any
+          [:set :string]
+          [:map
+           [::pass/subject {:optional true}]
+           [::pass/purpose {:optional true}]]]
+     :any]}
+  allowed-resources
   "Given a set of possible actions, and possibly a subject and purpose, which
   resources are allowed?"
   [db actions {::pass/keys [subject purpose]}]
@@ -158,9 +181,17 @@
 
           resource actions purpose))))
 
-;; TODO: This subject should be folded into the pass-ctx as it's optional (could
-;; be an anonymous action)
-(defn pull-allowed-resource
+(defn
+  ^{:malli/schema
+    [:=> [:cat
+          :any
+          [:set :string]
+          ::site/resource
+          [:map
+           [::pass/subject {:optional true}]
+           [::pass/purpose {:optional true}]]]
+     :any]}
+  pull-allowed-resource
   "Given a subject, a set of possible actions and a resource, pull the allowed
   attributes."
   [db actions resource {::pass/keys [subject purpose] :as pass-ctx}]
@@ -174,9 +205,18 @@
                         (fn [{::pass/keys [action]}]
                           (::pass/pull action))
                         check-result))]
-    (xt/pull db pull-expr resource)))
+    (xt/pull db pull-expr (:xt/id resource))))
 
-(defn pull-allowed-resources
+(defn
+  ^{:malli/schema
+    [:=> [:cat
+          :any
+          [:set :string]
+          [:map
+           [::pass/subject {:optional true}]
+           [::pass/purpose {:optional true}]]]
+     :any]}
+  pull-allowed-resources
   "Given a subject and a set of possible actions, which resources are allowed, and
   get me the documents. If resources-in-scope is given, only consider resources
   in that set."
@@ -213,7 +253,7 @@
 
           :in '[subject actions purpose resources-in-scope]}
 
-         subject actions purpose (or resources-in-scope #{}))]
+         (:xt/id subject) actions purpose (or resources-in-scope #{}))]
 
     ;; TODO: Too complex, extract this and unit test. The purpose here it to
     ;; apply the pull of each relevant action to each result, and merge the
