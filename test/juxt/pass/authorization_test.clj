@@ -439,7 +439,7 @@
                (authz/allowed-resources
                 db
                 actions
-                {::pass/subject (:xt/id subject)})))
+                {::pass/subject subject})))
 
       ;; Alice can see all her files.
       ALICE_SUBJECT

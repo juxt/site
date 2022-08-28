@@ -134,7 +134,7 @@
                :in '[subject actions purpose]}]
 
     (try
-      (xt/q db query subject actions purpose)
+      (xt/q db query (:xt/id subject) actions purpose)
       (catch Exception cause
         (throw
          (ex-info
