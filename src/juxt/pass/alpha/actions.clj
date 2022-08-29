@@ -292,8 +292,8 @@
         tx (xt/indexing-tx xt-ctx)]
     (try
       (assert base-uri "The base-uri must be provided")
-      (assert (or (nil? subject) (string? subject)) "Subject to do-action-in-tx-fn expected to be a string, or null")
-      (assert (or (nil? resource) (string? resource)) "Resource to do-action-in-tx-fn expected to be a string, or null")
+      (assert (or (nil? subject) (map? subject)) "Subject to do-action-in-tx-fn expected to be a string, or null")
+      (assert (or (nil? resource) (map? resource)) "Resource to do-action-in-tx-fn expected to be a string, or null")
 
       ;; Check that we /can/ call the action
       (let [check-permissions-result
@@ -376,7 +376,7 @@
                  (cond->
                      {:xt/id (format "%s/_site/action-log/%s" base-uri (::xt/tx-id tx))
                       ::site/type "https://meta.juxt.site/site/action-log-entry"
-                      ::pass/subject subject
+                      ::pass/subject-uri (:xt/id subject)
                       ::pass/action action
                       ::pass/purpose purpose
                       ::pass/puts (vec
@@ -437,8 +437,9 @@
       (dissoc ::site/xt-node ::site/db)
       ;; We take the ids, because it saves on serialization cost and we only
       ;; need the ids in do-action-in-tx-fn
-      (update ::pass/subject :xt/id)
-      (update ::site/resource :xt/id)))
+      ;;(update ::pass/subject :xt/id)
+      ;;(update ::site/resource :xt/id)
+      ))
 
 (defn apply-request-context-operations [ctx ops]
   (let [res

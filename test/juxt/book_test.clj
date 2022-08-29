@@ -890,3 +890,5 @@
 
 (comment
   (p/register! #'repl/e))
+
+;;(with-resources #{::init/system})
