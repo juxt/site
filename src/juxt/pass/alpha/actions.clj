@@ -547,13 +547,14 @@
           (check-permissions
            db
            actions
-           (cond-> {::pass/subject (:xt/id subject)}
+           ;; TODO: Isn't this now superfluous - can't we pass through the req?
+           (cond-> {::pass/subject subject}
              ;; When the resource is in the database, we can add it to the
              ;; permission checking in case there's a specific permission for
              ;; this resource.
-             resource (assoc ::site/resource (:xt/id resource))))]
+             resource (assoc ::site/resource resource)))]
 
-      (log/debugf "Permitted actions: %s" (pr-str permitted-actions) )
+      (log/debugf "Permitted actions: %s" (pr-str permitted-actions))
 
       (if (seq permitted-actions)
         (h (assoc req ::pass/permitted-actions permitted-actions))

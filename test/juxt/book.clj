@@ -988,7 +988,7 @@ Password: <input name=password type=password>
              (f/define make-access-token
                [(f/set-at
                  (f/keep
-                  [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
+                  [f/dup (f/of :subject) (f/of :xt/id) :juxt.pass.alpha/subject {} f/set-at f/swap
                    f/dup (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
                    (f/of :scope) :juxt.pass.alpha/scope f/rot f/set-at
                    (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
