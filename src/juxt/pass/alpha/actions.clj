@@ -78,7 +78,11 @@
      :any]}
   check-permissions
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
-  [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose}]
+  [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose :as options}]
+
+  (when (= (find options ::pass/subject) [::pass/subject nil])
+    (throw (ex-info "Nil subject passed!" {}))
+    )
 
   ;; TODO: These asserts have been replaced by Malli schema instrumentation
   (assert (or (nil? subject) (map? subject)) "Subject expected to be a map, or null")
@@ -546,10 +550,11 @@
            db
            actions
            ;; TODO: Isn't this now superfluous - can't we pass through the req?
-           (cond-> {::pass/subject subject}
+           (cond-> {}
              ;; When the resource is in the database, we can add it to the
              ;; permission checking in case there's a specific permission for
              ;; this resource.
+             subject (assoc ::pass/subject subject)
              resource (assoc ::site/resource resource)))]
 
       (log/debugf "Permitted actions: %s" (pr-str permitted-actions))

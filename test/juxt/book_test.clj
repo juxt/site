@@ -32,7 +32,6 @@
   (format "Basic %s" (String. (.encode (java.util.Base64/getEncoder) (.getBytes (format "%s:%s" user password))))))
 
 ;; Tests
-
 (deftest not-found-test
   (with-resources #{::init/system}
     (let [req {:ring.request/method :get
