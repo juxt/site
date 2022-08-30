@@ -1258,7 +1258,7 @@ Password: <input name=password type=password>
           (f/define extract-owner
             [(f/set-at
               (f/dip
-               [(f/env :juxt.pass.alpha/subject) site/entity (f/of :juxt.pass.alpha/user-identity) site/entity
+               [(f/env :juxt.pass.alpha/subject) (f/of :juxt.pass.alpha/user-identity) site/entity
                 (f/of :juxt.pass.alpha/user)
                 :owner]))])
 
@@ -1384,7 +1384,7 @@ Password: <input name=password type=password>
 
           (f/define ^{:f/stack-effect '[ctx key -- ctx]} update-base-resource
             [(f/dip
-              [(site/entity (f/env ::site/resource))
+              [(f/env ::site/resource) #_(site/entity (f/env ::site/resource))
                (f/set-at (f/dip [f/dup (f/of :input) ::http/content]))
                (f/set-at (f/dip ["application/graphql" ::http/content-type]))
                (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))])
@@ -1396,8 +1396,8 @@ Password: <input name=password type=password>
               ;; Perhaps could we use a template with eval-embedded-quotations?
               [{}
                (f/set-at (f/dip ["application/edn" ::http/content-type]))
-               (f/set-at (f/dip [(f/env ::site/resource) ".edn" f/swap f/str :xt/id]))
-               (f/set-at (f/dip [(f/env ::site/resource) ::site/variant-of]))
+               (f/set-at (f/dip [(f/env ::site/resource) (f/of :xt/id) ".edn" f/swap f/str :xt/id]))
+               (f/set-at (f/dip [(f/env ::site/resource) (f/of :xt/id) ::site/variant-of]))
                (f/set-at (f/dip [f/dup (f/of :compiled-schema) f/pr-str ::http/content]))])
              f/rot
              f/set-at])
@@ -1412,7 +1412,7 @@ Password: <input name=password type=password>
               f/rot)])
 
           (f/define ^{:f/stack-effect '[ctx -- ctx]} determine-status
-            [(f/of (site/entity (f/env ::site/resource)) ::http/content)
+            [(f/of (f/env ::site/resource) ::http/content)
              [200 :status f/rot f/set-at]
              [201 :status f/rot f/set-at]
              f/if])

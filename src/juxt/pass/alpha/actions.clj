@@ -477,9 +477,7 @@
   ;; by an anonymous user.
   (let [tx-fn (str base-uri "/_site/do-action")]
     (assert (xt/entity db tx-fn) "do-action must exist in database")
-    (let [tx (xt/submit-tx
-              xt-node
-              [[::xt/fn tx-fn (sanitize-ctx ctx)]])
+    (let [tx (xt/submit-tx xt-node [[::xt/fn tx-fn (sanitize-ctx ctx)]])
           {::xt/keys [tx-id]} (xt/await-tx xt-node tx)
           ctx (assoc ctx ::site/db (xt/db xt-node))]
 

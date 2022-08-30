@@ -601,7 +601,6 @@
      f/nip)
    {}))
 
-;;with-fixtures
 (deftest put-graphql-schema
   (with-resources
     #{"https://site.test/graphql"
@@ -654,8 +653,8 @@
           _ (is (= 201 (:ring.response/status put-response)))
           _ (is (nil? (get-in put-response [:ring.response/headers "location"])))
 
-          put-response (*handler* (finalize-request put-request))
-          _ (is (= 200 (:ring.response/status put-response)))
+          second-put-response (*handler* (finalize-request put-request))
+          _ (is (= 200 (:ring.response/status second-put-response)))
 
           get-response
           (*handler*
@@ -664,11 +663,11 @@
              :ring.request/path "/graphql"
              :ring.request/headers
              {"authorization" (format "Bearer %s" access-token)}}))
-          _ (is (= 200 (:ring.response/status put-response)))
+          _ (is (= 200 (:ring.response/status get-response)))
           _ (is (= "type Query { myName: String }" (:ring.response/body get-response)))
           _ (is (= "application/graphql" (get-in get-response [:ring.response/headers "content-type"])))
 
-          get-response
+          get-response-for-edn
           (*handler*
            (finalize-request
             {:ring.request/method :get
@@ -676,13 +675,13 @@
              :ring.request/headers
              {"authorization" (format "Bearer %s" access-token)
               "accept" "application/edn"}}))
-          _ (is (= 200 (:ring.response/status put-response)))
+          _ (is (= 200 (:ring.response/status get-response-for-edn)))
 
           errors (:errors (edn/read-string (:ring.response/body get-response)))
           _ (is (empty? errors))
-          _ (is (= "application/edn" (get-in get-response [:ring.response/headers "content-type"])))
+          _ (is (= "application/edn" (get-in get-response-for-edn [:ring.response/headers "content-type"])))
 
-          get-response
+          get-response-for-json
           (*handler*
            (finalize-request
             {:ring.request/method :get
@@ -691,9 +690,7 @@
              {"authorization" (format "Bearer %s" access-token)
               "accept" "application/json"}}))
 
-          _ (is (= 406 (:ring.response/status get-response)))
-
-
+          _ (is (= 406 (:ring.response/status get-response-for-json)))
 
           ]
 
@@ -718,7 +715,8 @@
           "content-type" "application/graphql"}
          ::body-bytes (.getBytes schema)}
         put-response (*handler* (finalize-request put-request))]
-    _ (is (= 201 (:ring.response/status put-response)))))
+    (is (= 201 (:ring.response/status put-response)))
+    put-response))
 
 (defn graphql-query [^String access-token ^String query]
   (let [post-response
@@ -742,18 +740,21 @@
 
     (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
 
-          _ (deploy-schema session-id "type Query { myName: String }")
+          response (deploy-schema session-id "type Query { myName: String }")
 
-          {access-token "access_token"
-           error "error"}
-          (book/authorize!
+          #_{access-token "access_token" error "error"}
+          #_(book/authorize!
            :session-id session-id
            "client_id" "local-terminal"
            "scope" ["https://site.test/oauth/scope/graphql/query"])
-          _ (is (nil? error) (format "OAuth2 grant error: %s" error))]
+          ;;_ (is (nil? error) (format "OAuth2 grant error: %s" error))
+          ]
 
       ;; Ready for implementation
       ;;(is (graphql-query access-token "query { myName }"))
+
+      response
+      ;;error
       )))
 
 ;; A post to /graphql selects the action relating to 'query', 'mutation' or
