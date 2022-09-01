@@ -178,7 +178,41 @@
      :juxt.pass.alpha/user (format "https://site.test/users/%s" username)
      :juxt.pass.alpha/purpose nil}))
 
-(defn create-action-register-patient-vitals! [])
+(defn create-action-register-patient-measurement! [_]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/register-patient-measurement"
+
+    :juxt.site.alpha/transact
+    {:juxt.flip.alpha/quotation
+     `(
+       (site/with-fx-acc-with-checks
+         [(site/push-fx
+           (f/dip
+            [site/request-body-as-edn
+             (site/validate
+              [:map
+               [:xt/id [:re "https://site.test/measurements/.*"]]
+               [:patient [:re "https://site.test/patients/.*"]]])
+
+             (site/set-type "https://site.test/types/measurement")
+
+             xtdb.api/put]))]))}
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject subject]]]}))
+
+(defn grant-permission-to-invoke-action-register-patient-measurement! [_]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/system/register-patient-measurement"
+    :juxt.pass.alpha/subject "https://site.test/subjects/system"
+    :juxt.pass.alpha/action "https://site.test/actions/register-patient-measurement"
+    :juxt.pass.alpha/purpose nil}))
 
 (defn create-action-read-vitals! [_]
   (init/do-action
@@ -260,6 +294,14 @@
               (grant-permission-to-list-patients! (get params "username")))
     :deps #{::init/system}}
 
+   "https://site.test/actions/register-patient-measurement"
+   {:create #'create-action-register-patient-measurement!
+    :deps #{::init/system}}
+
+   "https://site.test/permissions/system/register-patient-measurement"
+   {:create #'grant-permission-to-invoke-action-register-patient-measurement!
+    :deps #{::init/system}}
+
    "https://site.test/patients/{pid}"
    {:create #'register-patient!
     :deps #{::init/system
@@ -317,6 +359,9 @@
            "https://site.test/permissions/alice/list-patients"
            "https://site.test/permissions/bob/list-patients"
 
+           "https://site.test/actions/register-patient-measurement"
+           "https://site.test/permissions/system/register-patient-measurement"
+
            "https://site.test/patients"}
 
          ;; Add some users
@@ -331,6 +376,15 @@
 
     (with-resources
       resources
+
+      ;; Create some measurements
+      (init/do-action
+       "https://site.test/subjects/system"
+       "https://site.test/actions/register-patient-measurement"
+       {:xt/id "https://site.test/measurements/eeda3b49-2e96-42fc-9e6a-e89e2eb68c24"
+        :patient "https://site.test/patients/010"
+        :measurement {"heartRate" "45"
+                      "bloodPressure" "120/80"}})
 
       (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
             {alice-access-token "access_token"
@@ -441,19 +495,15 @@
         ;; provides our query, but we want to experiment with creating our own
         ;; query with sub-queries, which we can compile to with GraphQL.
 
-        ;; Let's just query then!
-
-        ;; Let's use Bob's subject
-
         #_(xt/q
-         (xt/db *xt-node*)
-         '{:find [(pull resource [*])]
-           :where [
-                   [resource :juxt.site.alpha/type "https://site.test/types/patient"]]})
+           (xt/db *xt-node*)
+           '{:find [(pull resource [*])]
+             :where [
+                     [resource :juxt.site.alpha/type "https://site.test/types/patient"]]})
 
         (let [db (xt/db *xt-node*)
 
-              {::pass/keys [subject]}
+              {bob ::pass/subject}
               (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))
 
               actions #{"https://site.test/actions/get-patient"}
@@ -462,8 +512,8 @@
 
           (xt/q
            db
-           {:find '[resource (pull action [:xt/id ::pass/pull]) purpose permission]
-            :keys '[resource action purpose permission]
+           {:find '[patient (pull action [:xt/id ::pass/pull]) permission (pull measurement [*])]
+            :keys '[patient action permission measurement]
             :where
             '[
               ;; Only consider given actions
@@ -473,16 +523,23 @@
               ;; Only consider allowed permssions
               [permission ::site/type "https://meta.juxt.site/pass/permission"]
               [permission ::pass/action action]
-              (allowed? subject resource permission)
+              (allowed? subject patient permission)
 
               ;; Only permissions that match our purpose
-              [permission ::pass/purpose purpose]]
+              [permission ::pass/purpose purpose]
+
+
+              [measurement :patient patient]
+              [measurement ::site/type "https://site.test/types/measurement"]
+              [(q {:find [e]
+                   })]
+              ]
 
             :rules rules
 
             :in '[subject actions purpose]}
 
-           subject actions nil)
+           bob actions nil)
 
           )
 
