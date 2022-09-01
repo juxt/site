@@ -208,10 +208,11 @@
         ;; This use of 'first' is worrisome. Perhaps we should be transacting
         ;; every permitted action.
         permitted-action (::pass/action (first (::pass/permitted-actions req)))
-        data-view (some :juxt.site.alpha/data-view (distinct (map ::pass/action (::pass/permitted-actions req))))]
+        ;;query (some :site/query (distinct (map ::pass/action (::pass/permitted-actions req))))
+        ]
 
     (cond
-      (:juxt.site.alpha/data-view permitted-action)
+      (::site/query permitted-action)
       (assoc
        req
        :ring.response/body
@@ -220,7 +221,7 @@
        ;; representation? This feels like it should be the responsibility of
        ;; the quotation, since that is the most flexible and otherwise we will
        ;; require a slew of additional data conventions.
-       (let [quotation (-> permitted-action :juxt.site.alpha/data-view :juxt.flip.alpha/quotation)]
+       (let [quotation (-> permitted-action ::site/query :juxt.flip.alpha/quotation)]
          (cond
            quotation
            (try
@@ -235,7 +236,7 @@
            (throw
             (ex-info
              "Data view must (currently) have a :juxt.flip.alpha/quotation entry"
-             {:data-view (:juxt.site.alpha/data-view permitted-action)
+             {:query (::site/query permitted-action)
               ::site/request-context req})))))
 
       ;; It's rare but sometimes a GET will evaluate a quotation. For example, the

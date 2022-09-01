@@ -1140,7 +1140,7 @@ Password: <input name=password type=password>
 
 ;; APIs
 
-(defn create-action-install-api-resource! [_]
+#_(defn create-action-install-api-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1175,7 +1175,7 @@ Password: <input name=password type=password>
           [permission :role role]
           [user :role role]]]})))))
 
-(defn grant-permission-to-install-api-resource! [_]
+#_(defn grant-permission-to-install-api-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -2131,12 +2131,12 @@ Password: <input name=password type=password>
    ;; Site resources. They're the same thing really. The below should be treated
    ;; with suspicion!
 
-   "https://example.org/actions/install-api-resource"
-   {:deps #{::init/system}
+   #_"https://example.org/actions/install-api-resource"
+   #_{:deps #{::init/system}
     :create #'create-action-install-api-resource!}
 
-   "https://example.org/permissions/system/install-api-resource"
-   {:deps #{::init/system}
+   #_"https://example.org/permissions/system/install-api-resource"
+   #_{:deps #{::init/system}
     :create #'grant-permission-to-install-api-resource!}
    }
 

@@ -263,13 +263,17 @@
     ;; apply the pull of each relevant action to each result, and merge the
     ;; results into a single map.
 
-    (for [[resource resource-group] (group-by :resource results)]
-      (apply merge
-             (for [{:keys [action purpose permission]}
-                   ;; TODO: Purpose and permission are useful metadata, how do
-                   ;; we retain in the result? with-meta?
-                   resource-group]
-               (xt/pull db (::pass/pull action '[*]) resource))))))
+    #_(throw (ex-info "HERE DEBUG" {:db db
+                                  :resource-groups (group-by :resource results)}))
+
+    (doall
+     (for [[resource resource-group] (group-by :resource results)]
+       (apply merge
+              (for [{:keys [action purpose permission]}
+                    ;; TODO: Purpose and permission are useful metadata, how do
+                    ;; we retain in the result? with-meta?
+                    resource-group]
+                (xt/pull db (::pass/pull action '[*]) resource)))))))
 
 (defn join-with-pull-allowed-resources
   "Join collection on given join-key with another pull of allowed-resources with

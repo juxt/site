@@ -163,14 +163,24 @@
           [id :juxt.pass.alpha/user user]
           [permission :juxt.pass.alpha/user user]]]
 
-       :juxt.site.alpha/data-view
+       ;; While many actions perform mutations on the database, some actions
+       ;; only query the database.
+       :juxt.site.alpha/query
        {:juxt.flip.alpha/quotation
         `(
-          ;; Perform a query, using the rules in get-patient.
-          (actions/pull-allowed-resources
-           {:actions #{"https://example.org/actions/get-patient"}})
-          )}
-       })))))
+          ;; Perform a query, using the rules in get-patient. It would be a good
+          ;; idea to restrict the ability for actions to make general queries
+          ;; against the database. By only exposing API functions such as
+          ;; pull-allowed-resources to Flip, we can limit the power of actions
+          ;; thereby securing them. This is preferable to limiting the ability
+          ;; to deploy actions to a select group of highly authorized
+          ;; individuals.
+          ;;
+          ;; TODO: Go through the use-cases which already make general lookups
+          ;; and queries to XT and see if we can rewrite them to use a more
+          ;; restricted API.
+          (pass/pull-allowed-resources
+           {:actions #{"https://example.org/actions/get-patient"}}))}})))))
 
 (defn grant-permission-to-list-patients! [username]
   (eval
@@ -324,10 +334,13 @@
            "https://site.test/permissions/bob/list-patients"
 
            "https://site.test/patients"}
+
          ;; Add some users
          (into
           (for [i (range 1 (inc 20))]
-            (format "https://site.test/patients/%03d" i))))]
+            (format "https://site.test/patients/%03d" i)))
+
+         )]
 
     ;; Alice can read patients
     ;; Carlos cannot read patients
@@ -400,7 +413,8 @@
         ;; payload.
 
 
-        ;; Alice can access a particular patient because she has the permission on get-every-patient-details
+        ;; Alice can access a particular patient because she has a particularly
+        ;; broad permission on the get-patient action
         (*handler*
          {:ring.request/method :get
           :ring.request/path "/patients/005"
@@ -408,21 +422,29 @@
           {"authorization" (format "Bearer %s" alice-access-token)
            "accept" "application/json"}})
 
-        #_(repl/ls)
+        ;; Bob can't see the patient details of Angie Solis
+        (*handler*
+         {:ring.request/method :get
+          :ring.request/path "/patients/005"
+          :ring.request/headers
+          {"authorization" (format "Bearer %s" bob-access-token)
+           "accept" "application/json"}})
 
-        #_(*handler*
+        ;;(repl/e "https://site.test/patients")
+        ;; list-patients is going to re-use the rule for get-patient.  In this
+        ;; sense, the action list-patients is a get-patient action applied
+        ;; across a set.
+
+        ;; Alice sees all patients
+        (*handler*
          {:ring.request/method :get
           :ring.request/path "/patients"
-;;          :debug true
+          ;;:debug true
           :ring.request/headers
           {"authorization" (format "Bearer %s" alice-access-token)
            "accept" "application/json"}})
 
-        ;;(repl/ls)
-        ;;(repl/e "https://site.test/actions/list-patients")
-        ;;(repl/e "https://site.test/patients")
-        ;;(repl/e "https://site.test/permissions/alice/list-patients")
-
+        ;; Bob sees a handful of patients
         (*handler*
          {:ring.request/method :get
           :ring.request/path "/patients"
@@ -431,16 +453,58 @@
           {"authorization" (format "Bearer %s" bob-access-token)
            "accept" "application/json"}})
 
-        ;;(repl/e "https://site.test/patients")
+        ;; We are calling juxt.pass.alpha.actions/pull-allowed-resources which
+        ;; provides our query, but we want to experiment with creating our own
+        ;; query with sub-queries, which we can compile to with GraphQL.
 
-        ;; list-patients is going to re-use the rule for get-patient.  In this
-        ;; sense, the action list-patients is a get-patient action applied
-        ;; across a set.
+        ;; Let's just query then!
 
-        ;; TODO: Add Bob and see that Bob cannot see any patients.
+        ;; Let's use Bob's subject
 
-        ;; TODO: Experiment with get-patient and permissions to limit Bob's view
-        ;; to a handful subset of patients.
+        (xt/q
+         (xt/db *xt-node*)
+         '{:find [(pull resource [*])]
+           :where [
+                   [resource :juxt.site.alpha/type "https://site.test/types/patient"]]})
+
+        (let [db (xt/db *xt-node*)
+
+              {::pass/keys [subject]}
+              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))
+
+              actions #{"https://site.test/actions/get-patient"}
+
+              rules (actions/actions->rules db actions)]
+
+          (xt/q
+           db
+           {:find '[resource (pull action [:xt/id ::pass/pull]) purpose permission]
+            :keys '[resource action purpose permission]
+            :where
+            '[
+              ;; Only consider given actions
+              [action ::site/type "https://meta.juxt.site/pass/action"]
+              [(contains? actions action)]
+
+              ;; Only consider allowed permssions
+              [permission ::site/type "https://meta.juxt.site/pass/permission"]
+              [permission ::pass/action action]
+              (allowed? subject resource permission)
+
+              ;; Only permissions that match our purpose
+              [permission ::pass/purpose purpose]]
+
+            :rules rules
+
+            :in '[subject actions purpose]}
+
+           subject actions nil)
+
+          )
+
+
+        ;;(repl/e (format "https://site.test/access-tokens/%s" bob-access-token))
+
 
         #_(juxt.site.alpha.init/do-action
            "https://site.test/subjects/system"
