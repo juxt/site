@@ -69,143 +69,127 @@
        [permission :juxt.pass.alpha/subject subject]]]}))
 
 (defn grant-permission-to-invoke-action-register-patient! [_]
-  (eval
-   (init/substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/system/register-patient"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/register-patient"
-       :juxt.pass.alpha/purpose nil})))))
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/system/register-patient"
+    :juxt.pass.alpha/subject "https://site.test/subjects/system"
+    :juxt.pass.alpha/action "https://site.test/actions/register-patient"
+    :juxt.pass.alpha/purpose nil}))
 
 (defn create-action-get-patient! [_]
-  (eval
-   (init/substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/get-patient"
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]
-          [resource :juxt.site.alpha/type "https://example.org/types/patient"]
-          [permission :patient :all]]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/get-patient"
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? subject resource permission)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]
+       [resource :juxt.site.alpha/type "https://site.test/types/patient"]
+       [permission :patient :all]]
 
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]
-          [resource :juxt.site.alpha/type "https://example.org/types/patient"]
-          [permission :patient resource]]]})))))
+      [(allowed? subject resource permission)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]
+       [resource :juxt.site.alpha/type "https://site.test/types/patient"]
+       [permission :patient resource]]]}))
 
 (defn grant-permission-to-get-any-patient! [username]
-  (eval
-   (init/substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id ~(format "https://example.org/permissions/%s/get-any-patient" username)
-       :juxt.pass.alpha/action "https://example.org/actions/get-patient"
-       :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
-       :patient :all
-       :juxt.pass.alpha/purpose nil
-       }))))
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/grant-permission"
+   {:xt/id (format "https://site.test/permissions/%s/get-any-patient" username)
+    :juxt.pass.alpha/action "https://site.test/actions/get-patient"
+    :juxt.pass.alpha/user (format "https://site.test/users/%s" username)
+    :patient :all
+    :juxt.pass.alpha/purpose nil
+    }))
 
 (defn grant-permission-to-get-patient! [username pid]
-  (eval
-   (init/substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id ~(format "https://example.org/permissions/%s/get-patient/%s" username pid)
-       :juxt.pass.alpha/action "https://example.org/actions/get-patient"
-       :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
-       :patient ~(format "https://example.org/patients/%s" pid)
-       :juxt.pass.alpha/purpose nil
-       }))))
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/grant-permission"
+   {:xt/id (format "https://site.test/permissions/%s/get-patient/%s" username pid)
+    :juxt.pass.alpha/action "https://site.test/actions/get-patient"
+    :juxt.pass.alpha/user (format "https://site.test/users/%s" username)
+    :patient (format "https://site.test/patients/%s" pid)
+    :juxt.pass.alpha/purpose nil
+    }))
 
 (defn create-action-list-patients! [_]
-  (eval
-   (init/substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/list-patients"
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/list-patients"
 
-       ;; What if this was the resource will target with GET?
-       ;; The /patients is more simply an alias.
+    ;; What if this was the resource will target with GET?
+    ;; The /patients is more simply an alias.
 
-       ;; Are actions just resources with ACL rules?
-       ;; Actions are already resources.
-       ;; Maybe any resource can be an action?
+    ;; Are actions just resources with ACL rules?
+    ;; Actions are already resources.
+    ;; Maybe any resource can be an action?
 
-       ;; What are our other examples of targeting actions?
-       ;; POST /actions/install-graphql-endpoint
-       ;; (book_test line ~500, book line ~1197)
+    ;; What are our other examples of targeting actions?
+    ;; POST /actions/install-graphql-endpoint
+    ;; (book_test line ~500, book line ~1197)
 
-       ;; An action is capable of deriving a view of state across a set of
-       ;; resources.
-       :juxt.site.alpha/methods
-       {:get
-        {:juxt.pass.alpha/actions #{"https://example.org/actions/list-patients"}}}
+    ;; An action is capable of deriving a view of state across a set of
+    ;; resources.
+    :juxt.site.alpha/methods
+    {:get
+     {:juxt.pass.alpha/actions #{"https://site.test/actions/list-patients"}}}
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? subject resource permission)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]]]
 
-       ;; While many actions perform mutations on the database, some actions
-       ;; only query the database.
-       :juxt.site.alpha/query
-       {:juxt.flip.alpha/quotation
-        `(
-          ;; Perform a query, using the rules in get-patient. It would be a good
-          ;; idea to restrict the ability for actions to make general queries
-          ;; against the database. By only exposing API functions such as
-          ;; pull-allowed-resources to Flip, we can limit the power of actions
-          ;; thereby securing them. This is preferable to limiting the ability
-          ;; to deploy actions to a select group of highly authorized
-          ;; individuals.
-          ;;
-          ;; TODO: Go through the use-cases which already make general lookups
-          ;; and queries to XT and see if we can rewrite them to use a more
-          ;; restricted API.
-          (pass/pull-allowed-resources
-           {:actions #{"https://example.org/actions/get-patient"}}))}})))))
+    ;; While many actions perform mutations on the database, some actions
+    ;; only query the database.
+    :juxt.site.alpha/query
+    {:juxt.flip.alpha/quotation
+     `(
+       ;; Perform a query, using the rules in get-patient. It would be a good
+       ;; idea to restrict the ability for actions to make general queries
+       ;; against the database. By only exposing API functions such as
+       ;; pull-allowed-resources to Flip, we can limit the power of actions
+       ;; thereby securing them. This is preferable to limiting the ability
+       ;; to deploy actions to a select group of highly authorized
+       ;; individuals.
+       ;;
+       ;; TODO: Go through the use-cases which already make general lookups
+       ;; and queries to XT and see if we can rewrite them to use a more
+       ;; restricted API.
+       (pass/pull-allowed-resources
+        {:actions #{"https://site.test/actions/get-patient"}}))}}))
 
 (defn grant-permission-to-list-patients! [username]
-  (eval
-   (init/substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id ~(format "https://example.org/permissions/%s/list-patients" username)
-       :juxt.pass.alpha/action "https://example.org/actions/list-patients"
-       :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
-       :juxt.pass.alpha/purpose nil}))))
+  (init/do-action
+    "https://site.test/subjects/system"
+    "https://site.test/actions/grant-permission"
+    {:xt/id (format "https://site.test/permissions/%s/list-patients" username)
+     :juxt.pass.alpha/action "https://site.test/actions/list-patients"
+     :juxt.pass.alpha/user (format "https://site.test/users/%s" username)
+     :juxt.pass.alpha/purpose nil}))
+
+(defn create-action-register-patient-vitals! [])
 
 (defn create-action-read-vitals! [_]
-  (eval
-   (init/substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/read-vitals"
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :xt/id]
-          ]]})))))
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/read-vitals"
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? subject resource permission)
+       [permission :xt/id]
+       ]]}))
 
 (def PATIENT_NAMES
   {
@@ -407,7 +391,7 @@
         ;; Here we have the conundrum: when the
         ;; https://site.test/actions/get-patient action rule has the clause
         ;; '[resource :juxt.site.alpha/type
-        ;; "https://example.org/types/patient"]' then it is not a permitted
+        ;; "https://site.test/types/patient"]' then it is not a permitted
         ;; action. We must separate the actions that allow access to a
         ;; uri-template'd resource and the actions that create the body
         ;; payload.
@@ -461,7 +445,7 @@
 
         ;; Let's use Bob's subject
 
-        (xt/q
+        #_(xt/q
          (xt/db *xt-node*)
          '{:find [(pull resource [*])]
            :where [
