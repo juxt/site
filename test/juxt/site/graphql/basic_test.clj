@@ -543,7 +543,7 @@
         (let [db (xt/db *xt-node*)
 
               {subject ::pass/subject}
-              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
+              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
 
           (for [{:keys [patient nested]}
                 (xt/q
@@ -586,6 +586,12 @@
             )
 
           )
+
+        ;; Additional scenarios:
+
+        ;; Alice, Bob, Carlos - multiple joins, 3-level queries, multiple concurrent actions
+
+        ;; Delegated access - richer rules
 
 
         ;;(repl/e (format "https://site.test/access-tokens/%s" bob-access-token))
