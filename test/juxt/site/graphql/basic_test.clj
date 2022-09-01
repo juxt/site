@@ -383,8 +383,16 @@
        "https://site.test/actions/register-patient-measurement"
        {:xt/id "https://site.test/measurements/eeda3b49-2e96-42fc-9e6a-e89e2eb68c24"
         :patient "https://site.test/patients/010"
-        :measurement {"heartRate" "45"
-                      "bloodPressure" "120/80"}})
+        :reading {"heartRate" "85"
+                  "bloodPressure" "120/80"}})
+
+      (init/do-action
+       "https://site.test/subjects/system"
+       "https://site.test/actions/register-patient-measurement"
+       {:xt/id "https://site.test/measurements/5d1cfb88-cafd-4241-8c7c-6719a9451f1d"
+        :patient "https://site.test/patients/010"
+        :reading {"heartRate" "87"
+                  "bloodPressure" "127/80"}})
 
       (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
             {alice-access-token "access_token"
@@ -503,7 +511,7 @@
 
         (let [db (xt/db *xt-node*)
 
-              {bob ::pass/subject}
+              {subject ::pass/subject}
               (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))
 
               actions #{"https://site.test/actions/get-patient"}
@@ -512,34 +520,30 @@
 
           (xt/q
            db
-           {:find '[patient (pull action [:xt/id ::pass/pull]) permission (pull measurement [*])]
+           {:find '[patient (pull action [:xt/id ::pass/pull]) permission measurement]
             :keys '[patient action permission measurement]
             :where
             '[
-              ;; Only consider given actions
-              [action ::site/type "https://meta.juxt.site/pass/action"]
-              [(contains? actions action)]
-
-              ;; Only consider allowed permssions
+              [action :xt/id "https://site.test/actions/get-patient"]
               [permission ::site/type "https://meta.juxt.site/pass/permission"]
               [permission ::pass/action action]
+              [permission ::pass/purpose purpose]
               (allowed? subject patient permission)
 
-              ;; Only permissions that match our purpose
-              [permission ::pass/purpose purpose]
-
-
-              [measurement :patient patient]
-              [measurement ::site/type "https://site.test/types/measurement"]
-              [(q {:find [e]
-                   })]
-              ]
+              [(q {:find [(pull m [:reading])]
+                   :where [
+                           [m :patient p]
+                           [m ::site/type "https://site.test/types/measurement"]
+                           ]
+                   :in [p]}
+                  patient)
+               measurement]]
 
             :rules rules
 
-            :in '[subject actions purpose]}
+            :in '[subject purpose]}
 
-           bob actions nil)
+           subject nil)
 
           )
 
