@@ -214,16 +214,31 @@
     :juxt.pass.alpha/action "https://site.test/actions/register-patient-measurement"
     :juxt.pass.alpha/purpose nil}))
 
-(defn create-action-read-vitals! [_]
+;; Warning, this is an overly broad action! TODO: Narrow this action.
+;; It permits grantees access to ALL measurements!!
+(defn create-action-read-any-measurement! [_]
   (init/do-action
    "https://site.test/subjects/system"
    "https://site.test/actions/create-action"
-   {:xt/id "https://site.test/actions/read-vitals"
+   {:xt/id "https://site.test/actions/read-any-measurement"
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
-       [permission :xt/id]
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]
+       ;;[resource :juxt.site.alpha/type "https://site.test/types/measurement"]
        ]]}))
+
+(defn grant-permission-to-read-any-measurement! [username]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/grant-permission"
+   {:xt/id (format "https://site.test/permissions/%s/read-any-measurement" username)
+    :juxt.pass.alpha/action "https://site.test/actions/read-any-measurement"
+    :juxt.pass.alpha/user (format "https://site.test/users/%s" username)
+    :juxt.pass.alpha/purpose nil
+    }))
 
 (def PATIENT_NAMES
   {
@@ -319,9 +334,15 @@
         ::http/content-type "application/json"}))
     :deps #{::init/system}}
 
-   "https://site.test/actions/read-vitals"
-   {:create #'create-action-read-vitals!
-    :deps #{::init/system}}})
+   "https://site.test/actions/read-any-measurement"
+   {:create #'create-action-read-any-measurement!
+    :deps #{::init/system}}
+
+   "https://site.test/permissions/{username}/read-any-measurement"
+   {:create (fn [{:keys [params]}]
+              (grant-permission-to-read-any-measurement! (get params "username")))
+    :deps #{::init/system}}
+   })
 
 (defmacro with-resources [resources & body]
   `(do
@@ -362,7 +383,11 @@
            "https://site.test/actions/register-patient-measurement"
            "https://site.test/permissions/system/register-patient-measurement"
 
-           "https://site.test/patients"}
+           "https://site.test/patients"
+
+           "https://site.test/actions/read-any-measurement"
+           "https://site.test/permissions/alice/read-any-measurement"
+           "https://site.test/permissions/bob/read-any-measurement"}
 
          ;; Add some users
          (into
@@ -512,36 +537,41 @@
         (let [db (xt/db *xt-node*)
 
               {subject ::pass/subject}
-              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))
-
-              actions #{"https://site.test/actions/get-patient"}
-
-              rules (actions/actions->rules db actions)]
+              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
 
           (xt/q
            db
-           {:find '[patient (pull action [:xt/id ::pass/pull]) permission measurement]
-            :keys '[patient action permission measurement]
-            :where
-            '[
-              [action :xt/id "https://site.test/actions/get-patient"]
-              [permission ::site/type "https://meta.juxt.site/pass/permission"]
-              [permission ::pass/action action]
-              [permission ::pass/purpose purpose]
-              (allowed? subject patient permission)
+           `{:find ~'[patient (pull action [:xt/id ::pass/pull]) permission measurement]
+             :keys ~'[patient action permission measurement]
+             :where
+             [
+              ~'[action :xt/id "https://site.test/actions/get-patient"]
+              ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
+              ~'[permission ::pass/action action]
+              ~'[permission ::pass/purpose purpose]
+              ~'(allowed? subject patient permission)
 
-              [(q {:find [(pull m [:reading])]
-                   :where [
-                           [m :patient p]
-                           [m ::site/type "https://site.test/types/measurement"]
-                           ]
-                   :in [p]}
-                  patient)
-               measurement]]
+              ;; join
+              [(~'q {:find ~'[(pull m [:reading])]
+                     :where
+                     ~'[
+                        [m :patient p]
+                        [m ::site/type "https://site.test/types/measurement"]
 
-            :rules rules
+                        [action :xt/id "https://site.test/actions/read-any-measurement"]
+                        [permission ::site/type "https://meta.juxt.site/pass/permission"]
+                        [permission ::pass/action action]
+                        [permission ::pass/purpose purpose]
+                        (allowed? sub m permission)
+                        ]
+                     :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
+                     :in ~'[p sub]}
+                ~'patient ~'subject)
+               ~'measurement]]
 
-            :in '[subject purpose]}
+             :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
+
+             :in [~'subject ~'purpose]}
 
            subject nil)
 
