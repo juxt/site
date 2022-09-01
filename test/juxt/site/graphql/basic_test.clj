@@ -84,6 +84,8 @@
    {:xt/id "https://site.test/actions/get-patient"
     :juxt.pass.alpha/rules
     '[
+      ;; TODO: Performance tweak: put [subject] to hint that subject is always
+      ;; bound - see @jdt for details
       [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
@@ -368,9 +370,6 @@
            "https://site.test/permissions/bob-can-authorize"
            "https://site.test/applications/local-terminal"
 
-           ;;"https://site.test/actions/install-api-resource"
-           ;;"https://site.test/permissions/system/install-api-resource"
-
            "https://site.test/actions/get-patient"
            "https://site.test/permissions/alice/get-any-patient"
            "https://site.test/permissions/bob/get-patient/004"
@@ -397,7 +396,6 @@
          )]
 
     ;; Alice can read patients
-    ;; Carlos cannot read patients
 
     (with-resources
       resources
@@ -418,6 +416,14 @@
         :patient "https://site.test/patients/010"
         :reading {"heartRate" "87"
                   "bloodPressure" "127/80"}})
+
+      (init/do-action
+       "https://site.test/subjects/system"
+       "https://site.test/actions/register-patient-measurement"
+       {:xt/id "https://site.test/measurements/5d1cfb88-cafd-4241-8c7c-6719a9451f1e"
+        :patient "https://site.test/patients/004"
+        :reading {"heartRate" "120"
+                  "bloodPressure" "137/80"}})
 
       (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
             {alice-access-token "access_token"
@@ -539,41 +545,45 @@
               {subject ::pass/subject}
               (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
 
-          (xt/q
-           db
-           `{:find ~'[patient (pull action [:xt/id ::pass/pull]) permission measurement]
-             :keys ~'[patient action permission measurement]
-             :where
-             [
-              ~'[action :xt/id "https://site.test/actions/get-patient"]
-              ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
-              ~'[permission ::pass/action action]
-              ~'[permission ::pass/purpose purpose]
-              ~'(allowed? subject patient permission)
+          (for [{:keys [patient nested]}
+                (xt/q
+                 db
+                 `{:find ~'[(pull patient [*]) {:measurements measurements}]
+                   :keys ~'[patient nested]
+                   :where
+                   [
+                    ~'[action :xt/id "https://site.test/actions/get-patient"]
+                    ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
+                    ~'[permission ::pass/action action]
+                    ~'[permission ::pass/purpose purpose]
+                    ~'(allowed? subject patient permission)
 
-              ;; join
-              [(~'q {:find ~'[(pull m [:reading])]
-                     :where
-                     ~'[
-                        [m :patient p]
-                        [m ::site/type "https://site.test/types/measurement"]
+                    ;; join
+                    [(~'q {:find ~'[(pull measurement [:reading])]
+                           :keys ~'[object]
+                           :where
+                           ~'[
+                              [measurement :patient patient]
+                              [measurement ::site/type "https://site.test/types/measurement"]
 
-                        [action :xt/id "https://site.test/actions/read-any-measurement"]
-                        [permission ::site/type "https://meta.juxt.site/pass/permission"]
-                        [permission ::pass/action action]
-                        [permission ::pass/purpose purpose]
-                        (allowed? sub m permission)
-                        ]
-                     :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
-                     :in ~'[p sub]}
-                ~'patient ~'subject)
-               ~'measurement]]
+                              [action :xt/id "https://site.test/actions/read-any-measurement"]
+                              [permission ::site/type "https://meta.juxt.site/pass/permission"]
+                              [permission ::pass/action action]
+                              [permission ::pass/purpose purpose]
+                              (allowed? subject measurement permission)
+                              ]
+                           :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
+                           :in ~'[patient subject]}
+                      ~'patient ~'subject)
+                     ~'measurements]]
 
-             :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
+                   :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
 
-             :in [~'subject ~'purpose]}
+                   :in [~'subject ~'purpose]}
 
-           subject nil)
+                 subject nil)]
+            (merge patient nested)
+            )
 
           )
 
