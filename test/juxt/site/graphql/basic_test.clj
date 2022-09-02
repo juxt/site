@@ -355,6 +355,23 @@
          (merge init/dependency-graph book/dependency-graph dependency-graph))))
      ~@body))
 
+;; Modelling ideas
+
+;; Doctor's have patients, patients have an assigned doctor.
+;; A measurement must be taken by a doctor or other individual.
+;; From the doctor, you can see patients.
+;; A patient should be able to see their own medical file.
+
+;; See NHS National role-based access control (RBAC) for developers
+;; "The database consists of:
+;; Job Roles (‘R’ codes) - the set of roles that can be assigned to users, for example Clinical Practitioner (R8000)
+;;  Activities (‘B’ codes) - the set of activities that users can perform, for
+;;  example Amend Patient Demographics (B0825)"
+;; -- https://digital.nhs.uk/developer/guides-and-documentation/security-and-authorisation/national-rbac-for-developers
+
+;; https://digital.nhs.uk/developer/api-catalogue/spine-directory-service-fhir
+
+
 (with-fixtures
   (let [resources
         (->
