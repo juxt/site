@@ -168,8 +168,15 @@
        ;; TODO: Go through the use-cases which already make general lookups
        ;; and queries to XT and see if we can rewrite them to use a more
        ;; restricted API.
-       (pass/pull-allowed-resources
-        {:actions #{"https://site.test/actions/get-patient"}}))}}))
+       #_(pass/pull-allowed-resources
+        {:actions #{"https://site.test/actions/get-patient"}})
+
+       ;; TODO: This needs to be aware of the content-type of the selected
+       ;; representation
+       (f/env :juxt.site.alpha/selected-representation)
+       ;;       jsonista.core/write-value-as-string
+       f/break
+       )}}))
 
 (defn grant-permission-to-list-patients! [username]
   (init/do-action
@@ -355,7 +362,9 @@
          (merge init/dependency-graph book/dependency-graph dependency-graph))))
      ~@body))
 
-(with-fixtures
+;;deftest query-test
+
+#_(with-fixtures
   (let [resources
         (->
          #{::init/system
@@ -471,20 +480,24 @@
 
         ;; Alice can access a particular patient because she has a particularly
         ;; broad permission on the get-patient action
-        (*handler*
-         {:ring.request/method :get
-          :ring.request/path "/patients/005"
-          :ring.request/headers
-          {"authorization" (format "Bearer %s" alice-access-token)
-           "accept" "application/json"}})
+        (let [response (*handler*
+                        {:ring.request/method :get
+                         :ring.request/path "/patients/005"
+                         :ring.request/headers
+                         {"authorization" (format "Bearer %s" alice-access-token)
+                          "accept" "application/json"}})]
+          (is (= (json/write-value-as-string {"name" "Angie Solis"})
+                 (:ring.response/body response)))
+          (is (= 200 (:ring.response/status response))))
 
         ;; Bob can't see the patient details of Angie Solis
-        (*handler*
-         {:ring.request/method :get
-          :ring.request/path "/patients/005"
-          :ring.request/headers
-          {"authorization" (format "Bearer %s" bob-access-token)
-           "accept" "application/json"}})
+        (let [response (*handler*
+                        {:ring.request/method :get
+                         :ring.request/path "/patients/005"
+                         :ring.request/headers
+                         {"authorization" (format "Bearer %s" bob-access-token)
+                          "accept" "application/json"}})]
+          (is (= 403 (:ring.response/status response))))
 
         ;;(repl/e "https://site.test/patients")
         ;; list-patients is going to re-use the rule for get-patient.  In this
@@ -492,6 +505,22 @@
         ;; across a set.
 
         ;; Alice sees all patients
+        #_(let [response
+                (*handler*
+                 {:ring.request/method :get
+                  :ring.request/path "/patients"
+                  ;;:debug true
+                  :ring.request/headers
+                  {"authorization" (format "Bearer %s" alice-access-token)
+                   "accept" "application/json"}})]
+            (is (= 200 (:ring.response/status response)))
+            ;;(is (= 200 (:ring.response/body response)))
+            (is (= "application/json" (get-in response [:ring.response/headers "content-type"])))
+            (is (string? (:ring.response/body response)))
+            )
+
+        ;; Why does this result in 200 OK?
+
         (*handler*
          {:ring.request/method :get
           :ring.request/path "/patients"
@@ -501,70 +530,64 @@
            "accept" "application/json"}})
 
         ;; Bob sees a handful of patients
-        (*handler*
-         {:ring.request/method :get
-          :ring.request/path "/patients"
-          ;;:debug true
-          :ring.request/headers
-          {"authorization" (format "Bearer %s" bob-access-token)
-           "accept" "application/json"}})
+        #_(*handler*
+           {:ring.request/method :get
+            :ring.request/path "/patients"
+            ;;:debug true
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" bob-access-token)
+             "accept" "application/json"}})
 
         ;; We are calling juxt.pass.alpha.actions/pull-allowed-resources which
         ;; provides our query, but we want to experiment with creating our own
         ;; query with sub-queries, which we can compile to with GraphQL.
 
-        #_(xt/q
-           (xt/db *xt-node*)
-           '{:find [(pull resource [*])]
-             :where [
-                     [resource :juxt.site.alpha/type "https://site.test/types/patient"]]})
+        #_(let [db (xt/db *xt-node*)
 
-        (let [db (xt/db *xt-node*)
+                {subject ::pass/subject}
+                (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
 
-              {subject ::pass/subject}
-              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
+            (for [{:keys [patient nested]}
+                  (xt/q
+                   db
+                   `{:find ~'[(pull patient [*]) {:measurements measurements}]
+                     :keys ~'[patient nested]
+                     :where
+                     [
+                      ~'[action :xt/id "https://site.test/actions/get-patient"]
+                      ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
+                      ~'[permission ::pass/action action]
+                      ~'[permission ::pass/purpose purpose]
+                      ~'(allowed? subject patient permission)
 
-          (for [{:keys [patient nested]}
-                (xt/q
-                 db
-                 `{:find ~'[(pull patient [*]) {:measurements measurements}]
-                   :keys ~'[patient nested]
-                   :where
-                   [
-                    ~'[action :xt/id "https://site.test/actions/get-patient"]
-                    ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
-                    ~'[permission ::pass/action action]
-                    ~'[permission ::pass/purpose purpose]
-                    ~'(allowed? subject patient permission)
+                      ;; join
+                      [(~'q {:find ~'[(pull measurement [:reading])]
+                             :keys ~'[object]
+                             :where
+                             ~'[
+                                [measurement :patient patient]
+                                [measurement ::site/type "https://site.test/types/measurement"]
 
-                    ;; join
-                    [(~'q {:find ~'[(pull measurement [:reading])]
-                           :keys ~'[object]
-                           :where
-                           ~'[
-                              [measurement :patient patient]
-                              [measurement ::site/type "https://site.test/types/measurement"]
+                                [action :xt/id "https://site.test/actions/read-any-measurement"]
+                                [permission ::site/type "https://meta.juxt.site/pass/permission"]
+                                [permission ::pass/action action]
+                                [permission ::pass/purpose purpose]
+                                (allowed? subject measurement permission)
+                                ]
+                             :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
+                             :in ~'[patient subject]}
+                        ~'patient ~'subject)
+                       ~'measurements]]
 
-                              [action :xt/id "https://site.test/actions/read-any-measurement"]
-                              [permission ::site/type "https://meta.juxt.site/pass/permission"]
-                              [permission ::pass/action action]
-                              [permission ::pass/purpose purpose]
-                              (allowed? subject measurement permission)
-                              ]
-                           :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
-                           :in ~'[patient subject]}
-                      ~'patient ~'subject)
-                     ~'measurements]]
+                     :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
 
-                   :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
+                     :in [~'subject ~'purpose]}
 
-                   :in [~'subject ~'purpose]}
+                   subject nil)]
+              (merge patient nested)
+              )
 
-                 subject nil)]
-            (merge patient nested)
             )
-
-          )
 
         ;; Modelling ideas
 

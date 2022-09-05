@@ -593,6 +593,10 @@
   [[s & stack] [_ & queue] env]
   [(cons (jsonista.core/read-value s) stack) queue env])
 
+(defmethod word 'jsonista.core/write-value-as-string
+  [[o & stack] [_ & queue] env]
+  [(cons (jsonista.core/write-value-as-string o) stack) queue env])
+
 ;; Convenience words
 
 (defmethod word 'juxt.site.alpha/set-type

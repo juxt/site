@@ -64,14 +64,16 @@
             (throw
              (ex-info
               "Bad content length"
-              {::site/request-context (assoc req :ring.response/status 400)}
+              {:ring.response/status 400
+               ::site/request-context req}
               e))))]
 
     (when (nil? content-length)
       (throw
        (ex-info
         "No Content-Length header found"
-        {::site/request-context (assoc req :ring.response/status 411)})))
+        {:ring.response/status 411
+         ::site/request-context req})))
 
     ;; Protects resources from PUTs that are too large. If you need to
     ;; exceed this limitation, explicitly declare ::spin/max-content-length in
@@ -81,13 +83,15 @@
         (throw
          (ex-info
           "Payload too large"
-          {::site/request-context (assoc req :ring.response/status 413)}))))
+          {:ring.response/status 413
+           ::site/request-context req}))))
 
     (when-not (:ring.request/body req)
       (throw
        (ex-info
         "No body in request"
-        {::site/request-context (assoc req :ring.response/status 400)})))
+        {:ring.response/status 400
+         ::site/request-context req})))
 
     (let [decoded-representation
           (decode-maybe
@@ -122,9 +126,10 @@
               (throw
                (ex-info
                 "The content-type of the request payload is not supported by the resource"
-                {::acceptable acceptable
+                {:ring.response/status 415
+                 ::acceptable acceptable
                  ::content-type (get request-rep "content-type")
-                 ::site/request-context (assoc req :ring.response/status 415)}))
+                 ::site/request-context req}))
 
               (and
                (= "text" (get-in request-rep [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/type]))
@@ -133,17 +138,19 @@
               (throw
                (ex-info
                 "The Content-Type header in the request is a text type and is required to specify its charset as a media-type parameter"
-                {::acceptable acceptable
+                {:ring.response/status 415
+                 ::acceptable acceptable
                  ::content-type (get request-rep "content-type")
-                 ::site/request-context (assoc req :ring.response/status 415)}))
+                 ::site/request-context req}))
 
               (= (:juxt.pick.alpha/charset-qvalue request-rep) 0.0)
               (throw
                (ex-info
                 "The charset of the Content-Type header in the request is not supported by the resource"
-                {::acceptable acceptable
+                {:ring.response/status 415
+                 ::acceptable acceptable
                  ::content-type (get request-rep "content-type")
-                 ::site/request-context (assoc req :ring.response/status 415)}))))
+                 ::site/request-context req}))))
 
           (when (get prefs "accept-encoding")
             (cond
@@ -151,9 +158,10 @@
               (throw
                (ex-info
                 "The content-encoding in the request is not supported by the resource"
-                {::acceptable acceptable
+                {:ring.response/status 409
+                 ::acceptable acceptable
                  ::content-encoding (get-in req [:ring.request/headers "content-encoding"] "identity")
-                 ::site/request-context (assoc req :ring.response/status 409)}))))
+                 ::site/request-context req}))))
 
           (when (get prefs "accept-language")
             (cond
@@ -161,23 +169,26 @@
               (throw
                (ex-info
                 "Request must contain Content-Language header"
-                {::acceptable acceptable
+                {:ring.response/status 409
+                 ::acceptable acceptable
                  ::content-language (get-in req [:ring.request/headers "content-language"])
-                 ::site/request-context (assoc req :ring.response/status 409)}))
+                 ::site/request-context req}))
 
               (= (:juxt.pick.alpha/content-language-qvalue request-rep) 0.0)
               (throw
                (ex-info
                 "The content-language in the request is not supported by the resource"
-                {::acceptable acceptable
+                {:ring.response/status 415
+                 ::acceptable acceptable
                  ::content-language (get-in req [:ring.request/headers "content-language"])
-                 ::site/request-context (assoc req :ring.response/status 415)}))))))
+                 ::site/request-context req}))))))
 
       (when (get-in req [:ring.request/headers "content-range"])
         (throw
          (ex-info
           "Content-Range header not allowed on a PUT request"
-          {::site/request-context (assoc req :ring.response/status 400)})))
+          {:ring.response/status 400
+           ::site/request-context req})))
 
       (with-open [in (:ring.request/body req)]
         (let [body (.readNBytes in content-length)
@@ -242,25 +253,15 @@
       ;; It's rare but sometimes a GET will evaluate a quotation. For example, the
       ;; Authorization Request (RFC 6749 Section 4.2.1).
       (and permitted-action (-> permitted-action ::site/transact ::flip/quotation))
-      (try
-        ;; TODO: Perhaps needs to be something to indicate whether or not the
-        ;; action will produce effects.
-        (actions/do-action
-         (cond-> req
-           permitted-action (assoc ::pass/action (:xt/id permitted-action))
-           ;; A java.io.BufferedInputStream in the request can cause this error:
-           ;; "invalid tx-op: Unfreezable type: class
-           ;; java.io.BufferedInputStream".
-           (:ring.request/body req) (dissoc :ring.request/body)))
-        (catch Exception e
-          (throw
-           (ex-info
-            (format "GET transaction failed: %s" (.getMessage e))
-            {::site/request-context
-             (merge (assoc req :ring.response/status 500)
-                    (ex-data e))
-             :permitted-action permitted-action}
-            e))))
+      ;; TODO: Perhaps needs to be something to indicate whether or not the
+      ;; action will produce effects.
+      (actions/do-action
+       (cond-> req
+         permitted-action (assoc ::pass/action (:xt/id permitted-action))
+         ;; A java.io.BufferedInputStream in the request can cause this error:
+         ;; "invalid tx-op: Unfreezable type: class
+         ;; java.io.BufferedInputStream".
+         (:ring.request/body req) (dissoc :ring.request/body)))
 
       ;;(::pass/permitted-actions req)
 
@@ -305,23 +306,13 @@
         ;; Default response status
         req (assoc req :ring.response/status 200)]
 
-    (try
-      (actions/do-action
-       (-> req
-           (assoc ::pass/action (:xt/id permitted-action))
-           ;; A java.io.BufferedInputStream in the request can provke this
-           ;; error: "invalid tx-op: Unfreezable type: class
-           ;; java.io.BufferedInputStream".
-           (dissoc :ring.request/body)))
-      (catch Exception e
-        (throw
-         (ex-info
-          (format "Transaction failed: %s" (.getMessage e))
-          {::site/request-context
-           (merge (assoc req :ring.response/status 500)
-                  (ex-data e))
-           :permitted-action permitted-action}
-          e))))))
+    (actions/do-action
+     (-> req
+         (assoc ::pass/action (:xt/id permitted-action))
+         ;; A java.io.BufferedInputStream in the request can provke this
+         ;; error: "invalid tx-op: Unfreezable type: class
+         ;; java.io.BufferedInputStream".
+         (dissoc :ring.request/body)))))
 
 (defn POST [req]
   (perform-unsafe-method req))
@@ -340,7 +331,7 @@
       (throw
        (ex-info
         "Resource allows PATCH but doesn't contain have a patch-fn function"
-        {::site/request-context (assoc req :ring.response/status 500)})))))
+        {::site/request-context req})))))
 
 (defn DELETE [{::site/keys [xt-node uri] :as req}]
   (let [tx (xt/submit-tx xt-node [[:xtdb.api/delete uri]])]
@@ -421,7 +412,8 @@
       (throw
        (ex-info
         "Method not implemented"
-        {::site/request-context (assoc req :ring.response/status 501)})))
+        {:ring.response/status 501
+         ::site/request-context req})))
     (h req)))
 
 (defn wrap-locate-resource [h]
@@ -437,12 +429,10 @@
         (throw
          (ex-info
           "Redirect"
-          {:location (::site/location resource)
-           ::site/request-context
-           (-> req
-               (assoc :ring.response/status status)
-               (update :ring.response/headers
-                       assoc "location" (::site/location resource)))}))))
+          {:ring.response/status status
+           :ring.response/headers {"location" (::site/location resource)}
+           :location (::site/location resource)
+           ::site/request-context req}))))
     (h req)))
 
 (defn wrap-find-current-representations
@@ -454,7 +444,8 @@
           (throw
            (ex-info
             "Not Found"
-            {::site/request-context (assoc req :ring.response/status 404)})))
+            {:ring.response/status 404
+             ::site/request-context req})))
         (h (assoc req ::site/current-representations cur-reps)))
       (h req))))
 
@@ -549,13 +540,11 @@
           (throw
            (ex-info
             "Method not allowed"
-            {:method method
+            {:ring.response/status 405
+             :ring.response/headers {"allow" (join-keywords allowed-methods true)}
+             :method method
              ::site/allowed-methods allowed-methods
-             ::site/request-context
-             (into
-              req
-              {:ring.response/status 405
-               :ring.response/headers {"allow" (join-keywords allowed-methods true)}})})))
+             ::site/request-context req})))
         (h (assoc req ::site/allowed-methods allowed-methods)))
       (h req))))
 
@@ -999,26 +988,32 @@
 
         (log/errorf e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
 
-        (let [ex-data
-              (-> (ex-data e)
-                  (update-in [::site/request-context :ring.response/status]
-                             (fn [x] (or x 500))))
-              rc (or (::site/request-context ex-data) req)
-              status (:ring.response/status rc)]
+        (let [ex-data (ex-data e)
+              ctx (or (::site/request-context ex-data) req)
+              status (or
+                      (:ring.response/status ex-data) ; explicit error status
+                      500)
+              _ (log/debugf "ERROR STATUS: %s %s (%s) %s" status (:ring.response/status ex-data) (.getMessage e)
+                            (pr-str (dissoc ex-data ::site/request-context)))
+              headers (merge
+                       (:ring.response/headers ctx)
+                       (:ring.response/headers ex-data))
+              ctx (cond-> ctx
+                    status (assoc :ring.response/status status)
+                    headers (assoc :ring.response/headers headers))]
 
-          (if (::site/start-date rc)
+          (if (::site/start-date ctx)
             (do
               ;; Don't log exceptions which are used to escape (e.g. 302, 401).
               (when (or (not (integer? status)) (>= status 500))
                 (let [ex-data (->storable ex-data)]
                   (log/errorf e "%s: %s" (.getMessage e) (pr-str (dissoc ex-data ::site/request-context)))))
 
-              (assert (::site/start-date rc))
-              (error-response rc e))
+              (error-response ctx e))
 
             (error-response
              req
-             (ex-info "ExceptionInfo caught, but with an invalid request-context attached" {::site/request-context rc} e)))))
+             (ex-info "ExceptionInfo caught, but with an invalid request-context attached" {::site/request-context ctx} e)))))
 
       (catch Throwable t (respond-internal-error req t))
       (finally (org.slf4j.MDC/clear)))))
@@ -1199,10 +1194,9 @@
       (throw
        (ex-info
         "Service unavailable"
-        {::site/request-context
-         (-> req
-             (into {:ring.response/status 503})
-             (assoc-in [:ring.response/headers "retry-after"] "120"))})))
+        {:ring.response/status 503
+         :ring.response/headers {"retry-after" "120"}
+         ::site/request-context req})))
     (h req)))
 
 (defn make-pipeline

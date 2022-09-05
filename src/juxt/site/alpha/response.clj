@@ -74,7 +74,7 @@
              (ex-info
               "Nil template-model. Template resources must have a :juxt.site.alpha/template-model attribute."
               {:resource (::site/resource req)
-               ::site/request-context (assoc req :ring.response/status 500)}))
+               ::site/request-context req}))
 
             ;; If a symbol, it is expected to be a resolvable internal function
             ;; (to support basic templates built on the request and internal
@@ -87,13 +87,13 @@
                 (ex-info
                  (format "Requiring resolve of %s returned nil" template-model)
                  {:template-model template-model
-                  ::site/request-context (assoc req :ring.response/status 500)})))
+                  ::site/request-context req})))
               (catch Exception e
                 (throw
                  (ex-info
                   (format "template-model fn '%s' not resolveable" template-model)
                   {:template-model template-model
-                   ::site/request-context (assoc req :ring.response/status 500)}
+                   ::site/request-context req}
                   e))))
 
             ;; It can also be an id of an entity in the database which contains
@@ -112,12 +112,12 @@
                  (ex-info
                   "Unsupported template-model entity"
                   {:template-model-entity template-model-entity
-                   ::site/request-context (assoc req :ring.response/status 500)})))
+                   ::site/request-context req})))
               (throw
                (ex-info
                 "Template model entity not found in database"
                 {:template-model template-model
-                 ::site/request-context (assoc req :ring.response/status 500)})))
+                 ::site/request-context req})))
 
             (map? template-model)
             (fn [_] template-model)
@@ -127,7 +127,7 @@
              (ex-info
               "Unsupported form of template-model"
               {:type (type template-model)
-               ::site/request-context (assoc req :ring.response/status 500)})))]
+               ::site/request-context req})))]
     (f req)))
 
 (defn render-template
@@ -163,12 +163,12 @@
       (throw
        (ex-info
         "No template dialect found"
-        {::site/request-context (assoc req :ring.response/status 500)}))
+        {::site/request-context req}))
       (throw
        (ex-info
         "Unsupported template dialect"
         {::site/template-dialect (::site/template-dialect template)
-         ::site/request-context (assoc req :ring.response/status 500)})))))
+         ::site/request-context req})))))
 
 (defn add-payload [{::site/keys [selected-representation db]
                     ::pass/keys [subject]

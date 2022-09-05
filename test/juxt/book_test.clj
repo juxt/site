@@ -2,9 +2,8 @@
 
 (ns juxt.book-test
   (:require
-   [clojure.java.io :as io]
+   [clojure.edn :as edn]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
-   [clojure.string :as str]
    [juxt.book :as book]
    [juxt.flip.alpha.core :as f]
    [juxt.flip.alpha.hiccup :as hc]
@@ -13,14 +12,11 @@
    [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.site.alpha :as-alias site]
    [juxt.http.alpha :as-alias http]
-   [juxt.site.alpha.graphql.flip :as graphql-flip]
    [juxt.site.alpha.init :as init]
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler* with-fixtures with-resources with-handler] :as tutil]
    [ring.util.codec :as codec]
-   [xtdb.api :as xt]
-   [clojure.core.server :as s]
-   [clojure.edn :as edn])
+   [xtdb.api :as xt])
   (:import (clojure.lang ExceptionInfo)))
 
 (defn finalize-request [request]

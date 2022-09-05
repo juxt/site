@@ -802,8 +802,9 @@
                               (let [msg (str "Schema does not exist at " uri ". Are you deploying it correctly?")]
                                 (throw (ex-info
                                         msg
-                                        {::site/errors [msg] ;; TODO
-                                         ::site/request-context (assoc req :ring.response/status 400)}))))
+                                        {:ring.response/status 400
+                                         ::site/errors [msg] ;; TODO
+                                         ::site/request-context req}))))
         body (some-> req ::site/received-representation ::http/body (String.))
 
         {query "query"
@@ -816,8 +817,9 @@
                                      (let [msg "Error parsing JSON body"]
                                        (ex-info
                                         msg
-                                        {::site/errors [msg]
-                                         ::site/request-context (assoc req :ring.response/status 400)})))))
+                                        {:ring.response/status 400
+                                         ::site/errors [msg]
+                                         ::site/request-context req})))))
           "application/graphql" {"query" body}
 
           (throw
@@ -852,7 +854,8 @@
               (throw
                (ex-info
                 "Error parsing or compiling GraphQL query"
-                (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                (cond-> {:ring.response/status 400
+                         ::site/request-context req}
                   (seq errors) (assoc ::grab/errors errors)))))))
 
         variables (into
@@ -888,7 +891,8 @@
             (throw
              (ex-info
               "No schema in request"
-              {::site/request-context {:ring.response/status 400}})))
+              {:ring.response/status 400
+               ::site/request-context req})))
 
         resource (xt/entity db uri)]
 
@@ -896,8 +900,9 @@
       (throw
        (ex-info
         "GraphQL resource not configured"
-        {:uri uri
-         ::site/request-context (assoc req :ring.response/status 400)})))
+        {:ring.response/status 400
+         :uri uri
+         ::site/request-context req})))
 
     (try
       (put-schema xt-node resource schema-str)
@@ -908,12 +913,13 @@
             (throw
              (ex-info
               "Errors in schema"
-              (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+              (cond-> {:ring.response/status 400
+                       ::site/request-context req}
                 (seq errors) (assoc ::grab/errors errors))))
             (throw
              (ex-info
               "Failed to put schema"
-              {::site/request-context (assoc req :ring.response/status 500)}
+              {::site/request-context req}
               e))))))))
 
 (defn plain-text-error-message [error]
@@ -990,7 +996,8 @@
             (throw
              (ex-info
               "No document in request"
-              {::site/request-context (assoc req :ring.response/status 400)})))
+              {:ring.response/status 400
+               ::site/request-context req})))
 
         resource (xt/entity db uri)]
 
@@ -999,15 +1006,17 @@
        (ex-info
         "GraphQL stored-document resource not configured"
         {:uri uri
-         ::site/request-context (assoc req :ring.response/status 400)})))
+         :ring.response/status 400
+         ::site/request-context req})))
 
     ;; Validate resource
     (when-not (::site/graphql-schema resource)
       (throw
        (ex-info
         "Resource should have a :juxt.site.alpha/graphql-schema key"
-        {::site/resource resource
-         ::site/request-context (assoc req :ring.response/status 500)})))
+        {:ring.response/status 500
+         ::site/resource resource
+         ::site/request-context req})))
 
     (let [schema-id (::site/graphql-schema resource)
           schema (some-> db (xt/entity schema-id) ::site/graphql-compiled-schema)]
@@ -1017,7 +1026,7 @@
          (ex-info
           "Cannot store a GraphQL document when the schema hasn't been added"
           {::site/graph-schema schema-id
-           ::site/request-context (assoc req :ring.response/status 500)})))
+           ::site/request-context req})))
 
       (try
         (let [m (stored-document-resource-map document-str schema)]
@@ -1036,12 +1045,13 @@
              ;; information from it)
              (ex-info
               "Errors in GraphQL document"
-              (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+              (cond-> {:ring.response/status 400
+                       ::site/request-context req}
                 (seq errors) (assoc ::grab/errors errors))))
             (throw
              (ex-info
               "Failed to store GraphQL document due to error"
-              {::site/request-context (assoc req :ring.response/status 500)}
+              {::site/request-context req}
               e))))))))
 
 (defn graphql-query [{::site/keys [db] :as req} stored-query-id operation-name variables]
@@ -1053,7 +1063,7 @@
              (ex-info
               "GraphQL stored query not found"
               {:stored-query-id stored-query-id
-               ::site/request-context (assoc req :ring.response/status 500)})))
+               ::site/request-context req})))
 
         schema-id (::site/graphql-schema resource)
 

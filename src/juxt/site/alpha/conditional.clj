@@ -4,16 +4,15 @@
   (:require
    [clojure.tools.logging :as log]
    [juxt.reap.alpha.decoders :as reap]
-   [juxt.reap.alpha.rfc7232 :as rfc7232]))
-
-(alias 'apex (create-ns 'juxt.apex.alpha))
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'pick (create-ns 'juxt.pick.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
-(alias 'rfc7230 (create-ns 'juxt.reap.alpha.rfc7230))
-(alias 'rfc7231 (create-ns 'juxt.reap.alpha.rfc7231))
-(alias 'rfc7232 (create-ns 'juxt.reap.alpha.rfc7232))
+   [juxt.reap.alpha.rfc7232 :as rfc7232]
+   [juxt.apex.alpha :as-alias apex]
+   [juxt.http.alpha :as-alias http]
+   [juxt.pick.alpha :as-alias pick]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.site.alpha :as-alias site]
+   [juxt.reap.alpha.rfc7230 :as-alias rfc7230]
+   [juxt.reap.alpha.rfc7231 :as-alias rfc7231]
+   [juxt.reap.alpha.rfc7232 :as-alias rfc7232]))
 
 (defn evaluate-if-match!
   "Evaluate an If-None-Match precondition header field in the context of a

@@ -507,11 +507,11 @@
             (let [status (:ring.response/status (:ex-data error))]
               (throw
                (ex-info
-                (format "Transaction error performing action %s: %s" action (:message error))
+                (format "Transaction error performing action %s: %s (status: %s)" action (:message error) status)
                 (into
-                 {::site/request-context
-                  (cond-> ctx
-                    status (assoc :ring.response/status status))}
+                 (cond-> {::site/request-context ctx}
+                   status (assoc :ring.response/status status))
+
                  (merge
                   (dissoc result ::site/type :xt/id ::site/error)
                   (:ex-data error)))))))
@@ -570,8 +570,8 @@
           (throw
            (ex-info
             (format "No permission for actions: %s" (pr-str actions))
-            {::site/request-context
-             (assoc req :ring.response/status 403)}))
+            {:ring.response/status 403
+             ::site/request-context req}))
 
           ;; No subject?
           (if-let [protection-spaces (::pass/protection-spaces req)]
@@ -580,13 +580,10 @@
             (throw
              (ex-info
               (format "No anonymous permission for actions (try authenticating!): %s" (pr-str actions))
-              {::site/request-context
-               (assoc
-                req
-                :ring.response/status 401
-                :ring.response/headers
-                {"www-authenticate"
-                 (http-authn/www-authenticate-header protection-spaces)})}))
+              {:ring.response/status 401
+               :ring.response/headers
+                {"www-authenticate" (http-authn/www-authenticate-header protection-spaces)}
+               ::site/request-context req}))
 
             ;; We are outside a protection space, there is nothing we can do
             ;; except return a 403 status.
@@ -609,15 +606,14 @@
                 (throw
                  (ex-info
                   (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))
-                  {::site/request-context
-                   (-> req
-                       (assoc :ring.response/status 302)
-                       (assoc-in [:ring.response/headers "location"] redirect))})))
+                  {:ring.response/status 302
+                   :ring.response/headers {"location" redirect}
+                   ::site/request-context req})))
               (throw
                (ex-info
                 (format "No anonymous permission for actions: %s" (pr-str actions))
-                {::site/request-context
-                 (assoc req :ring.response/status 403)})))))))))
+                {:ring.response/status 403
+                 ::site/request-context req})))))))))
 
 
 (defmethod f/word 'juxt.pass.alpha/pull-allowed-resources
