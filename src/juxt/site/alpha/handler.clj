@@ -229,7 +229,7 @@
              (catch Exception cause
                (throw
                 (ex-info
-                 "Failure running data view quotation"
+                 "Failure running query quotation"
                  {::site/request-context req}
                  cause))))
            :else
