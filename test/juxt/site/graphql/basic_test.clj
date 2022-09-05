@@ -355,23 +355,6 @@
          (merge init/dependency-graph book/dependency-graph dependency-graph))))
      ~@body))
 
-;; Modelling ideas
-
-;; Doctor's have patients, patients have an assigned doctor.
-;; A measurement must be taken by a doctor or other individual.
-;; From the doctor, you can see patients.
-;; A patient should be able to see their own medical file.
-
-;; See NHS National role-based access control (RBAC) for developers
-;; "The database consists of:
-;; Job Roles (‘R’ codes) - the set of roles that can be assigned to users, for example Clinical Practitioner (R8000)
-;;  Activities (‘B’ codes) - the set of activities that users can perform, for
-;;  example Amend Patient Demographics (B0825)"
-;; -- https://digital.nhs.uk/developer/guides-and-documentation/security-and-authorisation/national-rbac-for-developers
-
-;; https://digital.nhs.uk/developer/api-catalogue/spine-directory-service-fhir
-
-
 (with-fixtures
   (let [resources
         (->
@@ -464,26 +447,6 @@
 
         ;; Add a /patient/XXX resource to serve an individual patient.
 
-        ;; Let's be careful before treating 'api resources' differently from
-        ;; 'normal' Site resources. They're the same thing really.
-        #_(juxt.site.alpha.init/do-action
-           "https://site.test/subjects/system"
-           "https://site.test/actions/install-api-resource"
-           ;; This is the API resource representing a given patient
-           {:xt/id "https://site.test/patient/{pid}"
-            ::site/uri-template true
-            ;; TODO: Scope can be specified here
-            ::site/methods
-            {:get {::pass/actions #{"https://site.test/actions/perform-api-operation"}
-                   ;; TODO: Scope can be specified here. For example, only
-                   ;; read-only API operations may be granted to an application.
-                   :juxt.site.openapi/description "Get a patient"
-                   :actions #{"https://site.test/actions/get-patient"}}
-             :head {::pass/actions #{"https://site.test/actions/perform-get-operation"}}
-             :options {}}
-            ::http/content-type "application/json"
-            })
-
         ;; https://site.test/actions/get-patient must perform an XT query.
 
         ;; In the future, it would be good if the http request can include a
@@ -505,7 +468,6 @@
         ;; action. We must separate the actions that allow access to a
         ;; uri-template'd resource and the actions that create the body
         ;; payload.
-
 
         ;; Alice can access a particular patient because she has a particularly
         ;; broad permission on the get-patient action
@@ -604,45 +566,83 @@
 
           )
 
+        ;; Modelling ideas
+
+        ;; Doctor's have patients, patients have an assigned doctor.
+        ;; A measurement must be taken by a doctor or other individual.
+        ;; From the doctor, you can see patients.
+        ;; A patient should be able to see their own medical file.
+
+        ;; See NHS National role-based access control (RBAC) for developers
+        ;; "The database consists of:
+        ;; Job Roles (‘R’ codes) - the set of roles that can be assigned to users, for example Clinical Practitioner (R8000)
+        ;;  Activities (‘B’ codes) - the set of activities that users can perform, for
+        ;;  example Amend Patient Demographics (B0825)"
+        ;; -- https://digital.nhs.uk/developer/guides-and-documentation/security-and-authorisation/national-rbac-for-developers
+
+        ;; https://digital.nhs.uk/developer/api-catalogue/spine-directory-service-fhir
+
         ;; Additional scenarios:
 
         ;; Alice, Bob, Carlos - multiple joins, 3-level queries, multiple concurrent actions
 
-        ;; Delegated access - richer rules
+        ;; The challenge is to combine the following:
+
+        ;; 1. GraphQL schemas where fields in queries reference actions. For example:
+        ;;
+        ;; type Hospital { patients: [String] @site(action: https://site.test/actions/list-patients) }
+        ;;
+        ;; type Doctor { patients: [String] @site(action: https://site.test/actions/list-patients-by-doctor) }
+
+        ;; Should https://site.test/actions/list-patients-by-doctor exist
+        ;; independently or instead be a reference to
+        ;; https://site.test/actions/list-patients with a join key? The former
+        ;; is overly cumbersome and would require a lot of extra actions and
+        ;; associated admin costs.
+
+        ;; type Doctor {
+        ;;   id ID
+        ;;   patients(gender: String, costBasis: String): [Patient] @site(action: "https://site.test/actions/list-patients" join: "primary-doctor")
+        ;; }
+
+        ;; The `patients` field transforms to a sub-query.
+
+        ;; This sub-query is composed using the rules of list-patients.
+
+        ;; Additional clauses are added that correspond to the arguments, with
+        ;; optional arg->attribute mappings specified in (GraphQL) field
+        ;; directive.
+
+        ;; The 'join' key becomes an implicit argument. By default, the 'id' of
+        ;; the doctor is passed as the argument value.
+
+        ;; 2. Actions that have 'query' logic. Should that query logic be Flip?
+        ;; Or reference other actions? To what extent is 'list-patients = fmap
+        ;; get-patient' - is this a common case? Looks like we may need a
+        ;; 'calculus' for defining actions in terms of other more fundamental
+        ;; actions. Note: I think we're just seeing that get-patient and
+        ;; list-patient *share* the same rules. There is no reason rules can't
+        ;; be deduped via reference to independent documents, or even one to the
+        ;; other:
+
+        ;; {:xt/id "list-patients" ::pass/rules "get-patient"}
+
+        ;; Idea: Break GraphQL schemas into constituent types and create
+        ;; individual resources, one resource per type. Use 'set' difference to
+        ;; identity types to delete. Create HTML from /graphql to show a nice
+        ;; HTML page with a list of types.
+
+        )
+
+      )
 
 
-        ;;(repl/e (format "https://site.test/access-tokens/%s" bob-access-token))
+    ))
 
 
-        #_(juxt.site.alpha.init/do-action
-           "https://site.test/subjects/system"
-           "https://site.test/actions/install-api-resource"
-           {:xt/id "https://site.test/patients"
-            ::site/methods
-            {:get {::pass/actions #{"https://site.test/actions/get-patients"}}
-             :head {::pass/actions #{"https://site.test/actions/get-patients"}}
-             :options {}}
-            })
 
-        #_(*handler*
-           {:ring.request/method :get
-            :ring.request/path "/patients"
-            :ring.request/headers
-            {"authorization" (format "Bearer %s" access-token)
-             "accept" "application/edn"}}))
 
-      #_(repl/ls)
-      #_(repl/e "https://site.test/patients/010")
-
-      #_(let [db (xt/db *xt-node*)]
-
-          (xt/q
-           db
-           '{:find [(pull e [:name])]
-             :where [[e ::site/type "https://site.test/types/patient"]]
-             })
-
-          #_(let [compiled-schema
+#_(let [compiled-schema
                   (->
                    "juxt/site/graphql/basic.graphql"
                    io/resource
@@ -652,41 +652,4 @@
               (gqp/graphql-query->xtdb-query
                "query { patients { name heartRate } }"
                compiled-schema
-               db))))
-
-
-    ))
-
-#_{:find [e (pull e [:name :heartRate])],
- :where
- [[e :xt/id _]
-  [action :juxt.site.alpha/type "https://meta.juxt.site/pass/action"]
-  [action :xt/id #{"https://site.test/actions/get-patients"}]
-  [permission :juxt.site.alpha/type "https://meta.juxt.site/pass/permission"]
-  [permission
-   :juxt.pass.alpha/action
-   #{"https://site.test/actions/get-patients"}]
-  [permission :juxt.pass.alpha/purpose purpose]
-  (allowed? permission subject action e)
-  (include? action e)],
- :rules
- [[(allowed? subject resource permission)
-   [permission :xt/id]
-   [action :xt/id "https://site.test/actions/get-patients"]]],
-   :in [subject purpose]}
-
-#_(into
- #{::init/system
-   "https://site.test/graphql"
-   "https://site.test/actions/get-patients"
-   #_"https://site.test/actions/read-vitals"
-   "https://site.test/actions/register-patient"
-   "https://site.test/permissions/system/register-patient"
-   "https://site.test/patients/001"
-   "https://site.test/patients/002"
-
-   ;; Add some users
-   ;; Alice can read patients
-   ;; Carlos cannot patients
-   }
- (for [i (range 20)] (format "https://site.test/patients/%03d" i)))
+               db))
