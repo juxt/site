@@ -227,24 +227,28 @@
 
     (cond
       quotation
-      (let [evaluation-result
+      (let [env (-> req
+                    ;; Security hack: We want to guarentee that 'safe' methods are
+                    ;; safe. They can be made safe if we ensure they cannot write
+                    ;; to the database. Therefore, we remove the ::site/xt-node.
+
+                    ;; TODO: We should audit the code-base to ensure that actions
+                    ;; do not have overly powerful environments passed to them.
+                    (dissoc ::site/xt-node))
+            evaluation-result
             ;; The quotation must return a map with :ring.response/headers and
             ;; :ring.response/body (bytes) or ::site/content (content)
             (f/eval-quotation
              []
              quotation
-             (-> req
-                 ;; Security hack: We want to guarentee that 'safe' methods are
-                 ;; safe. They can be made safe if we ensure they cannot write
-                 ;; to the database. Therefore, we remove the ::site/xt-node.
+             env
+             )]
 
-                 ;; TODO: We should audit the code-base to ensure that actions
-                 ;; do not have overly powerful environments passed to them.
-                 (dissoc ::site/xt-node)))]
         (throw (ex-info "TODO" {:selected-representation selected-representation
                                 :quotation quotation
-                                :result evaluation-result}
-                        )))
+                                :result evaluation-result
+                                ;;:env env
+                                })))
       #_(::site/query permitted-action)
       #_(assoc
          req

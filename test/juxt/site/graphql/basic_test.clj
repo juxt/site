@@ -338,17 +338,54 @@
     (fn [_]
       (init/put!
        {:xt/id "https://site.test/patients"
-        ::site/methods
+        :juxt.site.alpha/methods
         {:get
-         {::pass/actions #{"https://site.test/actions/list-patients"}
+         {:juxt.pass.alpha/actions #{"https://site.test/actions/list-patients"}
           :juxt.flip.alpha/quotation
           ;; This should be a pattern of cond'ing on the content-type of the
           ;; selected representation.  TODO: get the action, call the query,
           ;; format the result according to the content-type, return the site
           ;; request context on the stack.
 
-          ;; Get the first permitted action entity
-          '()
+          ;; (We could use a quasiquote but that then makes this less portable
+          ;; across namespaces, due to a coupling between the quotation and any
+          ;; namespaces aliases declared in the ns.)
+          '(
+            ;; Get all the patients we can access.
+
+            ;; This is done by getting the first permitted action entity.
+
+            ;; TODO: This block should be factored into a common convenience
+            ;; since most GET implementations will do something similar.
+            (juxt.flip.alpha.core/env :juxt.pass.alpha/permitted-actions)
+            juxt.flip.alpha.core/first
+            (juxt.flip.alpha.core/of :juxt.pass.alpha/action)
+            (juxt.flip.alpha.core/of :juxt.site.alpha/query)
+            (juxt.flip.alpha.core/of :juxt.flip.alpha/quotation)
+            juxt.flip.alpha.core/call
+
+            ;; Now style according to the content-type
+            ;; First we need the content-type of the selected representation
+            (juxt.flip.alpha.core/env :juxt.site.alpha/selected-representation)
+            (juxt.flip.alpha.core/of :juxt.http.alpha/content-type)
+            (juxt.flip.alpha.core/case ["japplication/json"
+                                        (:todo-json)
+                                        (:content-type {} juxt.flip.alpha.core/set-at
+                                                       "Unsupported content-type"
+                                                       juxt.flip.alpha.core/swap
+                                                       juxt.flip.alpha.core/ex-info
+                                                       juxt.flip.alpha.core/throw-exception)
+
+                                        ;;
+                                        ;;juxt.flip.alpha.core/throw
+
+                                        #_(juxt.flip.alpha.core/swap
+
+                                           ;;(juxt.flip.alpha.core/ex-info )
+                                           )])
+
+
+            )
           }}
         ::http/content-type "application/json"}))
     :deps #{::init/system}}
@@ -495,7 +532,7 @@
                          {"authorization" (format "Bearer %s" alice-access-token)
                           "accept" "application/json"}})]
           (is (= (json/write-value-as-string {"name" "Angie Solis"})
-                 (:ring.response/body response)))
+                 (String. (:ring.response/body response))))
           (is (= 200 (:ring.response/status response))))
 
         ;; Bob can't see the patient details of Angie Solis
@@ -529,13 +566,28 @@
 
         ;; Why does this result in 200 OK?
 
+        (->
+         (*handler*
+          {:ring.request/method :get
+           :ring.request/path "/patients"
+           ;;:debug true
+           :ring.request/headers
+           {"authorization" (format "Bearer %s" alice-access-token)
+            "accept" "application/json"}})
+         ::site/errors
+         first
+         :ex-data
+         :result
+
+         )
+
         (*handler*
-         {:ring.request/method :get
-          :ring.request/path "/patients"
-          ;;:debug true
-          :ring.request/headers
-          {"authorization" (format "Bearer %s" alice-access-token)
-           "accept" "application/json"}})
+          {:ring.request/method :get
+           :ring.request/path "/patients"
+           ;;:debug true
+           :ring.request/headers
+           {"authorization" (format "Bearer %s" alice-access-token)
+            "accept" "application/json"}})
 
         ;; Bob sees a handful of patients
         #_(*handler*
@@ -607,7 +659,7 @@
         ;; See NHS National role-based access control (RBAC) for developers
         ;; "The database consists of:
         ;; Job Roles (‘R’ codes) - the set of roles that can be assigned to users, for example Clinical Practitioner (R8000)
-        ;;  Activities (‘B’ codes) - the set of activities that users can perform, for
+        ;; Activities (‘B’ codes) - the set of activities that users can perform, for
         ;;  example Amend Patient Demographics (B0825)"
         ;; -- https://digital.nhs.uk/developer/guides-and-documentation/security-and-authorisation/national-rbac-for-developers
 
@@ -676,3 +728,14 @@
      "query { patients { name heartRate } }"
      compiled-schema
      db))
+
+
+#_(let [obj :c]
+  (some
+   (fn [x]
+     (cond
+       (and (= (count x) 2) (= (first x) obj))
+       (second x)
+       (= (count x) 1) (first x)
+       ))
+   (partition-all 2 [:a 1 :b 2])))

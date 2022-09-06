@@ -3,7 +3,7 @@
 (ns juxt.flip.alpha.core
   ;; When promoting this ns, move the defmethods that require all these
   ;; dependencies:
-  (:refer-clojure :exclude [+ first second symbol drop keep when str ex-info any? filter map])
+  (:refer-clojure :exclude [+ first second symbol drop keep when str ex-info any? filter map case])
   (:require
    [clojure.core :as cc]
    [clojure.edn :as edn]
@@ -329,6 +329,23 @@
   (if-not ?
     [(cons ? stack) (concat f queue) env]
     [(cons ? stack) queue env]))
+
+;; See https://docs.factorcode.org/content/word-case%2Ccombinators.html
+(def case 'juxt.flip.alpha.core/case)
+(defmethod word 'juxt.flip.alpha.core/case
+  [[assoc ;; a sequence of object/quotation pairs, with an optional quotation at the end
+    obj & stack] [_ & queue] env]
+  (if-let [[quotation stack]
+           (some
+            (fn [x]
+              (cc/cond
+                (cc/and (= (cc/count x) 2) (= (cc/first x) obj))
+                [(cc/second x) stack]
+                (= (cc/count x) 1) [(cc/first x) (cons obj stack)]
+                ))
+            (cc/partition-all 2 assoc))]
+    [stack (concat quotation queue) env]
+    (throw (cc/ex-info "no-case" {}))))
 
 (def + 'juxt.flip.alpha.core/+)
 (defmethod word 'juxt.flip.alpha.core/+
