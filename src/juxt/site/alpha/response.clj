@@ -177,33 +177,7 @@
   ;; Should not be called if method is HEAD
   (assert (not= method :head))
 
-  (when (and (:debug req) #_(= 200 (:ring.response/status req)))
-    (throw
-     (ex-info
-      "DEBUG"
-      {:debug-output
-       {:status-so-far (:ring.response/status req)
-        :query
-        (when (seq (::pass/permitted-actions req))
-          (try
-            (actions/allowed-resources
-             db
-             #{"https://site.test/actions/get-patient"}
-             #_(set (map (comp :xt/id ::pass/action) (::pass/permitted-actions req)))
-             {::pass/subject (:xt/id subject)}
-             ;; Add purpose (somehow, request header?)
-             )
-            (catch Exception e
-              {:failed (ex-data e)
-               :message (.getMessage e)
-               :cause (.getCause e)})))
-        :subject subject
-        :actions (map (comp :xt/id ::pass/action) (::pass/permitted-actions req))}
-
-       ::site/request-context
-       req})))
-
-  (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation
+  (let [{::http/keys [body content]} selected-representation
         ;;template (some->> selected-representation ::site/template (xt/entity db))
         ;;custom-handler (get-in req [::site/methods method ::site/handler])
         ]
@@ -236,7 +210,16 @@
 
       #_#_template (render-template req template)
 
-      content (assoc req :ring.response/body content)
+      ;; TODO: Fish out the charset from the content-type of the
+      ;; selected-representation and use when converting to bytes.
+
+      ;; Note: Although :ring.response/body supports anything that satisfies
+      ;; ring.core.protocols.StreamableResponseBody, Ring will extract the
+      ;; charset of a String by looking at the Content-Type header for the
+      ;; response and using regex. Given we already know the charset, we should
+      ;; avoid triggering this functionality in Ring for performance reasons.
+      content (assoc req :ring.response/body (.getBytes content))
+
       body (assoc req :ring.response/body body)
       :else req)))
 

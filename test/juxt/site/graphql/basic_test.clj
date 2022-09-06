@@ -168,14 +168,15 @@
        ;; TODO: Go through the use-cases which already make general lookups
        ;; and queries to XT and see if we can rewrite them to use a more
        ;; restricted API.
-       #_(pass/pull-allowed-resources
+       (pass/pull-allowed-resources
         {:actions #{"https://site.test/actions/get-patient"}})
 
        ;; TODO: This needs to be aware of the content-type of the selected
        ;; representation
-       (f/env :juxt.site.alpha/selected-representation)
+       ;;(f/env :juxt.site.alpha/selected-representation)
+       ;;(f/of ::http/content-type)
        ;;       jsonista.core/write-value-as-string
-       f/break
+       ;;f/break
        )}}))
 
 (defn grant-permission-to-list-patients! [username]
@@ -339,7 +340,16 @@
        {:xt/id "https://site.test/patients"
         ::site/methods
         {:get
-         {::pass/actions #{"https://site.test/actions/list-patients"}}}
+         {::pass/actions #{"https://site.test/actions/list-patients"}
+          :juxt.flip.alpha/quotation
+          ;; This should be a pattern of cond'ing on the content-type of the
+          ;; selected representation.  TODO: get the action, call the query,
+          ;; format the result according to the content-type, return the site
+          ;; request context on the stack.
+
+          ;; Get the first permitted action entity
+          '()
+          }}
         ::http/content-type "application/json"}))
     :deps #{::init/system}}
 
@@ -364,7 +374,7 @@
 
 ;;deftest query-test
 
-#_(with-fixtures
+(with-fixtures
   (let [resources
         (->
          #{::init/system
@@ -400,9 +410,7 @@
          ;; Add some users
          (into
           (for [i (range 1 (inc 20))]
-            (format "https://site.test/patients/%03d" i)))
-
-         )]
+            (format "https://site.test/patients/%03d" i))))]
 
     ;; Alice can read patients
 
@@ -655,24 +663,16 @@
         ;; identity types to delete. Create HTML from /graphql to show a nice
         ;; HTML page with a list of types.
 
-        )
-
-      )
-
-
-    ))
-
-
-
+        ))))
 
 #_(let [compiled-schema
-                  (->
-                   "juxt/site/graphql/basic.graphql"
-                   io/resource
-                   slurp
-                   gcompiler/compile-schema)]
+        (->
+         "juxt/site/graphql/basic.graphql"
+         io/resource
+         slurp
+         gcompiler/compile-schema)]
 
-              (gqp/graphql-query->xtdb-query
-               "query { patients { name heartRate } }"
-               compiled-schema
-               db))
+    (gqp/graphql-query->xtdb-query
+     "query { patients { name heartRate } }"
+     compiled-schema
+     db))

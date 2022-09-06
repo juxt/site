@@ -213,42 +213,64 @@
 
               {::http/body body}))))))))
 
-(defn GET [{::pass/keys [subject] :as req}]
+(defn GET [{::pass/keys [subject]
+            ::site/keys [selected-representation]
+            :ring.request/keys [method]
+            :as req}]
+
   (conditional/evaluate-preconditions! req)
   (let [req (assoc req :ring.response/status 200)
-        ;; This use of 'first' is worrisome. Perhaps we should be transacting
-        ;; every permitted action.
+        ;; This use of 'first' is worrisome. Perhaps we should be merging the
+        ;; results of every permitted action? TODO: resolve this
         permitted-action (::pass/action (first (::pass/permitted-actions req)))
-        ;;query (some :site/query (distinct (map ::pass/action (::pass/permitted-actions req))))
-        ]
+        quotation (get-in selected-representation [::site/methods method ::flip/quotation])]
 
     (cond
-      (::site/query permitted-action)
-      (assoc
-       req
-       :ring.response/body
-       ;; We now have a map, but where should the responsibility lie to convert
-       ;; the data to the content-type of the current (negotiated)
-       ;; representation? This feels like it should be the responsibility of
-       ;; the quotation, since that is the most flexible and otherwise we will
-       ;; require a slew of additional data conventions.
-       (let [quotation (-> permitted-action ::site/query :juxt.flip.alpha/quotation)]
-         (cond
-           quotation
-           (try
-             (first (f/eval-quotation '[] quotation req))
-             (catch Exception cause
-               (throw
-                (ex-info
-                 "Failure running query quotation"
-                 {::site/request-context req}
-                 cause))))
-           :else
-           (throw
-            (ex-info
-             "Data view must (currently) have a :juxt.flip.alpha/quotation entry"
-             {:query (::site/query permitted-action)
-              ::site/request-context req})))))
+      quotation
+      (let [evaluation-result
+            ;; The quotation must return a map with :ring.response/headers and
+            ;; :ring.response/body (bytes) or ::site/content (content)
+            (f/eval-quotation
+             []
+             quotation
+             (-> req
+                 ;; Security hack: We want to guarentee that 'safe' methods are
+                 ;; safe. They can be made safe if we ensure they cannot write
+                 ;; to the database. Therefore, we remove the ::site/xt-node.
+
+                 ;; TODO: We should audit the code-base to ensure that actions
+                 ;; do not have overly powerful environments passed to them.
+                 (dissoc ::site/xt-node)))]
+        (throw (ex-info "TODO" {:selected-representation selected-representation
+                                :quotation quotation
+                                :result evaluation-result}
+                        )))
+      #_(::site/query permitted-action)
+      #_(assoc
+         req
+         :ring.response/body
+         ;; We now have a map, but where should the responsibility lie to convert
+         ;; the data to the content-type of the current (negotiated)
+         ;; representation? This feels like it should be the responsibility of
+         ;; the quotation, since that is the most flexible and otherwise we will
+         ;; require a slew of additional data conventions.
+         (let [quotation (-> permitted-action ::site/query :juxt.flip.alpha/quotation)]
+           (cond
+             quotation
+             (try
+               (first (f/eval-quotation '[] quotation req))
+               (catch Exception cause
+                 (throw
+                  (ex-info
+                   "Failure running query quotation"
+                   {::site/request-context req}
+                   cause))))
+             :else
+             (throw
+              (ex-info
+               "Query must (currently) have a :juxt.flip.alpha/quotation entry"
+               {:query (::site/query permitted-action)
+                ::site/request-context req})))))
 
       ;; It's rare but sometimes a GET will evaluate a quotation. For example, the
       ;; Authorization Request (RFC 6749 Section 4.2.1).

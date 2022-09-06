@@ -51,7 +51,7 @@
       (testing "Can retrieve a public immutable resource"
         (let [{:ring.response/keys [status body]} (*handler* (finalize-request req))]
           (is (= 200 status))
-          (is (= "Hello World!\r\n" body))))
+          (is (= "Hello World!\r\n" (String. body)))))
 
       (testing "Receive 405 when method not allowed"
         (let [invalid-req (assoc req :ring.request/method :put)
@@ -659,7 +659,7 @@
              :ring.request/headers
              {"authorization" (format "Bearer %s" access-token)}}))
           _ (is (= 200 (:ring.response/status get-response)))
-          _ (is (= "type Query { myName: String }" (:ring.response/body get-response)))
+          _ (is (= "type Query { myName: String }" (String. (:ring.response/body get-response))))
           _ (is (= "application/graphql" (get-in get-response [:ring.response/headers "content-type"])))
 
           get-response-for-edn
@@ -672,7 +672,7 @@
               "accept" "application/edn"}}))
           _ (is (= 200 (:ring.response/status get-response-for-edn)))
 
-          errors (:errors (edn/read-string (:ring.response/body get-response)))
+          errors (:errors (edn/read-string (String. (:ring.response/body get-response))))
           _ (is (empty? errors))
           _ (is (= "application/edn" (get-in get-response-for-edn [:ring.response/headers "content-type"])))
 
