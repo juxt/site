@@ -235,7 +235,7 @@
                     ;; TODO: We should audit the code-base to ensure that actions
                     ;; do not have overly powerful environments passed to them.
                     (dissoc ::site/xt-node))
-            evaluation-result
+            stack
             ;; The quotation must return a map with :ring.response/headers and
             ;; :ring.response/body (bytes) or ::site/content (content)
             (f/eval-quotation
@@ -244,9 +244,10 @@
              env
              )]
 
-        (throw (ex-info "TODO" {:selected-representation selected-representation
+        (assoc req :ring.response/body (first stack))
+        #_(throw (ex-info "TODO" {:selected-representation selected-representation
                                 :quotation quotation
-                                :result evaluation-result
+                                :result stack
                                 ;;:env env
                                 })))
       #_(::site/query permitted-action)

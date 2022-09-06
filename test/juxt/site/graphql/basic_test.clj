@@ -366,23 +366,26 @@
 
             ;; Now style according to the content-type
             ;; First we need the content-type of the selected representation
-            (juxt.flip.alpha.core/env :juxt.site.alpha/selected-representation)
-            (juxt.flip.alpha.core/of :juxt.http.alpha/content-type)
-            (juxt.flip.alpha.core/case ["japplication/json"
-                                        (:todo-json)
-                                        (:content-type {} juxt.flip.alpha.core/set-at
-                                                       "Unsupported content-type"
-                                                       juxt.flip.alpha.core/swap
-                                                       juxt.flip.alpha.core/ex-info
-                                                       juxt.flip.alpha.core/throw-exception)
+            ;;(juxt.flip.alpha.core/env :juxt.site.alpha/selected-representation)
+            ;;(juxt.flip.alpha.core/of :juxt.http.alpha/content-type)
 
-                                        ;;
-                                        ;;juxt.flip.alpha.core/throw
+            ;; Always going to be application/json!
+            jsonista.core/write-value-as-bytes
 
-                                        #_(juxt.flip.alpha.core/swap
 
-                                           ;;(juxt.flip.alpha.core/ex-info )
-                                           )])
+
+            #_(juxt.flip.alpha.core/case
+                ["application/json"
+
+                 ({:message "TODO: Style the stack in json format"})
+
+                 ;; TODO: This is the 'default' branch, but very ugly and needs
+                 ;; improving
+                 (:content-type {} juxt.flip.alpha.core/set-at
+                                "Unsupported content-type"
+                                juxt.flip.alpha.core/swap
+                                juxt.flip.alpha.core/ex-info
+                                juxt.flip.alpha.core/throw-exception)])
 
 
             )
@@ -409,9 +412,9 @@
          (merge init/dependency-graph book/dependency-graph dependency-graph))))
      ~@body))
 
-;;deftest query-test
+;;with-fixtures
 
-(with-fixtures
+(deftest query-test
   (let [resources
         (->
          #{::init/system
@@ -560,36 +563,38 @@
                    "accept" "application/json"}})]
             (is (= 200 (:ring.response/status response)))
             ;;(is (= 200 (:ring.response/body response)))
-            (is (= "application/json" (get-in response [:ring.response/headers "content-type"])))
+
             (is (string? (:ring.response/body response)))
             )
 
-        ;; Why does this result in 200 OK?
+        ;; Alice sees all 20 patients
+        (let [response
+              (*handler*
+               {:ring.request/method :get
+                :ring.request/path "/patients"
+                :ring.request/headers
+                {"authorization" (format "Bearer %s" alice-access-token)
+                 "accept" "application/json"}})
+              body (:ring.response/body response)
+              result (json/read-value body)]
+          (is (= "application/json" (get-in response [:ring.response/headers "content-type"])))
+          (is (vector? result))
+          (is (= 20 (count result))))
 
-        (->
-         (*handler*
-          {:ring.request/method :get
-           :ring.request/path "/patients"
-           ;;:debug true
-           :ring.request/headers
-           {"authorization" (format "Bearer %s" alice-access-token)
-            "accept" "application/json"}})
-         ::site/errors
-         first
-         :ex-data
-         :result
+        ;; Bob sees just 3 patients
+        (let [response
+              (*handler*
+               {:ring.request/method :get
+                :ring.request/path "/patients"
+                :ring.request/headers
+                {"authorization" (format "Bearer %s" bob-access-token)
+                 "accept" "application/json"}})
+              body (:ring.response/body response)
+              result (json/read-value body)]
+          (is (= "application/json" (get-in response [:ring.response/headers "content-type"])))
+          (is (vector? result))
+          (is (= 3 (count result))))
 
-         )
-
-        (*handler*
-          {:ring.request/method :get
-           :ring.request/path "/patients"
-           ;;:debug true
-           :ring.request/headers
-           {"authorization" (format "Bearer %s" alice-access-token)
-            "accept" "application/json"}})
-
-        ;; Bob sees a handful of patients
         #_(*handler*
            {:ring.request/method :get
             :ring.request/path "/patients"
