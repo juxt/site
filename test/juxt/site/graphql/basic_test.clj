@@ -412,9 +412,9 @@
          (merge init/dependency-graph book/dependency-graph dependency-graph))))
      ~@body))
 
-;;with-fixtures
+;;deftest query-test
 
-(deftest query-test
+(with-fixtures
   (let [resources
         (->
          #{::init/system
@@ -595,19 +595,13 @@
           (is (vector? result))
           (is (= 3 (count result))))
 
-        #_(*handler*
-           {:ring.request/method :get
-            :ring.request/path "/patients"
-            ;;:debug true
-            :ring.request/headers
-            {"authorization" (format "Bearer %s" bob-access-token)
-             "accept" "application/json"}})
-
         ;; We are calling juxt.pass.alpha.actions/pull-allowed-resources which
         ;; provides our query, but we want to experiment with creating our own
         ;; query with sub-queries, which we can compile to with GraphQL.
 
-        #_(let [db (xt/db *xt-node*)
+        ;; Now we have a get-patient with rules that we can bring into a sub-query
+
+        (let [db (xt/db *xt-node*)
 
                 {subject ::pass/subject}
                 (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
@@ -615,7 +609,7 @@
             (for [{:keys [patient nested]}
                   (xt/q
                    db
-                   `{:find ~'[(pull patient [*]) {:measurements measurements}]
+                   `{:find ~'[(pull patient [:xt/id :name]) {:measurements measurements}]
                      :keys ~'[patient nested]
                      :where
                      [
