@@ -414,6 +414,7 @@
       (catch Throwable e
         (let [action-log-entry-uri (format "%s/_site/action-log/%d" base-uri (::xt/tx-id tx))]
           (log/errorf e "Error when doing action: %s %s" action action-log-entry-uri)
+
           [[::xt/put
             {:xt/id action-log-entry-uri
              ::site/type "https://meta.juxt.site/site/action-log-entry"
@@ -422,9 +423,13 @@
              ::site/resource resource
              ::pass/purpose purpose
              ::site/error {:message (.getMessage e)
-                           :ex-data
+                           ;; ex-data is just too problematic to put into the
+                           ;; database as-is without some sanitization ensuring
+                           ;; it's nippyable.
+                           :ex-data (ex-data e)
                            ;; The site db will not be nippyable
-                           (dissoc (ex-data e) :env)
+
+                           #_(dissoc (ex-data e) :env)
                            ;; TODO: Ideally we'd like the environment in the
                            ;; action log for debugging purposes. But the below
                            ;; stills fails with a nippy error, haven't
@@ -510,7 +515,10 @@
             (let [status (:ring.response/status (:ex-data error))]
               (throw
                (ex-info
-                (format "Transaction error performing action %s: %s (status: %s)" action (:message error) status)
+                (format "Transaction error performing action %s: %s%s"
+                        action
+                        (:message error)
+                        (if status (format "(status: %s)" status) ""))
                 (into
                  (cond-> {::site/request-context ctx}
                    status (assoc :ring.response/status status))

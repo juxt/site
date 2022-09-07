@@ -37,6 +37,46 @@
   `((t/join-fixtures [with-system-xt with-handler])
     (fn [] ~@body)))
 
+(defn create-action-register-doctor! [_]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/register-doctor"
+
+    :juxt.site.alpha/transact
+    {:juxt.flip.alpha/quotation
+     `(
+       (site/with-fx-acc-with-checks
+         [(site/push-fx
+           (f/dip
+            [site/request-body-as-edn
+             (site/validate
+              [:map
+               [:xt/id [:re "https://site.test/doctors/.*"]]])
+
+             (site/set-type "https://site.test/types/doctor")
+
+             (site/set-methods
+              {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
+               :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
+               :options {}})
+
+             xtdb.api/put]))]))}
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject subject]]]}))
+
+(defn grant-permission-to-invoke-action-register-doctor! [_]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/system/register-doctor"
+    :juxt.pass.alpha/subject "https://site.test/subjects/system"
+    :juxt.pass.alpha/action "https://site.test/actions/register-doctor"
+    :juxt.pass.alpha/purpose nil}))
+
 (defn create-action-register-patient! [_]
   (init/do-action
    "https://site.test/subjects/system"
@@ -250,9 +290,15 @@
     :juxt.pass.alpha/purpose nil
     }))
 
+
+(def DOCTOR_NAMES
+  {"001" "Dr. Conway"
+   "002" "Dr. Murillo"
+   "003" "Dr. Jackson"
+   "004" "Dr. Kim"})
+
 (def PATIENT_NAMES
-  {
-   "001" "Terry Levine",
+  {"001" "Terry Levine",
    "002" "Jeannie Finley",
    "003" "Jewel Blackburn",
    "004" "Lila Dickson",
@@ -271,8 +317,19 @@
    "017" "Blanca Lindsey",
    "018" "Rudy King",
    "019" "Valarie Campos",
-   "020" "Elisabeth Riddle"
-   })
+   "020" "Elisabeth Riddle"})
+
+(defn register-doctor! [{:keys [id params]}]
+  (let [subid (get params "id")
+        name (get DOCTOR_NAMES subid)]
+    (assert name (format "No name found for id: %s" subid))
+    (init/do-action
+     "https://site.test/subjects/system"
+     "https://site.test/actions/register-doctor"
+     {:xt/id id
+      :name name
+      ::http/content-type "application/json"
+      ::http/content (json/write-value-as-string {"name" name})})))
 
 (defn register-patient! [{:keys [id params]}]
   (let [pid (get params "pid")
@@ -288,7 +345,15 @@
       })))
 
 (def dependency-graph
-  {"https://site.test/actions/register-patient"
+  {"https://site.test/actions/register-doctor"
+   {:create #'create-action-register-doctor!
+    :deps #{::init/system}}
+
+   "https://site.test/permissions/system/register-doctor"
+   {:create #'grant-permission-to-invoke-action-register-doctor!
+    :deps #{::init/system}}
+
+   "https://site.test/actions/register-patient"
    {:create #'create-action-register-patient!
     :deps #{::init/system}}
 
@@ -326,6 +391,12 @@
    "https://site.test/permissions/system/register-patient-measurement"
    {:create #'grant-permission-to-invoke-action-register-patient-measurement!
     :deps #{::init/system}}
+
+   "https://site.test/doctors/{id}"
+   {:create #'register-doctor!
+    :deps #{::init/system
+            "https://site.test/actions/register-doctor"
+            "https://site.test/permissions/system/register-doctor"}}
 
    "https://site.test/patients/{pid}"
    {:create #'register-patient!
@@ -412,9 +483,9 @@
          (merge init/dependency-graph book/dependency-graph dependency-graph))))
      ~@body))
 
-;;with-fixtures
+;;
 
-(deftest query-test
+(with-fixtures
   (let [resources
         (->
          #{::init/system
@@ -447,10 +518,15 @@
            "https://site.test/permissions/alice/read-any-measurement"
            "https://site.test/permissions/bob/read-any-measurement"}
 
-         ;; Add some users
+         ;; Add some patients
          (into
           (for [i (range 1 (inc 20))]
-            (format "https://site.test/patients/%03d" i))))]
+            (format "https://site.test/patients/%03d" i)))
+
+         ;; Add some doctors
+         (into
+          (for [i (range 1 (inc 4))]
+            (format "https://site.test/doctors/%03d" i))))]
 
     ;; Alice can read patients
 
@@ -602,51 +678,50 @@
         ;; Now we have a get-patient with rules that we can bring into a sub-query
 
         (let [db (xt/db *xt-node*)
+              {subject ::pass/subject}
+              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
 
-                {subject ::pass/subject}
-                (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
+          (for [{:keys [patient nested]}
+                (xt/q
+                 db
+                 `{:find ~'[(pull patient [:xt/id :name]) {:measurements measurements}]
+                   :keys ~'[patient nested]
+                   :where
+                   [
+                    ~'[action :xt/id "https://site.test/actions/get-patient"]
+                    ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
+                    ~'[permission ::pass/action action]
+                    ~'[permission ::pass/purpose purpose]
+                    ~'(allowed? subject patient permission)
 
-            (for [{:keys [patient nested]}
-                  (xt/q
-                   db
-                   `{:find ~'[(pull patient [:xt/id :name]) {:measurements measurements}]
-                     :keys ~'[patient nested]
-                     :where
-                     [
-                      ~'[action :xt/id "https://site.test/actions/get-patient"]
-                      ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
-                      ~'[permission ::pass/action action]
-                      ~'[permission ::pass/purpose purpose]
-                      ~'(allowed? subject patient permission)
+                    ;; join
+                    [(~'q {:find ~'[(pull measurement [:reading])]
+                           :keys ~'[object]
+                           :where
+                           ~'[
+                              [measurement :patient patient]
+                              [measurement ::site/type "https://site.test/types/measurement"]
 
-                      ;; join
-                      [(~'q {:find ~'[(pull measurement [:reading])]
-                             :keys ~'[object]
-                             :where
-                             ~'[
-                                [measurement :patient patient]
-                                [measurement ::site/type "https://site.test/types/measurement"]
+                              [action :xt/id "https://site.test/actions/read-any-measurement"]
+                              [permission ::site/type "https://meta.juxt.site/pass/permission"]
+                              [permission ::pass/action action]
+                              [permission ::pass/purpose purpose]
+                              (allowed? subject measurement permission)
+                              ]
+                           :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
+                           :in ~'[patient subject]}
+                      ~'patient ~'subject)
+                     ~'measurements]]
 
-                                [action :xt/id "https://site.test/actions/read-any-measurement"]
-                                [permission ::site/type "https://meta.juxt.site/pass/permission"]
-                                [permission ::pass/action action]
-                                [permission ::pass/purpose purpose]
-                                (allowed? subject measurement permission)
-                                ]
-                             :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
-                             :in ~'[patient subject]}
-                        ~'patient ~'subject)
-                       ~'measurements]]
+                   :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
 
-                     :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
+                   :in [~'subject ~'purpose]}
 
-                     :in [~'subject ~'purpose]}
-
-                   subject nil)]
-              (merge patient nested)
-              )
-
+                 subject nil)]
+            (merge patient nested)
             )
+
+          )
 
         ;; Modelling ideas
 
@@ -654,6 +729,32 @@
         ;; A measurement must be taken by a doctor or other individual.
         ;; From the doctor, you can see patients.
         ;; A patient should be able to see their own medical file.
+
+        #_(repl/e "https://site.test/patients/014")
+
+        (let [db (xt/db *xt-node*)
+                {subject ::pass/subject}
+                (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
+
+            (xt/q
+             db
+             `{:find ~'[(pull e [*])]
+               :where
+               [
+                ~'[e ::site/type "https://site.test/types/doctor"]]
+               :in [~'subject ~'purpose]}
+             subject nil)
+            )
+
+
+
+
+
+
+
+
+
+
 
         ;; See NHS National role-based access control (RBAC) for developers
         ;; "The database consists of:

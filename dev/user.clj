@@ -24,7 +24,27 @@
    [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]
    xtdb.query
-   fipp.ednize))
+   fipp.ednize
+   [juxt.clojars-mirrors.nippy.v3v1v1.taoensso.nippy :as nippy]
+   ))
+
+(nippy/extend-freeze
+ clojure.lang.Atom :juxt.site.alpha.nippy/atom [x data-output]
+ (.writeUTF data-output "<atom>"))
+
+(nippy/extend-thaw
+ :juxt.site.alpha.nippy/atom [data-input]
+ (.readUTF data-input)
+ nil)
+
+(nippy/extend-freeze
+ xtdb.query.QueryDatasource :juxt.site.alpha.nippy/db [x data-output]
+ (.writeUTF data-output "<db>"))
+
+(nippy/extend-thaw
+ :juxt.site.alpha.nippy/db [data-input]
+ (.readUTF data-input)
+ nil)
 
 (apply require clojure.main/repl-requires)
 
@@ -56,7 +76,10 @@
     (alter-var-root #'main/*system* (constantly system)))
 
   (println "Starting Malli development instrumentation")
-  (md/start! {:report (malli.dev.pretty/thrower)})
+  (md/start!
+   {:report
+    (fn [type data]
+      (throw (ex-info (format "Malli validation failure: %s" type) {:type type :data data})))})
 
   (log/info "System started and ready...")
 

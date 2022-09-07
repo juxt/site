@@ -685,7 +685,7 @@
                           (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
                         {:id id :status :created :result result})
                       (catch Throwable cause
-                        (throw (ex-info (format "Failed to converge %s" id) {} cause))
+                        (throw (ex-info (format "Failed to converge %s" id) {:id id} cause))
                         ;;{:id id :status :error :error cause}
                         ))))
         [])))
