@@ -11,7 +11,8 @@
    [juxt.site.alpha :as-alias site]
    [juxt.flip.alpha.core :as f :refer [eval-quotation]]
    [juxt.flip.alpha :as-alias flip]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   juxt.site.alpha.schema))
 
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
@@ -66,23 +67,12 @@
       (catch Exception e
         (throw (ex-info "Failed to query permissions" {:query query} e))))))
 
-(defn
-  ^{:malli/schema
-    [:=> [:cat
-          :any
-          [:set :string]
-          [:map
-           [::pass/subject {:optional true}]
-           [::site/resource {:optional true}]
-           [::pass/purpose {:optional true}]]]
-     :any]}
-  check-permissions
+(defn check-permissions
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
   [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose :as options}]
 
   (when (= (find options ::pass/subject) [::pass/subject nil])
-    (throw (ex-info "Nil subject passed!" {}))
-    )
+    (throw (ex-info "Nil subject passed!" {})))
 
   ;; TODO: These asserts have been replaced by Malli schema instrumentation
   (assert (or (nil? subject) (map? subject)) "Subject expected to be a map, or null")
@@ -101,21 +91,21 @@
         ;;(log/debugf "Returning permissions: %s" (pr-str permissions))
         permissions))))
 
-(defn
-  ^{:malli/schema
-    [:=> [:cat
-          :any
-          [:set :string]
-          [:map
-           [::pass/subject {:optional true}]
-           [::pass/purpose {:optional true}]]]
-     :any]}
-  allowed-resources
+(malli/=>
+ check-permissions
+ [:=> [:cat
+       :any
+       [:set :string]
+       [:map
+        [::pass/subject {:optional true}]
+        [::site/resource {:optional true}]
+        [::pass/purpose {:optional true}]]]
+  :any])
+
+(defn allowed-resources
   "Given a set of possible actions, and possibly a subject and purpose, which
   resources are allowed?"
   [db actions {::pass/keys [subject purpose]}]
-  {:pre [(malli/validate [:set {:min 1} :string] actions)]}
-
   (let [rules (actions->rules db actions)
         query {:find '[resource]
                :where
@@ -151,6 +141,17 @@
            :purpose purpose}
           cause))))))
 
+(malli/=>
+ allowed-resources
+ [:=> [:cat
+       :any
+       [:set {:min 0} :string]
+       ;;[:set :string]
+       [:map
+        [::pass/subject {:optional true}]
+        [::pass/purpose {:optional true}]]]
+  :any])
+
 ;; TODO: How is this call protected from unauthorized use? Must call this with
 ;; access-token to verify subject.
 (defn allowed-subjects
@@ -185,17 +186,7 @@
 
           resource actions purpose))))
 
-(defn
-  ^{:malli/schema
-    [:=> [:cat
-          :any
-          [:set :string]
-          ::site/resource
-          [:map
-           [::pass/subject {:optional true}]
-           [::pass/purpose {:optional true}]]]
-     :any]}
-  pull-allowed-resource
+(defn pull-allowed-resource
   "Given a subject, a set of possible actions and a resource, pull the allowed
   attributes."
   [db actions resource {::pass/keys [subject purpose] :as pass-ctx}]
@@ -211,16 +202,18 @@
                         check-result))]
     (xt/pull db pull-expr (:xt/id resource))))
 
-(defn
-  ^{:malli/schema
-    [:=> [:cat
-          :any
-          [:set :string]
-          [:map
-           [::pass/subject {:optional true}]
-           [::pass/purpose {:optional true}]]]
-     :any]}
-  pull-allowed-resources
+(malli/=>
+ pull-allowed-resource
+ [:=> [:cat
+       :any
+       [:set :string]
+       ::site/resource
+       [:map
+        [::pass/subject {:optional true}]
+        [::pass/purpose {:optional true}]]]
+  :any])
+
+(defn pull-allowed-resources
   "Given a subject and a set of possible actions, which resources are allowed, and
   get me the documents. If resources-in-scope is given, only consider resources
   in that set."
@@ -274,6 +267,16 @@
                     ;; we retain in the result? with-meta?
                     resource-group]
                 (xt/pull db (::pass/pull action '[*]) resource)))))))
+
+(malli/=>
+ pull-allowed-resources
+ [:=> [:cat
+        :any
+        [:set :string]
+        [:map
+         [::pass/subject {:optional true}]
+         [::pass/purpose {:optional true}]]]
+   :any])
 
 (defn join-with-pull-allowed-resources
   "Join collection on given join-key with another pull of allowed-resources with

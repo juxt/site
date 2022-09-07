@@ -412,9 +412,9 @@
          (merge init/dependency-graph book/dependency-graph dependency-graph))))
      ~@body))
 
-;;deftest query-test
+;;with-fixtures
 
-(with-fixtures
+(deftest query-test
   (let [resources
         (->
          #{::init/system

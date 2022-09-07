@@ -3,7 +3,7 @@
 (ns juxt.flip.alpha.core
   ;; When promoting this ns, move the defmethods that require all these
   ;; dependencies:
-  (:refer-clojure :exclude [+ first second symbol drop keep when str ex-info any? filter map case])
+  (:refer-clojure :exclude [+ first second symbol drop keep when str ex-info any? filter map case pr-str])
   (:require
    [clojure.core :as cc]
    [clojure.edn :as edn]
@@ -196,7 +196,7 @@
       (throw
        (clojure.core/ex-info
         "Failed validation check"
-        (read-string (pr-str (m/explain schema (clojure.core/first stack))))))
+        (read-string (cc/pr-str (m/explain schema (clojure.core/first stack))))))
       [stack queue env])))
 
 ;; Shuffle words - see
@@ -432,17 +432,17 @@
 (def str 'juxt.flip.alpha.core/str)
 (defmethod word 'juxt.flip.alpha.core/str
   [[s1 s2 & stack] [_ & queue] env]
-  [(cons (clojure.core/str s1 s2) stack) queue env])
+  [(cons (cc/str s1 s2) stack) queue env])
 
 (def pr-str 'juxt.flip.alpha.core/pr-str)
 (defmethod word 'juxt.flip.alpha.core/pr-str
   [[el & stack] [_ & queue] env]
-  [(cons (clojure.core/pr-str el) stack) queue env])
+  [(cons (cc/pr-str el) stack) queue env])
 
 (def number->string 'juxt.flip.alpha.core/number->string)
 (defmethod word 'juxt.flip.alpha.core/number->string
   [[n & stack] [_ & queue] env]
-  [(cons (clojure.core/str n) stack) queue env])
+  [(cons (cc/str n) stack) queue env])
 
 (defmethod word 'juxt.flip.alpha.core/form-decode
   [[encoded & stack] [_ & queue] env]
@@ -450,7 +450,7 @@
     [(cons (codec/form-decode encoded) stack)
      queue
      env]
-    (throw (clojure.core/ex-info "String to decode is null" {}))))
+    (throw (cc/ex-info "String to decode is null" {}))))
 
 (defmethod word 'juxt.flip.alpha.core/form-encode
   [[m & stack] [_ & queue] env]

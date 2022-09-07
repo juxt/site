@@ -3,7 +3,9 @@
 (ns juxt.site.alpha.schema
   (:require
    [malli.core :as m]
-   [juxt.site.alpha :as-alias site])
+   [malli.registry :as mr]
+   [juxt.site.alpha :as-alias site]
+   juxt.pass.alpha.schema)
   ;;(:import (xtdb.query QueryDatasource))
   )
 
@@ -14,3 +16,9 @@
                           )]
    ::site/resource [:map [:xt/id]]
    :xt/id [:string {:min 5}]})
+
+(mr/set-default-registry!
+   (mr/composite-registry
+    (m/default-schemas)
+    juxt.pass.alpha.schema/schema-registry
+    schema-registry))

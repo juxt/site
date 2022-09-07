@@ -76,7 +76,7 @@
         com.auth0/jwks-rsa {:mvn/version "0.20.1"}
 
         ;; Malli is used for authorization only
-        metosin/malli {:mvn/version "0.8.3"}
+        metosin/malli {:mvn/version "0.8.9"}
         }
 
  :aliases

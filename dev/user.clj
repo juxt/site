@@ -1,5 +1,7 @@
 ;; Copyright © 2021, JUXT LTD.
 
+;;(juxt.pass.alpha.actions/allowed-resources (db) #{} {::pass/subject :foo})
+
 (ns user
   (:require
    clojure.main
@@ -13,6 +15,7 @@
    [xtdb.api :as xt]
    malli.dev.pretty
    [malli.dev :as md]
+   [malli.instrument :as mi]
    juxt.site.alpha.schema
    juxt.pass.alpha.schema
    juxt.pass.alpha.actions
@@ -53,7 +56,7 @@
     (alter-var-root #'main/*system* (constantly system)))
 
   (println "Starting Malli development instrumentation")
-  (md/start!)
+  (md/start! {:report (malli.dev.pretty/thrower)})
 
   (log/info "System started and ready...")
 

@@ -51,14 +51,9 @@
     (load-namespaces system-config)
     (ig/prep system-config)))
 
-(mr/set-default-registry!
- (mr/composite-registry
-  (m/default-schemas)
-  juxt.pass.alpha.schema/schema-registry
-  juxt.site.alpha.schema/schema-registry))
-
 (defn -main [& _]
   (log/info "Starting system")
+
   (let [system-config (system-config)
         system (ig/init system-config)]
     (log/infof "Configuration: %s" (pr-str system-config))
