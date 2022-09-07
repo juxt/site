@@ -1,0 +1,92 @@
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+input searchTerm {
+  key: String
+  value: Sting
+}
+
+type Query {
+  allPets(searchTerms: [searchTerm]): [Pet]
+  pet(id: ID!): Pet
+  petCount(searchTerms: [searchTerm]): Int
+    @site(aggregate: "count" type: "Pet")
+  allOwners: [Owner]
+    @site(
+      q: {
+        find: [e]
+        where: [
+          [pet { keyword: "juxt.site/type" } "Pet"]
+          [pet { keyword: "juxt.home/juxtcode" } owner]
+          [e { keyword: "juxt.site.alpha/type" } "Person"]
+          [e { keyword: "juxt.home/juxtcode" } owner]
+        ]
+      }
+    )
+}
+
+type Owner {
+  id: ID
+  code: String @site(a: "juxt.home/juxtcode")
+  name: String
+  pets: [Pet]
+    @site(
+      q: {
+        find: [pet]
+        where: [
+          [pet { keyword: "juxt.home/juxtcode" } code]
+          [object { keyword: "juxt.home/juxtcode" } code]
+        ]
+      }
+    )
+}
+
+type Pet {
+  xtQuery: String
+  id: ID
+  img: String
+  name: String
+  breed: String
+  species: String
+  likes: [String]
+  ownerCode: String @site(a: "juxt.home/juxtcode")
+  owner: Owner
+    @site(
+      q: {
+        find: [owner]
+        where: [
+          [owner { keyword: "juxt.site.alpha/type" } "Person"]
+          [owner { keyword: "juxt.home/juxtcode" } code]
+          [object { keyword: "juxt.home/juxtcode" } code]
+        ]
+      }
+    )
+}
+
+type Mutation {
+  addPet(
+    id: ID @site(gen: { type: UUID pathPrefix: "{{base-uri}}/pets/" })
+    img: String
+    name: String
+    breed: String
+    species: String
+    likes: [String]
+    ownerCode: String @site(a: "juxt.home/juxtcode")
+  ): Pet
+
+  updatePet(
+    id: ID!
+    img: String
+    name: String
+    breed: String
+    species: String
+    likes: [String]
+    ownerCode: String @site(a: "juxt.home/juxtcode")
+  ): Pet @site(mutation: "update")
+
+    deletePet(
+    id: ID!
+  ): Pet @site(mutation: "delete")
+}

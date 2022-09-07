@@ -1,0 +1,75 @@
+2022-04-11T14:48:57,226+0100 [55737 1] com.newrelic INFO: Writing to New Relic log file: /Users/alexdavis/ghq/github.com/juxt/site/newrelic/logs/newrelic_agent.log
+2022-04-11T14:48:57,226+0100 [55737 1] com.newrelic INFO: JRE vendor Azul Systems, Inc. version 16.0.1
+2022-04-11T14:48:57,226+0100 [55737 1] com.newrelic INFO: JVM vendor Azul Systems, Inc. OpenJDK 64-Bit Server VM version 16.0.1+9
+2022-04-11T14:48:57,226+0100 [55737 1] com.newrelic INFO: OS Mac OS X version 12.3.1 arch aarch64
+2022-04-11T14:48:57,226+0100 [55737 1] com.newrelic INFO: Agent Host: Alexs-MBP.broadband IP: 192.168.1.152
+2022-04-11T14:48:57,226+0100 [55737 1] com.newrelic INFO: New Relic Agent v7.5.0 is initializing...
+2022-04-11T14:48:57,574+0100 [55737 21] com.newrelic INFO: Instrumentation com.newrelic.instrumentation.jdbc-resultset is disabled. Skipping.
+2022-04-11T14:48:58,148+0100 [55737 1] com.newrelic.agent.RPMServiceManagerImpl INFO: Configured to connect to New Relic at collector.eu01.nr-data.net:443
+2022-04-11T14:48:58,270+0100 [55737 1] com.newrelic INFO: Setting audit_mode to false
+2022-04-11T14:48:58,327+0100 [55737 1] com.newrelic.agent.config.ConfigServiceImpl INFO: Configuration file is /Users/alexdavis/ghq/github.com/juxt/site/newrelic/./newrelic.yml
+2022-04-11T14:48:58,330+0100 [55737 1] com.newrelic INFO: New Relic Agent v7.5.0 has started
+2022-04-11T14:48:58,330+0100 [55737 1] com.newrelic INFO: Agent class loader: com.newrelic.bootstrap.BootstrapAgent$JVMAgentClassLoader@4671e53b
+2022-04-11T14:48:58,330+0100 [55737 1] com.newrelic INFO: Premain startup complete in 1,475ms
+2022-04-11T14:49:13,365+0100 [55737 40] com.newrelic INFO: Host name is Alexs-MBP.broadband, display host Alexs-MBP.broadband for application site
+2022-04-11T14:49:13,366+0100 [55737 40] com.newrelic INFO: New Relic JFR Monitor is disabled: JFR config has not been enabled in the Java agent.
+2022-04-11T14:49:13,690+0100 [55737 40] com.newrelic INFO: Collector redirection to collector-001.eu01.nr-data.net:443
+2022-04-11T14:49:13,895+0100 [55737 40] com.newrelic INFO: Max payload size is 1,000,000 bytes
+2022-04-11T14:49:13,895+0100 [55737 40] com.newrelic INFO: Agent run id: BWNOii-YvgYvADR1IhSYBWpiVDJEAAIBAAAnIQEAANm5AgQMDakbAwAFNy41LjAAE0FsZXhzLU1CUC5icm9hZGJhbmQABHNpdGU
+2022-04-11T14:49:13,895+0100 [55737 40] com.newrelic INFO: Agent 55737@Alexs-MBP.broadband/site connected to collector.eu01.nr-data.net:443
+2022-04-11T14:49:13,896+0100 [55737 40] com.newrelic INFO: Reporting to: https://rpm.eu.newrelic.com/accounts/3437858/applications/202221851
+2022-04-11T14:49:13,897+0100 [55737 40] com.newrelic INFO: Using region aware collector host: collector.eu01.nr-data.net
+2022-04-11T14:49:13,897+0100 [55737 40] com.newrelic INFO: Using region aware metric ingest URI: https://metric-api.eu.newrelic.com/metric/v1
+2022-04-11T14:49:13,897+0100 [55737 40] com.newrelic INFO: Using region aware event ingest URI: https://insights-collector.eu01.nr-data.net/v1/accounts/events
+2022-04-11T14:49:13,897+0100 [55737 40] com.newrelic INFO: Using region aware collector host: collector.eu01.nr-data.net
+2022-04-11T14:49:13,897+0100 [55737 40] com.newrelic INFO: Using region aware metric ingest URI: https://metric-api.eu.newrelic.com/metric/v1
+2022-04-11T14:49:13,898+0100 [55737 40] com.newrelic INFO: Using region aware event ingest URI: https://insights-collector.eu01.nr-data.net/v1/accounts/events
+2022-04-11T14:49:13,979+0100 [55737 40] com.newrelic INFO: Real user monitoring is enabled for application site. Auto instrumentation is enabled.
+2022-04-11T14:49:13,979+0100 [55737 40] com.newrelic INFO: New Relic JFR Monitor is disabled: JFR config has not been enabled in the Java agent.
+2022-04-11T19:55:02,954+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-11T20:03:13,703+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-11T20:15:45,448+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-11T20:57:19,392+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-11T20:57:49,400+0100 [55737 73] com.newrelic INFO: Remote metric_data call failed : java.net.UnknownHostException: collector-001.eu01.nr-data.net: nodename nor servname provided, or not known.
+2022-04-11T20:57:49,404+0100 [55737 73] com.newrelic INFO: An unexpected error occurred sending metric data to New Relic. Please file a support ticket once you have seen several of these messages in a short period of time: java.net.UnknownHostException: collector-001.eu01.nr-data.net: nodename nor servname provided, or not known
+2022-04-11T20:58:48,877+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : java.net.UnknownHostException: collector-001.eu01.nr-data.net: nodename nor servname provided, or not known.
+2022-04-11T20:58:48,886+0100 [55737 73] com.newrelic INFO: Remote metric_data call failed : java.net.UnknownHostException: collector-001.eu01.nr-data.net.
+2022-04-11T20:58:48,887+0100 [55737 73] com.newrelic INFO: An unexpected error occurred sending metric data to New Relic. Please file a support ticket once you have seen several of these messages in a short period of time: java.net.UnknownHostException: collector-001.eu01.nr-data.net
+2022-04-11T21:15:41,473+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : java.net.UnknownHostException: collector-001.eu01.nr-data.net: nodename nor servname provided, or not known.
+2022-04-11T21:15:41,481+0100 [55737 73] com.newrelic INFO: Remote metric_data call failed : java.net.UnknownHostException: collector-001.eu01.nr-data.net.
+2022-04-11T21:15:41,482+0100 [55737 73] com.newrelic INFO: An unexpected error occurred sending metric data to New Relic. Please file a support ticket once you have seen several of these messages in a short period of time: java.net.UnknownHostException: collector-001.eu01.nr-data.net
+2022-04-11T21:31:29,139+0100 [55737 73] com.newrelic INFO: Successfully reconnected to the New Relic data service.
+2022-04-11T21:49:36,644+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-11T22:18:37,943+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-11T22:48:54,867+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-11T23:13:26,213+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-11T23:31:42,798+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T00:05:21,378+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T00:20:00,877+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T01:48:42,656+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T02:49:26,025+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T03:52:56,394+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T05:38:48,451+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T05:50:13,271+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T06:53:54,729+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T07:01:40,551+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T07:14:21,432+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T07:38:45,914+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T08:00:04,263+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T08:20:05,586+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T08:54:34,134+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T09:19:29,497+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T09:28:09,309+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T10:18:02,979+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T10:37:11,754+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T10:46:05,084+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T15:25:25,994+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Operation timed out.
+2022-04-12T15:25:26,008+0100 [55737 73] com.newrelic INFO: Remote metric_data call failed : java.net.UnknownHostException: collector-001.eu01.nr-data.net: nodename nor servname provided, or not known.
+2022-04-12T15:25:26,008+0100 [55737 73] com.newrelic INFO: An unexpected error occurred sending metric data to New Relic. Please file a support ticket once you have seen several of these messages in a short period of time: java.net.UnknownHostException: collector-001.eu01.nr-data.net: nodename nor servname provided, or not known
+2022-04-12T15:26:08,039+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : java.net.UnknownHostException: collector-001.eu01.nr-data.net: nodename nor servname provided, or not known.
+2022-04-12T15:26:08,046+0100 [55737 73] com.newrelic INFO: Remote metric_data call failed : java.net.UnknownHostException: collector-001.eu01.nr-data.net.
+2022-04-12T15:26:08,046+0100 [55737 73] com.newrelic INFO: An unexpected error occurred sending metric data to New Relic. Please file a support ticket once you have seen several of these messages in a short period of time: java.net.UnknownHostException: collector-001.eu01.nr-data.net
+2022-04-12T15:38:39,541+0100 [55737 73] com.newrelic INFO: Successfully reconnected to the New Relic data service.
+2022-04-12T15:52:17,162+0100 [55737 73] com.newrelic INFO: Remote get_agent_commands call failed : javax.net.ssl.SSLException: Connection reset.
+2022-04-12T16:28:22,869+0100 [55737 15] com.newrelic.agent.core.CoreServiceImpl INFO: JVM is shutting down
+2022-04-12T16:28:22,997+0100 [55737 15] com.newrelic.agent.core.CoreServiceImpl INFO: New Relic Agent has shutdown

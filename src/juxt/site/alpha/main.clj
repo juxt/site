@@ -5,6 +5,8 @@
    [aero.core :as aero]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log]
+   [juxt.site.alpha.init :as init]
+   [xtdb.api :as xt]
    [integrant.core :as ig]))
 
 (def system nil)
@@ -38,26 +40,34 @@
     (log/debug "Loading configuration from" (.getAbsolutePath config-file))
     (aero/read-config config-file {:profile profile})))
 
+(def config-map (config))
+
 (defn system-config
   "Construct a new system, configured with the given profile"
   []
-  (let [config (config)
-        system-config (:ig/system config)]
+  (let [system-config (:ig/system config-map)]
     (load-namespaces system-config)
     (ig/prep system-config)))
 
 (defn -main [& _]
   (log/info "Starting system")
   (let [system-config (system-config)
-        sys (ig/init system-config)]
-    (log/infof "Configuration: %s" (pr-str system-config))
+        sys (ig/init system-config)
+        node (:juxt.site.alpha.db/xt-node sys)
+        db (xt/db node)
+        open-api-path "/_site/apis/site/openapi.json"]
+
+    (when-not (xt/entity db open-api-path)
+      (init/insert-base-resources! node config))
 
     (log/info "System started and ready...")
+
     (log/trace "TRACE on")
+
     (Thread/setDefaultUncaughtExceptionHandler
      (reify Thread$UncaughtExceptionHandler
-       (uncaughtException [_ thread throwable]
-         (throw (ex-info "Default Exception caught:" throwable)))))
+       (uncaughtException [_ thread ex]
+         (log/error ex "Uncaught exception on" (.getName thread)))))
 
     (.addShutdownHook
      (Runtime/getRuntime)
@@ -65,4 +75,5 @@
       (fn []
         (ig/halt! sys))))
     (alter-var-root #'system (constantly sys)))
+
   @(promise))

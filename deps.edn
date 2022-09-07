@@ -1,6 +1,6 @@
 ;; Copyright © 2021, JUXT LTD.
 
-{:paths ["src"]
+{:paths ["src" "apis"]
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}
 
         ;; Project skeleton - also see src/config.edn
@@ -8,13 +8,20 @@
         aero/aero {:mvn/version "1.1.6"}
         io.aviso/pretty {:mvn/version "1.1.1"}
 
+        danlentz/clj-uuid {:mvn/version "0.1.9"}
+
+        ;; file watcher
+        io.methvin/directory-watcher {:mvn/version "0.15.0"}
+
         ;; XT
-        com.xtdb/xtdb-core {:mvn/version "1.21.0"}
-        com.xtdb/xtdb-rocksdb {:mvn/version "1.21.0"}
-        com.xtdb/xtdb-lucene {:mvn/version "1.21.0"}
-        com.xtdb/xtdb-http-server {:mvn/version "1.21.0"}
-        com.xtdb/xtdb-jdbc {:mvn/version "1.21.0"}
-        com.xtdb/xtdb-s3 {:mvn/version "1.21.0"}
+        com.xtdb/xtdb-core {:mvn/version "1.22.0-alpha2"}
+        com.xtdb/xtdb-rocksdb {:mvn/version "1.22.0-alpha2"}
+        com.xtdb/xtdb-lucene {:mvn/version "1.22.0-alpha2"}
+        com.xtdb/xtdb-http-server {:mvn/version "1.22.0-alpha2"}
+        com.xtdb/xtdb-jdbc {:mvn/version "1.22.0-alpha2"}
+        com.xtdb/xtdb-s3 {:mvn/version "1.22.0-alpha2"}
+        tatut/xtdb-inspector {:git/url "https://github.com/tatut/xtdb-inspector.git"
+                              :sha "6a60f0e04ad0ea3921422f757217a29601146e35"}
 
         ;; Jetty
         ring/ring-jetty-adapter {:mvn/version "1.9.5"}
@@ -88,9 +95,10 @@
  :aliases
  {:dev
   {:extra-paths ["dev" "test"]
-   :extra-deps { ;; Convenience libraries made available during development
+   :extra-deps {;; Convenience libraries made available during development
                 org.clojure/test.check {:mvn/version "1.1.1"}
                 nrepl/nrepl {:mvn/version "0.9.0"}
+                djblue/portal {:mvn/version "0.29.1"}
                 org.clojure/alpha.spec {:git/url "https://github.com/clojure/spec-alpha2.git"
                                         :sha "99456b1856a6fd934e2c30b17920bd790dd81775"}
                 org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}}

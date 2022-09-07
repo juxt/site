@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Load application's secret to env
+
+eval $(/usr/bin/load-secret-env.sh ${ENVIRONMENT:-"dev"}-knowledge-graph-rds-app)
+
+exec "$@"

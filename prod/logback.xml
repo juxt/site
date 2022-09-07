@@ -1,0 +1,21 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.FileAppender">
+        <file>logs/logback-app.log</file>
+	<encoder class="com.newrelic.logging.logback.NewRelicEncoder"/>
+    </appender>
+
+    <appender name="ASYNC" class="com.newrelic.logging.logback.NewRelicAsyncAppender">
+        <appender-ref ref="STDOUT" />
+    </appender>
+    <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>%d %-5level [%thread] %logger{0}: %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="ASYNC" />
+        <appender-ref ref="Console" />
+    </root>
+
+</configuration>

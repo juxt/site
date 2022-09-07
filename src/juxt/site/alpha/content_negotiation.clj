@@ -43,8 +43,7 @@
             "Not Acceptable"
             ;; TODO: Must add list of available representations
             ;; TODO: Add to req with into
-            {:ring.response/status 406
-             }))))
+            {:ring.response/status 406}))))
 
     #_(log/debug "result of negotiate-representation" (dissoc selected-representation ::http/body ::http/content))
 
@@ -53,13 +52,12 @@
     (cond-> selected-representation
       (not-empty vary) (assoc ::http/vary (str/join ", " vary)))))
 
-
 (defn find-variants [{::site/keys [resource uri db] :as req}]
 
   (let [variants (xt/q db '{:find [(pull v [*])]
-                           :where [[v ::site/variant-of uri]]
-                           :in [uri]}
-                      uri)]
+                            :where [[v ::site/variant-of uri]]
+                            :in [uri]}
+                       uri)]
     (when (pos? (count variants))
       (cond-> (for [[v] variants]
                 (assoc v ::http/content-location (:xt/id v)))

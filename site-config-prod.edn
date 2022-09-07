@@ -1,0 +1,80 @@
+{;; Used by bin/site to know where to send HTTP API requests.
+ :juxt.site.alpha/base-uri #env KG_URL_BASE
+ ;; If specified, inbound URLs will be uri-prefix + path. If not
+ ;; specified, will default to concatenating the request's proto (or
+ ;; X-Forwarded-Proto header) and Host (or X-Forwarded-Host) request header.
+
+ :ig/system
+ {:juxt.site.alpha.db/xt-node
+  #profile
+   {:dev
+    {:xtdb.http-server/server {:port 5511}
+
+     :xtdb/tx-log
+     {:kv-store {:xtdb/module xtdb.rocksdb/->kv-store
+                 :db-dir "db/txes"}}
+
+     :xtdb/document-store
+     {:kv-store {:xtdb/module xtdb.rocksdb/->kv-store
+                 :db-dir "db/docs"}}
+
+     :xtdb/index-store
+     {:kv-store {:xtdb/module xtdb.rocksdb/->kv-store
+                 :db-dir "db2/idxs"}}
+
+    :juxt.site.alpha.watcher/watcher
+    {:juxt.site.alpha/xt-node #ig/ref :juxt.site.alpha.db/xt-node
+     :juxt.site.alpha/base-uri #ref [:juxt.site.alpha/base-uri]
+     :juxt.site.alpha/should-watch? true}}
+
+    :prod
+    {:xtdb.jdbc/connection-pool
+     {:dialect {:xtdb/module xtdb.jdbc.mysql/->dialect}
+      :pool-opts {}
+      :db-spec   {:dbtype "mysql"
+                  :dbname #env MYSQL_DATABASE
+                  :user   #env MYSQL_USER
+                  :password #env MYSQL_PASSWORD
+                  :host #env MYSQL_HOST
+                  :port #env MYSQL_PORT}}
+
+     :xtdb/tx-log
+     {:xtdb/module xtdb.jdbc/->tx-log
+      :connection-pool :xtdb.jdbc/connection-pool}
+
+     :xtdb/document-store
+     {:xtdb/module xtdb.jdbc/->document-store
+      :cache-size 2000000 ;; caches up to 2M documents
+      :connection-pool :xtdb.jdbc/connection-pool}
+
+     :xtdb.rocksdb/block-cache {:xtdb/module xtdb.rocksdb/->lru-block-cache
+                                :cache-size 4000000000 ;; 4G
+                                }
+     :xtdb/index-store
+     {:kv-store {:xtdb/module xtdb.rocksdb/->kv-store
+
+                 :db-dir "db3/idxs"
+
+                 :checkpointer                                       ;;
+                 {:xtdb/module xtdb.checkpoint/->checkpointer        ;;
+                  :store {:xtdb/module xtdb.s3.checkpoint/->cp-store ;;
+                          :bucket #envf ["%s" XTDB_S3_BUCKET]        ;;
+                          :prefix "xtdb-checkpoints"}                ;;
+                  :approx-frequency "PT4H"}                          ;;
+                 }}}}
+  :juxt.site.alpha.server/server
+  {:juxt.site.alpha/xt-node #ig/ref :juxt.site.alpha.db/xt-node
+   :juxt.site.alpha/port 5509
+
+   ;; can probably get rid of this (but won't yet just in case)
+   :juxt.site.alpha/base-uri #ref [:juxt.site.alpha/base-uri]
+
+   :juxt.site.alpha/dynamic? #profile {:dev true :prod false}}
+
+  :juxt.site.alpha.nrepl/server
+  {:juxt.site.alpha/port 5510}
+
+  :juxt.site.alpha.watcher/watcher
+  {:juxt.site.alpha/xt-node #ig/ref :juxt.site.alpha.db/xt-node
+   :juxt.site.alpha/base-uri #ref [:juxt.site.alpha/base-uri]
+   :juxt.site.alpha/should-watch? false}}}

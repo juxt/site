@@ -104,8 +104,7 @@
 
 (defmethod validate-request-payload "application/json"
   [{::site/keys [received-representation resource db] :as req}]
-  (let [
-        body (::http/body received-representation)
+  (let [body (::http/body received-representation)
 
         instance (try
                    (json/read-value body)
@@ -148,8 +147,7 @@
 
 (defmethod validate-request-payload "application/x-www-form-urlencoded"
   [{::site/keys [received-representation resource db] :as req}]
-  (let [
-        body (::http/body received-representation)
+  (let [body (::http/body received-representation)
 
         instance (try
                    (form-decode (String. body))
@@ -432,7 +430,7 @@
    ;; yet do this is due to path parameters (see below). If we were to put path
    ;; parameters at one level higher in the OpenAPI, and enforce that, then we
    ;; could make this change.
-   {::site/keys [base-uri] :as req}]
+   req]
 
   ;; Do we have any OpenAPIs in the database?
   (or
@@ -440,7 +438,7 @@
 
    ;; TODO: In future, we should relax the locations where APIs can live to make
    ;; it easier to develop APIs with WebDav.
-   (when (re-matches (re-pattern (format "%s/_site/apis/\\w+/openapi.json" base-uri)) uri)
+   (when (re-matches (re-pattern "/_site/apis/\\w+/openapi.json") uri)
      (or
       ;; It might exist
       (some-> (x/entity db uri)
@@ -461,16 +459,11 @@
          matches
          (for [[openapi-uri openapi] openapis
                server (get openapi "servers")
-               :let [server-url (get server "url")
-                     abs-server-url
-                     (cond->> server-url
-                       (or (.startsWith server-url "/")
-                           (= server-url ""))
-                       (str base-uri))]
-               :when (.startsWith uri abs-server-url)
+               :let [server-url (get server "url")]
+               :when (.startsWith uri server-url)
                :let [paths (get openapi "paths")]
                path paths
-               :let [resource (path-entry->resource req path openapi openapi-uri (subs uri (count abs-server-url)))]
+               :let [resource (path-entry->resource req path openapi openapi-uri (subs uri (count server-url)))]
                :when resource]
            resource)]
 
@@ -500,7 +493,7 @@
                 #(every? ::jinx/valid?
                          (vals (get % ::apex/openapi-path-params)))
                 matches)]
-           (if (= (count resources) 1)
+           (if (pos? (count resources))
              (first resources)
              ;; TODO: There is the information in each path-param's validation
              ;; to construct a much more helpful error message.

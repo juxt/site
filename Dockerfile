@@ -3,7 +3,7 @@
 # build with:  sudo docker build -t juxt/site:latest .
 # drop in:     sudo docker run -it juxt/site bash
 # run with:    sudo docker run -p 2021:2021 -p 50505:50505 -d juxt/site:latest
-FROM clojure:openjdk-17-tools-deps
+FROM clojure:temurin-17-tools-deps-focal
 RUN apt-get update
 RUN apt-get -y install git
 WORKDIR /opt
