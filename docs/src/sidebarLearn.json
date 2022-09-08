@@ -8,7 +8,7 @@
       "path": "",
       "routes": [
         {
-          "title": "Quick Start",
+          "title": "Tutorials",
           "path": "/learn",
           "routes": [
             {
@@ -16,8 +16,20 @@
               "path": "/learn/installation"
             },
             {
-              "title": "What is Site?",
-              "path": "/learn/what-is-site"
+              "title": "Site CLI setup",
+              "path": "/learn/cli"
+            },
+            {
+              "title": "XTDB Primer",
+              "path": "/learn/xtdb"
+            },
+            {
+              "title": "Open API Tutorial",
+              "path": "/learn/openapi"
+            },
+            {
+              "title": "GraphQL Tutorial",
+              "path": "/learn/graphql"
             }
           ]
         }
