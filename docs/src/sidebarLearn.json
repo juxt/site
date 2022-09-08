@@ -16,10 +16,6 @@
               "path": "/learn/installation"
             },
             {
-              "title": "Site CLI setup",
-              "path": "/learn/cli"
-            },
-            {
               "title": "XTDB Primer",
               "path": "/learn/xtdb"
             },
