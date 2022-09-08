@@ -149,6 +149,8 @@
       [(allowed? subject resource permission)
        [permission :juxt.pass.alpha/subject subject]]]}))
 
+
+
 (defn create-action-get-patient! [_]
   (init/do-action
    "https://site.test/subjects/system"
@@ -847,6 +849,77 @@
         ;; HTML page with a list of types.
 
         ))))
+
+
+(with-fixtures
+  (let  [resources
+         (->
+          #{::init/system
+
+            "https://site.test/login"
+            "https://site.test/user-identities/alice/basic"
+            "https://site.test/user-identities/bob/basic"
+
+            "https://site.test/oauth/authorize"
+            "https://site.test/session-scopes/oauth"
+            "https://site.test/permissions/alice-can-authorize"
+            "https://site.test/permissions/bob-can-authorize"
+            "https://site.test/applications/local-terminal"
+
+            "https://site.test/actions/get-patient"
+            "https://site.test/permissions/alice/get-any-patient"
+            "https://site.test/permissions/bob/get-patient/004"
+            "https://site.test/permissions/bob/get-patient/009"
+            "https://site.test/permissions/bob/get-patient/010"
+            "https://site.test/actions/list-patients"
+            "https://site.test/permissions/alice/list-patients"
+            "https://site.test/permissions/bob/list-patients"
+
+            "https://site.test/actions/register-patient-measurement"
+            "https://site.test/permissions/system/register-patient-measurement"
+
+            "https://site.test/patients"
+
+            "https://site.test/actions/read-any-measurement"
+            "https://site.test/permissions/alice/read-any-measurement"
+            "https://site.test/permissions/bob/read-any-measurement"}
+
+          ;; Add some patients
+          (into
+           (for [i (range 1 (inc 20))]
+             (format "https://site.test/patients/%03d" i)))
+
+          ;; Add some doctors
+          (into
+           (for [i (range 1 (inc 4))]
+             (format "https://site.test/doctors/%03d" i))))]
+
+    (with-resources resources
+      (repl/ls)
+      (f/eval-quotation
+       []
+       `(
+         site/request-body-as-edn
+         (site/validate
+          [:map
+           [:patient [:re "https://site.test/patients/.*"]]
+           [:doctor [:re "https://site.test/doctors/.*"]]])
+
+
+         ;; More TODO...
+
+         ;; A POST to a patient URL?
+         ;; What if there are a number of actions one can perform on a patient?
+         ;; A PATCH to a patient????
+
+         )
+
+       {:juxt.site.alpha/received-representation
+        {:juxt.http.alpha/body
+         (.getBytes
+          (pr-str
+           {:patient "https://site.test/patients/001"
+            :doctor "https://site.test/doctors/001"}))}}))))
 
 #_(let [compiled-schema
         (->
