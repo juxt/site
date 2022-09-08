@@ -167,11 +167,13 @@ This only works for one to one relationships. For one to many use `each`.
 
 ### each {/_each_/}
 
-One of the more commonly used directives, used when you need to join across documents in the db.
+Also for joining, but used when you want to make a one-to-many relationship
 
-Given a db containing the following documents:
+say our house can now have multiple owners, we do this instead.
 
-```json
+Data in DB
+
+```clojure
 {:xt/id "house1"
  :type "mansion"}
 
@@ -179,9 +181,13 @@ Given a db containing the following documents:
  :name "bob"
  :ownedHouseId "house1"}
 
+{:xt/id "owner2"
+ :name "sally"
+ :ownedHouseId "house1"}
+
 ```
 
-You can define attributes that join onto the relevant XT document in both directions.
+note that owner becomes 'owners' which returns a list, so we use each instead of ref
 
 ```graphql
 type Owner {
@@ -193,7 +199,7 @@ type Owner {
 type House {
   id: ID!
   type: String!
-  owner: Owner @site(ref: "ownedHouseId")
+  owners: [Owner] @site(each: "ownedHouseId")
 }
 ```
 
