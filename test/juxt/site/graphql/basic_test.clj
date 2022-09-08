@@ -117,6 +117,38 @@
     :juxt.pass.alpha/action "https://site.test/actions/register-patient"
     :juxt.pass.alpha/purpose nil}))
 
+;; A patient's record contains an attribute that indicates the set of assigned doctors.
+(defn create-action-assign-doctor-to-patient! [_]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/assign-doctor-to-patient"
+
+    :juxt.site.alpha/transact
+    {:juxt.flip.alpha/quotation
+     `(
+       (site/with-fx-acc-with-checks
+         [(site/push-fx
+           (f/dip
+            [site/request-body-as-edn
+             (site/validate
+              [:map
+               [:patient [:re "https://site.test/patients/.*"]]
+               [:doctor [:re "https://site.test/doctors/.*"]]])
+
+             ;; More TODO...
+
+             ;; A POST to a patient URL?
+             ;; What if there are a number of actions one can perform on a patient?
+             ;; A PATCH to a patient????
+
+             ]))]))}
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject subject]]]}))
+
 (defn create-action-get-patient! [_]
   (init/do-action
    "https://site.test/subjects/system"
@@ -559,8 +591,7 @@
                   "bloodPressure" "137/80"}})
 
       (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
-            {alice-access-token "access_token"
-             error "error"}
+            {alice-access-token "access_token" error "error"}
             (book/authorize!
              :session-id alice-session-id
              "client_id" "local-terminal"
