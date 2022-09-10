@@ -17,6 +17,7 @@
    [juxt.site.alpha.init :as init]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
    [juxt.site.alpha.graphql.graphql-query-processor :as gqp]
+   [malli.core :as malli]
    [xtdb.api :as xt]))
 
 ;; TODO: Dedupe between this test ns and juxt.book-test
@@ -125,32 +126,34 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/assign-doctor-to-patient"
 
+    ;; A POST to a patient URL?
+    ;; What if there are a number of actions one can perform on a patient?
+    ;; A PATCH to a patient????
     :juxt.site.alpha/transact
-    {:juxt.flip.alpha/quotation
-     `(
-       (site/with-fx-acc-with-checks
-         [(site/push-fx
-           (f/dip
-            [site/request-body-as-edn
-             (site/validate
-              [:map
-               [:patient [:re "https://site.test/patients/.*"]]
-               [:doctor [:re "https://site.test/doctors/.*"]]])
-
-             ;; More TODO...
-
-             ;; A POST to a patient URL?
-             ;; What if there are a number of actions one can perform on a patient?
-             ;; A PATCH to a patient????
-
-             ]))]))}
+    {:juxt.site.alpha.malli/input-schema
+     [:map
+      [:patient [:re "https://site.test/patients/.*"]]
+      [:doctor [:re "https://site.test/doctors/.*"]]]
+     :juxt.site.alpha.sci/program
+     (pr-str
+      '[[:xtdb.api.put
+         (if-let [patient (xt/entity (:patient *input*))]
+           (update patient :doctor (fnil conj #{}) (:doctor *input*))
+           (throw (ex-info "No such patient" {:id (:patient *input*)})))]])}
 
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
        [permission :juxt.pass.alpha/subject subject]]]}))
 
-
+(defn grant-permission-to-invoke-action-assign-doctor-to-patient! [_]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/grant-permission"
+   {:xt/id "https://site.test/permissions/system/assign-doctor-to-patient"
+    :juxt.pass.alpha/subject "https://site.test/subjects/system"
+    :juxt.pass.alpha/action "https://site.test/actions/assign-doctor-to-patient"
+    :juxt.pass.alpha/purpose nil}))
 
 (defn create-action-get-patient! [_]
   (init/do-action
@@ -506,6 +509,14 @@
    "https://site.test/permissions/{username}/read-any-measurement"
    {:create (fn [{:keys [params]}]
               (grant-permission-to-read-any-measurement! (get params "username")))
+    :deps #{::init/system}}
+
+   "https://site.test/actions/assign-doctor-to-patient"
+   {:create #'create-action-assign-doctor-to-patient!
+    :deps #{::init/system}}
+
+   "https://site.test/permissions/system/assign-doctor-to-patient"
+   {:create #'grant-permission-to-invoke-action-assign-doctor-to-patient!
     :deps #{::init/system}}
    })
 
@@ -883,7 +894,10 @@
 
             "https://site.test/actions/read-any-measurement"
             "https://site.test/permissions/alice/read-any-measurement"
-            "https://site.test/permissions/bob/read-any-measurement"}
+            "https://site.test/permissions/bob/read-any-measurement"
+
+            "https://site.test/actions/assign-doctor-to-patient"
+            "https://site.test/permissions/system/assign-doctor-to-patient"}
 
           ;; Add some patients
           (into
@@ -897,47 +911,88 @@
 
     (with-resources resources
       (repl/ls)
-      (f/eval-quotation
-       [{:patient "https://site.test/patients/001"
-         :doctor "https://site.test/doctors/001"}]
-       `(
-         (site/with-fx-acc
-           [
-            ;; Validate arguments
-            (f/dip
-             [(site/validate
+
+      (init/do-action
+       "https://site.test/subjects/system"
+       "https://site.test/actions/assign-doctor-to-patient"
+       {:patient "https://site.test/patients/001"
+        :doctor "https://site.test/doctors/001"})
+
+      (repl/e "https://site.test/patients/001")
+
+      #_(let [db (xt/db *xt-node*)
+              opts {:namespaces
+                    {'user
+                     {'*input* {:patient "https://site.test/patients/001"
+                                :doctor "https://site.test/doctors/001"}}
+                     'xt
+                     {'entity (fn [id] (xt/entity db id))}
+
+                     'malli
+                     {'validate (fn [schema value] (malli/validate schema value))}}}]
+
+          (sci/eval-string
+           (pr-str
+
+            ;; TODO: Promote validation into action data so that *input* has an
+            ;; accessible schema definition as well as being validated prior to
+            ;; running the sci code.
+            '(assert
+              (malli/validate
                [:map
                 [:patient [:re "https://site.test/patients/.*"]]
-                [:doctor [:re "https://site.test/doctors/.*"]]])])
+                [:doctor [:re "https://site.test/doctors/.*"]]]
+               *input*)
+              "*input* is not valid")
 
-            (f/set-at (f/dip [:input]))
+            '[[:xtdb.api.put
+               (if-let [patient (xt/entity (:patient *input*))]
+                 (update patient :doctor (fnil conj #{}) (:doctor *input*))
+                 (throw (ex-info "No such patient" {:id (:patient *input*)})))]])
 
-            (f/set-at (f/keep [(f/of :input) (f/of :patient) site/entity :patient]))
+           opts)))))
 
-            :patient f/swap [(f/set-at (f/keep [:bar :foo]))] f/change-at
+#_(f/eval-quotation
+         [{:patient "https://site.test/patients/001"
+           :doctor "https://site.test/doctors/001"}]
+         `(
+           (site/with-fx-acc
+             [
+              ;; Validate arguments
+              (f/dip
+               [(site/validate
+                 [:map
+                  [:patient [:re "https://site.test/patients/.*"]]
+                  [:doctor [:re "https://site.test/doctors/.*"]]])])
 
-            ;;(f/keep [(f/change-at :patient f/swap [f/drop :ok]) :new-patient])
+              (f/set-at (f/dip [:input]))
+
+              (f/set-at (f/keep [(f/of :input) (f/of :patient) site/entity :patient]))
+
+              :patient f/swap [(f/set-at (f/keep [:bar :foo]))] f/change-at
+
+              ;;(f/keep [(f/change-at :patient f/swap [f/drop :ok]) :new-patient])
 
 
-            #_(site/entity (f/of :patient))])
+              #_(site/entity (f/of :patient))])
 
-         ;; The patient could be the resource undergoing a PATCH, where the
-         ;; PATCH body contains the doctor id.
+           ;; The patient could be the resource undergoing a PATCH, where the
+           ;; PATCH body contains the doctor id.
 
-         ;; Or a GraphQL mutation where an action is called with the patient id
-         ;; and doctor id as arguments.
+           ;; Or a GraphQL mutation where an action is called with the patient id
+           ;; and doctor id as arguments.
 
-         ;; It feels like this action needs to be given the arguments on its
-         ;; initial stack, rather than each action pull them into from EDN.
+           ;; It feels like this action needs to be given the arguments on its
+           ;; initial stack, rather than each action pull them into from EDN.
 
-         ;; However an action is called, let's always assume the action begins
-         ;; with arguments on its stack, as any quotation would. But
-         ;; conventionally, there is one argument: a map.
+           ;; However an action is called, let's always assume the action begins
+           ;; with arguments on its stack, as any quotation would. But
+           ;; conventionally, there is one argument: a map.
 
-         )
+           )
 
-       {::site/db (xt/db *xt-node*)
-        }))))
+         {::site/db (xt/db *xt-node*)
+          })
 
 #_(let [compiled-schema
         (->
@@ -951,7 +1006,6 @@
      compiled-schema
      db))
 
-
 #_(let [obj :c]
   (some
    (fn [x]
@@ -961,7 +1015,6 @@
        (= (count x) 1) (first x)
        ))
    (partition-all 2 [:a 1 :b 2])))
-
 
 #_(f/eval-quotation
  [{:input
@@ -986,9 +1039,5 @@
     :patient f/swap
     [(f/change-at
       :doctors f/swap
-      [(f/unless* [#{}]) "123" f/adjoin])])
-   )
-
+      [(f/unless* [#{}]) "123" f/adjoin])]))
  {})
-
-#_(sci/eval-string "(+ 2 2 10)")
