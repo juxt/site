@@ -3,6 +3,7 @@
 (ns juxt.site.graphql.basic-test
   (:require
    [jsonista.core :as json]
+   [sci.core :as sci]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [clojure.java.io :as io]
    [juxt.book :as book]
@@ -897,29 +898,46 @@
     (with-resources resources
       (repl/ls)
       (f/eval-quotation
-       []
+       [{:patient "https://site.test/patients/001"
+         :doctor "https://site.test/doctors/001"}]
        `(
-         site/request-body-as-edn
-         (site/validate
-          [:map
-           [:patient [:re "https://site.test/patients/.*"]]
-           [:doctor [:re "https://site.test/doctors/.*"]]])
+         (site/with-fx-acc
+           [
+            ;; Validate arguments
+            (f/dip
+             [(site/validate
+               [:map
+                [:patient [:re "https://site.test/patients/.*"]]
+                [:doctor [:re "https://site.test/doctors/.*"]]])])
+
+            (f/set-at (f/dip [:input]))
+
+            (f/set-at (f/keep [(f/of :input) (f/of :patient) site/entity :patient]))
+
+            :patient f/swap [(f/set-at (f/keep [:bar :foo]))] f/change-at
+
+            ;;(f/keep [(f/change-at :patient f/swap [f/drop :ok]) :new-patient])
 
 
-         ;; More TODO...
+            #_(site/entity (f/of :patient))])
 
-         ;; A POST to a patient URL?
-         ;; What if there are a number of actions one can perform on a patient?
-         ;; A PATCH to a patient????
+         ;; The patient could be the resource undergoing a PATCH, where the
+         ;; PATCH body contains the doctor id.
+
+         ;; Or a GraphQL mutation where an action is called with the patient id
+         ;; and doctor id as arguments.
+
+         ;; It feels like this action needs to be given the arguments on its
+         ;; initial stack, rather than each action pull them into from EDN.
+
+         ;; However an action is called, let's always assume the action begins
+         ;; with arguments on its stack, as any quotation would. But
+         ;; conventionally, there is one argument: a map.
 
          )
 
-       {:juxt.site.alpha/received-representation
-        {:juxt.http.alpha/body
-         (.getBytes
-          (pr-str
-           {:patient "https://site.test/patients/001"
-            :doctor "https://site.test/doctors/001"}))}}))))
+       {::site/db (xt/db *xt-node*)
+        }))))
 
 #_(let [compiled-schema
         (->
@@ -943,3 +961,34 @@
        (= (count x) 1) (first x)
        ))
    (partition-all 2 [:a 1 :b 2])))
+
+
+#_(f/eval-quotation
+ [{:input
+   {:patient "https://site.test/patients/001",
+    :doctor "https://site.test/doctors/001"},
+   :patient
+   {:name "Terry Levine",
+    :juxt.http.alpha/content-type "application/json",
+    :juxt.http.alpha/content "{\"name\":\"Terry Levine\"}",
+    :juxt.site.alpha/type "https://site.test/types/patient",
+    :juxt.site.alpha/methods
+    {:get
+     #:juxt.pass.alpha{:actions #{"https://site.test/actions/get-patient"}},
+     :head
+     #:juxt.pass.alpha{:actions #{"https://site.test/actions/get-patient"}},
+     :options {}},
+    :xt/id "https://site.test/patients/001"
+    }
+   :juxt.site.alpha/fx []}]
+ `(
+   (f/change-at
+    :patient f/swap
+    [(f/change-at
+      :doctors f/swap
+      [(f/unless* [#{}]) "123" f/adjoin])])
+   )
+
+ {})
+
+#_(sci/eval-string "(+ 2 2 10)")

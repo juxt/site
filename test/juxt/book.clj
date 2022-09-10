@@ -1384,7 +1384,7 @@ Password: <input name=password type=password>
 
           (f/define ^{:f/stack-effect '[ctx key -- ctx]} update-base-resource
             [(f/dip
-              [(f/env ::site/resource) #_(site/entity (f/env ::site/resource))
+              [(f/env ::site/resource)
                (f/set-at (f/dip [f/dup (f/of :input) ::http/content]))
                (f/set-at (f/dip ["application/graphql" ::http/content-type]))
                (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))])

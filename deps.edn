@@ -77,6 +77,9 @@
 
         ;; Malli is used for authorization only
         metosin/malli {:mvn/version "0.8.9"}
+
+        ;; sci is used as a potential alternative to Flip
+        org.babashka/sci {:mvn/version "0.3.32"}
         }
 
  :aliases

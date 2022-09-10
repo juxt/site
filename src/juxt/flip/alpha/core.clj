@@ -170,6 +170,11 @@
                (clojure.core/list? seq) (clojure.core/concat seq [elt])) stack)
    queue env])
 
+(def adjoin 'juxt.flip.alpha.core/adjoin)
+(defmethod word 'juxt.flip.alpha.core/adjoin
+  [[elt set & stack] [_ & queue] env]
+  [(cc/cons (cc/conj set elt) stack) queue env])
+
 (def >list 'juxt.flip.alpha.core/>list)
 (defmethod word 'juxt.flip.alpha.core/>list
   [[sequence & stack] [_ & queue] env]
@@ -491,15 +496,29 @@
   [(clojure.core/cons (clojure.core/update assoc key (clojure.core/fnil conj []) value) stack)
    queue env])
 
+(defmethod word 'juxt.flip.alpha.core/change-at
+  [[quot assoc key & stack] [_ & queue] env]
+  [stack queue env]
+  (assert (map? assoc))
+  (let [new-assoc
+        (cc/update
+         assoc key
+         (fn [value]
+           (cc/first (eval-quotation [value] quot env))))]
+    ;; In deviation from
+    ;; https://docs.factorcode.org/content/word-change-at%2Cassocs.html, where
+    ;; assocs are mutable, we have to return the modified assoc on the stack.
+    [(cc/cons new-assoc stack) queue env]))
+
 #_(defmethod word 'juxt.pass.alpha/find-matching-identity-on-password-query
-  [[{:keys [username-in-identity-key password-hash-in-identity-key]} & stack]
-   [_ & queue] env]
-  [(cons {:find '[e]
-          :where [
-                  ['e username-in-identity-key 'username]
-                  ['e password-hash-in-identity-key 'password-hash]
-                  ['(crypto.password.bcrypt/check password password-hash)]]
-          :in '[username password]} stack) queue env])
+    [[{:keys [username-in-identity-key password-hash-in-identity-key]} & stack]
+     [_ & queue] env]
+    [(cons {:find '[e]
+            :where [
+                    ['e username-in-identity-key 'username]
+                    ['e password-hash-in-identity-key 'password-hash]
+                    ['(crypto.password.bcrypt/check password password-hash)]]
+            :in '[username password]} stack) queue env])
 
 (defmethod word 'juxt.pass.alpha/encrypt-password
   [[password & stack] [_ & queue] env]
