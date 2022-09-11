@@ -217,12 +217,15 @@
 
               (cond
                 arg-type                 ; not a LIST
-                (let [value (or
-                              ;; If provided we use it
-                              (get args arg-name)
-                              ;; Else we try to generate it
-                              (generate-value generator-args args)
-                              )
+                (let [value (let [v (get args arg-name)]
+                              (if (boolean? v) ;; Fixes issue with mutation of false booleans
+                                v
+                                (or
+                                 ;; If provided we use it
+                                 v
+                                 ;; Else we try to generate it
+                                 (generate-value generator-args args)
+                                 )))
                       value
                       (cond-> value
                         ;; We don't want symbols in XT entities, because this leaks the
@@ -239,6 +242,10 @@
                         transform transform)]
 
                   (cond
+                    ;; Fixes issue with mutation of false booleans
+                    (boolean? value)
+                    (assoc acc key value)
+
                     (or kw (scalar? arg-type types-by-name) (enum? arg-type types-by-name))
                     (assoc-some acc key value)
 
