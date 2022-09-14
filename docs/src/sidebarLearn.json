@@ -26,9 +26,14 @@
             {
               "title": "GraphQL Tutorial",
               "path": "/learn/graphql"
+            },
+            {
+              "title": "Kanban App Tutorial",
+              "path": "/learn/kanban-tutorials"
             }
           ]
         }
+        
       ]
     }
   ]
