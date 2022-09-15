@@ -14,11 +14,8 @@
             {
               "title": "Site Directive",
               "path": "/reference/graphql/site-directive"
-            },
-            {
-              "title": "Lambda Directive",
-              "path": "/reference/graphql/lambda-directive"
             }
+            
           ]
         },
         {

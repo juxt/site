@@ -11,13 +11,13 @@ The @site directive controls how site turns a graphql query into an XTDB query o
 The site directive does nothing by itself, it must be passed at least one of the following parameters.
 
 - [q](#q)
-- e
+- [e](#e)
 - [a](#a)
-- ref
-- history
-- mutation
-- resolver
-- each
+- [ref](#ref)
+- [each](#each)
+- [history](#history)
+- [mutation](#mutation)
+- [resolver](#resolver)
 - [itemForId](#itemForId)
 
 ### q (query) {/_q_/}

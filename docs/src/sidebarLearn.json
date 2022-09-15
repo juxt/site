@@ -19,21 +19,48 @@
               "title": "XTDB Primer",
               "path": "/learn/xtdb"
             },
-            {
-              "title": "Open API Tutorial",
-              "path": "/learn/openapi"
-            },
+            
             {
               "title": "GraphQL Tutorial",
               "path": "/learn/graphql"
+            }
+            
+          ]
+        },
+        {
+          "title": "Walkthrough: Build a Kanban API",
+          "path": "/learn/kanban",
+          "routes": [
+            {
+              "title": "Introduction",
+              "path": "/learn/kanban/kanban0"
             },
             {
-              "title": "Kanban App Tutorial",
-              "path": "/learn/kanban-tutorials"
+              "title": "Part 1: Exploring the InSite Console",
+              "path": "/learn/kanban/kanban1"
+            },
+            {
+              "title": "Part 2: Uploading A Schema",
+              "path": "/learn/kanban/kanban2"
+            },
+            {
+              "title": "Part 3: Extending the Schema",
+              "path": "/learn/kanban/kanban3"
+            },
+            {
+              "title": "Part 4: Querying the Data",
+              "path": "/learn/kanban/kanban4"
+            },
+            {
+              "title": "Part 5: Summary & Next Steps",
+              "path": "/learn/kanban/kanban5"
+            },
+            {
+              "title": "",
+              "path": "/learn/kanban/kanban-tutorials"
             }
           ]
         }
-        
       ]
     }
   ]
