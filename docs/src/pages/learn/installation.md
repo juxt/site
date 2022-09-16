@@ -36,6 +36,8 @@ cp site/etc/config.edn $HOME/.config/site/config.edn
 site/bin/site-server
 ```
 
+Run this in a new terminal to open a REPL for initialisation:
+
 ```bash
 rlwrap nc localhost 50505
 ```

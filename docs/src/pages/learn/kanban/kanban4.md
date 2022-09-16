@@ -19,7 +19,7 @@ Feel free to add more itemForId operations to query the data in ways you find us
 
 Site is based on an XTDB database system and therefore the **entire history** of your data is available to you (including, I'm afraid, the typos you thought you deleted earlier...) Updates to a document do not destroy its previous data, so auditing the history of your data or reviewing it at a certain point in time is possible (and with Site it's easy!)
 
-The **history** directive allows you to see all the changes to a given document. Say for example you updated the name of a card at some point:
+The [**history**](../../reference/graphql/site-directive#history) directive allows you to see all the changes to a given document. Say for example you updated the name of a card at some point:
 
   <img src="/images/ss9.png"/>
 
