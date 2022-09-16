@@ -27,34 +27,29 @@ And optional (but recommended):
 
 Getting a fresh Site instance is as simple as running the following:
 
-<PackageImport>
-
 ```bash
 git clone https://github.com/juxt/site
 mkdir -p $HOME/.config/site
 cp site/etc/config.edn $HOME/.config/site/config.edn
-#Change into Site repo:
-cd site
-git switch frontend-example
-#Start server:
-bin/site-dev
+site/bin/site-server
 ```
 
-Run this in a new terminal to connect a REPL for initialisation:
+Run in a new terminal to connect a REPL for initialisation:
 
 ```bash
-rlwrap nc localhost 50505
+#can use ncat, telnet, netcat, depending on your system
+rlwrap ncat localhost 50505
 ```
+
+In the REPL:
 
 ```clojure Site REPL
  ;; init! takes a username and password and creates
  ;; a superuser using those credentials as well as
  ;; initialising the rest of Site's core modules.
- ;; Check src/site/alpha/repl.clj for details
+ ;; Check src/juxt/site/alpha/repl.clj for details
 (init! "admin" "admin")
 ```
-
-</PackageImport>
 
 ## Optional Site Modules {/_exports_/}
 
