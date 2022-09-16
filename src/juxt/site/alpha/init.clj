@@ -121,6 +121,7 @@
      ::site/db (xt/db xt-node)
      ::pass/subject subject
      ::pass/action action
+     ::pass/action-input edn-arg
      ::site/base-uri (base-uri)
      ::site/received-representation
      {::http/content-type "application/edn"

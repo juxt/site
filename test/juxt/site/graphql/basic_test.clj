@@ -918,7 +918,7 @@
        {:patient "https://site.test/patients/001"
         :doctor "https://site.test/doctors/001"})
 
-      (repl/e "https://site.test/patients/001")
+      #_(repl/e "https://site.test/patients/001")
 
       #_(let [db (xt/db *xt-node*)
               opts {:namespaces

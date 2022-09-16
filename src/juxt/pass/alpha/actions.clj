@@ -3,6 +3,7 @@
 (ns juxt.pass.alpha.actions
   (:require
    [clojure.tools.logging :as log]
+   [sci.core :as sci]
    [malli.core :as malli]
    [malli.error :a me]
    [ring.util.codec :as codec]
@@ -294,6 +295,7 @@
   [xt-ctx
    {subject ::pass/subject
     action ::pass/action
+    action-input ::pass/action-input
     access-token ::pass/access-token
     resource ::site/resource
     purpose ::pass/purpose
@@ -342,24 +344,36 @@
                    ctx
                    ::site/db db
                    ::pass/permissions (map ::pass/permission check-permissions-result))
-              [{::site/keys [fx]}]
+              fx
               (cond
-                (::site/transact action-doc)
-                (let [quotation (-> action-doc ::site/transact ::flip/quotation)]
-                  (cond
-                    quotation (eval-quotation
-                               (reverse args) ; push the args to the stack
-                               quotation
-                               env)
-                    :else
-                    (throw (ex-info "Unsupported transact content" {::site/transact (::site/transact action-doc)}))))
+
+                ;; Official: sci
+                (-> action-doc ::site/transact :juxt.site.alpha.sci/program)
+                (sci/eval-string
+                 (-> action-doc ::site/transact :juxt.site.alpha.sci/program)
+                 {:namespaces
+                  {'user
+                   {'*input* action-input}
+                   'xt
+                   {'entity (fn [id] (xt/entity db id))}
+                   'malli
+                   {'validate (fn [schema value] (malli/validate schema value))}}})
+
+                ;; Deprecated: flip
+                (-> action-doc ::site/transact ::flip/quotation)
+                (let [[{::site/keys [fx]}]
+                      (eval-quotation
+                       (reverse args)   ; push the args to the stack
+                       (-> action-doc ::site/transact ::flip/quotation)
+                       env)]
+                  fx)
 
                 ;; There might be other strategies in the future (although the
                 ;; fewer the better really)
                 :else
                 (throw
                  (ex-info
-                  "Submitted actions should have a juxt.site.alpha/transact entry"
+                  "Submitted actions should have a valid juxt.site.alpha/transact entry"
                   {:action action-doc})))
 
               _ (log/infof "FX are %s" (pr-str fx))
