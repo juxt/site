@@ -24,7 +24,7 @@ The full schema for this tutorial is available [here](kanban/schema), but I woul
 
 This tutorial is designed to be an entry point for exploring Site's capabilities and therefore has minimal prerequisite knowledge. However, if at any point you're finding schemas, entities, requests, and directives turning to soup in your brain, I would recommend [Johanna Antonelli's presentation](https://www.youtube.com/watch?v=PZVYVAxbzmE) for reClojure 2021 which demonstrates how to build a slightly simpler GraphQL service using Site.
 
-We launch into our tutorial on the assumption that you already have Site running locally on your machine. Site set-up is not time consuming but it still deserves its [own instructions](/learn/installation). You need to have the GraphiQL, InSite, and SwaggerUI optional modules [installed as well](https://github.com/juxt/site/tree/master/opt).
+We launch into our tutorial on the assumption that you already have Site running locally on your machine. Site set-up is not time consuming but it still deserves its [own instructions](/learn/installation). You need to have the GraphiQL, InSite, and SwaggerUI optional modules installed as well. Navigate to site/opt in a terminal and run the [commands found here](https://github.com/juxt/site/tree/master/opt).
 
 Once you have the server running locally, head to [the InSite Console](https://tb-site-console.vercel.app/apis) (TODO permanent link to insite) and you are ready to begin.
 
