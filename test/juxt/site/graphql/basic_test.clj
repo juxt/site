@@ -951,6 +951,8 @@
 
       (repl/e "https://site.test/patients/001")
 
+      (repl/e "https://site.test/assignments/patient/001/doctor/001")
+
       )))
 
 #_(f/eval-quotation
