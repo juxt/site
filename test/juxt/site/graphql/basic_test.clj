@@ -599,7 +599,15 @@
          ;; Add some doctors
          (into
           (for [i (range 1 (inc 4))]
-            (format "https://site.test/doctors/%03d" i))))]
+            (format "https://site.test/doctors/%03d" i)))
+
+         (into
+          #{"https://site.test/assignments/patient/001/doctor/001"
+            "https://site.test/assignments/patient/002/doctor/001"
+            "https://site.test/assignments/patient/003/doctor/001"
+            "https://site.test/assignments/patient/004/doctor/002"
+            "https://site.test/assignments/patient/005/doctor/001"
+            "https://site.test/assignments/patient/005/doctor/002"}))]
 
     ;; Alice can read patients
 
@@ -879,81 +887,6 @@
 
         ))))
 
-
-;; Just adding assignments here
-
-(with-fixtures
-  (let  [resources
-         (->
-          #{::init/system
-
-            "https://site.test/login"
-            "https://site.test/user-identities/alice/basic"
-            "https://site.test/user-identities/bob/basic"
-
-            "https://site.test/oauth/authorize"
-            "https://site.test/session-scopes/oauth"
-            "https://site.test/permissions/alice-can-authorize"
-            "https://site.test/permissions/bob-can-authorize"
-            "https://site.test/applications/local-terminal"
-
-            "https://site.test/actions/get-patient"
-            "https://site.test/permissions/alice/get-any-patient"
-            "https://site.test/permissions/bob/get-patient/004"
-            "https://site.test/permissions/bob/get-patient/009"
-            "https://site.test/permissions/bob/get-patient/010"
-            "https://site.test/actions/list-patients"
-            "https://site.test/permissions/alice/list-patients"
-            "https://site.test/permissions/bob/list-patients"
-
-            "https://site.test/actions/register-patient-measurement"
-            "https://site.test/permissions/system/register-patient-measurement"
-
-            "https://site.test/patients"
-
-            "https://site.test/actions/read-any-measurement"
-            "https://site.test/permissions/alice/read-any-measurement"
-            "https://site.test/permissions/bob/read-any-measurement"
-
-            "https://site.test/actions/assign-doctor-to-patient"
-            "https://site.test/permissions/system/assign-doctor-to-patient"}
-
-          ;; Add some patients
-          (into
-           (for [i (range 1 (inc 20))]
-             (format "https://site.test/patients/%03d" i)))
-
-          ;; Add some doctors
-          (into
-           (for [i (range 1 (inc 4))]
-             (format "https://site.test/doctors/%03d" i)))
-
-          (into
-           #{"https://site.test/assignments/patient/001/doctor/001"})
-          )]
-
-    (with-resources resources
-      (repl/ls)
-
-      (init/do-action
-       "https://site.test/subjects/system"
-       "https://site.test/actions/assign-doctor-to-patient"
-       {:patient "https://site.test/patients/001"
-        :doctor "https://site.test/doctors/001"})
-
-      (repl/e "https://site.test/patients/001")
-
-      (init/do-action
-       "https://site.test/subjects/system"
-       "https://site.test/actions/assign-doctor-to-patient"
-       {:patient "https://site.test/patients/001"
-        :doctor "https://site.test/doctors/002"})
-
-      (repl/e "https://site.test/patients/001")
-
-      (repl/e "https://site.test/assignments/patient/001/doctor/001")
-
-      )))
 
 #_(f/eval-quotation
          [{:patient "https://site.test/patients/001"
