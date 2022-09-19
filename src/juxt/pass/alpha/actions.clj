@@ -346,18 +346,23 @@
                    ::pass/permissions (map ::pass/permission check-permissions-result))
               fx
               (cond
-
                 ;; Official: sci
                 (-> action-doc ::site/transact :juxt.site.alpha.sci/program)
-                (sci/eval-string
-                 (-> action-doc ::site/transact :juxt.site.alpha.sci/program)
-                 {:namespaces
-                  {'user
-                   {'*input* action-input}
-                   'xt
-                   {'entity (fn [id] (xt/entity db id))}
-                   'malli
-                   {'validate (fn [schema value] (malli/validate schema value))}}})
+                (try
+                  (sci/eval-string
+                   (-> action-doc ::site/transact :juxt.site.alpha.sci/program)
+                   {:namespaces
+                    {'user
+                     {'*input* action-input}
+                     'xt
+                     {'entity (fn [id] (xt/entity db id))}
+                     'malli
+                     {'validate (fn [schema value] (malli/validate schema value))}}})
+                  (catch clojure.lang.ExceptionInfo e
+                    ;; The sci.impl/callstack contains a volatile which isn't freezable.
+                    ;; Also, we want to unwrap the original cause exception.
+                    ;; Possibly, in future, we should get the callstack
+                    (throw (ex-info (.getMessage e) (or (ex-data (.getCause e)) {})))))
 
                 ;; Deprecated: flip
                 (-> action-doc ::site/transact ::flip/quotation)
@@ -485,7 +490,8 @@
 
 (defn do-action
   [{::site/keys [xt-node db base-uri resource]
-    ::pass/keys [subject action]
+    ;; TODO: Arguably action should passed as a map
+    ::pass/keys [subject action action-input]
     :as ctx}]
   (assert (::site/xt-node ctx) "xt-node must be present")
   (assert (::site/db ctx) "db must be present")
@@ -502,6 +508,19 @@
      (ex-info
       "Resource to do-action expected to be a map, or null"
       {::site/request-context ctx :resource resource})))
+
+  ;; This should be in the tx-fn but getting this malli exception: No
+  ;; implementation of method: :-form of protocol: #'malli.core/Schema found for
+  ;; class: clojure.lang.PersistentVector
+  (let [action (xt/entity db action)]
+    (when-let [input-schema (-> action ::site/transact :juxt.site.alpha.malli/input-schema)]
+      (when-not (malli/validate input-schema action-input)
+        (throw
+         (ex-info
+          "Input to action is not valid"
+          {:action (:xt/id action)
+           :explain (malli/explain input-schema action-input)})))))
+
 
   ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed
   ;; by an anonymous user.
@@ -525,7 +544,7 @@
              (format "%s/_site/action-log/%d" base-uri tx-id))]
         (if-let [error (::site/error result)]
           (do
-            (log/errorf "Transaction error: %s" (pr-str error))
+            (log/errorf "Transaction error: %s" error)
             (let [status (:ring.response/status (:ex-data error))]
               (throw
                (ex-info

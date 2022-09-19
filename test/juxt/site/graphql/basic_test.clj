@@ -136,11 +136,13 @@
       [:doctor [:re "https://site.test/doctors/.*"]]]
      :juxt.site.alpha.sci/program
      (pr-str
-      '[[:xtdb.api/put
-         (if-let [patient (xt/entity (:patient *input*))]
-           (update patient :doctor (fnil conj #{}) (:doctor *input*))
-           (throw (ex-info "No such patient" {:id (:patient *input*)})))]])}
-
+      '(let [[_ patient-id] (re-matches #"https://site.test/patients/(.*)" (:patient *input*))
+             [_ doctor-id] (re-matches #"https://site.test/doctors/(.*)" (:doctor *input*))
+             id (format "https://site.test/assignments/patient/%s/doctor/%s" patient-id doctor-id)]
+         [[:xtdb.api/put
+           {:xt/id id
+            :patient (:patient *input*)
+            :doctor (:doctor *input*)}]]))}
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
@@ -154,6 +156,13 @@
     :juxt.pass.alpha/subject "https://site.test/subjects/system"
     :juxt.pass.alpha/action "https://site.test/actions/assign-doctor-to-patient"
     :juxt.pass.alpha/purpose nil}))
+
+(defn assign-doctor-to-patient! [{:keys [patient doctor]}]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/assign-doctor-to-patient"
+   {:patient patient
+    :doctor doctor}))
 
 (defn create-action-get-patient! [_]
   (init/do-action
@@ -357,10 +366,13 @@
    "019" "Valarie Campos",
    "020" "Elisabeth Riddle"})
 
-(defn register-doctor! [{:keys [id params]}]
+(defn register-doctor! [{:keys [id params] :as arg1}]
   (let [subid (get params "id")
         name (get DOCTOR_NAMES subid)]
-    (assert name (format "No name found for id: %s" subid))
+    (when (nil? name)
+      (throw (ex-info "arg1" {:arg1 arg1}))
+      )
+    #_(assert name (format "No name found for id: %s" subid))
     (init/do-action
      "https://site.test/subjects/system"
      "https://site.test/actions/register-doctor"
@@ -431,13 +443,15 @@
     :deps #{::init/system}}
 
    "https://site.test/doctors/{id}"
-   {:create #'register-doctor!
+   {:create (fn [args]
+              (register-doctor! args))
     :deps #{::init/system
             "https://site.test/actions/register-doctor"
             "https://site.test/permissions/system/register-doctor"}}
 
    "https://site.test/patients/{pid}"
-   {:create #'register-patient!
+   {:create (fn [args]
+              (register-patient! args))
     :deps #{::init/system
             "https://site.test/actions/register-patient"
             "https://site.test/permissions/system/register-patient"}}
@@ -481,20 +495,18 @@
             ;; Always going to be application/json!
             jsonista.core/write-value-as-bytes
 
-
-
             #_(juxt.flip.alpha.core/case
-                ["application/json"
+                  ["application/json"
 
-                 ({:message "TODO: Style the stack in json format"})
+                   ({:message "TODO: Style the stack in json format"})
 
-                 ;; TODO: This is the 'default' branch, but very ugly and needs
-                 ;; improving
-                 (:content-type {} juxt.flip.alpha.core/set-at
-                                "Unsupported content-type"
-                                juxt.flip.alpha.core/swap
-                                juxt.flip.alpha.core/ex-info
-                                juxt.flip.alpha.core/throw-exception)])
+                   ;; TODO: This is the 'default' branch, but very ugly and needs
+                   ;; improving
+                   (:content-type {} juxt.flip.alpha.core/set-at
+                                  "Unsupported content-type"
+                                  juxt.flip.alpha.core/swap
+                                  juxt.flip.alpha.core/ex-info
+                                  juxt.flip.alpha.core/throw-exception)])
 
 
             )
@@ -518,7 +530,22 @@
    "https://site.test/permissions/system/assign-doctor-to-patient"
    {:create #'grant-permission-to-invoke-action-assign-doctor-to-patient!
     :deps #{::init/system}}
-   })
+
+   "https://site.test/assignments/patient/{pid}/doctor/{did}"
+   {:create (fn [{:keys [params]}]
+              (assign-doctor-to-patient!
+               {:patient (format "https://site.test/patients/%s" (get params "pid"))
+                :doctor (format "https://site.test/doctors/%s" (get params "did"))}))
+    :deps (fn [params _]
+            (when (nil? (get params "pid"))
+              (throw (ex-info "Bad params (pid)" {:params params})))
+            (when (nil? (get params "did"))
+              (throw (ex-info "Bad params (did)" {:params params})))
+            #{::init/system
+              (format "https://site.test/patients/%s" (get params "pid"))
+              (format "https://site.test/doctors/%s" (get params "did"))
+              "https://site.test/actions/assign-doctor-to-patient"
+              "https://site.test/permissions/system/assign-doctor-to-patient"})}})
 
 (defmacro with-resources [resources & body]
   `(do
@@ -791,16 +818,6 @@
              subject nil)
             )
 
-
-
-
-
-
-
-
-
-
-
         ;; See NHS National role-based access control (RBAC) for developers
         ;; "The database consists of:
         ;; Job Roles (‘R’ codes) - the set of roles that can be assigned to users, for example Clinical Practitioner (R8000)
@@ -863,6 +880,8 @@
         ))))
 
 
+;; Just adding assignments here
+
 (with-fixtures
   (let  [resources
          (->
@@ -907,7 +926,11 @@
           ;; Add some doctors
           (into
            (for [i (range 1 (inc 4))]
-             (format "https://site.test/doctors/%03d" i))))]
+             (format "https://site.test/doctors/%03d" i)))
+
+          (into
+           #{"https://site.test/assignments/patient/001/doctor/001"})
+          )]
 
     (with-resources resources
       (repl/ls)
@@ -928,37 +951,7 @@
 
       (repl/e "https://site.test/patients/001")
 
-      #_(let [db (xt/db *xt-node*)
-              opts {:namespaces
-                    {'user
-                     {'*input* {:patient "https://site.test/patients/001"
-                                :doctor "https://site.test/doctors/001"}}
-                     'xt
-                     {'entity (fn [id] (xt/entity db id))}
-
-                     'malli
-                     {'validate (fn [schema value] (malli/validate schema value))}}}]
-
-          (sci/eval-string
-           (pr-str
-
-            ;; TODO: Promote validation into action data so that *input* has an
-            ;; accessible schema definition as well as being validated prior to
-            ;; running the sci code.
-            '(assert
-              (malli/validate
-               [:map
-                [:patient [:re "https://site.test/patients/.*"]]
-                [:doctor [:re "https://site.test/doctors/.*"]]]
-               *input*)
-              "*input* is not valid")
-
-            '[[:xtdb.api.put
-               (if-let [patient (xt/entity (:patient *input*))]
-                 (update patient :doctor (fnil conj #{}) (:doctor *input*))
-                 (throw (ex-info "No such patient" {:id (:patient *input*)})))]])
-
-           opts)))))
+      )))
 
 #_(f/eval-quotation
          [{:patient "https://site.test/patients/001"
