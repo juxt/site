@@ -812,7 +812,7 @@
 
         #_(repl/e "https://site.test/patients/014")
 
-        (let [db (xt/db *xt-node*)
+        #_(let [db (xt/db *xt-node*)
                 {subject ::pass/subject}
                 (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
 
@@ -941,39 +941,3 @@
      "query { patients { name heartRate } }"
      compiled-schema
      db))
-
-#_(let [obj :c]
-  (some
-   (fn [x]
-     (cond
-       (and (= (count x) 2) (= (first x) obj))
-       (second x)
-       (= (count x) 1) (first x)
-       ))
-   (partition-all 2 [:a 1 :b 2])))
-
-#_(f/eval-quotation
- [{:input
-   {:patient "https://site.test/patients/001",
-    :doctor "https://site.test/doctors/001"},
-   :patient
-   {:name "Terry Levine",
-    :juxt.http.alpha/content-type "application/json",
-    :juxt.http.alpha/content "{\"name\":\"Terry Levine\"}",
-    :juxt.site.alpha/type "https://site.test/types/patient",
-    :juxt.site.alpha/methods
-    {:get
-     #:juxt.pass.alpha{:actions #{"https://site.test/actions/get-patient"}},
-     :head
-     #:juxt.pass.alpha{:actions #{"https://site.test/actions/get-patient"}},
-     :options {}},
-    :xt/id "https://site.test/patients/001"
-    }
-   :juxt.site.alpha/fx []}]
- `(
-   (f/change-at
-    :patient f/swap
-    [(f/change-at
-      :doctors f/swap
-      [(f/unless* [#{}]) "123" f/adjoin])]))
- {})
