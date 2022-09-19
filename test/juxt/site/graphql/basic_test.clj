@@ -136,7 +136,7 @@
       [:doctor [:re "https://site.test/doctors/.*"]]]
      :juxt.site.alpha.sci/program
      (pr-str
-      '[[:xtdb.api.put
+      '[[:xtdb.api/put
          (if-let [patient (xt/entity (:patient *input*))]
            (update patient :doctor (fnil conj #{}) (:doctor *input*))
            (throw (ex-info "No such patient" {:id (:patient *input*)})))]])}
@@ -918,7 +918,15 @@
        {:patient "https://site.test/patients/001"
         :doctor "https://site.test/doctors/001"})
 
-      #_(repl/e "https://site.test/patients/001")
+      (repl/e "https://site.test/patients/001")
+
+      (init/do-action
+       "https://site.test/subjects/system"
+       "https://site.test/actions/assign-doctor-to-patient"
+       {:patient "https://site.test/patients/001"
+        :doctor "https://site.test/doctors/002"})
+
+      (repl/e "https://site.test/patients/001")
 
       #_(let [db (xt/db *xt-node*)
               opts {:namespaces
