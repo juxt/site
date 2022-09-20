@@ -31,14 +31,15 @@ Getting a fresh Site instance is as simple as running the following:
 git clone https://github.com/juxt/site
 mkdir -p $HOME/.config/site
 cp site/etc/config.edn $HOME/.config/site/config.edn
-site/bin/site-server
+git switch fontend-example
+site/bin/site-dev
 ```
 
 Run in a new terminal to connect a REPL for initialisation:
 
 ```bash
 #can use ncat, telnet, netcat, depending on your system
-rlwrap ncat localhost 50505
+rlwrap ncat localhost 5510
 ```
 
 In the REPL:
@@ -48,7 +49,7 @@ In the REPL:
  ;; a superuser using those credentials as well as
  ;; initialising the rest of Site's core modules.
  ;; Check src/juxt/site/alpha/repl.clj for details
-(init! "admin" "admin")
+(init!)
 ```
 
 ## Optional Site Modules {/_exports_/}
