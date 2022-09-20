@@ -31,7 +31,8 @@ Getting a fresh Site instance is as simple as running the following:
 git clone https://github.com/juxt/site
 mkdir -p $HOME/.config/site
 cp site/etc/config.edn $HOME/.config/site/config.edn
-git switch fontend-example
+cd site
+git switch frontend-example
 site/bin/site-dev
 ```
 
@@ -39,7 +40,7 @@ Run in a new terminal to connect a REPL for initialisation:
 
 ```bash
 #can use ncat, telnet, netcat, depending on your system
-rlwrap ncat localhost 5510
+rlwrap ncat localhost 50505
 ```
 
 In the REPL:

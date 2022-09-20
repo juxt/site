@@ -2,10 +2,10 @@ To complete the functionality of our kanban schema, we need to add additional op
 
 - Return to the schema and create a mutation called deleteWorkflow. To delete an entity you only need to pass its ID as an argument. By default, Site mutations are ‘Create’ operations and will auto-generate a unique ID for the new document, but you can specify other types of mutation with directives - used for example in @site(mutation: "update") in updateWorkflow.
 - deleteWorkflow uses the same mutation directive and should look like this:
-  ```
+  ```graphql
         deleteWorkflow(id: ID!): Workflow @site(mutation: "delete")
   ```
-- Repeat these steps to write deleteWorkflowState, and while you're at it you might as well get ahead and write deleteCard.
+- Repeat these steps to write deleteWorkflowState.
 
 Save the schema in site/apis, refresh the console page, and you should now be able to use your delete mutations in the InSite console. (Now is an excellent time to clean up your data and remove those typoed practice entities you inevitably made earlier.)
 
@@ -100,7 +100,7 @@ type Card {
   }
   ```
 
-Save and return to InSite. Play around with your new type and operations to check that everything is running smoothly and you don't feel that any basic queries or mutations are missing.
+Save and return to InSite. Play around with your new type and operations to check that everything is running smoothly and you don't feel that any basic queries or mutations are missing (perhaps deleteCard?).
 
 You may find more update operations helpul while you get the hang of things.
 When querying for a type, experiment with returning the details of other document types linked to yours:

@@ -19,15 +19,19 @@ Feel free to add more itemForId operations to query the data in ways you find us
 
 Site is based on an XTDB database system and therefore the **entire history** of your data is available to you (including, I'm afraid, the typos you thought you deleted earlier...) Updates to a document do not destroy its previous data, so auditing the history of your data or reviewing it at a certain point in time is possible (and with Site it's easy!)
 
-The [**history**](../../reference/graphql/site-directive#history) directive allows you to see all the changes to a given document. Say for example you updated the name of a card at some point:
+The [**history**](../../reference/graphql/site-directive#history) directive allows you to see all the changes to a given document. Say for example you updated the name of a card at some point, you can add the query:
+
+```graphql
+cardHistory(id: ID!): [Card] @site(history: "desc")
+```
+
+When this query is run, Site returns a list of Cards which represent the document at every iteration:
 
   <img src="/images/ss9.png"/>
 
-- Site returns a list of Cards which represent the document at every iteration.
-
 A list like this is all well and good, but you need to know _when_ a cat walked across your keyboard and turned "Deliver Prototype" into "cknkalielmkl.nm,cne". Without a timestamp to cross reference with your home security cameras, how will you be able to tell _which_ pet is the culprit?
 
-We can add the inbuilt fields \_siteCreatedAt and \_siteValidTime to our Card type to easily access the temporal power of XTDB.
+We can add the fields \_siteCreatedAt: String and \_siteValidTime: String to our Card type to easily access the temporal power of XTDB via Site's inbuilt \_site fields.
 
 <img src="/images/ss10.png"/>
 

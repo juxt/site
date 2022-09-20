@@ -8,7 +8,9 @@ We are going to be using a GraphQL schema as the structure for our application, 
 <img src="/images/ss2.png"/>
 
 On the left you should be able to see the operations used by Site itself (<em>how meta</em>)
-<img src="/images/ss3.png"/>
+<img src="/images/ss3.1.png"/>
 
-- Click on the >allUsers query, select id and username to return, hit play to run the query and ta-dah! You should see your own user details appear on the right.
-- Queries can also be passed arguments: click >user on the left to add it to your query and input your username in the pink quotes. Choose name to return and run the query as before. You've just queried Site for a list of all users and for a specific user's full name based on their username. At the moment your results may be short and relatively uninteresting, but in the next section we will start creating our own schema for storing, mutating, and querying data beyond your wildest (productivity-app-based) dreams...
+- Click on the >apis query, select type and id to return, hit play to run the query and ta-dah! You should see the same APIs listed that were visible on the landing page.
+- Queries can also be passed arguments: click >request on the left to add it to your query and you can see where you will be able to input a request ID to return its details. To find an ID to test, run the requests query returning summaries -> id. However, you might not get any IDs returned yet as your Site instance is fresh as a daisy.
+
+- At the moment your query results may be short and relatively uninteresting, but in the next section we will start creating our own schema for storing, mutating, and querying data beyond your wildest (productivity-app-based) dreams...

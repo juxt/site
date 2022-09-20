@@ -70,7 +70,7 @@ As before we can see the queries on the left, but querying for allWorkflows won'
 - createWorkflow -> enter a name and return the name and ID (we will need this ID later so use the Query Variables panel to record it).
 - Query allWorkflows you should see your shiny new Workflow!
 
-- Repeat these steps and create a WorkflowState named "To Do" (or whatever you fancy)
+- Repeat these steps for createWorkflowState to create a WorkflowState named "To Do" (or whatever you fancy)
 - We can use updateWorkflow to add our state to our Workflow using the IDs we saved previously
   <img src="/images/ss6.png"/>
   <em>Note that workflowStateIds need to be in an array</em>

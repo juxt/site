@@ -18,7 +18,7 @@ You can also [play with this kanban board](https://hire.juxt.site/) live.
 
 In this tutorial we will be using Site's packaged InSite GraphQL console to visualise our API as it develops, but Site is (#Wording standardised? a good web citizen?) so feel free to use another explorer if you fancy.
 
-The full schema for this tutorial is available [here](kanban/schema), but I would highly recommend leaving that tantalising box unopened for now in order to derive the most benefit (and understanding) from the step-by-step approach we'll take below.
+The full schema for this tutorial is available [here](schema), but I would highly recommend leaving that tantalising box unopened for now in order to derive the most benefit (and understanding) from the step-by-step approach we'll take below.
 
 ## Preface
 
