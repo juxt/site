@@ -780,6 +780,7 @@
                  ]
 
                 compile-eql
+                ;; This function compiles an annotated EQL query to an XTDB/Core1 query
                 (fn compile-eql [ctx eql]
                   (let [action-id (::pass/action (meta eql))
                         _ (assert action-id "Action must be specified on metadata")
