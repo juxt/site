@@ -666,7 +666,9 @@
             "https://site.test/assignments/patient/003/doctor/001"
             "https://site.test/assignments/patient/004/doctor/002"
             "https://site.test/assignments/patient/005/doctor/001"
-            "https://site.test/assignments/patient/005/doctor/002"}))]
+            "https://site.test/assignments/patient/005/doctor/002"
+            "https://site.test/assignments/patient/006/doctor/003"
+            "https://site.test/assignments/patient/010/doctor/003"}))]
 
     ;; Alice can read patients
 
@@ -920,16 +922,21 @@
                  ::site/type
                  {:patients
                   ^{::pass/action "https://site.test/actions/get-patient"}
-                  [:xt/id :name ::site/type]}]
+                  [:xt/id
+                   :name
+                   ::site/type
+                   {:measurements
+                    ^{::pass/action "https://site.test/actions/read-any-measurement"}
+                    [:reading]}]}]
 
-                q (compile-eql {:depth 0} #_list-patients-eql join-doctors-to-their-patients-eql)]
+                q (compile-eql #_list-patients-eql join-doctors-to-their-patients-eql)]
 
             q
 
             (->>
-               (xt/q db q subject nil)
-               ;; Declutter result tree
-               (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))))
+             (xt/q db q subject nil)
+             ;; Declutter result tree
+             (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))))
 
         ;; type Doctor {
         ;;   id ID
