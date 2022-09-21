@@ -346,6 +346,29 @@
     :juxt.pass.alpha/purpose nil
     }))
 
+(defn create-action-get-doctor! [_]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/create-action"
+   {:xt/id "https://site.test/actions/get-doctor"
+
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? subject resource permission)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]
+       [resource :juxt.site.alpha/type "https://site.test/types/doctor"]]
+      ]}))
+
+(defn grant-permission-to-get-doctor! [username]
+  (init/do-action
+   "https://site.test/subjects/system"
+   "https://site.test/actions/grant-permission"
+   {:xt/id (format "https://site.test/permissions/%s/get-doctor" username)
+    :juxt.pass.alpha/action "https://site.test/actions/get-doctor"
+    :juxt.pass.alpha/user (format "https://site.test/users/%s" username)
+    :juxt.pass.alpha/purpose nil}))
 
 (def DOCTOR_NAMES
   {"001" "Dr. Conway"
@@ -428,6 +451,10 @@
    {:create #'create-action-get-patient!
     :deps #{::init/system}}
 
+   "https://site.test/actions/get-doctor"
+   {:create #'create-action-get-doctor!
+    :deps #{::init/system}}
+
    "https://site.test/permissions/{username}/get-any-patient"
    {:create (fn [{:keys [params]}]
               (grant-permission-to-get-any-patient! (get params "username")))
@@ -449,6 +476,11 @@
 
    "https://site.test/permissions/system/register-patient-measurement"
    {:create #'grant-permission-to-invoke-action-register-patient-measurement!
+    :deps #{::init/system}}
+
+   "https://site.test/permissions/{username}/get-doctor"
+   {:create (fn [{:keys [params]}]
+              (grant-permission-to-get-doctor! (get params "username")))
     :deps #{::init/system}}
 
    "https://site.test/doctors/{id}"
@@ -575,11 +607,13 @@
            "https://site.test/login"
            "https://site.test/user-identities/alice/basic"
            "https://site.test/user-identities/bob/basic"
+           "https://site.test/user-identities/carlos/basic"
 
            "https://site.test/oauth/authorize"
            "https://site.test/session-scopes/oauth"
            "https://site.test/permissions/alice-can-authorize"
            "https://site.test/permissions/bob-can-authorize"
+           "https://site.test/permissions/carlos-can-authorize"
            "https://site.test/applications/local-terminal"
 
            "https://site.test/actions/get-patient"
@@ -593,6 +627,10 @@
 
            "https://site.test/actions/register-patient-measurement"
            "https://site.test/permissions/system/register-patient-measurement"
+
+           "https://site.test/actions/get-doctor"
+           "https://site.test/permissions/alice/get-doctor"
+           "https://site.test/permissions/bob/get-doctor"
 
            "https://site.test/patients"
 
@@ -665,7 +703,19 @@
              "client_id" "local-terminal"
              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
              )
-            _ (is (nil? error) (format "OAuth2 grant error: %s" error))]
+            _ (is (nil? error) (format "OAuth2 grant error: %s" error))
+
+            carlos-session-id (book/login-with-form! {"username" "carlos" "password" "toothpick"})
+            {carlos-access-token "access_token"
+             error "error"}
+            (book/authorize!
+             :session-id carlos-session-id
+             "client_id" "local-terminal"
+             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+             )
+            _ (is (nil? error) (format "OAuth2 grant error: %s" error))
+
+            ]
 
         ;; Add a /patient/XXX resource to serve an individual patient.
 
@@ -824,6 +874,7 @@
                 '^{::pass/action "https://site.test/actions/get-patient"}
                 [:xt/id
                  :name
+                 ::site/type
                  {:measurements
                   ^{::pass/action "https://site.test/actions/read-any-measurement"}
                   [:reading]}]
@@ -831,16 +882,18 @@
                 join-doctors-to-their-patients-eql
                 '^{::pass/action "https://site.test/actions/get-doctor"}
                 [:xt/id
-                 ;;:name
-                 #_{:measurements
-                  ^{::pass/action "https://site.test/actions/read-any-measurement"}
-                  [:reading]}]
+                 :name
+                 ::site/type
+                 {:patients
+                  ^{::pass/action "https://site.test/actions/get-patient"}
+                  [:xt/id :name ::site/type
+                   ]}]
 
                 q (compile-eql {} #_list-patients-eql join-doctors-to-their-patients-eql)]
 
             q
 
-            #_(->>
+            (->>
              (xt/q db q subject nil)
              ;; Declutter result tree
              (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))))

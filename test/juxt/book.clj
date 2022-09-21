@@ -1887,7 +1887,8 @@ Password: <input name=password type=password>
                  {::pass/username username
                   ::pass/password (case username
                                     "alice" "garden"
-                                    "bob" "walrus")
+                                    "bob" "walrus"
+                                    "carlos" "toothpick")
                   ::pass/realm "Wonderland"})))
     :deps (fn [{:strs [username]} {::site/keys [base-uri]}]
             #{::init/system
