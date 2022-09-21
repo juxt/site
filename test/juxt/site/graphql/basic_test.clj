@@ -171,11 +171,6 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/get-patient"
 
-    :juxt.pass.alpha/filters
-    #{:contexts {"https://site.test/types/doctor"
-                 '[[$e :doctor $parent]]}
-      :args {:gender '[[$e :gender $arg-value]]}}
-
     :juxt.pass.alpha/rules
     '[
       ;; TODO: Performance tweak: put [subject] to hint that subject is always
@@ -325,6 +320,12 @@
    "https://site.test/subjects/system"
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/read-any-measurement"
+
+    :juxt.pass.alpha/contexts
+    {"https://site.test/actions/get-patient"
+     {:where-clauses-to-add '[[e :patient parent]
+                              [e ::site/type "https://site.test/types/measurement"]]}}
+
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
@@ -780,9 +781,15 @@
 
                 compile-eql
                 (fn compile-eql [ctx eql]
-                  (let [action (::pass/action (meta eql))
-                        rules (actions/actions->rules db #{action})]
-                    (assert action "Action must be specified on metadata")
+                  (let [action-id (::pass/action (meta eql))
+                        _ (assert action-id "Action must be specified on metadata")
+                        rules (actions/actions->rules db #{action-id})
+                        action (xt/entity db action-id)
+                        parent-action (::pass/action ctx)
+                        where-clauses-to-add
+                        (when-let [parent-action-id (:xt/id parent-action)]
+                          (get-in action [::pass/contexts parent-action-id :where-clauses-to-add]))]
+
                     (reduce
                      (fn [acc prop]
                        (cond
@@ -792,22 +799,26 @@
                          (let [[join-k eql] (first prop)]
                            (-> acc
                                (update-in [:find 1] assoc join-k (symbol (name join-k)))
-                               (update :where conj [`(~'q ~(compile-eql {} eql) ~'e ~'subject ~'purpose) (symbol (name join-k))])))
+                               (update :where conj [`(~'q ~(compile-eql {::pass/action action} eql) ~'e ~'subject ~'purpose) (symbol (name join-k))])))
                          :else acc))
                      `{:find [(~'pull ~'e []) {}]
                        :keys [~'root ~'joins]
                        :where ~(cond->
-                                   `[[~'action :xt/id ~action]
+                                   `[[~'action :xt/id ~action-id]
                                      ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
                                      ~'[permission ::pass/action action]
                                      ~'[permission ::pass/purpose purpose]
                                      ~'(allowed? subject e permission)]
-                                   ctx (conj ['e :patient 'parent] ['e ::site/type "https://site.test/types/measurement"]))
+                                   where-clauses-to-add (-> (concat where-clauses-to-add) vec))
                        :rules ~rules
-                       :in ~(if ctx '[parent subject purpose] '[subject purpose])}
+                       :in ~(if parent-action '[parent subject purpose] '[subject purpose])
+                       ;;:_where-clauses-to-add ~where-clauses-to-add
+                       ;;:_parent-action ~parent-action
+                       ;;:_action ~action
+                       }
                      eql)))
 
-                q (compile-eql nil eql)]
+                q (compile-eql {} eql)]
 
             q
 
