@@ -767,8 +767,6 @@
         ;; Metadata attributed to the EQL contains actions.
         ;; The EQL could be the target of the compilation of a GraphQL query.
 
-
-
         (let [db (xt/db *xt-node*)
               {subject ::pass/subject}
               (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
@@ -788,18 +786,18 @@
               ~'(allowed? subject e permission)
 
               ;; join
-              [(~'q {:find ~'[(pull measurement [:reading])]
+              [(~'q {:find ~'[(pull e [:reading])]
                      :keys ~'[node]
                      :where
                      ~'[
-                        [measurement :patient parent]
-                        [measurement ::site/type "https://site.test/types/measurement"]
+                        [e :patient parent]
+                        [e ::site/type "https://site.test/types/measurement"]
 
                         [action :xt/id "https://site.test/actions/read-any-measurement"]
                         [permission ::site/type "https://meta.juxt.site/pass/permission"]
                         [permission ::pass/action action]
                         [permission ::pass/purpose purpose]
-                        (allowed? subject measurement permission)
+                        (allowed? subject e permission)
                         ]
                      :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
                      :in ~'[parent subject]}
