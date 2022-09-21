@@ -913,8 +913,18 @@
                 ;; The actions are associated with EQL properties using
                 ;; metadata.
 
-                ;; These actions limit the visibility of the data according to
-                ;; their rules.
+                ;; Actions are where 'Form' is defined. Or, more precisely,
+                ;; actions are where 'Form' and 'Code' meet.
+
+                ;; An action defines the mapping from the Data to the Form (a
+                ;; view of the data that best suits a given domain or
+                ;; application context).
+
+                ;; Additionally, actions define access controls that restrict
+                ;; who can see what.
+
+                ;; The data processing activities of a system are entirely
+                ;; expressable in terms of actions.
 
                 list-patients-eql
                 '^{::pass/action "https://site.test/actions/get-patient"}
@@ -935,9 +945,12 @@
                   [:xt/id
                    :name
                    ::site/type
-                   {:measurements
+                   {:readings
                     ^{::pass/action "https://site.test/actions/read-any-measurement"}
                     [:reading]}]}]
+
+                ;; TODO: Get a particular doctor, by id
+                ;; Use EQL parameters for this
 
                 q (compile-eql #_list-patients-eql join-doctors-to-their-patients-eql)]
 
@@ -946,12 +959,9 @@
             (->>
              (xt/q db q subject nil)
              ;; Declutter result tree
-             (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))))
+             (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))
 
-        ;; type Doctor {
-        ;;   id ID
-        ;;   patients(gender: String, costBasis: String): [Patient] @site(action: "https://site.test/actions/list-patients" join: "primary-doctor")
-        ;; }
+            ))
 
 
         ;; Modelling ideas
