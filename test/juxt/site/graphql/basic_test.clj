@@ -838,69 +838,71 @@
 
           (let [compile-eql
                 ;; This function compiles an annotated EQL query to an XTDB/Core1 query
-                (fn compile-eql [ctx eql]
-                  (assert (map? ctx))
-                  (assert (number? (:depth ctx)))
-                  (let [depth (:depth ctx)
-                        action-id (::pass/action (meta eql))
-                        _ (assert action-id "Action must be specified on metadata")
-                        action (xt/entity db action-id)
-                        _ (assert action (format "Action not found: %s" action-id))
-                        rules (actions/actions->rules db #{action-id})
-                        _ (assert (seq rules) (format "No rules found for action %s" action-id))
+                (fn compile-eql
+                  ([eql] (compile-eql {:depth 0} eql))
+                  ([ctx eql]
+                   (assert (map? ctx))
+                   (assert (number? (:depth ctx)))
+                   (let [depth (:depth ctx)
+                         action-id (::pass/action (meta eql))
+                         _ (assert action-id "Action must be specified on metadata")
+                         action (xt/entity db action-id)
+                         _ (assert action (format "Action not found: %s" action-id))
+                         rules (actions/actions->rules db #{action-id})
+                         _ (assert (seq rules) (format "No rules found for action %s" action-id))
 
-                        ;; We need to rename these rules so they don't conflict
-                        ;; with the rules in the parent
-                        rules2 (mapv (fn [rule]
-                                       (update rule 0 #(apply list (cons 'n2/allowed? (rest %))))
-                                       ) rules)
+                         ;; We need to rename these rules so they don't conflict
+                         ;; with the rules in the parent
+                         rules2 (mapv (fn [rule]
+                                        (update rule 0 #(apply list (cons 'n2/allowed? (rest %))))
+                                        ) rules)
 
-                        parent-action (::pass/action ctx)
-                        additional-where-clauses
-                        (when-let [parent-action-id (:xt/id parent-action)]
-                          (get-in action [::pass/contexts parent-action-id :additional-where-clauses]))]
+                         parent-action (::pass/action ctx)
+                         additional-where-clauses
+                         (when-let [parent-action-id (:xt/id parent-action)]
+                           (get-in action [::pass/contexts parent-action-id :additional-where-clauses]))]
 
-                    (reduce
-                     (fn [acc prop]
-                       (cond
-                         (keyword? prop)
-                         (update-in acc [:find 0] #(list 'pull (if parent-action 'e 'e) (conj (last %) prop)))
-                         (map? prop)
-                         (let [[join-k eql] (first prop)]
-                           (-> acc
-                               (update-in [:find 1] (fnil assoc {}) join-k (symbol (name join-k)))
-                               (assoc :keys '[root joins])
-                               (update :where conj [`(~'q ; sub-query
-                                                      ~(compile-eql
-                                                        (-> ctx
-                                                            (assoc ::pass/action action)
-                                                            (update :depth inc))
-                                                        eql)
-                                                      ~'e ; e becomes the parent
-                                                      ~'subject
-                                                      ~'purpose)
-                                                    (symbol (name join-k))])))
-                         :else acc))
-                     `{:find [(~'pull ~(if parent-action 'e 'e) [])]
-                       :keys [~'root]
-                       :where
-                       ~(cond-> `[[~'action :xt/id ~action-id]
-                                  ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
-                                  ~'[permission ::pass/action action]
-                                  ~'[permission ::pass/purpose purpose]
-                                  ;; We must rename 'allowed?' here because we
-                                  ;; cannot allow rules from parent queries to
-                                  ;; affect rules from sub-queries. In other
-                                  ;; words, sub-queries must be completely
-                                  ;; isolated.
-                                  ~(list (symbol (str "depth" depth) "allowed?") 'subject (if parent-action 'e 'e) 'permission)]
-                          additional-where-clauses (-> (concat additional-where-clauses) vec))
-                       :rules ~(mapv (fn [rule]
-                                       (update rule 0 #(apply list (cons (symbol (str "depth" depth) "allowed?") (rest %))))
-                                       ) rules)
-                       :in ~(if parent-action '[parent subject purpose] '[subject purpose])}
+                     (reduce
+                      (fn [acc prop]
+                        (cond
+                          (keyword? prop)
+                          (update-in acc [:find 0] #(list 'pull (if parent-action 'e 'e) (conj (last %) prop)))
+                          (map? prop)
+                          (let [[join-k eql] (first prop)]
+                            (-> acc
+                                (update-in [:find 1] (fnil assoc {}) join-k (symbol (name join-k)))
+                                (assoc :keys '[root joins])
+                                (update :where conj [`(~'q ; sub-query
+                                                       ~(compile-eql
+                                                         (-> ctx
+                                                             (assoc ::pass/action action)
+                                                             (update :depth inc))
+                                                         eql)
+                                                       ~'e ; e becomes the parent
+                                                       ~'subject
+                                                       ~'purpose)
+                                                     (symbol (name join-k))])))
+                          :else acc))
+                      `{:find [(~'pull ~(if parent-action 'e 'e) [])]
+                        :keys [~'root]
+                        :where
+                        ~(cond-> `[[~'action :xt/id ~action-id]
+                                   ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
+                                   ~'[permission ::pass/action action]
+                                   ~'[permission ::pass/purpose purpose]
+                                   ;; We must rename 'allowed?' here because we
+                                   ;; cannot allow rules from parent queries to
+                                   ;; affect rules from sub-queries. In other
+                                   ;; words, sub-queries must be completely
+                                   ;; isolated.
+                                   ~(list (symbol (str "depth" depth) "allowed?") 'subject (if parent-action 'e 'e) 'permission)]
+                           additional-where-clauses (-> (concat additional-where-clauses) vec))
+                        :rules ~(mapv (fn [rule]
+                                        (update rule 0 #(apply list (cons (symbol (str "depth" depth) "allowed?") (rest %))))
+                                        ) rules)
+                        :in ~(if parent-action '[parent subject purpose] '[subject purpose])}
 
-                     eql)))
+                      eql))))
 
                 list-patients-eql
                 '^{::pass/action "https://site.test/actions/get-patient"}
