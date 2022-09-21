@@ -803,7 +803,13 @@
                          (let [[join-k eql] (first prop)]
                            (-> acc
                                (update-in [:find 1] assoc join-k (symbol (name join-k)))
-                               (update :where conj [`(~'q ~(compile-eql {::pass/action action} eql) ~'e ~'subject ~'purpose) (symbol (name join-k))])))
+                               (update :where conj [`(~'q ; sub-query
+                                                      ~(compile-eql
+                                                        {::pass/action action} eql)
+                                                      ~'e ; e becomes the parent
+                                                      ~'subject
+                                                      ~'purpose)
+                                                    (symbol (name join-k))])))
                          :else acc))
                      `{:find [(~'pull ~'e []) {}]
                        :keys [~'root ~'joins]
