@@ -839,7 +839,10 @@
           (let [compile-eql
                 ;; This function compiles an annotated EQL query to an XTDB/Core1 query
                 (fn compile-eql [ctx eql]
-                  (let [action-id (::pass/action (meta eql))
+                  (assert (map? ctx))
+                  (assert (number? (:depth ctx)))
+                  (let [depth (:depth ctx)
+                        action-id (::pass/action (meta eql))
                         _ (assert action-id "Action must be specified on metadata")
                         action (xt/entity db action-id)
                         _ (assert action (format "Action not found: %s" action-id))
@@ -849,7 +852,7 @@
                         ;; We need to rename these rules so they don't conflict
                         ;; with the rules in the parent
                         rules2 (mapv (fn [rule]
-                                       (update rule 0 #(apply list (cons 'inner-allowed? (rest %))))
+                                       (update rule 0 #(apply list (cons 'n2/allowed? (rest %))))
                                        ) rules)
 
                         parent-action (::pass/action ctx)
@@ -869,7 +872,10 @@
                                (assoc :keys '[root joins])
                                (update :where conj [`(~'q ; sub-query
                                                       ~(compile-eql
-                                                        {::pass/action action} eql)
+                                                        (-> ctx
+                                                            (assoc ::pass/action action)
+                                                            (update :depth inc))
+                                                        eql)
                                                       ~'e ; e becomes the parent
                                                       ~'subject
                                                       ~'purpose)
@@ -877,14 +883,21 @@
                          :else acc))
                      `{:find [(~'pull ~(if parent-action 'e 'e) [])]
                        :keys [~'root]
-                       :where ~(cond->
-                                   `[[~'action :xt/id ~action-id]
-                                     ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
-                                     ~'[permission ::pass/action action]
-                                     ~'[permission ::pass/purpose purpose]
-                                     ~(list (if parent-action 'inner-allowed? 'allowed?) 'subject (if parent-action 'e 'e) 'permission)]
-                                   additional-where-clauses (-> (concat additional-where-clauses) vec))
-                       :rules ~(if parent-action rules2 rules)
+                       :where
+                       ~(cond-> `[[~'action :xt/id ~action-id]
+                                  ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
+                                  ~'[permission ::pass/action action]
+                                  ~'[permission ::pass/purpose purpose]
+                                  ;; We must rename 'allowed?' here because we
+                                  ;; cannot allow rules from parent queries to
+                                  ;; affect rules from sub-queries. In other
+                                  ;; words, sub-queries must be completely
+                                  ;; isolated.
+                                  ~(list (symbol (str "depth" depth) "allowed?") 'subject (if parent-action 'e 'e) 'permission)]
+                          additional-where-clauses (-> (concat additional-where-clauses) vec))
+                       :rules ~(mapv (fn [rule]
+                                       (update rule 0 #(apply list (cons (symbol (str "depth" depth) "allowed?") (rest %))))
+                                       ) rules)
                        :in ~(if parent-action '[parent subject purpose] '[subject purpose])}
 
                      eql)))
@@ -905,15 +918,14 @@
                  ::site/type
                  {:patients
                   ^{::pass/action "https://site.test/actions/get-patient"}
-                  [:xt/id :name ::site/type
-                   ]}]
+                  [:xt/id :name ::site/type]}]
 
-                q (compile-eql {} #_list-patients-eql join-doctors-to-their-patients-eql)]
+                q (compile-eql {:depth 0} #_list-patients-eql join-doctors-to-their-patients-eql)]
 
             q
 
             (->>
-             (xt/q db q subject nil)
+               (xt/q db q subject nil)
                ;; Declutter result tree
                (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))))
 
