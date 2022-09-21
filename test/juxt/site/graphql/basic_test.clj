@@ -990,14 +990,14 @@
                     ;; parallel. For now, we just run the first query.
                     (compile-ast
                      (eql/query->ast
-                      #_list-patients-eql
+                      list-patients-eql
                       #_join-doctors-to-their-patients-eql
-                      search-doctor-eql)))]
+                      #_search-doctor-eql)))]
 
             q1
 
             (->>
-             (xt/q db q1 alice nil)
+             (xt/q db q1 bob nil)
              ;; Declutter result tree
              (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))
 
