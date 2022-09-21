@@ -143,7 +143,8 @@
          [[:xtdb.api/put
            {:xt/id id
             :patient (:patient *input*)
-            :doctor (:doctor *input*)}]]))}
+            :doctor (:doctor *input*)
+            ::site/type "ASSIGNMENT"}]]))}
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
@@ -170,6 +171,13 @@
    "https://site.test/subjects/system"
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/get-patient"
+
+    :juxt.pass.alpha/contexts
+    {"https://site.test/actions/get-doctor"
+     {:additional-where-clauses
+      '[[ass ::site/type "ASSIGNMENT"]
+        [ass :patient e]
+        [ass :doctor parent]]}}
 
     :juxt.pass.alpha/rules
     '[
@@ -853,7 +861,7 @@
                      (fn [acc prop]
                        (cond
                          (keyword? prop)
-                         (update-in acc [:find 0] #(list 'pull (if parent-action 'e2 'e) (conj (last %) prop)))
+                         (update-in acc [:find 0] #(list 'pull (if parent-action 'e 'e) (conj (last %) prop)))
                          (map? prop)
                          (let [[join-k eql] (first prop)]
                            (-> acc
@@ -867,14 +875,14 @@
                                                       ~'purpose)
                                                     (symbol (name join-k))])))
                          :else acc))
-                     `{:find [(~'pull ~(if parent-action 'e2 'e) [])]
+                     `{:find [(~'pull ~(if parent-action 'e 'e) [])]
                        :keys [~'root]
                        :where ~(cond->
                                    `[[~'action :xt/id ~action-id]
                                      ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
                                      ~'[permission ::pass/action action]
                                      ~'[permission ::pass/purpose purpose]
-                                     ~(list (if parent-action 'inner-allowed? 'allowed?) 'subject (if parent-action 'e2 'e) 'permission)]
+                                     ~(list (if parent-action 'inner-allowed? 'allowed?) 'subject (if parent-action 'e 'e) 'permission)]
                                    additional-where-clauses (-> (concat additional-where-clauses) vec))
                        :rules ~(if parent-action rules2 rules)
                        :in ~(if parent-action '[parent subject purpose] '[subject purpose])}
