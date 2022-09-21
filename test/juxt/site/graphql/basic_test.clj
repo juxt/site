@@ -362,8 +362,14 @@
    {:xt/id "https://site.test/actions/get-doctor"
 
     :juxt.pass.alpha/params
-    {:search {:juxt.pass.alpha/additional-where-clauses
-               '[[e :name $]]}}
+    {:search
+     {:juxt.pass.alpha/additional-where-clauses
+      '[[e :name doctor-name]
+        [(re-seq pat doctor-name)]
+        ;; Case-insensitive search
+        [(str "(?i:" $ ")") regex]
+        [(re-pattern regex) pat]
+        ]}}
 
     :juxt.pass.alpha/rules
     '[
@@ -384,7 +390,7 @@
     :juxt.pass.alpha/purpose nil}))
 
 (def DOCTOR_NAMES
-  {"001" "Dr. Conway"
+  {"001" "Dr. Jack Conway"
    "002" "Dr. Murillo"
    "003" "Dr. Jackson"
    "004" "Dr. Kim"})
@@ -678,6 +684,22 @@
       (init/do-action
        "https://site.test/subjects/system"
        "https://site.test/actions/register-patient-measurement"
+       {:xt/id "https://site.test/measurements/5d1cfb88-cafd-4241-8c7c-6719a9451f1e"
+        :patient "https://site.test/patients/004"
+        :reading {"heartRate" "120"
+                  "bloodPressure" "137/80"}})
+
+      (init/do-action
+       "https://site.test/subjects/system"
+       "https://site.test/actions/register-patient-measurement"
+       {:xt/id "https://site.test/measurements/5d1cfb88-cafd-4241-8c7c-6719a9451f1e"
+        :patient "https://site.test/patients/006"
+        :reading {"heartRate" "82"
+                  "bloodPressure" "198/160"}})
+
+      (init/do-action
+       "https://site.test/subjects/system"
+       "https://site.test/actions/register-patient-measurement"
        {:xt/id "https://site.test/measurements/eeda3b49-2e96-42fc-9e6a-e89e2eb68c24"
         :patient "https://site.test/patients/010"
         :reading {"heartRate" "85"
@@ -690,14 +712,6 @@
         :patient "https://site.test/patients/010"
         :reading {"heartRate" "87"
                   "bloodPressure" "127/80"}})
-
-      (init/do-action
-       "https://site.test/subjects/system"
-       "https://site.test/actions/register-patient-measurement"
-       {:xt/id "https://site.test/measurements/5d1cfb88-cafd-4241-8c7c-6719a9451f1e"
-        :patient "https://site.test/patients/004"
-        :reading {"heartRate" "120"
-                  "bloodPressure" "137/80"}})
 
       (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
             {alice-access-token "access_token" error "error"}
@@ -986,11 +1000,12 @@
 
                 ;; Get a particular doctor, by a simple term.
                 ;; Uses EQL parameters for this.
-                get-doctor-eql
+                search-doctor-eql
                 '[{(:doctor {::pass/action "https://site.test/actions/get-doctor"
-                             :search "Dr. Jackson"})
+                             :search "jack"})
                    [:xt/id
                     :name
+                    ::site/type
                     {(:patients {::pass/action "https://site.test/actions/get-patient"})
                      [:xt/id
                       :name
@@ -998,14 +1013,15 @@
                       {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
                        [:reading]}]}]}]
 
-                ;; The compilation process allows multiple queries to be
-                ;; specified in the EQL specification, each may be run in
-                ;; parallel. For now, we just run the first query.
-                q1 (first (compile-ast
-                           (eql/query->ast
-                            #_list-patients-eql
-                            #_join-doctors-to-their-patients-eql
-                            get-doctor-eql)))]
+                q1 (first
+                    ;; ^ The compilation process allows multiple queries to be
+                    ;; specified in the EQL specification, each may be run in
+                    ;; parallel. For now, we just run the first query.
+                    (compile-ast
+                     (eql/query->ast
+                      #_list-patients-eql
+                      #_join-doctors-to-their-patients-eql
+                      search-doctor-eql)))]
 
             q1
 
