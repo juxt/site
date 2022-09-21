@@ -774,21 +774,15 @@
               {subject ::pass/subject}
               (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
 
-          (let [eql
-                '^{::pass/action "https://site.test/actions/get-patient"}
-                [:xt/id
-                 :name
-                 {:measurements
-                  ^{::pass/action "https://site.test/actions/read-any-measurement"}
-                  [:reading]}]
-
-                compile-eql
+          (let [compile-eql
                 ;; This function compiles an annotated EQL query to an XTDB/Core1 query
                 (fn compile-eql [ctx eql]
                   (let [action-id (::pass/action (meta eql))
                         _ (assert action-id "Action must be specified on metadata")
-                        rules (actions/actions->rules db #{action-id})
                         action (xt/entity db action-id)
+                        _ (assert action (format "Action not found: %s" action-id))
+                        rules (actions/actions->rules db #{action-id})
+                        _ (assert (seq rules) (format "No rules found for action %s" action-id))
                         parent-action (::pass/action ctx)
                         additional-where-clauses
                         (when-let [parent-action-id (:xt/id parent-action)]
@@ -802,7 +796,8 @@
                          (map? prop)
                          (let [[join-k eql] (first prop)]
                            (-> acc
-                               (update-in [:find 1] assoc join-k (symbol (name join-k)))
+                               (update-in [:find 1] (fnil assoc {}) join-k (symbol (name join-k)))
+                               (assoc :keys '[root joins])
                                (update :where conj [`(~'q ; sub-query
                                                       ~(compile-eql
                                                         {::pass/action action} eql)
@@ -811,8 +806,8 @@
                                                       ~'purpose)
                                                     (symbol (name join-k))])))
                          :else acc))
-                     `{:find [(~'pull ~'e []) {}]
-                       :keys [~'root ~'joins]
+                     `{:find [(~'pull ~'e [])]
+                       :keys [~'root]
                        :where ~(cond->
                                    `[[~'action :xt/id ~action-id]
                                      ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
@@ -825,14 +820,36 @@
 
                      eql)))
 
-                q (compile-eql {} eql)]
+                list-patients-eql
+                '^{::pass/action "https://site.test/actions/get-patient"}
+                [:xt/id
+                 :name
+                 {:measurements
+                  ^{::pass/action "https://site.test/actions/read-any-measurement"}
+                  [:reading]}]
+
+                join-doctors-to-their-patients-eql
+                '^{::pass/action "https://site.test/actions/get-doctor"}
+                [:xt/id
+                 ;;:name
+                 #_{:measurements
+                  ^{::pass/action "https://site.test/actions/read-any-measurement"}
+                  [:reading]}]
+
+                q (compile-eql {} #_list-patients-eql join-doctors-to-their-patients-eql)]
 
             q
 
-            (->>
+            #_(->>
              (xt/q db q subject nil)
              ;; Declutter result tree
              (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))))
+
+        ;; type Doctor {
+        ;;   id ID
+        ;;   patients(gender: String, costBasis: String): [Patient] @site(action: "https://site.test/actions/list-patients" join: "primary-doctor")
+        ;; }
+
 
         ;; Modelling ideas
 
@@ -964,3 +981,5 @@
      "query { patients { name heartRate } }"
      compiled-schema
      db))
+
+;;(update-in {:find ['(pull)]} [:find 1] (fnil assoc {}) :foo :bar)
