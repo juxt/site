@@ -599,6 +599,10 @@
 
 ;;
 
+(map (fn [rule]
+       (update rule 0 #(cons 'allowed2? (rest %)))
+       ) rules)
+
 (with-fixtures
   (let [resources
         (->
@@ -822,7 +826,7 @@
 
         (let [db (xt/db *xt-node*)
               {subject ::pass/subject}
-              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
+              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
 
           (let [compile-eql
                 ;; This function compiles an annotated EQL query to an XTDB/Core1 query
@@ -833,6 +837,13 @@
                         _ (assert action (format "Action not found: %s" action-id))
                         rules (actions/actions->rules db #{action-id})
                         _ (assert (seq rules) (format "No rules found for action %s" action-id))
+
+                        ;; We need to rename these rules so they don't conflict
+                        ;; with the rules in the parent
+                        rules2 (mapv (fn [rule]
+                                       (update rule 0 #(apply list (cons 'inner-allowed? (rest %))))
+                                       ) rules)
+
                         parent-action (::pass/action ctx)
                         additional-where-clauses
                         (when-let [parent-action-id (:xt/id parent-action)]
@@ -842,7 +853,7 @@
                      (fn [acc prop]
                        (cond
                          (keyword? prop)
-                         (update-in acc [:find 0] #(list 'pull 'e (conj (last %) prop)))
+                         (update-in acc [:find 0] #(list 'pull (if parent-action 'e2 'e) (conj (last %) prop)))
                          (map? prop)
                          (let [[join-k eql] (first prop)]
                            (-> acc
@@ -856,16 +867,16 @@
                                                       ~'purpose)
                                                     (symbol (name join-k))])))
                          :else acc))
-                     `{:find [(~'pull ~'e [])]
+                     `{:find [(~'pull ~(if parent-action 'e2 'e) [])]
                        :keys [~'root]
                        :where ~(cond->
                                    `[[~'action :xt/id ~action-id]
                                      ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
                                      ~'[permission ::pass/action action]
                                      ~'[permission ::pass/purpose purpose]
-                                     ~'(allowed? subject e permission)]
+                                     ~(list (if parent-action 'inner-allowed? 'allowed?) 'subject (if parent-action 'e2 'e) 'permission)]
                                    additional-where-clauses (-> (concat additional-where-clauses) vec))
-                       :rules ~rules
+                       :rules ~(if parent-action rules2 rules)
                        :in ~(if parent-action '[parent subject purpose] '[subject purpose])}
 
                      eql)))
@@ -895,8 +906,8 @@
 
             (->>
              (xt/q db q subject nil)
-             ;; Declutter result tree
-             (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))))
+               ;; Declutter result tree
+               (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))))
 
         ;; type Doctor {
         ;;   id ID
