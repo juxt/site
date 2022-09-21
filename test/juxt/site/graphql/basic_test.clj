@@ -605,12 +605,6 @@
          (merge init/dependency-graph book/dependency-graph dependency-graph))))
      ~@body))
 
-;;
-
-(map (fn [rule]
-       (update rule 0 #(cons 'allowed2? (rest %)))
-       ) rules)
-
 (with-fixtures
   (let [resources
         (->
@@ -847,17 +841,11 @@
                    (assert (number? (:depth ctx)))
                    (let [depth (:depth ctx)
                          action-id (::pass/action (meta eql))
-                         _ (assert action-id "Action must be specified on metadata")
-                         action (xt/entity db action-id)
-                         _ (assert action (format "Action not found: %s" action-id))
-                         rules (actions/actions->rules db #{action-id})
-                         _ (assert (seq rules) (format "No rules found for action %s" action-id))
-
-                         ;; We need to rename these rules so they don't conflict
-                         ;; with the rules in the parent
-                         rules2 (mapv (fn [rule]
-                                        (update rule 0 #(apply list (cons 'n2/allowed? (rest %))))
-                                        ) rules)
+                         ;;_ (assert action-id "Action must be specified on metadata")
+                         action (when action-id (xt/entity db action-id))
+                         _ (when action-id (assert action (format "Action not found: %s" action-id)))
+                         rules (when action (actions/actions->rules db #{action-id}))
+                         _ (when action (assert (seq rules) (format "No rules found for action %s" action-id)))
 
                          parent-action (::pass/action ctx)
                          additional-where-clauses
@@ -868,7 +856,7 @@
                       (fn [acc prop]
                         (cond
                           (keyword? prop)
-                          (update-in acc [:find 0] #(list 'pull (if parent-action 'e 'e) (conj (last %) prop)))
+                          (update-in acc [:find 0] #(list 'pull 'e (conj (last %) prop)))
                           (map? prop)
                           (let [[join-k eql] (first prop)]
                             (-> acc
@@ -885,7 +873,7 @@
                                                        ~'purpose)
                                                      (symbol (name join-k))])))
                           :else acc))
-                      `{:find [(~'pull ~(if parent-action 'e 'e) [])]
+                      `{:find [(~'pull ~'e [])]
                         :keys [~'root]
                         :where
                         ~(cond-> `[[~'action :xt/id ~action-id]
@@ -897,12 +885,12 @@
                                    ;; affect rules from sub-queries. In other
                                    ;; words, sub-queries must be completely
                                    ;; isolated.
-                                   ~(list (symbol (str "depth" depth) "allowed?") 'subject (if parent-action 'e 'e) 'permission)]
+                                   ~(list (symbol (str "depth" depth) "allowed?") 'subject 'e 'permission)]
                            additional-where-clauses (-> (concat additional-where-clauses) vec))
                         :rules ~(mapv (fn [rule]
                                         (update rule 0 #(apply list (cons (symbol (str "depth" depth) "allowed?") (rest %))))
                                         ) rules)
-                        :in ~(if parent-action '[parent subject purpose] '[subject purpose])}
+                        :in ~(if (pos? (:depth ctx)) '[parent subject purpose] '[subject purpose])}
 
                       eql))))
 
@@ -949,10 +937,18 @@
                     ^{::pass/action "https://site.test/actions/read-any-measurement"}
                     [:reading]}]}]
 
-                ;; TODO: Get a particular doctor, by id
-                ;; Use EQL parameters for this
+                ;; Get a particular doctor, by a simple term.
+                ;; Use EQL parameters for this.
+                ;; (TODO)
+                get-doctor-eql
+                '[^{::pass/action "https://site.test/actions/get-doctor"}
+                  {(:doctor {:search "jackson"})
+                   [:xt/id :name]}]
 
-                q (compile-eql #_list-patients-eql join-doctors-to-their-patients-eql)]
+                q (compile-eql
+                   #_list-patients-eql
+                   #_join-doctors-to-their-patients-eql
+                   get-doctor-eql)]
 
             q
 
