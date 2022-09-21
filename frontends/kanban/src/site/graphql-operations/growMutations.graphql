@@ -1,0 +1,17 @@
+mutation createGrowTag($growTag: GrowTagInput!) {
+  createGrowTag(growTag: $growTag) {
+    id
+  }
+}
+
+mutation upsertGrowResource($growResource: GrowResourceInput!) {
+  upsertGrowResource(growResource: $growResource) {
+    id
+  }
+}
+
+mutation deleteGrowResource($id: ID!) {
+  deleteGrowResource(id: $id) {
+    id
+  }
+}

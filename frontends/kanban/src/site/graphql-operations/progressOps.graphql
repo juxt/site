@@ -1,0 +1,16 @@
+mutation createProgress($progressItem: ProgressItemInput!) {
+  createProgressItem(progressItem: $progressItem) {
+    id
+  }
+}
+query allProgress {
+  allProgressItems {
+    id
+    name
+    descriptionHTML
+    currentScore
+    _siteSubject
+    _siteCreatedAt
+    _siteValidTime
+  }
+}

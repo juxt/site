@@ -1,0 +1,12 @@
+query cardByIds($ids: [ID]!) {
+  cardsByIds(ids: $ids) {
+    ...CardDetails
+    ... on HiringCard {
+      cvPdf {
+        base64
+        name
+        type
+      }
+    }
+  }
+}

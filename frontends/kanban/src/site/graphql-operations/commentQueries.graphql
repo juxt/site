@@ -1,0 +1,29 @@
+query commentsForEID($id: ID!) {
+  commentsForEntity(id: $id) {
+    id
+    text
+    _siteSubject
+    _siteValidTime
+    _siteCreatedAt
+    children {
+      _siteSubject
+      id
+    }
+  }
+}
+
+query recentComments {
+  allComments(limit: 5) {
+    id
+    card {
+      ... on HiringCard {
+        id
+        title
+      }
+    }
+    _siteCreatedAt
+    _siteValidTime
+    _siteSubject
+    text
+  }
+}

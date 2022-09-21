@@ -1,0 +1,22 @@
+fragment CardDetails on Card {
+  ...CardFields
+  ... on HiringCard {
+    description
+    agent
+    _siteSubject
+    location
+    taskHtml
+    files {
+      base64
+      name
+      type
+    }
+    workflowState {
+      id
+      name
+      tasks
+      roles
+    }
+    stateStr
+  }
+}

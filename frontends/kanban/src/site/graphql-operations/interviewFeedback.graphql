@@ -1,0 +1,32 @@
+mutation createInterviewFeedback($interviewFeedback: InterviewFeedbackInput!) {
+  createInterviewFeedback(interviewFeedback: $interviewFeedback) {
+    id
+  }
+}
+
+query feedbackForCard($cardId: ID!) {
+  feedbackForCard(id: $cardId) {
+    ...feedbackFields
+  }
+}
+
+fragment feedbackFields on InterviewFeedback {
+  id
+  overallScore
+  summary
+  stateStr
+  questions {
+    question
+    response
+    description
+    scoreCardsLabel
+    scoreCards {
+      text
+      description
+      score
+    }
+  }
+  _siteSubject
+  _siteValidTime
+  _siteCreatedAt
+}

@@ -1,0 +1,8 @@
+mutation createWorkflowProject(
+  $workflowProject: WorkflowProjectInput!
+  $workflowProjectId: ID!
+) {
+  createWorkflowProject(workflowProject: $workflowProject) {
+    id
+  }
+}

@@ -1,0 +1,50 @@
+query kanbanData($id: ID!) {
+  allWorkflowProjects {
+    ...WorkflowProjectFields
+  }
+  myJuxtcode
+  workflow(id: $id) {
+    description
+    id
+    name
+    workflowStates {
+      ...WorkflowStateFields
+    }
+  }
+}
+
+fragment WorkflowProjectFields on WorkflowProject {
+  id
+  name
+  description
+  openRoles {
+    name
+    count
+  }
+}
+
+query allClients {
+  allClients {
+    name
+    id
+  }
+}
+
+query allRejectionReasons {
+  allRejectionReasons {
+    name
+    id
+  }
+}
+
+mutation createRejectionReason($reason: RejectionReasonInput!) {
+  createRejectionReason(rejectionReason: $reason) {
+    id
+  }
+}
+
+mutation createClient($client: ClientInput!) {
+  createClient(client: $client) {
+    id
+  }
+}

@@ -10,3 +10,4 @@ opt/graphiql/target
 *.dylib
 .clj-kondo
 **/generated/*
+frontends/**/node_modules/*

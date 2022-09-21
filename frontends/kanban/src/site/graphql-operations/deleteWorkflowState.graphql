@@ -1,0 +1,12 @@
+mutation deleteWorkflowState(
+  $id: ID!
+  $workflowId: ID!
+  $workflowStateIds: [ID!]!
+) {
+  deleteWorkflowState(id: $id) {
+    id
+  }
+  updateWorkflow(id: $workflowId, workflowStateIds: $workflowStateIds) {
+    id
+  }
+}

@@ -1,0 +1,7 @@
+mutation deleteCardFromColumn($cardId: ID!, $workflowStateId: ID!) {
+  deleteCardFromColumn(cardId: $cardId, workflowStateId: $workflowStateId) {
+    ... on HiringCard {
+      id
+    }
+  }
+}

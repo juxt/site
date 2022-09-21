@@ -1,0 +1,10 @@
+fragment WorkflowStateFields on WorkflowState {
+  id
+  name
+  description
+  roles
+  tasks
+  cards {
+    ...CardFields
+  }
+}

@@ -1,0 +1,13 @@
+query commentsForCard($id: ID!, $asOf: String) {
+  commentsForEntity(id: $id, limit: 100, order: "asc", asOf: $asOf) {
+    id
+    _siteCreatedAt
+    _siteSubject
+    _siteValidTime
+    text
+    parentId
+    children {
+      text
+    }
+  }
+}

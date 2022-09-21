@@ -1,0 +1,327 @@
+.ProseMirror {
+  overflow-y: auto;
+  &:focus-visible {
+    outline: none;
+  }
+
+  > *:first-child {
+    margin-top: 0;
+  }
+
+  > *:last-child {
+    margin-bottom: 0;
+  }
+
+  ul,
+  ol {
+    li {
+      > ul,
+      > ol {
+        margin: 0;
+      }
+
+      p {
+        display: inline;
+        margin: 0;
+      }
+    }
+  }
+
+  ul[data-type='taskList'] {
+    list-style: none;
+
+    li {
+      display: flex;
+
+      > label {
+        flex: 0 0 auto;
+        margin-right: 0.5em;
+        user-select: none;
+      }
+
+      > div {
+        flex: 1 1 auto;
+      }
+    }
+
+    input[type='checkbox'] {
+      cursor: pointer;
+    }
+  }
+
+  hr {
+    border: none;
+    border-top: 2px solid rgba(#0d0d0d, 0.1);
+    margin: 1.5rem 0;
+  }
+
+  span[data-mention] {
+    background-color: rgba(#005d71, 0.15);
+    box-decoration-break: clone;
+    font-size: 0.9rem;
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 2px 4px;
+    color: #005d71;
+
+    > .char {
+      display: inline-block;
+      margin: 1px 2px 0 0;
+      color: #0098b8;
+    }
+  }
+
+  p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: rgba(#111111, 0.3);
+    pointer-events: none;
+    height: 0;
+    font-style: italic;
+  }
+
+  .color {
+    white-space: nowrap;
+
+    &::before {
+      content: ' ';
+      display: inline-block;
+      width: 0.8em;
+      height: 0.8em;
+      border: 1px solid rgba(#808080, 0.3);
+      vertical-align: middle;
+      margin-right: 0.2em;
+      margin-bottom: 0.15em;
+      border-radius: 50%;
+      background-color: var(--color);
+    }
+  }
+
+  /*!
+      Theme: GitHub
+      Description: Light theme as seen on github.com
+      Author: github.com
+      Maintainer: @Hirse
+      Updated: 2021-05-15
+      Outdated base version: https://github.com/primer/github-syntax-light
+      Current colors taken from GitHub's CSS
+    */
+
+  .hljs {
+    color: #24292e;
+    background-color: #ffffff;
+  }
+
+  .hljs-doctag,
+  .hljs-keyword,
+  .hljs-meta .hljs-keyword,
+  .hljs-template-tag,
+  .hljs-template-variable,
+  .hljs-type,
+  .hljs-variable.language_ {
+    /* prettylights-syntax-keyword */
+    color: #d73a49;
+  }
+
+  .hljs-title,
+  .hljs-title.class_,
+  .hljs-title.class_.inherited__,
+  .hljs-title.function_ {
+    /* prettylights-syntax-entity */
+    color: #6f42c1;
+  }
+
+  .hljs-attr,
+  .hljs-attribute,
+  .hljs-literal,
+  .hljs-meta,
+  .hljs-number,
+  .hljs-operator,
+  .hljs-variable,
+  .hljs-selector-attr,
+  .hljs-selector-class,
+  .hljs-selector-id {
+    /* prettylights-syntax-constant */
+    color: #005cc5;
+  }
+
+  .hljs-regexp,
+  .hljs-string,
+  .hljs-meta .hljs-string {
+    /* prettylights-syntax-string */
+    color: #032f62;
+  }
+
+  .hljs-built_in,
+  .hljs-symbol {
+    /* prettylights-syntax-variable */
+    color: #e36209;
+  }
+
+  .hljs-comment,
+  .hljs-code,
+  .hljs-formula {
+    /* prettylights-syntax-comment */
+    color: #6a737d;
+  }
+
+  .hljs-name,
+  .hljs-quote,
+  .hljs-selector-tag,
+  .hljs-selector-pseudo {
+    /* prettylights-syntax-entity-tag */
+    color: #22863a;
+  }
+
+  .hljs-subst {
+    /* prettylights-syntax-storage-modifier-import */
+    color: #24292e;
+  }
+
+  .hljs-section {
+    /* prettylights-syntax-markup-heading */
+    color: #005cc5;
+    font-weight: bold;
+  }
+
+  .hljs-bullet {
+    /* prettylights-syntax-markup-list */
+    color: #735c0f;
+  }
+
+  .hljs-emphasis {
+    /* prettylights-syntax-markup-italic */
+    color: #24292e;
+    font-style: italic;
+  }
+
+  .hljs-strong {
+    /* prettylights-syntax-markup-bold */
+    color: #24292e;
+    font-weight: bold;
+  }
+
+  .hljs-addition {
+    /* prettylights-syntax-markup-inserted */
+    color: #22863a;
+    background-color: #f0fff4;
+  }
+
+  .hljs-deletion {
+    /* prettylights-syntax-markup-deleted */
+    color: #b31d28;
+    background-color: #ffeef0;
+  }
+}
+
+.MentionDropdownItem {
+  display: flex;
+  align-items: center;
+  height: inherit;
+
+  .avatar {
+    border: 1px solid rgba(#003945, 0.3);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    margin-right: 5px;
+  }
+
+  .name {
+    line-height: 20px;
+  }
+}
+
+.tippy-box[data-animation='fade'][data-state='hidden'] {
+  opacity: 0;
+}
+
+[data-tippy-root] {
+  max-width: calc(100vw - 10px);
+}
+
+.tippy-box[data-placement^='top'] > .tippy-arrow {
+  bottom: 0;
+}
+
+.tippy-box[data-placement^='top'] > .tippy-arrow:before {
+  bottom: -7px;
+  left: 0;
+  border-width: 8px 8px 0;
+  border-top-color: initial;
+  transform-origin: center top;
+}
+
+.tippy-box[data-inertia][data-state='visible'] {
+  transition-timing-function: cubic-bezier(0.54, 1.5, 0.38, 1.11);
+}
+
+.tippy-arrow {
+  width: 16px;
+  height: 16px;
+  @apply bg-slate-700;
+}
+
+.tippy-arrow:before {
+  content: '';
+  position: absolute;
+  border-color: transparent;
+  border-style: solid;
+}
+
+.SuggestionDropdown {
+  border: 1px solid rgba(#003945, 0.3);
+  border-radius: 5px;
+  max-height: calc(2px + (32px * 6));
+  min-width: calc(100% + 15px);
+  background-color: white;
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex-direction: column;
+    display: flex;
+    > button {
+      height: 32px;
+      @apply truncate;
+      font-size: 0.8em;
+      padding-left: 5px;
+      white-space: nowrap;
+      cursor: pointer;
+
+      &.selected,
+      &:hover {
+        color: #005d71;
+      }
+
+      &.selected {
+        background: rgba(#005d71, 0.15);
+      }
+
+      &:hover {
+        background: rgba(#005d71, 0.1);
+      }
+    }
+  }
+
+  &.os-host-scrollbar-vertical-hidden {
+    min-width: calc(100% + 5px);
+  }
+  .os-scrollbar-handle {
+    background: rgba(#003945, 0.3);
+  }
+  .os-scrollbar {
+    padding: 2px;
+    right: 0;
+    box-sizing: border-box;
+    background: rgba(#003945, 0.3);
+  }
+  > .os-scrollbar:hover {
+    > .os-scrollbar-track {
+      > .os-scrollbar-handle {
+        background-color: rgba(#003945, 0.5);
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+mutation moveCard(
+  $workflowStateId: ID!
+  $cardId: ID!
+  $previousCard: ID
+  $sameColMove: Boolean
+) {
+  moveCard(
+    cardId: $cardId
+    workflowStateId: $workflowStateId
+    previousCard: $previousCard
+    sameColMove: $sameColMove
+  ) {
+    ... on HiringCard {
+      id
+    }
+  }
+}

@@ -1,0 +1,56 @@
+.SuggestionDropdown {
+    background: #ffffff;
+    border: 1px solid rgba(#003945, 0.3);
+    border-radius: 5px;
+    max-height: calc(2px + (32px * 6));
+    min-width: calc(100% + 15px);
+
+    ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+
+        > li {
+            height: 32px;
+            font-size: 0.8em;
+            padding-left: 5px;
+            white-space: nowrap;
+            cursor: pointer;
+
+            &.selected,
+            &:hover {
+                color: #005d71;
+            }
+    
+            &.selected {
+                background: rgba(#005d71, 0.15);
+            }
+
+            &:hover {
+                background: rgba(#005d71, 0.1);
+            }
+        }
+    }
+
+    &.os-host-scrollbar-vertical-hidden {
+        min-width: calc(100% + 5px);
+    }
+
+    &.os-theme-dark {
+        > .os-scrollbar {
+            > .os-scrollbar-track {
+                > .os-scrollbar-handle {
+                    background: rgba(#003945, 0.3);
+                }
+            }
+        }
+
+        > .os-scrollbar:hover {
+            > .os-scrollbar-track {
+                > .os-scrollbar-handle {
+                    background: rgba(#003945, 0.5);
+                }
+            }
+        }
+    }
+}

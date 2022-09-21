@@ -1,0 +1,13 @@
+mutation createWorkflowState(
+  $colId: ID!
+  $workflowStateIds: [ID!]!
+  $workflowId: ID!
+  $workflowState: WorkflowStateInput!
+) {
+  updateWorkflowState(id: $colId, workflowState: $workflowState) {
+    id
+  }
+  updateWorkflow(id: $workflowId, workflowStateIds: $workflowStateIds) {
+    id
+  }
+}

@@ -1,0 +1,28 @@
+fragment CardFields on Card {
+  ... on HiringCard {
+    interviewFeedback {
+      ...feedbackFields
+    }
+    id
+    title
+    _siteValidTime
+    createdAt
+    currentOwnerUsernames
+    takeHomeLanguage
+    hasRemoteFee
+    isFastTrack
+    rejectionFeedback
+    rejectionReasons {
+      id
+      name
+    }
+    potentialClients {
+      id
+      name
+    }
+    project {
+      id
+      name
+    }
+  }
+}

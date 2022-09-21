@@ -1,0 +1,11 @@
+mutation updateWorkflowProject(
+  $workflowProject: WorkflowProjectInput!
+  $workflowProjectId: ID!
+) {
+  updateWorkflowProject(
+    id: $workflowProjectId
+    workflowProject: $workflowProject
+  ) {
+    id
+  }
+}

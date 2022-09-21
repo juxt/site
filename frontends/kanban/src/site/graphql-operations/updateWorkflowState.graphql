@@ -1,0 +1,5 @@
+mutation updateWorkflowState($id: ID!, $workflowState: WorkflowStateInput!) {
+  updateWorkflowState(id: $id, workflowState: $workflowState) {
+    id
+  }
+}
