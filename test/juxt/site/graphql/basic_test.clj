@@ -172,9 +172,9 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/get-patient"
 
-    :juxt.pass.alpha/contexts
+    :juxt.pass.alpha/action-contexts
     {"https://site.test/actions/get-doctor"
-     {:additional-where-clauses
+     {:juxt.pass.alpha/additional-where-clauses
       '[[ass ::site/type "https://site.test/types/doctor-patient-assignment"]
         [ass :patient e]
         [ass :doctor parent]]}}
@@ -329,9 +329,9 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/read-any-measurement"
 
-    :juxt.pass.alpha/contexts
+    :juxt.pass.alpha/action-contexts
     {"https://site.test/actions/get-patient"
-     {:additional-where-clauses
+     {:juxt.pass.alpha/additional-where-clauses
       '[[e :patient parent]
         [e ::site/type "https://site.test/types/measurement"]]}}
 
@@ -836,7 +836,7 @@
 
         (let [db (xt/db *xt-node*)
               {subject ::pass/subject}
-              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
+              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
 
           (let [compile-eql
                 ;; This function compiles an annotated EQL query to an XTDB/Core1 query
@@ -862,7 +862,7 @@
                          parent-action (::pass/action ctx)
                          additional-where-clauses
                          (when-let [parent-action-id (:xt/id parent-action)]
-                           (get-in action [::pass/contexts parent-action-id :additional-where-clauses]))]
+                           (get-in action [::pass/action-contexts parent-action-id ::pass/additional-where-clauses]))]
 
                      (reduce
                       (fn [acc prop]
@@ -905,6 +905,16 @@
                         :in ~(if parent-action '[parent subject purpose] '[subject purpose])}
 
                       eql))))
+
+                ;; Here are some EQL examples. These are easy to construct
+                ;; manually or target with a compiler, for example, for the
+                ;; production of GraphQL, XML or CSV.
+
+                ;; The actions are associated with EQL properties using
+                ;; metadata.
+
+                ;; These actions limit the visibility of the data according to
+                ;; their rules.
 
                 list-patients-eql
                 '^{::pass/action "https://site.test/actions/get-patient"}
