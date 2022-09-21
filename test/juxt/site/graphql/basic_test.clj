@@ -361,6 +361,10 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/get-doctor"
 
+    :juxt.pass.alpha/params
+    {:search {:juxt.pass.alpha/additional-where-clauses
+               '[[e :name $]]}}
+
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
@@ -830,7 +834,9 @@
         ;; The EQL could be the target of the compilation of a GraphQL query.
 
         (let [db (xt/db *xt-node*)
-              {subject ::pass/subject}
+              {alice ::pass/subject}
+              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))
+              {bob ::pass/subject}
               (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
 
           #_{:type :root,
@@ -880,9 +886,20 @@
                          _ (when action (assert (seq rules) (format "No rules found for action %s" action-id)))
 
                          parent-action (::pass/action ctx)
+
                          additional-where-clauses
-                         (when-let [parent-action-id (:xt/id parent-action)]
-                           (get-in action [::pass/action-contexts parent-action-id ::pass/additional-where-clauses]))]
+                         (concat
+                          (when-let [parent-action-id (:xt/id parent-action)]
+                            (get-in action [::pass/action-contexts parent-action-id ::pass/additional-where-clauses]))
+                          (mapcat (fn [[k v]]
+                                    (when-let [clauses
+                                               (get-in action [::pass/params k ::pass/additional-where-clauses])]
+                                      (postwalk (fn [x] (if (= x '$) v x)
+                                                  ) clauses)
+                                      ))
+
+                                  (:params ast))
+                          )]
 
                      (reduce
                       (fn [acc node]
@@ -968,12 +985,18 @@
                        [:reading]}]}]}]
 
                 ;; Get a particular doctor, by a simple term.
-                ;; Use EQL parameters for this.
-                ;; (TODO)
+                ;; Uses EQL parameters for this.
                 get-doctor-eql
                 '[{(:doctor {::pass/action "https://site.test/actions/get-doctor"
-                             :search "jackson"})
-                   [:xt/id :name]}]
+                             :search "Dr. Jackson"})
+                   [:xt/id
+                    :name
+                    {(:patients {::pass/action "https://site.test/actions/get-patient"})
+                     [:xt/id
+                      :name
+                      ::site/type
+                      {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
+                       [:reading]}]}]}]
 
                 ;; The compilation process allows multiple queries to be
                 ;; specified in the EQL specification, each may be run in
@@ -987,7 +1010,7 @@
             q1
 
             (->>
-             (xt/q db q1 subject nil)
+             (xt/q db q1 alice nil)
              ;; Declutter result tree
              (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))
 
