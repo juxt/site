@@ -826,51 +826,7 @@
             (->>
              (xt/q db q subject nil)
              ;; Declutter result tree
-             (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x)))
-             )
-            )
-
-          ;; TODO: Generate this query
-
-          #_(xt/q
-             db
-             `{:find ~'[(pull e [:xt/id :name]) {:measurements measurements
-                                                 :foo measurements}]
-               :keys ~'[root children]
-               :where
-               [
-                ~'[action :xt/id "https://site.test/actions/get-patient"]
-                ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
-                ~'[permission ::pass/action action]
-                ~'[permission ::pass/purpose purpose]
-                ~'(allowed? subject e permission)
-
-                ;; join
-                [(~'q {:find ~'[(pull e [:reading])]
-                       :keys ~'[node]
-                       :where
-                       ~'[
-                          [e :patient parent]
-                          [e ::site/type "https://site.test/types/measurement"]
-
-                          [action :xt/id "https://site.test/actions/read-any-measurement"]
-                          [permission ::site/type "https://meta.juxt.site/pass/permission"]
-                          [permission ::pass/action action]
-                          [permission ::pass/purpose purpose]
-                          (allowed? subject e permission)
-                          ]
-                       :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
-                       :in ~'[parent subject purpose]}
-                  ~'e ~'subject ~'purpose)
-                 ~'measurements]]
-
-               :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
-
-               :in [~'subject ~'purpose]}
-
-             subject nil)
-
-          )
+             (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))))
 
         ;; Modelling ideas
 
