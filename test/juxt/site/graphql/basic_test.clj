@@ -323,8 +323,9 @@
 
     :juxt.pass.alpha/contexts
     {"https://site.test/actions/get-patient"
-     {:where-clauses-to-add '[[e :patient parent]
-                              [e ::site/type "https://site.test/types/measurement"]]}}
+     {:additional-where-clauses
+      '[[e :patient parent]
+        [e ::site/type "https://site.test/types/measurement"]]}}
 
     :juxt.pass.alpha/rules
     '[
@@ -775,9 +776,11 @@
 
           (let [eql
                 '^{::pass/action "https://site.test/actions/get-patient"}
-                [:xt/id :name
-                 {:measurements ^{::pass/action "https://site.test/actions/read-any-measurement"} [:reading]}
-                 ]
+                [:xt/id
+                 :name
+                 {:measurements
+                  ^{::pass/action "https://site.test/actions/read-any-measurement"}
+                  [:reading]}]
 
                 compile-eql
                 ;; This function compiles an annotated EQL query to an XTDB/Core1 query
@@ -787,9 +790,9 @@
                         rules (actions/actions->rules db #{action-id})
                         action (xt/entity db action-id)
                         parent-action (::pass/action ctx)
-                        where-clauses-to-add
+                        additional-where-clauses
                         (when-let [parent-action-id (:xt/id parent-action)]
-                          (get-in action [::pass/contexts parent-action-id :where-clauses-to-add]))]
+                          (get-in action [::pass/contexts parent-action-id :additional-where-clauses]))]
 
                     (reduce
                      (fn [acc prop]
@@ -810,13 +813,10 @@
                                      ~'[permission ::pass/action action]
                                      ~'[permission ::pass/purpose purpose]
                                      ~'(allowed? subject e permission)]
-                                   where-clauses-to-add (-> (concat where-clauses-to-add) vec))
+                                   additional-where-clauses (-> (concat additional-where-clauses) vec))
                        :rules ~rules
-                       :in ~(if parent-action '[parent subject purpose] '[subject purpose])
-                       ;;:_where-clauses-to-add ~where-clauses-to-add
-                       ;;:_parent-action ~parent-action
-                       ;;:_action ~action
-                       }
+                       :in ~(if parent-action '[parent subject purpose] '[subject purpose])}
+
                      eql)))
 
                 q (compile-eql {} eql)]
