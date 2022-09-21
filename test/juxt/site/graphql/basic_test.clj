@@ -853,37 +853,6 @@
               {bob ::pass/subject}
               (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
 
-          #_{:type :root,
-             :children
-             [{:type :join,
-               :dispatch-key :patients,
-               :key :patients,
-               :params #:juxt.pass.alpha{:action "https://site.test/actions/get-patient"},
-               :meta {:line 1120, :column 5},
-               :query
-               [:xt/id
-                :name
-                :juxt.site.alpha/type
-                {(:measurements
-                  #:juxt.pass.alpha{:action
-                                    "https://site.test/actions/read-any-measurement"})
-                 [:reading]}],
-               :children
-               [{:type :prop, :dispatch-key :xt/id, :key :xt/id}
-                {:type :prop, :dispatch-key :name, :key :name}
-                {:type :prop,
-                 :dispatch-key :juxt.site.alpha/type,
-                 :key :juxt.site.alpha/type}
-                {:type :join,
-                 :dispatch-key :measurements,
-                 :key :measurements,
-                 :params
-                 #:juxt.pass.alpha{:action
-                                   "https://site.test/actions/read-any-measurement"},
-                 :meta {:line 1124, :column 6},
-                 :query [:reading],
-                 :children [{:type :prop, :dispatch-key :reading, :key :reading}]}]}]}
-
           (let [compile-ast
                 ;; This function compiles an annotated EQL query to an XTDB/Core1 query
                 (fn compile-ast
@@ -903,17 +872,18 @@
 
                          additional-where-clauses
                          (concat
+                          ;; Context
                           (when-let [parent-action-id (:xt/id parent-action)]
                             (get-in action [::pass/action-contexts parent-action-id ::pass/additional-where-clauses]))
-                          (mapcat (fn [[k v]]
-                                    (when-let [clauses
-                                               (get-in action [::pass/params k ::pass/additional-where-clauses])]
-                                      (postwalk (fn [x] (if (= x '$) v x)
-                                                  ) clauses)
-                                      ))
-
-                                  (:params ast))
-                          )]
+                          ;; Parameters
+                          (mapcat
+                           (fn [[k v]]
+                             (when-let [clauses
+                                        (get-in action [::pass/params k ::pass/additional-where-clauses])]
+                               (postwalk
+                                (fn [x] (if (= x '$) v x))
+                                clauses)))
+                           (:params ast)))]
 
                      (reduce
                       (fn [acc node]
@@ -936,6 +906,7 @@
                                                        ~'purpose)
                                                      (symbol (name dispatch-key))])))
                           :else acc))
+
                       `{:find [(~'pull ~'e [])]
                         :keys [~'root]
                         :where
@@ -1041,20 +1012,6 @@
         ;; A patient should be able to see their own medical file.
 
         #_(repl/e "https://site.test/patients/014")
-
-        #_(let [db (xt/db *xt-node*)
-                {subject ::pass/subject}
-                (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
-
-            (xt/q
-             db
-             `{:find ~'[(pull e [*])]
-               :where
-               [
-                ~'[e ::site/type "https://site.test/types/doctor"]]
-               :in [~'subject ~'purpose]}
-             subject nil)
-            )
 
         ;; See NHS National role-based access control (RBAC) for developers
         ;; "The database consists of:
