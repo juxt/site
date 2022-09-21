@@ -169,6 +169,12 @@
    "https://site.test/subjects/system"
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/get-patient"
+
+    :juxt.pass.alpha/filters
+    #{:contexts {"https://site.test/types/doctor"
+                 '[[$e :doctor $parent]]}
+      :args {:gender '[[$e :gender $arg-value]]}}
+
     :juxt.pass.alpha/rules
     '[
       ;; TODO: Performance tweak: put [subject] to hint that subject is always
@@ -757,49 +763,54 @@
 
         ;; Now we have a get-patient with rules that we can bring into a sub-query
 
+        ;; Let's start with an EQL that represents our query.
+        ;; Metadata attributed to the EQL contains actions.
+        ;; The EQL could be the target of the compilation of a GraphQL query.
+
+
+
         (let [db (xt/db *xt-node*)
               {subject ::pass/subject}
-              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} alice-access-token))]
+              (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
 
-          (for [{:keys [patient nested]}
-                (xt/q
-                 db
-                 `{:find ~'[(pull patient [:xt/id :name]) {:measurements measurements}]
-                   :keys ~'[patient nested]
-                   :where
-                   [
-                    ~'[action :xt/id "https://site.test/actions/get-patient"]
-                    ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
-                    ~'[permission ::pass/action action]
-                    ~'[permission ::pass/purpose purpose]
-                    ~'(allowed? subject patient permission)
+          ;; TODO: Generate this query
 
-                    ;; join
-                    [(~'q {:find ~'[(pull measurement [:reading])]
-                           :keys ~'[object]
-                           :where
-                           ~'[
-                              [measurement :patient patient]
-                              [measurement ::site/type "https://site.test/types/measurement"]
+          (xt/q
+           db
+           `{:find ~'[(pull e [:xt/id :name]) measurements]
+             :keys ~'[patient measurements]
+             :where
+             [
+              ~'[action :xt/id "https://site.test/actions/get-patient"]
+              ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
+              ~'[permission ::pass/action action]
+              ~'[permission ::pass/purpose purpose]
+              ~'(allowed? subject e permission)
 
-                              [action :xt/id "https://site.test/actions/read-any-measurement"]
-                              [permission ::site/type "https://meta.juxt.site/pass/permission"]
-                              [permission ::pass/action action]
-                              [permission ::pass/purpose purpose]
-                              (allowed? subject measurement permission)
-                              ]
-                           :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
-                           :in ~'[patient subject]}
-                      ~'patient ~'subject)
-                     ~'measurements]]
+              ;; join
+              [(~'q {:find ~'[(pull measurement [:reading])]
+                     :keys ~'[node]
+                     :where
+                     ~'[
+                        [measurement :patient parent]
+                        [measurement ::site/type "https://site.test/types/measurement"]
 
-                   :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
+                        [action :xt/id "https://site.test/actions/read-any-measurement"]
+                        [permission ::site/type "https://meta.juxt.site/pass/permission"]
+                        [permission ::pass/action action]
+                        [permission ::pass/purpose purpose]
+                        (allowed? subject measurement permission)
+                        ]
+                     :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
+                     :in ~'[parent subject]}
+                ~'e ~'subject)
+               ~'measurements]]
 
-                   :in [~'subject ~'purpose]}
+             :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
 
-                 subject nil)]
-            (merge patient nested)
-            )
+             :in [~'subject ~'purpose]}
+
+           subject nil)
 
           )
 
@@ -869,6 +880,38 @@
         ;; The 'join' key becomes an implicit argument. By default, the 'id' of
         ;; the doctor is passed as the argument value.
 
+        ;; But, for many models, there is a xref relation. A patient's
+        ;; relationship to a doctor is governed by a dedicated 'assignment'
+        ;; document. This way, it is straight-forward to remove this assignment,
+        ;; inspect a history of assignments, and to add further metadata about
+        ;; the assignment.
+
+        ;; The 'form' of the GraphQL should not expose this xref relation
+        ;; directly, but use it to generate a mapping between patients and
+        ;; doctors.
+
+        ;; Where should the metadata for this xref relation be provided? For
+        ;; example, if the assignment document has a type (and it certainly
+        ;; should), where should this type be specificed? If it's directly in
+        ;; the GraphQL SDL, then a) it both complicates and exposes the GraphQL
+        ;; SDL to structural details and b) needs to be repeated for other
+        ;; access protocols, like REST.
+
+        ;; Therefore, it makes sense that the actions themselves understand how
+        ;; to navigate these relationships. Actions can be both shared between
+        ;; applications while still allowing applications to demand bespoke
+        ;; actions where necessary.
+
+        ;; Therefore it seems that actions are the 'form' documents.
+
+        ;; Let's take the list-patients action. In the context of a doctor, it
+        ;; needs to know how to join on the doctor id. The 'parent context',
+        ;; whether it be a hosital, doctor or other type, is extremely common
+        ;; (since data is often emitted as DAGs). Therefore each action should
+        ;; be aware of the context in which it runs.
+
+        ;; TODO: First, rewrite list-patients/get-patient to use SCI.
+
         ;; 2. Actions that have 'query' logic. Should that query logic be Flip?
         ;; Or reference other actions? To what extent is 'list-patients = fmap
         ;; get-patient' - is this a common case? Looks like we may need a
@@ -888,47 +931,72 @@
         ))))
 
 
+#_`{:find ~'[(pull patient [:xt/id :name])]
+                   :keys ~'[patient]
+                   :where
+                   [
+                    ~'[action :xt/id "https://site.test/actions/get-patient"]
+                    ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
+                    ~'[permission ::pass/action action]
+                    ~'[permission ::pass/purpose purpose]
+                    ~'(allowed? subject patient permission)
+
+                    ]
+
+                   :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
+
+  :in [~'subject ~'purpose]}
+
+(let [eql '[{:patient [:xt/id :name]}]
+      reducer
+      (fn [eql]
+        (reduce (fn [acc prop]
+                  acc
+                  ) {:find []} eql))]
+
+  (reducer eql))
+
 #_(f/eval-quotation
-         [{:patient "https://site.test/patients/001"
-           :doctor "https://site.test/doctors/001"}]
-         `(
-           (site/with-fx-acc
-             [
-              ;; Validate arguments
-              (f/dip
-               [(site/validate
-                 [:map
-                  [:patient [:re "https://site.test/patients/.*"]]
-                  [:doctor [:re "https://site.test/doctors/.*"]]])])
+   [{:patient "https://site.test/patients/001"
+     :doctor "https://site.test/doctors/001"}]
+   `(
+     (site/with-fx-acc
+       [
+        ;; Validate arguments
+        (f/dip
+         [(site/validate
+           [:map
+            [:patient [:re "https://site.test/patients/.*"]]
+            [:doctor [:re "https://site.test/doctors/.*"]]])])
 
-              (f/set-at (f/dip [:input]))
+        (f/set-at (f/dip [:input]))
 
-              (f/set-at (f/keep [(f/of :input) (f/of :patient) site/entity :patient]))
+        (f/set-at (f/keep [(f/of :input) (f/of :patient) site/entity :patient]))
 
-              :patient f/swap [(f/set-at (f/keep [:bar :foo]))] f/change-at
+        :patient f/swap [(f/set-at (f/keep [:bar :foo]))] f/change-at
 
-              ;;(f/keep [(f/change-at :patient f/swap [f/drop :ok]) :new-patient])
+        ;;(f/keep [(f/change-at :patient f/swap [f/drop :ok]) :new-patient])
 
 
-              #_(site/entity (f/of :patient))])
+        #_(site/entity (f/of :patient))])
 
-           ;; The patient could be the resource undergoing a PATCH, where the
-           ;; PATCH body contains the doctor id.
+     ;; The patient could be the resource undergoing a PATCH, where the
+     ;; PATCH body contains the doctor id.
 
-           ;; Or a GraphQL mutation where an action is called with the patient id
-           ;; and doctor id as arguments.
+     ;; Or a GraphQL mutation where an action is called with the patient id
+     ;; and doctor id as arguments.
 
-           ;; It feels like this action needs to be given the arguments on its
-           ;; initial stack, rather than each action pull them into from EDN.
+     ;; It feels like this action needs to be given the arguments on its
+     ;; initial stack, rather than each action pull them into from EDN.
 
-           ;; However an action is called, let's always assume the action begins
-           ;; with arguments on its stack, as any quotation would. But
-           ;; conventionally, there is one argument: a map.
+     ;; However an action is called, let's always assume the action begins
+     ;; with arguments on its stack, as any quotation would. But
+     ;; conventionally, there is one argument: a map.
 
-           )
+     )
 
-         {::site/db (xt/db *xt-node*)
-          })
+   {::site/db (xt/db *xt-node*)
+    })
 
 #_(let [compiled-schema
         (->
