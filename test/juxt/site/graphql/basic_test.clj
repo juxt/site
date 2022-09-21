@@ -882,7 +882,7 @@
         ;; independently or instead be a reference to
         ;; https://site.test/actions/list-patients with a join key? The former
         ;; is overly cumbersome and would require a lot of extra actions and
-        ;; associated admin costs.
+        ;; associated admin costs. (DONE: we have gone with the notion of an action being called in the context of another)
 
         ;; type Doctor {
         ;;   id ID
@@ -950,41 +950,8 @@
 
         ))))
 
-
-#_`{:find ~'[(pull e [:xt/id :name]) measurements]
-    :keys ~'[root measurements]
-    :where
-    [
-     ~'[action :xt/id "https://site.test/actions/get-patient"]
-     ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
-     ~'[permission ::pass/action action]
-     ~'[permission ::pass/purpose purpose]
-     ~'(allowed? subject e permission)
-
-     ;; join
-     [(~'q {:find ~'[(pull e [:reading])]
-            :keys ~'[node]
-            :where
-            ~'[
-               [e :patient parent]
-               [e ::site/type "https://site.test/types/measurement"]
-
-               [action :xt/id "https://site.test/actions/read-any-measurement"]
-               [permission ::site/type "https://meta.juxt.site/pass/permission"]
-               [permission ::pass/action action]
-               [permission ::pass/purpose purpose]
-               (allowed? subject e permission)
-               ]
-            :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
-            :in ~'[parent subject]}
-       ~'e ~'subject)
-      ~'measurements]]
-
-    :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
-
-    :in [~'subject ~'purpose]}
-
-
+;; The GraphQL compilation now targets the EQL, rather than direct to XTDB. This
+;; also makes the transition to XTDB/Core2 more straight-forward.
 
 #_(let [compiled-schema
         (->
