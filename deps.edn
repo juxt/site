@@ -80,6 +80,8 @@
 
         ;; sci is used as a potential alternative to Flip
         org.babashka/sci {:mvn/version "0.3.32"}
+
+        edn-query-language/eql {:mvn/version "1.0.0"}
         }
 
  :aliases

@@ -3,6 +3,7 @@
 (ns juxt.site.graphql.basic-test
   (:require
    [clojure.walk :refer [postwalk]]
+   [edn-query-language.core :as eql]
    [jsonista.core :as json]
    [sci.core :as sci]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
@@ -832,15 +833,46 @@
               {subject ::pass/subject}
               (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
 
-          (let [compile-eql
+          #_{:type :root,
+             :children
+             [{:type :join,
+               :dispatch-key :patients,
+               :key :patients,
+               :params #:juxt.pass.alpha{:action "https://site.test/actions/get-patient"},
+               :meta {:line 1120, :column 5},
+               :query
+               [:xt/id
+                :name
+                :juxt.site.alpha/type
+                {(:measurements
+                  #:juxt.pass.alpha{:action
+                                    "https://site.test/actions/read-any-measurement"})
+                 [:reading]}],
+               :children
+               [{:type :prop, :dispatch-key :xt/id, :key :xt/id}
+                {:type :prop, :dispatch-key :name, :key :name}
+                {:type :prop,
+                 :dispatch-key :juxt.site.alpha/type,
+                 :key :juxt.site.alpha/type}
+                {:type :join,
+                 :dispatch-key :measurements,
+                 :key :measurements,
+                 :params
+                 #:juxt.pass.alpha{:action
+                                   "https://site.test/actions/read-any-measurement"},
+                 :meta {:line 1124, :column 6},
+                 :query [:reading],
+                 :children [{:type :prop, :dispatch-key :reading, :key :reading}]}]}]}
+
+          (let [compile-ast
                 ;; This function compiles an annotated EQL query to an XTDB/Core1 query
-                (fn compile-eql
-                  ([eql] (compile-eql {:depth 0} eql))
-                  ([ctx eql]
+                (fn compile-ast
+                  ([ast] (map (fn [child] (compile-ast {:depth 0} child)) (:children ast)))
+                  ([ctx ast]
                    (assert (map? ctx))
                    (assert (number? (:depth ctx)))
                    (let [depth (:depth ctx)
-                         action-id (::pass/action (meta eql))
+                         action-id (-> ast :params ::pass/action)
                          ;;_ (assert action-id "Action must be specified on metadata")
                          action (when action-id (xt/entity db action-id))
                          _ (when action-id (assert action (format "Action not found: %s" action-id)))
@@ -853,25 +885,25 @@
                            (get-in action [::pass/action-contexts parent-action-id ::pass/additional-where-clauses]))]
 
                      (reduce
-                      (fn [acc prop]
-                        (cond
-                          (keyword? prop)
-                          (update-in acc [:find 0] #(list 'pull 'e (conj (last %) prop)))
-                          (map? prop)
-                          (let [[join-k eql] (first prop)]
+                      (fn [acc node]
+                        (case (:type node)
+                          :prop
+                          (update-in acc [:find 0] #(list 'pull 'e (conj (last %) (:key node))))
+                          :join
+                          (let [{:keys [dispatch-key]} node]
                             (-> acc
-                                (update-in [:find 1] (fnil assoc {}) join-k (symbol (name join-k)))
+                                (update-in [:find 1] (fnil assoc {}) dispatch-key (symbol (name dispatch-key)))
                                 (assoc :keys '[root joins])
                                 (update :where conj [`(~'q ; sub-query
-                                                       ~(compile-eql
+                                                       ~(compile-ast
                                                          (-> ctx
                                                              (assoc ::pass/action action)
                                                              (update :depth inc))
-                                                         eql)
+                                                         node)
                                                        ~'e ; e becomes the parent
                                                        ~'subject
                                                        ~'purpose)
-                                                     (symbol (name join-k))])))
+                                                     (symbol (name dispatch-key))])))
                           :else acc))
                       `{:find [(~'pull ~'e [])]
                         :keys [~'root]
@@ -892,7 +924,7 @@
                                         ) rules)
                         :in ~(if (pos? (:depth ctx)) '[parent subject purpose] '[subject purpose])}
 
-                      eql))))
+                      (:children ast)))))
 
                 ;; Here are some EQL examples. These are easy to construct
                 ;; manually or target with a compiler, for example, for the
@@ -915,45 +947,47 @@
                 ;; expressable in terms of actions.
 
                 list-patients-eql
-                '^{::pass/action "https://site.test/actions/get-patient"}
-                [:xt/id
-                 :name
-                 ::site/type
-                 {:measurements
-                  ^{::pass/action "https://site.test/actions/read-any-measurement"}
-                  [:reading]}]
+                '[
+                  {(:patients {::pass/action "https://site.test/actions/get-patient"})
+                   [:xt/id
+                    :name
+                    ::site/type
+                    {(:measurements {::pass/action "https://site.test/actions/read-any-measurement"})
+                     [:reading]}]}]
 
                 join-doctors-to-their-patients-eql
-                '^{::pass/action "https://site.test/actions/get-doctor"}
-                [:xt/id
-                 :name
-                 ::site/type
-                 {:patients
-                  ^{::pass/action "https://site.test/actions/get-patient"}
-                  [:xt/id
-                   :name
-                   ::site/type
-                   {:readings
-                    ^{::pass/action "https://site.test/actions/read-any-measurement"}
-                    [:reading]}]}]
+                '[{(:doctors {::pass/action "https://site.test/actions/get-doctor"})
+                   [:xt/id
+                    :name
+                    ::site/type
+                    {(:patients {::pass/action "https://site.test/actions/get-patient"})
+                     [:xt/id
+                      :name
+                      ::site/type
+                      {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
+                       [:reading]}]}]}]
 
                 ;; Get a particular doctor, by a simple term.
                 ;; Use EQL parameters for this.
                 ;; (TODO)
                 get-doctor-eql
-                '[^{::pass/action "https://site.test/actions/get-doctor"}
-                  {(:doctor {:search "jackson"})
+                '[{(:doctor {::pass/action "https://site.test/actions/get-doctor"
+                             :search "jackson"})
                    [:xt/id :name]}]
 
-                q (compile-eql
-                   #_list-patients-eql
-                   #_join-doctors-to-their-patients-eql
-                   get-doctor-eql)]
+                ;; The compilation process allows multiple queries to be
+                ;; specified in the EQL specification, each may be run in
+                ;; parallel. For now, we just run the first query.
+                q1 (first (compile-ast
+                           (eql/query->ast
+                            #_list-patients-eql
+                            #_join-doctors-to-their-patients-eql
+                            get-doctor-eql)))]
 
-            q
+            q1
 
             (->>
-             (xt/q db q subject nil)
+             (xt/q db q1 subject nil)
              ;; Declutter result tree
              (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))))
 
