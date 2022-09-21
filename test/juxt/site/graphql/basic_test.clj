@@ -2,6 +2,7 @@
 
 (ns juxt.site.graphql.basic-test
   (:require
+   [clojure.walk :refer [postwalk]]
    [jsonista.core :as json]
    [sci.core :as sci]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
@@ -771,44 +772,91 @@
               {subject ::pass/subject}
               (ffirst (xt/q db '{:find [(pull e [*])] :where [[e ::pass/token token]] :in [token]} bob-access-token))]
 
+          (let [eql
+                '^{::pass/action "https://site.test/actions/get-patient"}
+                [:xt/id :name
+                 {:measurements ^{::pass/action "https://site.test/actions/read-any-measurement"} [:reading]}
+                 ]
+
+                compile-eql
+                (fn compile-eql [ctx eql]
+                  (let [action (::pass/action (meta eql))
+                        rules (actions/actions->rules db #{action})]
+                    (assert action "Action must be specified on metadata")
+                    (reduce
+                     (fn [acc prop]
+                       (cond
+                         (keyword? prop)
+                         (update-in acc [:find 0] #(list 'pull 'e (conj (last %) prop)))
+                         (map? prop)
+                         (let [[join-k eql] (first prop)]
+                           (-> acc
+                               (update-in [:find 1] assoc join-k (symbol (name join-k)))
+                               (update :where conj [`(~'q ~(compile-eql {} eql) ~'e ~'subject ~'purpose) (symbol (name join-k))])))
+                         :else acc))
+                     `{:find [(~'pull ~'e []) {}]
+                       :keys [~'root ~'joins]
+                       :where ~(cond->
+                                   `[[~'action :xt/id ~action]
+                                     ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
+                                     ~'[permission ::pass/action action]
+                                     ~'[permission ::pass/purpose purpose]
+                                     ~'(allowed? subject e permission)]
+                                   ctx (conj ['e :patient 'parent] ['e ::site/type "https://site.test/types/measurement"]))
+                       :rules ~rules
+                       :in ~(if ctx '[parent subject purpose] '[subject purpose])}
+                     eql)))
+
+                q (compile-eql nil eql)]
+
+            q
+
+            (->>
+             (xt/q db q subject nil)
+             ;; Declutter result tree
+             (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x)))
+             )
+            )
+
           ;; TODO: Generate this query
 
-          (xt/q
-           db
-           `{:find ~'[(pull e [:xt/id :name]) measurements]
-             :keys ~'[patient measurements]
-             :where
-             [
-              ~'[action :xt/id "https://site.test/actions/get-patient"]
-              ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
-              ~'[permission ::pass/action action]
-              ~'[permission ::pass/purpose purpose]
-              ~'(allowed? subject e permission)
+          #_(xt/q
+             db
+             `{:find ~'[(pull e [:xt/id :name]) {:measurements measurements
+                                                 :foo measurements}]
+               :keys ~'[root children]
+               :where
+               [
+                ~'[action :xt/id "https://site.test/actions/get-patient"]
+                ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
+                ~'[permission ::pass/action action]
+                ~'[permission ::pass/purpose purpose]
+                ~'(allowed? subject e permission)
 
-              ;; join
-              [(~'q {:find ~'[(pull e [:reading])]
-                     :keys ~'[node]
-                     :where
-                     ~'[
-                        [e :patient parent]
-                        [e ::site/type "https://site.test/types/measurement"]
+                ;; join
+                [(~'q {:find ~'[(pull e [:reading])]
+                       :keys ~'[node]
+                       :where
+                       ~'[
+                          [e :patient parent]
+                          [e ::site/type "https://site.test/types/measurement"]
 
-                        [action :xt/id "https://site.test/actions/read-any-measurement"]
-                        [permission ::site/type "https://meta.juxt.site/pass/permission"]
-                        [permission ::pass/action action]
-                        [permission ::pass/purpose purpose]
-                        (allowed? subject e permission)
-                        ]
-                     :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
-                     :in ~'[parent subject]}
-                ~'e ~'subject)
-               ~'measurements]]
+                          [action :xt/id "https://site.test/actions/read-any-measurement"]
+                          [permission ::site/type "https://meta.juxt.site/pass/permission"]
+                          [permission ::pass/action action]
+                          [permission ::pass/purpose purpose]
+                          (allowed? subject e permission)
+                          ]
+                       :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
+                       :in ~'[parent subject purpose]}
+                  ~'e ~'subject ~'purpose)
+                 ~'measurements]]
 
-             :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
+               :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
 
-             :in [~'subject ~'purpose]}
+               :in [~'subject ~'purpose]}
 
-           subject nil)
+             subject nil)
 
           )
 
@@ -929,30 +977,40 @@
         ))))
 
 
-#_`{:find ~'[(pull patient [:xt/id :name])]
-                   :keys ~'[patient]
-                   :where
-                   [
-                    ~'[action :xt/id "https://site.test/actions/get-patient"]
-                    ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
-                    ~'[permission ::pass/action action]
-                    ~'[permission ::pass/purpose purpose]
-                    ~'(allowed? subject patient permission)
+#_`{:find ~'[(pull e [:xt/id :name]) measurements]
+    :keys ~'[root measurements]
+    :where
+    [
+     ~'[action :xt/id "https://site.test/actions/get-patient"]
+     ~'[permission ::site/type "https://meta.juxt.site/pass/permission"]
+     ~'[permission ::pass/action action]
+     ~'[permission ::pass/purpose purpose]
+     ~'(allowed? subject e permission)
 
-                    ]
+     ;; join
+     [(~'q {:find ~'[(pull e [:reading])]
+            :keys ~'[node]
+            :where
+            ~'[
+               [e :patient parent]
+               [e ::site/type "https://site.test/types/measurement"]
 
-                   :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
+               [action :xt/id "https://site.test/actions/read-any-measurement"]
+               [permission ::site/type "https://meta.juxt.site/pass/permission"]
+               [permission ::pass/action action]
+               [permission ::pass/purpose purpose]
+               (allowed? subject e permission)
+               ]
+            :rules ~(actions/actions->rules db #{"https://site.test/actions/read-any-measurement"})
+            :in ~'[parent subject]}
+       ~'e ~'subject)
+      ~'measurements]]
 
-  :in [~'subject ~'purpose]}
+    :rules ~(actions/actions->rules db #{"https://site.test/actions/get-patient"})
 
-(let [eql '[{:patient [:xt/id :name]}]
-      reducer
-      (fn [eql]
-        (reduce (fn [acc prop]
-                  acc
-                  ) {:find []} eql))]
+    :in [~'subject ~'purpose]}
 
-  (reducer eql))
+
 
 #_(f/eval-quotation
    [{:patient "https://site.test/patients/001"
