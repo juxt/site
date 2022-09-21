@@ -986,48 +986,6 @@
 
 
 
-#_(f/eval-quotation
-   [{:patient "https://site.test/patients/001"
-     :doctor "https://site.test/doctors/001"}]
-   `(
-     (site/with-fx-acc
-       [
-        ;; Validate arguments
-        (f/dip
-         [(site/validate
-           [:map
-            [:patient [:re "https://site.test/patients/.*"]]
-            [:doctor [:re "https://site.test/doctors/.*"]]])])
-
-        (f/set-at (f/dip [:input]))
-
-        (f/set-at (f/keep [(f/of :input) (f/of :patient) site/entity :patient]))
-
-        :patient f/swap [(f/set-at (f/keep [:bar :foo]))] f/change-at
-
-        ;;(f/keep [(f/change-at :patient f/swap [f/drop :ok]) :new-patient])
-
-
-        #_(site/entity (f/of :patient))])
-
-     ;; The patient could be the resource undergoing a PATCH, where the
-     ;; PATCH body contains the doctor id.
-
-     ;; Or a GraphQL mutation where an action is called with the patient id
-     ;; and doctor id as arguments.
-
-     ;; It feels like this action needs to be given the arguments on its
-     ;; initial stack, rather than each action pull them into from EDN.
-
-     ;; However an action is called, let's always assume the action begins
-     ;; with arguments on its stack, as any quotation would. But
-     ;; conventionally, there is one argument: a map.
-
-     )
-
-   {::site/db (xt/db *xt-node*)
-    })
-
 #_(let [compiled-schema
         (->
          "juxt/site/graphql/basic.graphql"
