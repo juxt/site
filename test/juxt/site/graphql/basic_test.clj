@@ -144,7 +144,7 @@
            {:xt/id id
             :patient (:patient *input*)
             :doctor (:doctor *input*)
-            ::site/type "ASSIGNMENT"}]]))}
+            ::site/type "https://site.test/types/doctor-patient-assignment"}]]))}
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
@@ -175,7 +175,7 @@
     :juxt.pass.alpha/contexts
     {"https://site.test/actions/get-doctor"
      {:additional-where-clauses
-      '[[ass ::site/type "ASSIGNMENT"]
+      '[[ass ::site/type "https://site.test/types/doctor-patient-assignment"]
         [ass :patient e]
         [ass :doctor parent]]}}
 
