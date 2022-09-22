@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.site.graphql.basic-test
+(ns juxt.pass.eql-datalog-compiler-test
   (:require
    [edn-query-language.core :as eql]
    [jsonista.core :as json]
