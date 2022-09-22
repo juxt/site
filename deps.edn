@@ -76,7 +76,12 @@
         com.auth0/jwks-rsa {:mvn/version "0.20.1"}
 
         ;; Malli is used for authorization only
-        metosin/malli {:mvn/version "0.8.3"}
+        metosin/malli {:mvn/version "0.8.9"}
+
+        ;; sci is used as a potential alternative to Flip
+        org.babashka/sci {:mvn/version "0.3.32"}
+
+        edn-query-language/eql {:mvn/version "1.0.0"}
         }
 
  :aliases
@@ -103,8 +108,8 @@
     lambdaisland/kaocha-junit-xml {:mvn/version "0.0.76"}
     nrepl/nrepl {:mvn/version "0.9.0"}
     }
-   :jvm-opts ["--add-opens" "java.base/java.util.concurrent=ALL-UNNAMED"]
-   }
+   :jvm-opts ["--add-opens" "java.base/java.util.concurrent=ALL-UNNAMED"]}
+
   :coverage
   {:extra-paths ["test"]
    :extra-deps {

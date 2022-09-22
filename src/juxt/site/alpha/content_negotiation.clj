@@ -42,7 +42,8 @@
           "Not Acceptable"
           ;; TODO: Must add list of available representations
           ;; TODO: Add to req with into
-          {::site/request-context (assoc req :ring.response/status 406)}))))
+          {:ring.response/status 406
+           ::site/request-context req}))))
 
     #_(log/debug "result of negotiate-representation" (dissoc selected-representation ::http/body ::http/content))
 

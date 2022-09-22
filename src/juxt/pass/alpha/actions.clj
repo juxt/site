@@ -3,6 +3,7 @@
 (ns juxt.pass.alpha.actions
   (:require
    [clojure.tools.logging :as log]
+   [sci.core :as sci]
    [malli.core :as malli]
    [malli.error :a me]
    [ring.util.codec :as codec]
@@ -11,7 +12,8 @@
    [juxt.site.alpha :as-alias site]
    [juxt.flip.alpha.core :as f :refer [eval-quotation]]
    [juxt.flip.alpha :as-alias flip]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   juxt.site.alpha.schema))
 
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
@@ -32,7 +34,10 @@
 ;; This is broken out into its own function to assist debugging when
 ;; authorization is denied and we don't know why. A better authorization
 ;; debugger is definitely required.
-(defn query-permissions [{:keys [db rules subject actions resource purpose] :as args}]
+(defn
+  ^{:private true
+    }
+  query-permissions [{:keys [db rules subject actions resource purpose] :as args}]
   (assert (or (nil? subject) (string? subject)))
   (assert (or (nil? resource) (string? resource)))
   (let [query {:find '[(pull permission [*]) (pull action [*])]
@@ -65,10 +70,14 @@
 
 (defn check-permissions
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
-  [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose}]
+  [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose :as options}]
 
-  (assert (or (nil? subject) (string? subject)) "Subject expected to be a string, or null")
-  (assert (or (nil? resource) (string? resource)) "Resource expected to be a string, or null")
+  (when (= (find options ::pass/subject) [::pass/subject nil])
+    (throw (ex-info "Nil subject passed!" {})))
+
+  ;; TODO: These asserts have been replaced by Malli schema instrumentation
+  (assert (or (nil? subject) (map? subject)) "Subject expected to be a map, or null")
+  (assert (or (nil? resource) (map? resource)) "Resource expected to be a map, or null")
 
   (let [rules (actions->rules db actions)]
     (when (seq rules)
@@ -76,19 +85,28 @@
             (query-permissions
              {:db db
               :rules rules
-              :subject subject
+              :subject (:xt/id subject)
               :actions actions
-              :resource resource
+              :resource (:xt/id resource)
               :purpose purpose})]
         ;;(log/debugf "Returning permissions: %s" (pr-str permissions))
         permissions))))
+
+(malli/=>
+ check-permissions
+ [:=> [:cat
+       :any
+       [:set :string]
+       [:map
+        [::pass/subject {:optional true}]
+        [::site/resource {:optional true}]
+        [::pass/purpose {:optional true}]]]
+  :any])
 
 (defn allowed-resources
   "Given a set of possible actions, and possibly a subject and purpose, which
   resources are allowed?"
   [db actions {::pass/keys [subject purpose]}]
-  {:pre [(malli/validate [:set {:min 1} :string] actions)]}
-
   (let [rules (actions->rules db actions)
         query {:find '[resource]
                :where
@@ -111,7 +129,7 @@
                :in '[subject actions purpose]}]
 
     (try
-      (xt/q db query subject actions purpose)
+      (xt/q db query (:xt/id subject) actions purpose)
       (catch Exception cause
         (throw
          (ex-info
@@ -123,6 +141,17 @@
            :action-entities (doseq [a actions] (xt/entity db a))
            :purpose purpose}
           cause))))))
+
+(malli/=>
+ allowed-resources
+ [:=> [:cat
+       :any
+       [:set {:min 0} :string]
+       ;;[:set :string]
+       [:map
+        [::pass/subject {:optional true}]
+        [::pass/purpose {:optional true}]]]
+  :any])
 
 ;; TODO: How is this call protected from unauthorized use? Must call this with
 ;; access-token to verify subject.
@@ -158,8 +187,6 @@
 
           resource actions purpose))))
 
-;; TODO: This subject should be folded into the pass-ctx as it's optional (could
-;; be an anonymous action)
 (defn pull-allowed-resource
   "Given a subject, a set of possible actions and a resource, pull the allowed
   attributes."
@@ -174,7 +201,18 @@
                         (fn [{::pass/keys [action]}]
                           (::pass/pull action))
                         check-result))]
-    (xt/pull db pull-expr resource)))
+    (xt/pull db pull-expr (:xt/id resource))))
+
+(malli/=>
+ pull-allowed-resource
+ [:=> [:cat
+       :any
+       [:set :string]
+       ::site/resource
+       [:map
+        [::pass/subject {:optional true}]
+        [::pass/purpose {:optional true}]]]
+  :any])
 
 (defn pull-allowed-resources
   "Given a subject and a set of possible actions, which resources are allowed, and
@@ -213,19 +251,33 @@
 
           :in '[subject actions purpose resources-in-scope]}
 
-         subject actions purpose (or resources-in-scope #{}))]
+         (:xt/id subject) actions purpose (or resources-in-scope #{}))]
 
     ;; TODO: Too complex, extract this and unit test. The purpose here it to
     ;; apply the pull of each relevant action to each result, and merge the
     ;; results into a single map.
 
-    (for [[resource resource-group] (group-by :resource results)]
-      (apply merge
-             (for [{:keys [action purpose permission]}
-                   ;; TODO: Purpose and permission are useful metadata, how do
-                   ;; we retain in the result? with-meta?
-                   resource-group]
-               (xt/pull db (::pass/pull action '[*]) resource))))))
+    #_(throw (ex-info "HERE DEBUG" {:db db
+                                  :resource-groups (group-by :resource results)}))
+
+    (doall
+     (for [[resource resource-group] (group-by :resource results)]
+       (apply merge
+              (for [{:keys [action purpose permission]}
+                    ;; TODO: Purpose and permission are useful metadata, how do
+                    ;; we retain in the result? with-meta?
+                    resource-group]
+                (xt/pull db (::pass/pull action '[*]) resource)))))))
+
+(malli/=>
+ pull-allowed-resources
+ [:=> [:cat
+        :any
+        [:set :string]
+        [:map
+         [::pass/subject {:optional true}]
+         [::pass/purpose {:optional true}]]]
+   :any])
 
 (defn join-with-pull-allowed-resources
   "Join collection on given join-key with another pull of allowed-resources with
@@ -243,6 +295,7 @@
   [xt-ctx
    {subject ::pass/subject
     action ::pass/action
+    action-input ::pass/action-input
     access-token ::pass/access-token
     resource ::site/resource
     purpose ::pass/purpose
@@ -252,8 +305,8 @@
         tx (xt/indexing-tx xt-ctx)]
     (try
       (assert base-uri "The base-uri must be provided")
-      (assert (or (nil? subject) (string? subject)) "Subject to do-action-in-tx-fn expected to be a string, or null")
-      (assert (or (nil? resource) (string? resource)) "Resource to do-action-in-tx-fn expected to be a string, or null")
+      (assert (or (nil? subject) (map? subject)) "Subject to do-action-in-tx-fn expected to be a string, or null")
+      (assert (or (nil? resource) (map? resource)) "Resource to do-action-in-tx-fn expected to be a string, or null")
 
       ;; Check that we /can/ call the action
       (let [check-permissions-result
@@ -291,24 +344,41 @@
                    ctx
                    ::site/db db
                    ::pass/permissions (map ::pass/permission check-permissions-result))
-              [{::site/keys [fx]}]
+              fx
               (cond
-                (::site/transact action-doc)
-                (let [quotation (-> action-doc ::site/transact ::flip/quotation)]
-                  (cond
-                    quotation (eval-quotation
-                               (reverse args) ; push the args to the stack
-                               quotation
-                               env)
-                    :else
-                    (throw (ex-info "Unsupported transact content" {::site/transact (::site/transact action-doc)}))))
+                ;; Official: sci
+                (-> action-doc ::site/transact :juxt.site.alpha.sci/program)
+                (try
+                  (sci/eval-string
+                   (-> action-doc ::site/transact :juxt.site.alpha.sci/program)
+                   {:namespaces
+                    {'user
+                     {'*input* action-input}
+                     'xt
+                     {'entity (fn [id] (xt/entity db id))}
+                     'malli
+                     {'validate (fn [schema value] (malli/validate schema value))}}})
+                  (catch clojure.lang.ExceptionInfo e
+                    ;; The sci.impl/callstack contains a volatile which isn't freezable.
+                    ;; Also, we want to unwrap the original cause exception.
+                    ;; Possibly, in future, we should get the callstack
+                    (throw (ex-info (.getMessage e) (or (ex-data (.getCause e)) {})))))
+
+                ;; Deprecated: flip
+                (-> action-doc ::site/transact ::flip/quotation)
+                (let [[{::site/keys [fx]}]
+                      (eval-quotation
+                       (reverse args)   ; push the args to the stack
+                       (-> action-doc ::site/transact ::flip/quotation)
+                       env)]
+                  fx)
 
                 ;; There might be other strategies in the future (although the
                 ;; fewer the better really)
                 :else
                 (throw
                  (ex-info
-                  "Submitted actions should have a juxt.site.alpha/transact entry"
+                  "Submitted actions should have a valid juxt.site.alpha/transact entry"
                   {:action action-doc})))
 
               _ (log/infof "FX are %s" (pr-str fx))
@@ -336,7 +406,7 @@
                  (cond->
                      {:xt/id (format "%s/_site/action-log/%s" base-uri (::xt/tx-id tx))
                       ::site/type "https://meta.juxt.site/site/action-log-entry"
-                      ::pass/subject subject
+                      ::pass/subject-uri (:xt/id subject)
                       ::pass/action action
                       ::pass/purpose purpose
                       ::pass/puts (vec
@@ -363,6 +433,7 @@
       (catch Throwable e
         (let [action-log-entry-uri (format "%s/_site/action-log/%d" base-uri (::xt/tx-id tx))]
           (log/errorf e "Error when doing action: %s %s" action action-log-entry-uri)
+
           [[::xt/put
             {:xt/id action-log-entry-uri
              ::site/type "https://meta.juxt.site/site/action-log-entry"
@@ -371,9 +442,13 @@
              ::site/resource resource
              ::pass/purpose purpose
              ::site/error {:message (.getMessage e)
-                           :ex-data
+                           ;; ex-data is just too problematic to put into the
+                           ;; database as-is without some sanitization ensuring
+                           ;; it's nippyable.
+                           :ex-data (ex-data e)
                            ;; The site db will not be nippyable
-                           (dissoc (ex-data e) :env)
+
+                           #_(dissoc (ex-data e) :env)
                            ;; TODO: Ideally we'd like the environment in the
                            ;; action log for debugging purposes. But the below
                            ;; stills fails with a nippy error, haven't
@@ -397,8 +472,9 @@
       (dissoc ::site/xt-node ::site/db)
       ;; We take the ids, because it saves on serialization cost and we only
       ;; need the ids in do-action-in-tx-fn
-      (update ::pass/subject :xt/id)
-      (update ::site/resource :xt/id)))
+      ;;(update ::pass/subject :xt/id)
+      ;;(update ::site/resource :xt/id)
+      ))
 
 (defn apply-request-context-operations [ctx ops]
   (let [res
@@ -414,7 +490,8 @@
 
 (defn do-action
   [{::site/keys [xt-node db base-uri resource]
-    ::pass/keys [subject action]
+    ;; TODO: Arguably action should passed as a map
+    ::pass/keys [subject action action-input]
     :as ctx}]
   (assert (::site/xt-node ctx) "xt-node must be present")
   (assert (::site/db ctx) "db must be present")
@@ -432,13 +509,24 @@
       "Resource to do-action expected to be a map, or null"
       {::site/request-context ctx :resource resource})))
 
+  ;; This should be in the tx-fn but getting this malli exception: No
+  ;; implementation of method: :-form of protocol: #'malli.core/Schema found for
+  ;; class: clojure.lang.PersistentVector
+  (let [action (xt/entity db action)]
+    (when-let [input-schema (-> action ::site/transact :juxt.site.alpha.malli/input-schema)]
+      (when-not (malli/validate input-schema action-input)
+        (throw
+         (ex-info
+          "Input to action is not valid"
+          {:action (:xt/id action)
+           :explain (malli/explain input-schema action-input)})))))
+
+
   ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed
   ;; by an anonymous user.
   (let [tx-fn (str base-uri "/_site/do-action")]
     (assert (xt/entity db tx-fn) "do-action must exist in database")
-    (let [tx (xt/submit-tx
-              xt-node
-              [[::xt/fn tx-fn (sanitize-ctx ctx)]])
+    (let [tx (xt/submit-tx xt-node [[::xt/fn tx-fn (sanitize-ctx ctx)]])
           {::xt/keys [tx-id]} (xt/await-tx xt-node tx)
           ctx (assoc ctx ::site/db (xt/db xt-node))]
 
@@ -456,15 +544,18 @@
              (format "%s/_site/action-log/%d" base-uri tx-id))]
         (if-let [error (::site/error result)]
           (do
-            (log/errorf "Transaction error: %s" (pr-str error))
+            (log/errorf "Transaction error: %s" error)
             (let [status (:ring.response/status (:ex-data error))]
               (throw
                (ex-info
-                (format "Transaction error performing action %s: %s" action (:message error))
+                (format "Transaction error performing action %s: %s%s"
+                        action
+                        (:message error)
+                        (if status (format "(status: %s)" status) ""))
                 (into
-                 {::site/request-context
-                  (cond-> ctx
-                    status (assoc :ring.response/status status))}
+                 (cond-> {::site/request-context ctx}
+                   status (assoc :ring.response/status status))
+
                  (merge
                   (dissoc result ::site/type :xt/id ::site/error)
                   (:ex-data error)))))))
@@ -506,13 +597,15 @@
           (check-permissions
            db
            actions
-           (cond-> {::pass/subject (:xt/id subject)}
+           ;; TODO: Isn't this now superfluous - can't we pass through the req?
+           (cond-> {}
              ;; When the resource is in the database, we can add it to the
              ;; permission checking in case there's a specific permission for
              ;; this resource.
-             resource (assoc ::site/resource (:xt/id resource))))]
+             subject (assoc ::pass/subject subject)
+             resource (assoc ::site/resource resource)))]
 
-      (log/debugf "Permitted actions: %s" (pr-str permitted-actions) )
+      (log/debugf "Permitted actions: %s" (pr-str permitted-actions))
 
       (if (seq permitted-actions)
         (h (assoc req ::pass/permitted-actions permitted-actions))
@@ -521,8 +614,8 @@
           (throw
            (ex-info
             (format "No permission for actions: %s" (pr-str actions))
-            {::site/request-context
-             (assoc req :ring.response/status 403)}))
+            {:ring.response/status 403
+             ::site/request-context req}))
 
           ;; No subject?
           (if-let [protection-spaces (::pass/protection-spaces req)]
@@ -531,13 +624,10 @@
             (throw
              (ex-info
               (format "No anonymous permission for actions (try authenticating!): %s" (pr-str actions))
-              {::site/request-context
-               (assoc
-                req
-                :ring.response/status 401
-                :ring.response/headers
-                {"www-authenticate"
-                 (http-authn/www-authenticate-header protection-spaces)})}))
+              {:ring.response/status 401
+               :ring.response/headers
+                {"www-authenticate" (http-authn/www-authenticate-header protection-spaces)}
+               ::site/request-context req}))
 
             ;; We are outside a protection space, there is nothing we can do
             ;; except return a 403 status.
@@ -560,15 +650,14 @@
                 (throw
                  (ex-info
                   (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))
-                  {::site/request-context
-                   (-> req
-                       (assoc :ring.response/status 302)
-                       (assoc-in [:ring.response/headers "location"] redirect))})))
+                  {:ring.response/status 302
+                   :ring.response/headers {"location" redirect}
+                   ::site/request-context req})))
               (throw
                (ex-info
                 (format "No anonymous permission for actions: %s" (pr-str actions))
-                {::site/request-context
-                 (assoc req :ring.response/status 403)})))))))))
+                {:ring.response/status 403
+                 ::site/request-context req})))))))))
 
 
 (defmethod f/word 'juxt.pass.alpha/pull-allowed-resources
@@ -576,3 +665,9 @@
   (assert (::site/db env) "No database in environment")
   (let [result (pull-allowed-resources (::site/db env) actions env)]
     [(cons result stack) queue env]))
+
+
+(comment
+  (sci/eval-string
+   "(+ (clojure.core/rand) 10)"
+   {:namespaces {'clojure.core {'rand (constantly 0.5)}}}))

@@ -2,10 +2,15 @@
 
 (ns juxt.site.alpha.main
   (:require
+   juxt.pass.alpha.schema
+   juxt.site.alpha.schema
    [aero.core :as aero]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log]
-   [integrant.core :as ig]))
+   [integrant.core :as ig]
+   [malli.core :as m]
+   [malli.registry :as mr]
+   ))
 
 (def ^:dynamic *system* nil)
 
@@ -48,6 +53,7 @@
 
 (defn -main [& _]
   (log/info "Starting system")
+
   (let [system-config (system-config)
         system (ig/init system-config)]
     (log/infof "Configuration: %s" (pr-str system-config))

@@ -121,6 +121,7 @@
      ::site/db (xt/db xt-node)
      ::pass/subject subject
      ::pass/action action
+     ::pass/action-input edn-arg
      ::site/base-uri (base-uri)
      ::site/received-representation
      {::http/content-type "application/edn"
@@ -685,7 +686,7 @@
                           (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
                         {:id id :status :created :result result})
                       (catch Throwable cause
-                        (throw (ex-info (format "Failed to converge %s" id) {} cause))
+                        (throw (ex-info (format "Failed to converge %s" id) {:id id} cause))
                         ;;{:id id :status :error :error cause}
                         ))))
         [])))

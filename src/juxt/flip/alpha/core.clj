@@ -3,7 +3,7 @@
 (ns juxt.flip.alpha.core
   ;; When promoting this ns, move the defmethods that require all these
   ;; dependencies:
-  (:refer-clojure :exclude [+ first second symbol drop keep when str ex-info any? filter map])
+  (:refer-clojure :exclude [+ first second symbol drop keep when str ex-info any? filter map case pr-str])
   (:require
    [clojure.core :as cc]
    [clojure.edn :as edn]
@@ -170,6 +170,11 @@
                (clojure.core/list? seq) (clojure.core/concat seq [elt])) stack)
    queue env])
 
+(def adjoin 'juxt.flip.alpha.core/adjoin)
+(defmethod word 'juxt.flip.alpha.core/adjoin
+  [[elt set & stack] [_ & queue] env]
+  [(cc/cons (cc/conj set elt) stack) queue env])
+
 (def >list 'juxt.flip.alpha.core/>list)
 (defmethod word 'juxt.flip.alpha.core/>list
   [[sequence & stack] [_ & queue] env]
@@ -196,7 +201,7 @@
       (throw
        (clojure.core/ex-info
         "Failed validation check"
-        (read-string (pr-str (m/explain schema (clojure.core/first stack))))))
+        (read-string (cc/pr-str (m/explain schema (clojure.core/first stack))))))
       [stack queue env])))
 
 ;; Shuffle words - see
@@ -330,6 +335,23 @@
     [(cons ? stack) (concat f queue) env]
     [(cons ? stack) queue env]))
 
+;; See https://docs.factorcode.org/content/word-case%2Ccombinators.html
+(def case 'juxt.flip.alpha.core/case)
+(defmethod word 'juxt.flip.alpha.core/case
+  [[assoc ;; a sequence of object/quotation pairs, with an optional quotation at the end
+    obj & stack] [_ & queue] env]
+  (if-let [[quotation stack]
+           (some
+            (fn [x]
+              (cc/cond
+                (cc/and (= (cc/count x) 2) (= (cc/first x) obj))
+                [(cc/second x) stack]
+                (= (cc/count x) 1) [(cc/first x) (cons obj stack)]
+                ))
+            (cc/partition-all 2 assoc))]
+    [stack (concat quotation queue) env]
+    (throw (cc/ex-info "no-case" {}))))
+
 (def + 'juxt.flip.alpha.core/+)
 (defmethod word 'juxt.flip.alpha.core/+
   [[y x & stack] [_ & queue] env]
@@ -415,17 +437,17 @@
 (def str 'juxt.flip.alpha.core/str)
 (defmethod word 'juxt.flip.alpha.core/str
   [[s1 s2 & stack] [_ & queue] env]
-  [(cons (clojure.core/str s1 s2) stack) queue env])
+  [(cons (cc/str s1 s2) stack) queue env])
 
 (def pr-str 'juxt.flip.alpha.core/pr-str)
 (defmethod word 'juxt.flip.alpha.core/pr-str
   [[el & stack] [_ & queue] env]
-  [(cons (clojure.core/pr-str el) stack) queue env])
+  [(cons (cc/pr-str el) stack) queue env])
 
 (def number->string 'juxt.flip.alpha.core/number->string)
 (defmethod word 'juxt.flip.alpha.core/number->string
   [[n & stack] [_ & queue] env]
-  [(cons (clojure.core/str n) stack) queue env])
+  [(cons (cc/str n) stack) queue env])
 
 (defmethod word 'juxt.flip.alpha.core/form-decode
   [[encoded & stack] [_ & queue] env]
@@ -433,7 +455,7 @@
     [(cons (codec/form-decode encoded) stack)
      queue
      env]
-    (throw (clojure.core/ex-info "String to decode is null" {}))))
+    (throw (cc/ex-info "String to decode is null" {}))))
 
 (defmethod word 'juxt.flip.alpha.core/form-encode
   [[m & stack] [_ & queue] env]
@@ -474,15 +496,29 @@
   [(clojure.core/cons (clojure.core/update assoc key (clojure.core/fnil conj []) value) stack)
    queue env])
 
+(defmethod word 'juxt.flip.alpha.core/change-at
+  [[quot assoc key & stack] [_ & queue] env]
+  [stack queue env]
+  (assert (map? assoc))
+  (let [new-assoc
+        (cc/update
+         assoc key
+         (fn [value]
+           (cc/first (eval-quotation [value] quot env))))]
+    ;; In deviation from
+    ;; https://docs.factorcode.org/content/word-change-at%2Cassocs.html, where
+    ;; assocs are mutable, we have to return the modified assoc on the stack.
+    [(cc/cons new-assoc stack) queue env]))
+
 #_(defmethod word 'juxt.pass.alpha/find-matching-identity-on-password-query
-  [[{:keys [username-in-identity-key password-hash-in-identity-key]} & stack]
-   [_ & queue] env]
-  [(cons {:find '[e]
-          :where [
-                  ['e username-in-identity-key 'username]
-                  ['e password-hash-in-identity-key 'password-hash]
-                  ['(crypto.password.bcrypt/check password password-hash)]]
-          :in '[username password]} stack) queue env])
+    [[{:keys [username-in-identity-key password-hash-in-identity-key]} & stack]
+     [_ & queue] env]
+    [(cons {:find '[e]
+            :where [
+                    ['e username-in-identity-key 'username]
+                    ['e password-hash-in-identity-key 'password-hash]
+                    ['(crypto.password.bcrypt/check password password-hash)]]
+            :in '[username password]} stack) queue env])
 
 (defmethod word 'juxt.pass.alpha/encrypt-password
   [[password & stack] [_ & queue] env]
@@ -592,6 +628,14 @@
 (defmethod word 'jsonista.core/read-string
   [[s & stack] [_ & queue] env]
   [(cons (jsonista.core/read-value s) stack) queue env])
+
+(defmethod word 'jsonista.core/write-value-as-string
+  [[o & stack] [_ & queue] env]
+  [(cons (jsonista.core/write-value-as-string o) stack) queue env])
+
+(defmethod word 'jsonista.core/write-value-as-bytes
+  [[o & stack] [_ & queue] env]
+  [(cons (jsonista.core/write-value-as-bytes o) stack) queue env])
 
 ;; Convenience words
 

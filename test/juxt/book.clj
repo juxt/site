@@ -988,7 +988,7 @@ Password: <input name=password type=password>
              (f/define make-access-token
                [(f/set-at
                  (f/keep
-                  [f/dup (f/of :subject) :juxt.pass.alpha/subject {} f/set-at f/swap
+                  [f/dup (f/of :subject) (f/of :xt/id) :juxt.pass.alpha/subject {} f/set-at f/swap
                    f/dup (f/of :application) (f/of :xt/id) :juxt.pass.alpha/application f/rot f/set-at
                    (f/of :scope) :juxt.pass.alpha/scope f/rot f/set-at
                    (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
@@ -1140,7 +1140,7 @@ Password: <input name=password type=password>
 
 ;; APIs
 
-(defn create-action-install-api-resource! [_]
+#_(defn create-action-install-api-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1175,7 +1175,7 @@ Password: <input name=password type=password>
           [permission :role role]
           [user :role role]]]})))))
 
-(defn grant-permission-to-install-api-resource! [_]
+#_(defn grant-permission-to-install-api-resource! [_]
   (eval
    (substitute-actual-base-uri
     (quote
@@ -1258,7 +1258,7 @@ Password: <input name=password type=password>
           (f/define extract-owner
             [(f/set-at
               (f/dip
-               [(f/env :juxt.pass.alpha/subject) site/entity (f/of :juxt.pass.alpha/user-identity) site/entity
+               [(f/env :juxt.pass.alpha/subject) (f/of :juxt.pass.alpha/user-identity) site/entity
                 (f/of :juxt.pass.alpha/user)
                 :owner]))])
 
@@ -1384,7 +1384,7 @@ Password: <input name=password type=password>
 
           (f/define ^{:f/stack-effect '[ctx key -- ctx]} update-base-resource
             [(f/dip
-              [(site/entity (f/env ::site/resource))
+              [(f/env ::site/resource)
                (f/set-at (f/dip [f/dup (f/of :input) ::http/content]))
                (f/set-at (f/dip ["application/graphql" ::http/content-type]))
                (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))])
@@ -1396,8 +1396,8 @@ Password: <input name=password type=password>
               ;; Perhaps could we use a template with eval-embedded-quotations?
               [{}
                (f/set-at (f/dip ["application/edn" ::http/content-type]))
-               (f/set-at (f/dip [(f/env ::site/resource) ".edn" f/swap f/str :xt/id]))
-               (f/set-at (f/dip [(f/env ::site/resource) ::site/variant-of]))
+               (f/set-at (f/dip [(f/env ::site/resource) (f/of :xt/id) ".edn" f/swap f/str :xt/id]))
+               (f/set-at (f/dip [(f/env ::site/resource) (f/of :xt/id) ::site/variant-of]))
                (f/set-at (f/dip [f/dup (f/of :compiled-schema) f/pr-str ::http/content]))])
              f/rot
              f/set-at])
@@ -1412,7 +1412,7 @@ Password: <input name=password type=password>
               f/rot)])
 
           (f/define ^{:f/stack-effect '[ctx -- ctx]} determine-status
-            [(f/of (site/entity (f/env ::site/resource)) ::http/content)
+            [(f/of (f/env ::site/resource) ::http/content)
              [200 :status f/rot f/set-at]
              [201 :status f/rot f/set-at]
              f/if])
@@ -1887,7 +1887,8 @@ Password: <input name=password type=password>
                  {::pass/username username
                   ::pass/password (case username
                                     "alice" "garden"
-                                    "bob" "walrus")
+                                    "bob" "walrus"
+                                    "carlos" "toothpick")
                   ::pass/realm "Wonderland"})))
     :deps (fn [{:strs [username]} {::site/keys [base-uri]}]
             #{::init/system
@@ -2131,12 +2132,12 @@ Password: <input name=password type=password>
    ;; Site resources. They're the same thing really. The below should be treated
    ;; with suspicion!
 
-   "https://example.org/actions/install-api-resource"
-   {:deps #{::init/system}
+   #_"https://example.org/actions/install-api-resource"
+   #_{:deps #{::init/system}
     :create #'create-action-install-api-resource!}
 
-   "https://example.org/permissions/system/install-api-resource"
-   {:deps #{::init/system}
+   #_"https://example.org/permissions/system/install-api-resource"
+   #_{:deps #{::init/system}
     :create #'grant-permission-to-install-api-resource!}
    }
 

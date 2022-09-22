@@ -143,6 +143,6 @@
           (throw
            (ex-info
             "Error parsing or compiling GraphQL query for template model"
-            (cond-> {::site/request-context (assoc req :ring.response/status 500)}
+            (cond-> {::site/request-context req}
               (seq errors) (assoc ::errors errors))
             e)))))))

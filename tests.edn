@@ -6,11 +6,12 @@
  :tests [{:id :test
           :test-paths ["test"]
           :ns-patterns ["juxt.book-test"
+                        "juxt.pass.authorization-test"
+                        "juxt.site.cors-test"
                         "juxt.site.graphql-compiler-test"
                         "juxt.site.graphql-auth-integration-test"
+                        "juxt.site.graphql.basic-test"
                         "juxt.site.return-test"
-                        "juxt.site.cors-test"
-                        "juxt.pass.authorization-test"
                         ]}]
 
  :reporter kaocha.report/documentation}
