@@ -397,25 +397,25 @@
    "004" "Dr. Kim"})
 
 (def PATIENT_NAMES
-  {"001" "Terry Levine",
-   "002" "Jeannie Finley",
-   "003" "Jewel Blackburn",
-   "004" "Lila Dickson",
-   "005" "Angie Solis",
-   "006" "Floyd Castro",
-   "007" "Melanie Black",
-   "008" "Beulah Leonard",
-   "009" "Monica Russell",
+  {"001" "Terry Levine"
+   "002" "Jeannie Finley"
+   "003" "Jewel Blackburn"
+   "004" "Lila Dickson"
+   "005" "Angie Solis"
+   "006" "Floyd Castro"
+   "007" "Melanie Black"
+   "008" "Beulah Leonard"
+   "009" "Monica Russell"
    "010" "Sondra Richardson"
-   "011" "Kim Robles",
-   "012" "Mark Richard",
-   "013" "Hazel Huynh",
-   "014" "Francesco Casey",
-   "015" "Moshe Lynch",
-   "016" "Darrel Schwartz",
-   "017" "Blanca Lindsey",
-   "018" "Rudy King",
-   "019" "Valarie Campos",
+   "011" "Kim Robles"
+   "012" "Mark Richard"
+   "013" "Hazel Huynh"
+   "014" "Francesco Casey"
+   "015" "Moshe Lynch"
+   "016" "Darrel Schwartz"
+   "017" "Blanca Lindsey"
+   "018" "Rudy King"
+   "019" "Valarie Campos"
    "020" "Elisabeth Riddle"})
 
 (defn register-doctor! [{:keys [id params] :as arg1}]
@@ -892,104 +892,104 @@
                           {(:measurements {::pass/action "https://site.test/actions/read-any-measurement"})
                            [:reading]}]}])))]
 
-            (is (= #{{:name "Terry Levine",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/001",
+            (is (= #{{:name "Terry Levine"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/001"
                       :measurements nil}
-                     {:name "Moshe Lynch",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/015",
+                     {:name "Moshe Lynch"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/015"
                       :measurements nil}
-                     {:name "Hazel Huynh",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/013",
+                     {:name "Hazel Huynh"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/013"
                       :measurements nil}
-                     {:name "Valarie Campos",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/019",
+                     {:name "Valarie Campos"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/019"
                       :measurements nil}
-                     {:name "Lila Dickson",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/004",
+                     {:name "Lila Dickson"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/004"
                       :measurements nil}
-                     {:name "Floyd Castro",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/006",
+                     {:name "Floyd Castro"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/006"
                       :measurements
-                      [{:reading {"bloodPressure" "198/160", "heartRate" "82"}}]}
-                     {:name "Jeannie Finley",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/002",
+                      [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
+                     {:name "Jeannie Finley"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/002"
                       :measurements nil}
-                     {:name "Beulah Leonard",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/008",
+                     {:name "Beulah Leonard"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/008"
                       :measurements nil}
-                     {:name "Francesco Casey",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/014",
+                     {:name "Francesco Casey"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/014"
                       :measurements nil}
-                     {:name "Angie Solis",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/005",
+                     {:name "Angie Solis"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/005"
                       :measurements nil}
-                     {:name "Jewel Blackburn",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/003",
+                     {:name "Jewel Blackburn"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/003"
                       :measurements nil}
-                     {:name "Sondra Richardson",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/010",
+                     {:name "Sondra Richardson"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/010"
                       :measurements
-                      [{:reading {"bloodPressure" "127/80", "heartRate" "87"}}
-                       {:reading {"bloodPressure" "120/80", "heartRate" "85"}}]}
-                     {:name "Monica Russell",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/009",
+                      [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                       {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}
+                     {:name "Monica Russell"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/009"
                       :measurements nil}
-                     {:name "Rudy King",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/018",
+                     {:name "Rudy King"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/018"
                       :measurements nil}
-                     {:name "Mark Richard",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/012",
+                     {:name "Mark Richard"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/012"
                       :measurements nil}
-                     {:name "Blanca Lindsey",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/017",
+                     {:name "Blanca Lindsey"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/017"
                       :measurements nil}
-                     {:name "Elisabeth Riddle",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/020",
+                     {:name "Elisabeth Riddle"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/020"
                       :measurements nil}
-                     {:name "Melanie Black",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/007",
+                     {:name "Melanie Black"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/007"
                       :measurements nil}
-                     {:name "Kim Robles",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/011",
+                     {:name "Kim Robles"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/011"
                       :measurements nil}
-                     {:name "Darrel Schwartz",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/016",
+                     {:name "Darrel Schwartz"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/016"
                       :measurements nil}}
                    (eqlc/prune-result (xt/q db q1 alice nil))))
 
-            (is (= #{{:name "Lila Dickson",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/004",
+            (is (= #{{:name "Lila Dickson"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/004"
                       :measurements nil}
-                     {:name "Sondra Richardson",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/010",
+                     {:name "Sondra Richardson"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/010"
                       :measurements
-                      [{:reading {"bloodPressure" "127/80", "heartRate" "87"}}
-                       {:reading {"bloodPressure" "120/80", "heartRate" "85"}}]}
-                     {:name "Monica Russell",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/009",
+                      [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                       {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}
+                     {:name "Monica Russell"
+                      :juxt.site.alpha/type "https://site.test/types/patient"
+                      :xt/id "https://site.test/patients/009"
                       :measurements nil}}
                    (eqlc/prune-result (xt/q db q1 bob nil)))))
 
@@ -1008,84 +1008,84 @@
                             {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
                              [:reading]}]}]}])))]
 
-            (is (= #{{:name "Dr. Jack Conway",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/001",
+            (is (= #{{:name "Dr. Jack Conway"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/001"
                       :patients
-                      [{:name "Terry Levine",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/001",
+                      [{:name "Terry Levine"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/001"
                         :readings nil}
-                       {:name "Jeannie Finley",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/002",
+                       {:name "Jeannie Finley"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/002"
                         :readings nil}
-                       {:name "Jewel Blackburn",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/003",
+                       {:name "Jewel Blackburn"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/003"
                         :readings nil}
-                       {:name "Angie Solis",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/005",
+                       {:name "Angie Solis"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/005"
                         :readings nil}]}
-                     {:name "Dr. Murillo",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/002",
+                     {:name "Dr. Murillo"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/002"
                       :patients
-                      [{:name "Lila Dickson",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/004",
+                      [{:name "Lila Dickson"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/004"
                         :readings nil}
-                       {:name "Angie Solis",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/005",
+                       {:name "Angie Solis"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/005"
                         :readings nil}]}
-                     {:name "Dr. Jackson",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/003",
+                     {:name "Dr. Jackson"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/003"
                       :patients
-                      [{:name "Floyd Castro",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/006",
+                      [{:name "Floyd Castro"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/006"
                         :readings
-                        [{:reading {"bloodPressure" "198/160", "heartRate" "82"}}]}
-                       {:name "Sondra Richardson",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/010",
+                        [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
+                       {:name "Sondra Richardson"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/010"
                         :readings
-                        [{:reading {"bloodPressure" "127/80", "heartRate" "87"}}
-                         {:reading {"bloodPressure" "120/80", "heartRate" "85"}}]}]}
-                     {:name "Dr. Kim",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/004",
+                        [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                         {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}
+                     {:name "Dr. Kim"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/004"
                       :patients nil}}
                    (eqlc/prune-result (xt/q db q1 alice nil))))
 
-            (is (= #{{:name "Dr. Jack Conway",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/001",
+            (is (= #{{:name "Dr. Jack Conway"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/001"
                       :patients nil}
-                     {:name "Dr. Murillo",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/002",
+                     {:name "Dr. Murillo"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/002"
                       :patients
-                      [{:name "Lila Dickson",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/004",
+                      [{:name "Lila Dickson"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/004"
                         :readings nil}]}
-                     {:name "Dr. Jackson",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/003",
+                     {:name "Dr. Jackson"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/003"
                       :patients
-                      [{:name "Sondra Richardson",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/010",
+                      [{:name "Sondra Richardson"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/010"
                         :readings
-                        [{:reading {"bloodPressure" "127/80", "heartRate" "87"}}
-                         {:reading {"bloodPressure" "120/80", "heartRate" "85"}}]}]}
-                     {:name "Dr. Kim",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/004",
+                        [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                         {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}
+                     {:name "Dr. Kim"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/004"
                       :patients nil}}
                    (eqlc/prune-result (xt/q db q1 bob nil)))))
 
@@ -1107,57 +1107,57 @@
                             {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
                              [:reading]}]}]}])))]
 
-            (is (= #{{:name "Dr. Jack Conway",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/001",
+            (is (= #{{:name "Dr. Jack Conway"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/001"
                       :patients
-                      [{:name "Terry Levine",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/001",
+                      [{:name "Terry Levine"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/001"
                         :readings nil}
-                       {:name "Jeannie Finley",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/002",
+                       {:name "Jeannie Finley"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/002"
                         :readings nil}
-                       {:name "Jewel Blackburn",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/003",
+                       {:name "Jewel Blackburn"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/003"
                         :readings nil}
-                       {:name "Angie Solis",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/005",
+                       {:name "Angie Solis"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/005"
                         :readings nil}]}
-                     {:name "Dr. Jackson",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/003",
+                     {:name "Dr. Jackson"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/003"
                       :patients
-                      [{:name "Floyd Castro",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/006",
+                      [{:name "Floyd Castro"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/006"
                         :readings
-                        [{:reading {"bloodPressure" "198/160", "heartRate" "82"}}]}
-                       {:name "Sondra Richardson",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/010",
+                        [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
+                       {:name "Sondra Richardson"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/010"
                         :readings
-                        [{:reading {"bloodPressure" "127/80", "heartRate" "87"}}
-                         {:reading {"bloodPressure" "120/80", "heartRate" "85"}}]}]}}
+                        [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                         {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}}
                    (eqlc/prune-result (xt/q db q1 alice nil))))
 
-            (is (= #{{:name "Dr. Jack Conway",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/001",
+            (is (= #{{:name "Dr. Jack Conway"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/001"
                       :patients nil}
-                     {:name "Dr. Jackson",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
-                      :xt/id "https://site.test/doctors/003",
+                     {:name "Dr. Jackson"
+                      :juxt.site.alpha/type "https://site.test/types/doctor"
+                      :xt/id "https://site.test/doctors/003"
                       :patients
-                      [{:name "Sondra Richardson",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/010",
+                      [{:name "Sondra Richardson"
+                        :juxt.site.alpha/type "https://site.test/types/patient"
+                        :xt/id "https://site.test/patients/010"
                         :readings
-                        [{:reading {"bloodPressure" "127/80", "heartRate" "87"}}
-                         {:reading {"bloodPressure" "120/80", "heartRate" "85"}}]}]}}
+                        [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                         {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}}
                    (eqlc/prune-result (xt/q db q1 bob nil))))))
 
         ;; Modelling ideas
