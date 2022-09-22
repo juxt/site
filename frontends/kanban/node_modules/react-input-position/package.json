@@ -1,0 +1,78 @@
+{
+  "name": "react-input-position",
+  "version": "1.3.2",
+  "description": "A React component that decorates it's children with mouse/touch position tracking, a status toggle fired by click/gesture events, and more.",
+  "keywords": [
+    "touch",
+    "tap",
+    "gesture",
+    "mouse",
+    "click",
+    "move",
+    "cursor",
+    "input",
+    "position",
+    "coordinates",
+    "track",
+    "event",
+    "listener"
+  ],
+  "license": "MIT",
+  "author": "Adam Risberg <myniztan@hotmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adamrisberg/react-input-position.git"
+  },
+  "homepage": "https://adamrisberg.github.io/react-input-position",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "webpack-dev-server --mode development",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "transpile": "rimraf dist && babel src -d dist --ignore src/__tests__/*",
+    "prepublishOnly": "npm run transpile",
+    "build": "rimraf examples/dist && webpack --mode production",
+    "deploy": "gh-pages -d examples/dist",
+    "publish-demo": "npm run build && npm run deploy"
+  },
+  "peerDependencies": {
+    "react": "^16.3.0",
+    "react-dom": "^16.3.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.12.1",
+    "@babel/core": "^7.12.3",
+    "@babel/plugin-proposal-class-properties": "^7.12.1",
+    "@babel/preset-env": "^7.12.1",
+    "@babel/preset-react": "^7.12.5",
+    "@types/jest": "^24.9.1",
+    "babel-eslint": "^9.0.0",
+    "babel-jest": "^24.9.0",
+    "babel-loader": "^8.1.0",
+    "css-loader": "^2.1.1",
+    "enzyme": "^3.11.0",
+    "enzyme-adapter-react-16": "^1.15.5",
+    "eslint": "^5.16.0",
+    "eslint-config-react-app": "^3.0.8",
+    "eslint-loader": "^2.2.1",
+    "eslint-plugin-flowtype": "^2.50.3",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-jsx-a11y": "^6.4.1",
+    "eslint-plugin-react": "^7.21.5",
+    "file-loader": "^3.0.1",
+    "gh-pages": "^2.2.0",
+    "html-webpack-plugin": "^3.2.0",
+    "jest": "^24.9.0",
+    "react": "^16.14.0",
+    "react-dom": "^16.14.0",
+    "rimraf": "^2.7.1",
+    "style-loader": "^0.23.1",
+    "webpack": "^4.44.2",
+    "webpack-cli": "^3.3.12",
+    "webpack-dev-server": "^3.11.0"
+  },
+  "dependencies": {
+    "prop-types": "^15.7.2"
+  }
+}

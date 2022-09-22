@@ -1,0 +1,66 @@
+{
+  "name": "detect-it",
+  "version": "4.0.1",
+  "description": "Detect if a device is mouse only, touch only, or hybrid",
+  "main": "dist/detect-it.cjs.js",
+  "module": "dist/detect-it.esm.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "rollpkg build --addUmdBuild",
+    "watch": "rollpkg watch",
+    "prepublishOnly": "npm run lint && npm test && npm run build",
+    "lint": "eslint src",
+    "test": "jest",
+    "test:watch": "jest --watchAll",
+    "coverage": "npx live-server coverage/lcov-report",
+    "lintStaged": "lint-staged"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rafgraph/detect-it.git"
+  },
+  "keywords": [
+    "detect",
+    "device",
+    "mouse",
+    "touch",
+    "hybrid",
+    "passive events",
+    "pointer events"
+  ],
+  "author": "Rafael Pedicini <rafael@rafgraph.dev>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rafgraph/detect-it/issues"
+  },
+  "homepage": "https://detect-it.rafgraph.dev",
+  "devDependencies": {
+    "lint-staged": "^10.5.4",
+    "pre-commit": "^1.2.2",
+    "rollpkg": "^0.4.2",
+    "typescript": "^4.1.5"
+  },
+  "pre-commit": "lintStaged",
+  "lint-staged": {
+    "(src/**/*|demo/src/**/*)": [
+      "eslint",
+      "prettier --write --ignore-unknown"
+    ]
+  },
+  "prettier": "rollpkg/configs/prettier.json",
+  "eslintConfig": {
+    "extends": [
+      "./node_modules/rollpkg/configs/eslint"
+    ],
+    "rules": {
+      "jest/no-mocks-import": "off"
+    }
+  },
+  "jest": {
+    "preset": "rollpkg"
+  }
+}

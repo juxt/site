@@ -1,0 +1,1 @@
+{"version":3,"file":"get-select-scroll-area.d.ts","sourceRoot":"","sources":["../../../../src/components/Select/get-select-scroll-area/get-select-scroll-area.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAqB,MAAM,OAAO,CAAC;AAC1C,OAAO,EAAc,eAAe,EAAE,MAAM,kBAAkB,CAAC;AAE/D,UAAU,qBAAsB,SAAQ,eAAe;IACrD,SAAS,CAAC,EAAE,MAAM,CAAC;CACpB;AAED,wBAAgB,mBAAmB,CAAC,KAAK,EAAE,qBAAqB,gGAa/D"}

@@ -199,8 +199,21 @@
   (let [tx-id (xt/submit-tx node tx)]
     (xt/await-tx node tx-id)))
 
-(defn apply-uri-mappings
-  [mapping]
+(defn validate-resource-line [s]
+  (edn/read-string
+   {:eof :eof :readers edn-readers}
+   s))
+
+(defn get-zipped-output-stream []
+  (let [zos (doto
+             (-> (str (now-id) ".edn.zip")
+                 io/file
+                 io/output-stream
+                 java.util.zip.ZipOutputStream.)
+              (.putNextEntry (java.util.zip.ZipEntry. "resources.edn")))]
+    (java.io.OutputStreamWriter. zos)))
+
+(defn apply-uri-mappings [mapping]
   (fn [ent]
     ;; Create a regex pattern which detects anything as a mapping key
     (let [pat (re-pattern (str/join "|" (map #(format "\\Q%s\\E" %) (keys mapping))))]
@@ -253,14 +266,12 @@
    (let [out (or out
                  (when filename (io/output-stream (io/file filename)))
                  (get-zipped-output-stream))
-         pred (or pred some?)
          encoder (java.util.Base64/getEncoder)
          resources
          (cond->> (q '{:find [(pull e [*])]
-                       :where [[e :xt/id]]})
+                       :where [[e :xt/id]]
+                       :timeout 10000000000})
            true (map first)
-           true (filter #(not= (::site/type %) "Request"))
-           pred (filter pred)
            true (sort-by :xt/id))]
 
      (defmethod print-method (type (byte-array [])) [x writer]
@@ -348,8 +359,8 @@
    (let [db (xt/db (xt-node))]
      [;; Awaiting a fix to https://github.com/juxt/xtdb/issues/1480
       #_{:complete? (and
-                     (xt/entity db "/_site/tx_fns/put_if_match_wildcard")
-                     (xt/entity db "/_site/tx_fns/put_if_match_etags"))
+                     (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
+                     (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
          :happy-message "Site transaction functions installed."
          :sad-message "Site transaction functions not installed. "
          :fix "Enter (put-site-txfns!) to fix this."}

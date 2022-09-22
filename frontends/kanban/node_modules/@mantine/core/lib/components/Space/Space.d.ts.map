@@ -1,0 +1,1 @@
+{"version":3,"file":"Space.d.ts","sourceRoot":"","sources":["../../../src/components/Space/Space.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAqB,MAAM,OAAO,CAAC;AAC1C,OAAO,EAAE,YAAY,EAAE,iBAAiB,EAAE,MAAM,iBAAiB,CAAC;AAGlE,MAAM,WAAW,UAAW,SAAQ,YAAY;IAC9C,2CAA2C;IAC3C,CAAC,CAAC,EAAE,iBAAiB,CAAC;IAEtB,0CAA0C;IAC1C,CAAC,CAAC,EAAE,iBAAiB,CAAC;CACvB;AAED,eAAO,MAAM,KAAK,mFAejB,CAAC"}

@@ -986,8 +986,9 @@
 
 (def cors-headers
   "Generic CORS headers"
-  {"Access-Control-Allow-Origin"  "*"
-   "Access-Control-Allow-Headers" "*"
+  {"Access-Control-Allow-Origin"  "http://localhost:5173"
+   "Access-Control-Allow-Headers" ""
+   "access-control-allow-credentials" "true"
    "Access-Control-Allow-Methods" "GET"})
 
 (defn preflight?

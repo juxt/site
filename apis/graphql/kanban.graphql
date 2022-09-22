@@ -1,0 +1,369 @@
+schema @site(type: "kanban/prod") {
+  query: Query
+  mutation: Mutation
+}
+
+type Query {
+  allWorkflows: [Workflow]
+  workflow(id: ID!): Workflow
+  myJuxtcode: String @site(subject: "juxt.pass.alpha/username")
+  allHiringCards: [HiringCard]
+  cardHistory(id: ID!, limit: Int, offset: Int, historicalDb: Boolean): [Card]
+    @site(history: "desc")
+  cardsByIds(ids: [ID]!): [Card]
+  allWorkflowStates: [WorkflowState]
+  workflowState(id: ID!): WorkflowState
+  allWorkflowProjects: [WorkflowProject]
+  commentsForEntity(
+    id: ID!
+    limit: Int
+    order: String
+    asOf: String
+  ): [Comment] @site(itemForId: "cardId")
+  allComments(limit: Int): [Comment]
+  cardsForProject(id: ID!): [Card] @site(itemForId: "workflowProjectId")
+  feedbackForCard(id: ID!): [InterviewFeedback] @site(itemForId: "cardId")
+  allClients: [Client]
+  allRejectionReasons: [RejectionReason]
+  allProgressItems: [ProgressItem]
+  progressHistory(id: ID!): [ProgressItem] @site(history: "desc")
+}
+
+type Mutation {
+  createWorkflow(
+    id: ID
+    name: String!
+    description: String
+    workflowStateIds: [ID]
+  ): Workflow
+  updateWorkflow(
+    id: ID!
+    name: String
+    description: String
+    workflowStateIds: [ID]
+  ): Workflow @site(mutation: "update")
+  deleteWorkflow(id: ID!): Workflow @site(mutation: "delete")
+  createWorkflowState(WorkflowState: WorkflowStateInput): WorkflowState
+  createWorkflowStates(workflowStates: [WorkflowStateInput]): [WorkflowState]
+
+  moveCard(
+    cardId: ID!
+    workflowStateId: ID!
+    previousCard: ID
+    sameColMove: Boolean
+  ): Card @site(resolver: "kanban.resolvers/move-card")
+  deleteCardFromColumn(cardId: ID!, workflowStateId: ID!): Card
+    @site(resolver: "kanban.resolvers/delete-card-from-column")
+
+  updateWorkflowState(
+    id: ID!
+    workflowState: WorkflowStateInput
+  ): WorkflowState @site(mutation: "update")
+  deleteWorkflowState(id: ID!): WorkflowState @site(mutation: "delete")
+  createHiringCard(Card: HiringCardInput): HiringCard
+  updateHiringCard(id: ID!, Card: HiringCardInput): Card
+    @site(mutation: "update", objectType: "HiringCard")
+  deleteHiringCard(id: ID!): HiringCard @site(mutation: "delete")
+  rollbackCard(id: ID!, asOf: String!): HiringCard @site(mutation: "rollback")
+  createWorkflowProject(workflowProject: WorkflowProjectInput): WorkflowProject
+  createWorkflowProjects(
+    workflowProjects: [WorkflowProjectInput]
+  ): [WorkflowProject]
+  updateWorkflowProject(
+    id: ID!
+    workflowProject: WorkflowProjectInput
+  ): WorkflowProject @site(mutation: "update")
+  deleteWorkflowProject(id: ID!): WorkflowProject @site(mutation: "delete")
+  createComment(Comment: CommentInput): Comment
+  updatecomment(id: ID!, Comment: CommentInput): Comment
+    @site(mutation: "update")
+  deleteComment(id: ID!): Comment @site(mutation: "delete")
+  createInterviewFeedback(
+    interviewFeedback: InterviewFeedbackInput!
+  ): InterviewFeedback
+  upsertGrowResource(growResource: GrowResourceInput): GrowResource
+    @site(mutation: "update")
+  createGrowTag(growTag: GrowTagInput): GrowTag
+  deleteGrowResource(id: ID!): GrowResource @site(mutation: "delete")
+  createClient(client: ClientInput): Client
+  createRejectionReason(rejectionReason: RejectionReasonInput): RejectionReason
+  createProgressItem(progressItem: ProgressItemInput): ProgressItem
+  updateProgressItem(id: ID!, progressItem: ProgressItemInput): ProgressItem
+    @site(mutation: "update")
+  deleteProgressItem(id: ID!): ProgressItem @site(mutation: "delete")
+}
+
+input HiringQuestionInput {
+  question: String!
+  response: String!
+  description: String
+  scoreCardsLabel: String
+  scoreCards: [HiringScoreCardInput!]!
+  preSet: Boolean
+}
+
+input HiringScoreCardInput {
+  text: String!
+  score: Int!
+  description: String
+  preSet: Boolean
+}
+
+input InterviewFeedbackInput {
+  id: ID!
+  overallScore: Int!
+  stateStr: String!
+  summary: String!
+  questions: [HiringQuestionInput]
+  cardId: ID!
+}
+
+input CommentInput {
+  text: String!
+  parentId: ID
+  cardId: ID!
+}
+
+input OpenRoleInput {
+  name: String!
+  count: Int!
+}
+
+input WorkflowProjectInput {
+  name: String!
+  openRoles: [OpenRoleInput]
+  description: String
+  id: ID
+}
+
+input WorkflowStateInput {
+  name: String
+  description: String
+  roles: [String]
+  tasks: [String]
+  id: ID
+  cardIds: [ID]
+}
+
+input FileInput {
+  name: String!
+  type: String!
+  base64: String!
+}
+
+input HiringCardInput {
+  title: String
+  description: String
+  takeHomeLanguage: String
+  workflowProjectId: ID
+  currentOwnerUsernames: [String]
+  createdAt: String
+  isFastTrack: Boolean
+  hasRemoteFee: Boolean
+  potentialClientIds: [ID]
+  rejectionReasonIds: [ID]
+  rejectionFeedback: String
+  stateStr: String
+  taskHtml: String
+  workflowId: ID
+  languages: [String]
+  agent: String
+  location: String
+  files: [FileInput]
+  cvPdf: FileInput
+}
+
+type Workflow {
+  id: ID!
+  name: String!
+  description: String
+  _siteQuery: String
+  workflowStates: [WorkflowState]! @site(each: "workflowStateIds")
+}
+
+enum WorkflowStateType {
+  UNSTARTED
+  STARTED
+  DONE
+}
+
+type WorkflowState {
+  id: ID!
+  name: String!
+  _siteQuery: String
+  description: String
+  type: WorkflowStateType
+  roles: [String]
+  tasks: [String]
+  workflow: Workflow! @site(ref: "workflowStateIds")
+  cards: [Card] @site(each: "cardIds")
+}
+
+type OpenRole {
+  name: String!
+  count: Int!
+}
+
+type WorkflowProject {
+  id: ID!
+  name: String!
+  description: String
+  openRoles: [OpenRole] @onObject
+  hiringCard: HiringCard @site(ref: "workflowProjectId")
+}
+
+type File {
+  name: String!
+  type: String!
+  base64: String!
+}
+
+input ClientInput {
+  name: String!
+  id: ID
+}
+
+type Client {
+  name: String!
+  id: ID!
+}
+
+input RejectionReasonInput {
+  name: String!
+  id: ID
+}
+
+type RejectionReason {
+  name: String!
+  id: ID!
+}
+
+type HiringCard {
+  id: ID!
+  title: String!
+  _siteValidTime: String!
+  _siteSubject: ID
+  _siteQuery: String
+  agent: String
+  hasRemoteFee: Boolean
+  isFastTrack: Boolean
+  currentOwnerUsernames: [String]
+  potentialClients: [Client] @site(each: "potentialClientIds")
+  rejectionReasons: [RejectionReason] @site(each: "rejectionReasonIds")
+  rejectionFeedback: String
+  project: WorkflowProject @site(ref: "workflowProjectId")
+  taskHtml: String
+  takeHomeLanguage: String
+  description: String
+  languages: [String]
+  interviewFeedback: [InterviewFeedback] @site(ref: "cardId")
+  location: String
+  createdAt: String
+  files: [File] @onObject
+  cvPdf: File @onObject
+  stateStr: String
+  workflow: Workflow @site(ref: "workflowId")
+  workflowState: WorkflowState
+    @site(
+      q: {
+        edn: """
+        {:find [e]
+           :where [[e {{type}} "WorkflowState"]
+                   [e :cardIds "{{object-id}}"]]}
+        """
+      }
+    )
+}
+
+type HiringScoreCard {
+  text: String!
+  description: String
+  score: Int!
+}
+
+type HiringQuestion {
+  question: String!
+  response: String!
+  description: String
+  scoreCardsLabel: String
+  scoreCards: [HiringScoreCard!]! @onObject
+}
+
+type InterviewFeedback {
+  id: ID!
+  overallScore: Int!
+  stateStr: String!
+  summary: String!
+  questions: [HiringQuestion] @onObject
+  _siteSubject: String
+  _siteValidTime: String!
+  _siteCreatedAt: String!
+  card: Card @site(ref: "cardId")
+  _siteQuery: String
+}
+
+union Card = HiringCard
+
+type Comment {
+  id: ID!
+  text: String!
+  _siteSubject: String
+  _siteValidTime: String!
+  _siteCreatedAt: String!
+  parentId: String
+  card: Card @site(ref: "cardId")
+  children: [Comment] @site(ref: "parentId")
+  _siteQuery: String
+}
+
+input GrowTagInput {
+  id: ID!
+  name: String!
+}
+
+input GrowResourceInput {
+  id: ID
+  name: String
+  description: String
+  descriptionHTML: String
+  category: String
+  url: String
+  foo: String
+  type: String
+  tagIds: [ID]
+}
+
+type GrowTag {
+  id: ID!
+  name: String!
+}
+
+type GrowResource {
+  id: ID!
+  name: String!
+  description: String
+  descriptionHTML: String
+  url: String
+  category: String
+  tags: [GrowTag] @site(each: "tagIds")
+  _siteQuery: String
+  _siteSubject: String
+  _siteValidTime: String!
+}
+
+input ProgressItemInput {
+  id: ID!
+  name: String!
+  descriptionHTML: String
+  currentScore: String!
+}
+
+type ProgressItem {
+  id: ID!
+  name: String!
+  descriptionHTML: String
+  currentScore: String!
+  _siteSubject: String
+  _siteValidTime: String!
+  _siteCreatedAt: String!
+}

@@ -1,0 +1,53 @@
+{
+  "name": "merge-refs",
+  "version": "1.0.0",
+  "description": "A function that merges React refs into one.",
+  "main": "dist/umd/index.js",
+  "module": "dist/esm/index.js",
+  "source": "src/index.js",
+  "sideEffects": false,
+  "scripts": {
+    "build": "yarn build-esm && yarn build-umd",
+    "build-esm": "cross-env BABEL_ENV=production-esm babel src -d dist/esm --ignore **/*.spec.js",
+    "build-umd": "cross-env BABEL_ENV=production-umd babel src -d dist/umd --ignore **/*.spec.js",
+    "clean": "rimraf dist",
+    "jest": "jest",
+    "jest-coverage": "jest --coverage",
+    "lint": "eslint src/ --ext .jsx,.js",
+    "prepublishOnly": "yarn clean && yarn build",
+    "test": "yarn lint && yarn jest"
+  },
+  "keywords": [
+    "react",
+    "react ref",
+    "react refs",
+    "merge"
+  ],
+  "author": {
+    "name": "Wojciech Maj",
+    "email": "kontakt@wojtekmaj.pl"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/cli": "^7.5.5",
+    "@babel/core": "^7.5.5",
+    "@babel/preset-env": "^7.5.5",
+    "babel-jest": "^24.0.0",
+    "cross-env": "^6.0.3",
+    "eslint": "^6.1.0",
+    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-plugin-import": "^2.18.2",
+    "jest": "^24.8.0",
+    "rimraf": "^3.0.0"
+  },
+  "files": [
+    "LICENSE",
+    "README.md",
+    "dist/",
+    "src/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wojtekmaj/merge-refs.git"
+  }
+}

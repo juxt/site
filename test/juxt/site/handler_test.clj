@@ -1,4 +1,3 @@
-;; Copyright © 2021, JUXT LTD.
 
 (ns juxt.site.handler-test
   (:require
@@ -106,7 +105,6 @@
     (is (= "putAB"
            (get-in r [::site/resource ::apex/operation "operationId"])))))
 
-
 (deftest inject-path-parameter-with-forward-slash-test
   ;; PUT a project code of ABC/DEF (with Swagger) and ensure the / is
   ;; preserved. This test tests an edge case where we want a path parameter to contain a /.
@@ -149,7 +147,7 @@
              {"properties"
               {"name" {"type" "string" "minLength" 1}}}}}}}}}}}]])
 
-  (let [path (str"/things/" (java.net.URLEncoder/encode "ABC/DEF"))
+  (let [path (str "/things/" (java.net.URLEncoder/encode "ABC/DEF"))
         body (json/write-value-as-string {"name" "zip"})
         r (*handler*
            {:ring.request/method :put
@@ -176,20 +174,20 @@
       ::http/content-type "image/png"
       ::http/methods #{:get}}]])
   (are [if-modified-since status]
-      (= status
-         (:ring.response/status
-          (*handler*
-           {:ring.request/method :get
-            :ring.request/headers
-            (if if-modified-since
-              {"if-modified-since"
-               (format-http-date if-modified-since)}
-              {})
-            :ring.request/path "/test.png"})))
-      nil 200
-      #inst "2020-02-29" 200
-      #inst "2020-03-01" 304
-      #inst "2020-03-02" 304))
+       (= status
+          (:ring.response/status
+           (*handler*
+            {:ring.request/method :get
+             :ring.request/headers
+             (if if-modified-since
+               {"if-modified-since"
+                (format-http-date if-modified-since)}
+               {})
+             :ring.request/path "/test.png"})))
+    nil 200
+    #inst "2020-02-29" 200
+    #inst "2020-03-01" 304
+    #inst "2020-03-02" 304))
 
 (deftest if-none-match-test
   (submit-and-await!
@@ -200,18 +198,18 @@
       ::http/content-type "image/png"
       ::http/methods #{:get :head :options}}]])
   (are [if-none-match status]
-      (= status
-         (:ring.response/status
-          (*handler*
-           {:ring.request/method :get
-            :ring.request/headers
-            (if if-none-match {"if-none-match" if-none-match} {})
-            :ring.request/path "/test.png"})))
-      nil 200
-      "" 200
-      "def" 200
-      "abc" 200
-      "\"abc\"" 304))
+       (= status
+          (:ring.response/status
+           (*handler*
+            {:ring.request/method :get
+             :ring.request/headers
+             (if if-none-match {"if-none-match" if-none-match} {})
+             :ring.request/path "/test.png"})))
+    nil 200
+    "" 200
+    "def" 200
+    "abc" 200
+    "\"abc\"" 304))
 
 ;; TODO: If-Unmodified-Since
 
@@ -239,8 +237,7 @@
       ::site/type "StaticRepresentation"
       ::http/etag "\"abc\""
       ::http/content-type "image/png"
-      ::http/methods #{:put}
-      }]])
+      ::http/methods #{:put}}]])
   (:ring.response/status
    (let [body "Hello"]
      (*handler*
@@ -263,16 +260,16 @@
 
 (deftest redirect-test
   (submit-and-await!
-    [[:xtdb.api/put
-      {:xt/id "https://example.org/"
-       ::site/type "Redirect"
-       ::site/location "/test.html"}]])
+   [[:xtdb.api/put
+     {:xt/id "https://example.org/"
+      ::site/type "Redirect"
+      ::site/location "/test.html"}]])
 
-   (let [response (*handler*
-                   {:ring.request/method :get
-                    :ring.request/path "/"})]
-     (is (= 302 (:ring.response/status response)))
-     (is (= "/test.html" (get-in response [:ring.response/headers "location"])))))
+  (let [response (*handler*
+                  {:ring.request/method :get
+                   :ring.request/path "/"})]
+    (is (= 302 (:ring.response/status response)))
+    (is (= "/test.html" (get-in response [:ring.response/headers "location"])))))
 
 (deftest content-negotiation-test
   (submit-and-await!
@@ -306,11 +303,11 @@
 
   ;; TODO: Enable test when 406 is re-instated
   #_(let [response
-        (*handler*
-         {:ring.request/method :get
-          :ring.request/path "/report"
-          :ring.request/headers {"accept" "image/png"}})]
-    (is (= 406 (:ring.response/status response)))))
+          (*handler*
+           {:ring.request/method :get
+            :ring.request/path "/report"
+            :ring.request/headers {"accept" "image/png"}})]
+      (is (= 406 (:ring.response/status response)))))
 
 (deftest variants-test
   (submit-and-await!
@@ -350,70 +347,69 @@
 
   ;; TODO: Enable test when 406 is re-instated
   #_(let [response
-        (*handler*
-         {:ring.request/method :get
-          :ring.request/path "/report"
-          :ring.request/headers {"accept" "image/png"}})]
-    (is (= 406 (:ring.response/status response)))))
+          (*handler*
+           {:ring.request/method :get
+            :ring.request/path "/report"
+            :ring.request/headers {"accept" "image/png"}})]
+      (is (= 406 (:ring.response/status response)))))
 
 #_((t/join-fixtures [with-xt with-handler])
- (fn []
-   (submit-and-await!
-    [ ;;[:xtdb.api/put access-all-areas]
-     [:xtdb.api/put
-      {:xt/id "https://example.org/sensitive-report.html"
-       ::http/content-type "text/html;charset=utf-8"
-       ::http/content "Latest sales figures"
-       ::http/methods #{:get :head :options}}]
+   (fn []
+     (submit-and-await!
+      [;;[:xtdb.api/put access-all-areas]
+       [:xtdb.api/put
+        {:xt/id "https://example.org/sensitive-report.html"
+         ::http/content-type "text/html;charset=utf-8"
+         ::http/content "Latest sales figures"
+         ::http/methods #{:get :head :options}}]
 
-     [:xtdb.api/put
-      {:xt/id "https://example.org/401.html"
-       ::site/type "ErrorRepresentation"
-       ::http/status #{401 403}
-       ::http/content-type "text/html;charset=utf-8"
-       ::http/content "<h1>Unauthorized or Forbidden</h1>"}]
+       [:xtdb.api/put
+        {:xt/id "https://example.org/401.html"
+         ::site/type "ErrorRepresentation"
+         ::http/status #{401 403}
+         ::http/content-type "text/html;charset=utf-8"
+         ::http/content "<h1>Unauthorized or Forbidden</h1>"}]
 
-     [:xtdb.api/put
-      {:xt/id "https://example.org/401.txt"
-       ::site/type "ErrorRepresentation"
-       ::http/status #{401}
-       ::http/content-type "text/plain;charset=utf-8"
-       ::http/content "Unauthorized"}]
+       [:xtdb.api/put
+        {:xt/id "https://example.org/401.txt"
+         ::site/type "ErrorRepresentation"
+         ::http/status #{401}
+         ::http/content-type "text/plain;charset=utf-8"
+         ::http/content "Unauthorized"}]
 
-     [:xtdb.api/put
-      {:xt/id "https://example.org/406.html"
-       ::site/type "ErrorRepresentation"
-       ::http/status #{406}
-       ::http/content-type "text/html;charset=utf-8"
-       ::http/content "<h1>Unacceptable</h1>"
-       ::http/methods #{:get :head :options}}]])
+       [:xtdb.api/put
+        {:xt/id "https://example.org/406.html"
+         ::site/type "ErrorRepresentation"
+         ::http/status #{406}
+         ::http/content-type "text/html;charset=utf-8"
+         ::http/content "<h1>Unacceptable</h1>"
+         ::http/methods #{:get :head :options}}]])
 
-   (let [db (x/db *xt-node*)]
-     (x/q db '{:find [er]
-               :where [[er ::site/type "ErrorRepresentation"]
-                       [er ::http/status 403]]}))
+     (let [db (x/db *xt-node*)]
+       (x/q db '{:find [er]
+                 :where [[er ::site/type "ErrorRepresentation"]
+                         [er ::http/status 403]]}))
 
-   (*handler*
-    {:ring.request/method :get
-     :ring.request/path "/sensitive-report.html"
-     :ring.request/headers {"accept" "text/html"}})))
+     (*handler*
+      {:ring.request/method :get
+       :ring.request/path "/sensitive-report.html"
+       :ring.request/headers {"accept" "text/html"}})))
 
 #_((t/join-fixtures [with-xt with-handler])
- (fn []
-   (submit-and-await!
-    [[:xtdb.api/put access-all-areas]
-     [:xtdb.api/put
-      {:xt/id "https://example.org/report.html"
-       ::http/content-type "text/html;charset=utf-8"
-       ::http/content "Latest figures"
-       ::http/methods #{:get :head :options}
-       ::http/cache-directives #{:no-store}
-       }]])
+   (fn []
+     (submit-and-await!
+      [[:xtdb.api/put access-all-areas]
+       [:xtdb.api/put
+        {:xt/id "https://example.org/report.html"
+         ::http/content-type "text/html;charset=utf-8"
+         ::http/content "Latest figures"
+         ::http/methods #{:get :head :options}
+         ::http/cache-directives #{:no-store}}]])
 
-   (:ring.response/headers
-    (*handler*
-     {:ring.request/method :get
-      :ring.request/path "/report.html"}))))
+     (:ring.response/headers
+      (*handler*
+       {:ring.request/method :get
+        :ring.request/path "/report.html"}))))
 
 ;; TODO:
       ;; "The server generating a 304 response MUST generate any of the following
@@ -426,19 +422,19 @@
 ;; TODO: Security headers - read latest OWASP and similar
 
 #_(deftest app-test
-  (submit-and-await!
-   [[:xtdb.api/put access-all-areas]
+    (submit-and-await!
+     [[:xtdb.api/put access-all-areas]
 
-    [:xtdb.api/put
-     {:xt/id "https://example.org/view/index.html"
-      ::http/methods #{:get}
-      ::http/content-type "text/html;charset=utf-8"
-      ::http/content "<h1>Hello!</h1>"}]])
+      [:xtdb.api/put
+       {:xt/id "https://example.org/view/index.html"
+        ::http/methods #{:get}
+        ::http/content-type "text/html;charset=utf-8"
+        ::http/content "<h1>Hello!</h1>"}]])
 
-  (let [response
-        (*handler*
-         {:ring.request/method :get
-          :ring.request/path "/view/index.html"
-          :ring.request/headers {"accept" "text/html"}})]
-    (is (= 200 (:ring.response/status response)))
-    (is (= "<h1>Hello!</h1>" (:ring.response/body response)))))
+    (let [response
+          (*handler*
+           {:ring.request/method :get
+            :ring.request/path "/view/index.html"
+            :ring.request/headers {"accept" "text/html"}})]
+      (is (= 200 (:ring.response/status response)))
+      (is (= "<h1>Hello!</h1>" (:ring.response/body response)))))

@@ -1,0 +1,1 @@
+{"version":3,"file":"use-focus-return.d.ts","sourceRoot":"","sources":["../../src/use-focus-return/use-focus-return.ts"],"names":[],"mappings":"AAGA,UAAU,cAAc;IACtB,MAAM,EAAE,OAAO,CAAC;IAChB,kBAAkB,EAAE,MAAM,CAAC;IAC3B,iBAAiB,CAAC,EAAE,OAAO,CAAC;CAC7B;AAED,qEAAqE;AACrE,wBAAgB,cAAc,CAAC,EAC7B,MAAM,EACN,kBAAkB,EAClB,iBAAwB,GACzB,EAAE,cAAc,cAoChB"}

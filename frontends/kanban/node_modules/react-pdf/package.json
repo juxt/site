@@ -1,0 +1,120 @@
+{
+  "name": "react-pdf",
+  "version": "5.7.2",
+  "description": "Display PDFs in your React app as easily as if they were images.",
+  "main": "dist/umd/entry.js",
+  "module": "dist/esm/entry.js",
+  "source": "src/entry.js",
+  "scripts": {
+    "build": "yarn build-js-all && yarn copy-styles",
+    "build-js-all": "yarn build-js-esm && yarn build-js-umd",
+    "build-js-esm": "BABEL_ENV=production-esm babel src -d dist/esm --ignore \"**/*.spec.js,**/*.spec.jsx\"",
+    "build-js-umd": "BABEL_ENV=production-umd babel src -d dist/umd --ignore \"**/*.spec.js,**/*.spec.jsx\"",
+    "clean": "rimraf dist",
+    "copy-styles": "node ./copy-styles.js",
+    "jest": "jest",
+    "lint": "eslint sample/ src/ test/ --ext .jsx,.js",
+    "prepack": "yarn clean && yarn build",
+    "test": "yarn lint && yarn jest"
+  },
+  "keywords": [
+    "pdf",
+    "pdf-viewer",
+    "react"
+  ],
+  "author": {
+    "name": "Wojciech Maj",
+    "email": "kontakt@wojtekmaj.pl"
+  },
+  "contributors": [
+    {
+      "name": "Anenth",
+      "email": "anenthvishnu@gmail.com"
+    },
+    {
+      "name": "Artur Termenji",
+      "email": "atermenji@gmail.com"
+    },
+    {
+      "name": "Bart Van Houtte",
+      "email": "bart.van.houtte@ading.be"
+    },
+    {
+      "name": "Dmitry Ivakhnenko",
+      "email": "jeetiss@yandex.ru"
+    },
+    {
+      "name": "Felipe Lacerda",
+      "email": "fegolac@gmail.com"
+    },
+    {
+      "name": "Julia Kieserman",
+      "email": "kieserman.julia@gmail.com"
+    },
+    {
+      "name": "Lucas Simkins",
+      "email": "lucas.simkins@gmail.com"
+    },
+    {
+      "name": "Niklas Närhinen",
+      "email": "niklas@narhinen.net"
+    },
+    {
+      "name": "Robert Scott",
+      "email": "rs@robsco.info"
+    },
+    {
+      "name": "Thomas McCarthy",
+      "email": "tom@tomm.cc"
+    }
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@babel/runtime": "^7.0.0",
+    "file-loader": "^6.0.0",
+    "make-cancellable-promise": "^1.0.0",
+    "make-event-props": "^1.1.0",
+    "merge-class-names": "^1.1.1",
+    "merge-refs": "^1.0.0",
+    "pdfjs-dist": "2.12.313",
+    "prop-types": "^15.6.2",
+    "tiny-invariant": "^1.0.0",
+    "tiny-warning": "^1.0.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.15.0",
+    "@babel/core": "^7.15.0",
+    "@babel/plugin-transform-runtime": "^7.15.0",
+    "@babel/preset-env": "^7.15.0",
+    "@babel/preset-react": "^7.14.0",
+    "@wojtekmaj/enzyme-adapter-react-17": "^0.6.0",
+    "enzyme": "^3.10.0",
+    "eslint": "^8.5.0",
+    "eslint-config-wojtekmaj": "^0.6.5",
+    "husky": "^7.0.0",
+    "jest": "^27.0.0",
+    "prettier": "^2.5.0",
+    "pretty-quick": "^3.1.0",
+    "react": "^17.0.0",
+    "react-dom": "^17.0.0",
+    "rimraf": "^3.0.0",
+    "webpack": "^5.20.0"
+  },
+  "peerDependencies": {
+    "react": "^16.3.0 || ^17.0.0 || ^18.0.0",
+    "react-dom": "^16.3.0 || ^17.0.0 || ^18.0.0"
+  },
+  "resolutions": {
+    "semver@7.0.0": "^7.0.0"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wojtekmaj/react-pdf.git"
+  },
+  "funding": "https://github.com/wojtekmaj/react-pdf?sponsor=1",
+  "packageManager": "yarn@3.1.0"
+}

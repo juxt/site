@@ -1,0 +1,8 @@
+{
+  "main": "dist/react-select.cjs.js",
+  "module": "dist/react-select.esm.js",
+  "types": "dist/react-select.cjs.d.ts",
+  "preconstruct": {
+    "source": "../src/Async"
+  }
+}

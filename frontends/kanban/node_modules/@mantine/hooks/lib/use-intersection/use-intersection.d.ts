@@ -1,0 +1,2 @@
+export declare function useIntersection<T extends HTMLElement = any>(options?: ConstructorParameters<typeof IntersectionObserver>[1]): readonly [(element: T | null) => void, IntersectionObserverEntry | null];
+//# sourceMappingURL=use-intersection.d.ts.map
