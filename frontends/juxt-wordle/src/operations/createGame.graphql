@@ -1,0 +1,5 @@
+mutation saveGame($id: ID!, $game: GameInput!) {
+  saveGame(id: $id, game: $game) {
+    id
+  }
+}

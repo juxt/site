@@ -1,0 +1,5 @@
+query todaysGames($date: String!) {
+  todaysGames(date: $date) {
+    ...gameFields
+  }
+}

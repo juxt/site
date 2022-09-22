@@ -1,0 +1,36 @@
+{:xt/id "http://localhost:5509/wordle/graphql"
+ :juxt.http.alpha/content-type "text/plain;charset=utf-8"
+ :juxt.http.alpha/methods #{:get :head :post :put :options}
+ :juxt.http.alpha/acceptable-on-put "application/graphql"
+ :juxt.http.alpha/acceptable-on-post "application/json"
+ :juxt.pass.alpha/classification "PUBLIC"
+
+ :juxt.site.alpha/access-control-allow-origins
+ {#regex "http://localhost:\\p{Digit}+"
+  {:juxt.site.alpha/access-control-allow-methods #{:post}
+   :juxt.site.alpha/access-control-allow-headers #{"authorization" "content-type"}
+   :juxt.site.alpha/access-control-allow-credentials true}}
+
+ ;; For handling the upsert the schema
+ :juxt.site.alpha/put-fn juxt.site.alpha.graphql/put-handler
+ :juxt.http.alpha/put-error-representations
+ [{:ring.reponse/status 400
+   :juxt.http.alpha/content-type "application/json"
+   :juxt.site.alpha/body-fn juxt.site.alpha.graphql/put-error-json-body}
+  {:ring.response/status 400
+   :juxt.http.alpha/content-type "text/plain"
+   :juxt.site.alpha/body-fn juxt.site.alpha.graphql/put-error-text-body}
+  {:ring.response/status 400
+   :juxt.http.alpha/content-type "text/html;charset=utf-8"
+   ;; TODO: Point to an HTML template that can render the errors nicely
+   :juxt.http.alpha/content "<h1>Error compiling schema</h1>"}]
+
+ ;; For POSTing GraphQL queries
+ :juxt.site.alpha/post-fn juxt.site.alpha.graphql/post-handler
+ :juxt.http.alpha/post-error-representations
+ [{:ring.response/status 400
+   :juxt.http.alpha/content-type "text/plain"
+   :juxt.site.alpha/body-fn juxt.site.alpha.graphql/post-error-text-body}
+  {:ring.response/status 400
+   :juxt.http.alpha/content-type "application/json"
+   :juxt.site.alpha/body-fn juxt.site.alpha.graphql/post-error-json-body}]}

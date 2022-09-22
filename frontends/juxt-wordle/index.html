@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Word game completely unrelated to wordle"
+    />
+    <link rel="apple-touch-icon" href="/logo192.png" />
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+    <link rel="manifest" href="/manifest.json" />
+    <!--
+      Notice the use of  in the tags above.
+      It will be replaced with the URL of the `public` folder during the build.
+      Only files inside the `public` folder can be referenced from the HTML.
+
+      Unlike "/favicon.ico" or "favicon.ico", "/favicon.ico" will
+      work correctly both with client-side routing and a non-root public URL.
+      Learn how to configure a non-root public URL by running `npm run build`.
+    -->
+    <title>Juxtle</title>
+  </head>
+  <body class="h-full">
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root">
+      <div
+        class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8"
+      >
+        <div class="max-w-md w-full space-y-8">
+          <div>
+            <img
+              class="mx-auto h-12 w-auto"
+              src="https://uploads-ssl.webflow.com/5ee34ed4230ab8487c90e89e/5ee7bee82d03ccd4545bd058_method-draw-image.svg"
+              alt="Workflow"
+            />
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+              Sign in to play Juxtle
+            </h2>
+            <p>
+              A totally original game, nothing to do with
+              <a
+                class="font-medium text-orange-400 hover:text-orange-500"
+                href="https://www.powerlanguage.co.uk/wordle/"
+                >wordle</a
+              >
+              whatsoever.
+            </p>
+          </div>
+          <form class="mt-8 space-y-6" onsubmit="">
+            <input type="hidden" name="remember" value="true" />
+            <div class="rounded-md shadow-sm -space-y-px">
+              <div>
+                <label for="email-address" class="sr-only"
+                  >JUXT code (or some unique username)</label
+                >
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  required
+                  class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
+                  placeholder="JUXT code (or some unique username)"
+                />
+              </div>
+            </div>
+            <div>
+              <button
+                type="submit"
+                class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-400 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+              >
+                Sign in
+              </button>
+            </div>
+          </form>
+          <script>
+            document.querySelector('form').onsubmit = function (e) {
+              e.preventDefault()
+              const username = document.querySelector('#username').value
+              localStorage['username'] = username.toLowerCase().trim()
+              window.location.reload()
+            }
+          </script>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/index.tsx"></script>
+    <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
+
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
+
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
+  </body>
+</html>

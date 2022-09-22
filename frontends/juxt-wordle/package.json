@@ -1,0 +1,67 @@
+{
+  "name": "wordle",
+  "version": "0.1.0",
+  "homepage": "https://alexd.uk/site/_apps/wordle",
+  "private": true,
+  "dependencies": {
+    "@headlessui/react": "^1.4.3",
+    "@heroicons/react": "^1.0.5",
+    "@tailwindcss/forms": "^0.4.0",
+    "@testing-library/jest-dom": "^5.16.1",
+    "@testing-library/react": "^12.1.2",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/jest": "^27.4.0",
+    "@types/react": "^17.0.38",
+    "@types/react-dom": "^17.0.11",
+    "classnames": "^2.3.1",
+    "graphql": "^16.2.0",
+    "lodash-es": "^4.17.21",
+    "pretty-ms": "^7.0.1",
+    "react": "^17.0.2",
+    "react-countdown": "^2.3.2",
+    "react-dom": "^17.0.2",
+    "react-query": "^3.34.11",
+    "react-scripts": "5.0.0",
+    "react-table": "^7.7.0",
+    "typescript": "^4.5.5",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "generate": "graphql-codegen",
+    "dev": "vite",
+    "build": "vite build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@graphql-codegen/cli": "^2.4.0",
+    "@graphql-codegen/typescript-operations": "^2.2.2",
+    "@graphql-codegen/typescript-react-query": "^3.3.1",
+    "@types/lodash-es": "^4.17.5",
+    "@types/react-table": "^7.7.9",
+    "@vitejs/plugin-react": "^2.1.0",
+    "autoprefixer": "^10.4.2",
+    "postcss": "^8.4.5",
+    "prettier": "^2.5.1",
+    "tailwindcss": "^3.0.15",
+    "vite": "^3.1.3"
+  }
+}

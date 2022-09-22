@@ -1,0 +1,5 @@
+query gameHistory($id: ID!) {
+  gameHistoryForId(id: $id) {
+    ...gameFields
+  }
+}

@@ -1,0 +1,5 @@
+query gameForId($id: ID!) {
+  gameForId(id: $id) {
+    ...gameFields
+  }
+}

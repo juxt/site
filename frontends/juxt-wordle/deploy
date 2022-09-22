@@ -1,0 +1,5 @@
+SITE_BASE_URI='https://alexd.uk'
+GRAPHQL_PATH='/wordle/graphql'
+GRAPHQL_API_URL="${SITE_BASE_URI}${GRAPHQL_PATH}"
+site post-resources --file resources.edn
+site put-graphql --file schema.graphql --path $GRAPHQL_PATH
