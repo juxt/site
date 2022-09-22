@@ -2,25 +2,17 @@
 
 (ns juxt.site.graphql.basic-test
   (:require
-   [clojure.walk :refer [postwalk]]
    [edn-query-language.core :as eql]
    [jsonista.core :as json]
-   [sci.core :as sci]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
-   [clojure.java.io :as io]
    [juxt.book :as book]
    [juxt.flip.alpha.core :as f]
    [juxt.pass.alpha.eql-datalog-compiler :as eqlc]
-   [juxt.site.alpha.repl :as repl]
-   [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]
    [juxt.site.alpha :as-alias site]
-   [juxt.pass.alpha.actions :as actions]
    [juxt.pass.alpha :as-alias pass]
    [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
-   [juxt.site.alpha.graphql.graphql-query-processor :as gqp]
-   [malli.core :as malli]
    [xtdb.api :as xt]))
 
 ;; TODO: Dedupe between this test ns and juxt.book-test
@@ -769,72 +761,55 @@
 
         ;; Alice can access a particular patient because she has a particularly
         ;; broad permission on the get-patient action
-        (let [response (*handler*
-                        {:ring.request/method :get
-                         :ring.request/path "/patients/005"
-                         :ring.request/headers
-                         {"authorization" (format "Bearer %s" alice-access-token)
-                          "accept" "application/json"}})]
-          (is (= (json/write-value-as-string {"name" "Angie Solis"})
-                 (String. (:ring.response/body response))))
-          (is (= 200 (:ring.response/status response))))
+        (testing "Access to /patient/005"
+          (let [response (*handler*
+                          {:ring.request/method :get
+                           :ring.request/path "/patients/005"
+                           :ring.request/headers
+                           {"authorization" (format "Bearer %s" alice-access-token)
+                            "accept" "application/json"}})]
+            (is (= (json/write-value-as-string {"name" "Angie Solis"})
+                   (String. (:ring.response/body response))))
+            (is (= 200 (:ring.response/status response))))
 
-        ;; Bob can't see the patient details of Angie Solis
-        (let [response (*handler*
-                        {:ring.request/method :get
-                         :ring.request/path "/patients/005"
-                         :ring.request/headers
-                         {"authorization" (format "Bearer %s" bob-access-token)
-                          "accept" "application/json"}})]
-          (is (= 403 (:ring.response/status response))))
+          ;; Bob can't see the patient details of Angie Solis
+          (let [response (*handler*
+                          {:ring.request/method :get
+                           :ring.request/path "/patients/005"
+                           :ring.request/headers
+                           {"authorization" (format "Bearer %s" bob-access-token)
+                            "accept" "application/json"}})]
+            (is (= 403 (:ring.response/status response)))))
 
-        ;;(repl/e "https://site.test/patients")
-        ;; list-patients is going to re-use the rule for get-patient.  In this
-        ;; sense, the action list-patients is a get-patient action applied
-        ;; across a set.
+        (testing "List patients with /patients"
 
-        ;; Alice sees all patients
-        #_(let [response
+          ;; Alice sees all 20 patients
+          (let [response
                 (*handler*
                  {:ring.request/method :get
                   :ring.request/path "/patients"
-                  ;;:debug true
                   :ring.request/headers
                   {"authorization" (format "Bearer %s" alice-access-token)
-                   "accept" "application/json"}})]
-            (is (= 200 (:ring.response/status response)))
-            ;;(is (= 200 (:ring.response/body response)))
+                   "accept" "application/json"}})
+                body (:ring.response/body response)
+                result (json/read-value body)]
+            (is (= "application/json" (get-in response [:ring.response/headers "content-type"])))
+            (is (vector? result))
+            (is (= 20 (count result))))
 
-            (is (string? (:ring.response/body response)))
-            )
-
-        ;; Alice sees all 20 patients
-        (let [response
-              (*handler*
-               {:ring.request/method :get
-                :ring.request/path "/patients"
-                :ring.request/headers
-                {"authorization" (format "Bearer %s" alice-access-token)
-                 "accept" "application/json"}})
-              body (:ring.response/body response)
-              result (json/read-value body)]
-          (is (= "application/json" (get-in response [:ring.response/headers "content-type"])))
-          (is (vector? result))
-          (is (= 20 (count result))))
-
-        ;; Bob sees just 3 patients
-        (let [response
-              (*handler*
-               {:ring.request/method :get
-                :ring.request/path "/patients"
-                :ring.request/headers
-                {"authorization" (format "Bearer %s" bob-access-token)
-                 "accept" "application/json"}})
-              body (:ring.response/body response)
-              result (json/read-value body)]
-          (is (= "application/json" (get-in response [:ring.response/headers "content-type"])))
-          (is (vector? result))
-          (is (= 3 (count result))))
+          ;; Bob sees just 3 patients
+          (let [response
+                (*handler*
+                 {:ring.request/method :get
+                  :ring.request/path "/patients"
+                  :ring.request/headers
+                  {"authorization" (format "Bearer %s" bob-access-token)
+                   "accept" "application/json"}})
+                body (:ring.response/body response)
+                result (json/read-value body)]
+            (is (= "application/json" (get-in response [:ring.response/headers "content-type"])))
+            (is (vector? result))
+            (is (= 3 (count result)))))
 
         ;; We are calling juxt.pass.alpha.actions/pull-allowed-resources which
         ;; provides our query, but we want to experiment with creating our own
@@ -877,288 +852,297 @@
           ;; The data processing activities of a system are entirely
           ;; expressable in terms of actions.
 
-          (let [q1 (first
-                    ;; ^ The compilation process allows multiple queries to be
-                    ;; specified in the EQL specification, each may be run in
-                    ;; parallel. For now, we just run the first query.
-                    (eqlc/compile-ast
-                     db
-                     (eql/query->ast
-                      '[
-                        {(:patients {::pass/action "https://site.test/actions/get-patient"})
-                         [:xt/id
-                          :name
-                          ::site/type
-                          {(:measurements {::pass/action "https://site.test/actions/read-any-measurement"})
-                           [:reading]}]}])))]
-
-            (is (= #{{:name "Terry Levine"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/001"
-                      :measurements nil}
-                     {:name "Moshe Lynch"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/015"
-                      :measurements nil}
-                     {:name "Hazel Huynh"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/013"
-                      :measurements nil}
-                     {:name "Valarie Campos"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/019"
-                      :measurements nil}
-                     {:name "Lila Dickson"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/004"
-                      :measurements nil}
-                     {:name "Floyd Castro"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/006"
-                      :measurements
-                      [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
-                     {:name "Jeannie Finley"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/002"
-                      :measurements nil}
-                     {:name "Beulah Leonard"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/008"
-                      :measurements nil}
-                     {:name "Francesco Casey"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/014"
-                      :measurements nil}
-                     {:name "Angie Solis"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/005"
-                      :measurements nil}
-                     {:name "Jewel Blackburn"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/003"
-                      :measurements nil}
-                     {:name "Sondra Richardson"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/010"
-                      :measurements
-                      [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
-                       {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}
-                     {:name "Monica Russell"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/009"
-                      :measurements nil}
-                     {:name "Rudy King"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/018"
-                      :measurements nil}
-                     {:name "Mark Richard"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/012"
-                      :measurements nil}
-                     {:name "Blanca Lindsey"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/017"
-                      :measurements nil}
-                     {:name "Elisabeth Riddle"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/020"
-                      :measurements nil}
-                     {:name "Melanie Black"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/007"
-                      :measurements nil}
-                     {:name "Kim Robles"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/011"
-                      :measurements nil}
-                     {:name "Darrel Schwartz"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/016"
-                      :measurements nil}}
-                   (eqlc/prune-result (xt/q db q1 alice nil))))
-
-            (is (= #{{:name "Lila Dickson"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/004"
-                      :measurements nil}
-                     {:name "Sondra Richardson"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/010"
-                      :measurements
-                      [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
-                       {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}
-                     {:name "Monica Russell"
-                      :juxt.site.alpha/type "https://site.test/types/patient"
-                      :xt/id "https://site.test/patients/009"
-                      :measurements nil}}
-                   (eqlc/prune-result (xt/q db q1 bob nil)))))
-
-          (let [q1 (first
-                    (eqlc/compile-ast
-                     db
-                     (eql/query->ast
-                      '[{(:doctors {::pass/action "https://site.test/actions/get-doctor"})
-                         [:xt/id
-                          :name
-                          ::site/type
+          (testing "Graph query with two-levels of results"
+            (let [q1 (first
+                      ;; ^ The compilation process allows multiple queries to be
+                      ;; specified in the EQL specification, each may be run in
+                      ;; parallel. For now, we just run the first query.
+                      (eqlc/compile-ast
+                       db
+                       (eql/query->ast
+                        '[
                           {(:patients {::pass/action "https://site.test/actions/get-patient"})
                            [:xt/id
                             :name
                             ::site/type
-                            {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
-                             [:reading]}]}]}])))]
+                            {(:measurements {::pass/action "https://site.test/actions/read-any-measurement"})
+                             [:reading]}]}])))]
 
-            (is (= #{{:name "Dr. Jack Conway"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/001"
-                      :patients
-                      [{:name "Terry Levine"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/001"
-                        :readings nil}
-                       {:name "Jeannie Finley"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/002"
-                        :readings nil}
-                       {:name "Jewel Blackburn"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/003"
-                        :readings nil}
-                       {:name "Angie Solis"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/005"
-                        :readings nil}]}
-                     {:name "Dr. Murillo"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/002"
-                      :patients
-                      [{:name "Lila Dickson"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/004"
-                        :readings nil}
-                       {:name "Angie Solis"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/005"
-                        :readings nil}]}
-                     {:name "Dr. Jackson"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/003"
-                      :patients
-                      [{:name "Floyd Castro"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/006"
-                        :readings
-                        [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
-                       {:name "Sondra Richardson"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/010"
-                        :readings
-                        [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
-                         {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}
-                     {:name "Dr. Kim"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/004"
-                      :patients nil}}
-                   (eqlc/prune-result (xt/q db q1 alice nil))))
+              (testing "Alice's view"
+                (is (= #{{:name "Terry Levine"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/001"
+                          :measurements nil}
+                         {:name "Moshe Lynch"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/015"
+                          :measurements nil}
+                         {:name "Hazel Huynh"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/013"
+                          :measurements nil}
+                         {:name "Valarie Campos"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/019"
+                          :measurements nil}
+                         {:name "Lila Dickson"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/004"
+                          :measurements nil}
+                         {:name "Floyd Castro"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/006"
+                          :measurements
+                          [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
+                         {:name "Jeannie Finley"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/002"
+                          :measurements nil}
+                         {:name "Beulah Leonard"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/008"
+                          :measurements nil}
+                         {:name "Francesco Casey"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/014"
+                          :measurements nil}
+                         {:name "Angie Solis"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/005"
+                          :measurements nil}
+                         {:name "Jewel Blackburn"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/003"
+                          :measurements nil}
+                         {:name "Sondra Richardson"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/010"
+                          :measurements
+                          [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                           {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}
+                         {:name "Monica Russell"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/009"
+                          :measurements nil}
+                         {:name "Rudy King"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/018"
+                          :measurements nil}
+                         {:name "Mark Richard"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/012"
+                          :measurements nil}
+                         {:name "Blanca Lindsey"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/017"
+                          :measurements nil}
+                         {:name "Elisabeth Riddle"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/020"
+                          :measurements nil}
+                         {:name "Melanie Black"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/007"
+                          :measurements nil}
+                         {:name "Kim Robles"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/011"
+                          :measurements nil}
+                         {:name "Darrel Schwartz"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/016"
+                          :measurements nil}}
+                       (eqlc/prune-result (xt/q db q1 alice nil)))))
 
-            (is (= #{{:name "Dr. Jack Conway"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/001"
-                      :patients nil}
-                     {:name "Dr. Murillo"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/002"
-                      :patients
-                      [{:name "Lila Dickson"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/004"
-                        :readings nil}]}
-                     {:name "Dr. Jackson"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/003"
-                      :patients
-                      [{:name "Sondra Richardson"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/010"
-                        :readings
-                        [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
-                         {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}
-                     {:name "Dr. Kim"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/004"
-                      :patients nil}}
-                   (eqlc/prune-result (xt/q db q1 bob nil)))))
+              (testing "Bob's view"
+                (is (= #{{:name "Lila Dickson"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/004"
+                          :measurements nil}
+                         {:name "Sondra Richardson"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/010"
+                          :measurements
+                          [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                           {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}
+                         {:name "Monica Russell"
+                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :xt/id "https://site.test/patients/009"
+                          :measurements nil}}
+                       (eqlc/prune-result (xt/q db q1 bob nil)))))))
 
-          ;; Get a particular doctor, by a simple search term.
-          ;; Uses EQL parameters for this.
-          (let [q1 (first
-                    (eqlc/compile-ast
-                     db
-                     (eql/query->ast
-                      '[{(:doctor {::pass/action "https://site.test/actions/get-doctor"
-                                   :search "jack"})
-                         [:xt/id
-                          :name
-                          ::site/type
-                          {(:patients {::pass/action "https://site.test/actions/get-patient"})
+          (testing "Graph query with 3 levels of nesting"
+            (let [q1 (first
+                      (eqlc/compile-ast
+                       db
+                       (eql/query->ast
+                        '[{(:doctors {::pass/action "https://site.test/actions/get-doctor"})
                            [:xt/id
                             :name
                             ::site/type
-                            {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
-                             [:reading]}]}]}])))]
+                            {(:patients {::pass/action "https://site.test/actions/get-patient"})
+                             [:xt/id
+                              :name
+                              ::site/type
+                              {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
+                               [:reading]}]}]}])))]
 
-            (is (= #{{:name "Dr. Jack Conway"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/001"
-                      :patients
-                      [{:name "Terry Levine"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/001"
-                        :readings nil}
-                       {:name "Jeannie Finley"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/002"
-                        :readings nil}
-                       {:name "Jewel Blackburn"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/003"
-                        :readings nil}
-                       {:name "Angie Solis"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/005"
-                        :readings nil}]}
-                     {:name "Dr. Jackson"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/003"
-                      :patients
-                      [{:name "Floyd Castro"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/006"
-                        :readings
-                        [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
-                       {:name "Sondra Richardson"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/010"
-                        :readings
-                        [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
-                         {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}}
-                   (eqlc/prune-result (xt/q db q1 alice nil))))
+              (testing "Alice's view"
+                (is (= #{{:name "Dr. Jack Conway"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/001"
+                          :patients
+                          [{:name "Terry Levine"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/001"
+                            :readings nil}
+                           {:name "Jeannie Finley"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/002"
+                            :readings nil}
+                           {:name "Jewel Blackburn"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/003"
+                            :readings nil}
+                           {:name "Angie Solis"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/005"
+                            :readings nil}]}
+                         {:name "Dr. Murillo"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/002"
+                          :patients
+                          [{:name "Lila Dickson"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/004"
+                            :readings nil}
+                           {:name "Angie Solis"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/005"
+                            :readings nil}]}
+                         {:name "Dr. Jackson"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/003"
+                          :patients
+                          [{:name "Floyd Castro"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/006"
+                            :readings
+                            [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
+                           {:name "Sondra Richardson"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/010"
+                            :readings
+                            [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                             {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}
+                         {:name "Dr. Kim"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/004"
+                          :patients nil}}
+                       (eqlc/prune-result (xt/q db q1 alice nil)))))
 
-            (is (= #{{:name "Dr. Jack Conway"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/001"
-                      :patients nil}
-                     {:name "Dr. Jackson"
-                      :juxt.site.alpha/type "https://site.test/types/doctor"
-                      :xt/id "https://site.test/doctors/003"
-                      :patients
-                      [{:name "Sondra Richardson"
-                        :juxt.site.alpha/type "https://site.test/types/patient"
-                        :xt/id "https://site.test/patients/010"
-                        :readings
-                        [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
-                         {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}}
-                   (eqlc/prune-result (xt/q db q1 bob nil))))))
+              (testing "Bob's view"
+                (is (= #{{:name "Dr. Jack Conway"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/001"
+                          :patients nil}
+                         {:name "Dr. Murillo"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/002"
+                          :patients
+                          [{:name "Lila Dickson"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/004"
+                            :readings nil}]}
+                         {:name "Dr. Jackson"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/003"
+                          :patients
+                          [{:name "Sondra Richardson"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/010"
+                            :readings
+                            [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                             {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}
+                         {:name "Dr. Kim"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/004"
+                          :patients nil}}
+                       (eqlc/prune-result (xt/q db q1 bob nil)))))))
+
+          (testing "Graph query with parameters"
+            ;; Get a particular doctor, by a simple search term.
+            ;; Uses EQL parameters for this.
+            (let [q1 (first
+                      (eqlc/compile-ast
+                       db
+                       (eql/query->ast
+                        '[{(:doctor {::pass/action "https://site.test/actions/get-doctor"
+                                     :search "jack"})
+                           [:xt/id
+                            :name
+                            ::site/type
+                            {(:patients {::pass/action "https://site.test/actions/get-patient"})
+                             [:xt/id
+                              :name
+                              ::site/type
+                              {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
+                               [:reading]}]}]}])))]
+
+              (testing "Alice's view"
+                (is (= #{{:name "Dr. Jack Conway"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/001"
+                          :patients
+                          [{:name "Terry Levine"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/001"
+                            :readings nil}
+                           {:name "Jeannie Finley"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/002"
+                            :readings nil}
+                           {:name "Jewel Blackburn"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/003"
+                            :readings nil}
+                           {:name "Angie Solis"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/005"
+                            :readings nil}]}
+                         {:name "Dr. Jackson"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/003"
+                          :patients
+                          [{:name "Floyd Castro"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/006"
+                            :readings
+                            [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
+                           {:name "Sondra Richardson"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/010"
+                            :readings
+                            [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                             {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}}
+                       (eqlc/prune-result (xt/q db q1 alice nil)))))
+
+              (testing "Bob's view"
+                (is (= #{{:name "Dr. Jack Conway"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/001"
+                          :patients nil}
+                         {:name "Dr. Jackson"
+                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :xt/id "https://site.test/doctors/003"
+                          :patients
+                          [{:name "Sondra Richardson"
+                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :xt/id "https://site.test/patients/010"
+                            :readings
+                            [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
+                             {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}}
+                       (eqlc/prune-result (xt/q db q1 bob nil))))))))
 
         ;; Modelling ideas
 
