@@ -15,7 +15,7 @@ type Query {
       }
     )
   timeTakenForGame(id: ID!): Int
-    @site(resolver: "juxt.site.wordle.resolvers/resolve-game-time")
+    @site(resolver: "juxtle.resolvers/resolve-game-time")
   gameForId(id: ID!): GameState
   gameHistoryForId(id: ID!): [GameState] @site(history: "asc")
   todaysGames(date: String!): [GameState]
@@ -58,11 +58,11 @@ type GameState {
   _siteValidTime: String!
   date: String!
   finished: Boolean!
-    @site(resolver: "juxt.site.wordle.resolvers/resolve-finished")
+    @site(resolver: "juxtle.resolvers/resolve-finished")
   username: String!
   guesses: [String!]
   solution: String!
   timeTakenMillis: Int
-    @site(resolver: "juxt.site.wordle.resolvers/resolve-game-time")
+    @site(resolver: "juxtle.resolvers/resolve-game-time")
 }
 
