@@ -110,4 +110,4 @@ When querying for a type, experiment with returning the details of other documen
 
 If you are having trouble or want to double check your code, remember that the final schema for this project is available [here](schema).
 
-So far we have queried our data using Site's default queries - return all of a type, or lookup a type by id. To build a more sophisticated picture, in the next part we will be writing (marginally) more complex graphql queries and implementing Site directives that turn these queries into XTDB legible requests ( #wording).
+So far we have queried our data using Site's default queries - return all of a type, or lookup a type by id. To build a more sophisticated picture, in the next part we will be writing (marginally) more complex graphql queries and implementing Site directives that turn these queries into XTDB legible requests.

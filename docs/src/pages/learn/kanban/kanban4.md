@@ -89,10 +89,6 @@ type Query {
 
 </APIAnatomy>
 
-**TODO make APIAnatomy narrower ^**
-
-All cards that (#Wording satisfy?) e will be returned as a list.
+All cards that satisfy e will be returned as a list.
 
   <img src="/images/ss12.png"/>
-
-**Static example of resolver TODO**

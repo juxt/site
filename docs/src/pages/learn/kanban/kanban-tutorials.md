@@ -1,42 +1,47 @@
 # Kanban API Tutorial
 
-(#Wording all) Working with Site is a fast and straightforward way to build a fully functional and customisable back end that provides standardised APIs to connect to front end(s) of your choice. As Site is created ( #Wording built? ) on an XTDB database, you can access [all the benefits](https://docs.xtdb.com/concepts/what-is-xtdb/) of flexible, immutable, bi-temporal data storage and manipulation within minutes just by uploading a simple GraphQL schema.
+Working with Site is a fast and straightforward way to build a fully functional and customisable back end that provides standardised APIs to connect to front end(s) of your choice. As Site is situated on an XTDB database, you can access [all the benefits](https://docs.xtdb.com/concepts/what-is-xtdb/) of flexible, immutable, bi-temporal data storage and manipulation within minutes just by uploading a simple GraphQL schema.
 
 JUXT's InSite console (or indeed any preferred GraphQL visualiser) allows you to amend and test your data structures in real time, giving you the convenience and immediacy of existing no-code back end products, without their frustrating opacity or inevitable limits on customisation as your system becomes more complex.
 
 All the most commonly used back end functionality happens in one place in Site - a GraphQL schema - and requires only a basic knowledge of GraphQL. For more complex requirements Site can integrate custom queries and external code files, and each iteration can be built on the previous with no need for system-wide refactoring.
 
 I'm sure all of that is enough to whet your appetite, so lets crack on with a tutorial to build the back end for a simple kanban app. Hooking up a user interface is beyond the scope of this tutorial (for now...), but here is an example of a similar React based web-app that uses Site as its resource server:
-**TODO Example of kanban board (embedded or a video)**
 
-In this tutorial we will be using Site's packaged InSite GraphQL console to visualise our API as it develops, but Site is (#Wording standardised? a good web citizen?) so feel free to use another explorer if you fancy.
+<img src="/images/hiring.gif"/>
 
-The full schema for this tutorial is available here (**TODO link**), but I would highly recommend leaving that tantalising box unopened for now in order to derive the most benefit (and understanding) from the step-by-step approach we'll take below.
+You can also [play with this kanban board](https://hire.juxt.site/) live.
+
+In this tutorial we will be using Site's packaged InSite GraphQL console to visualise our API as it develops, but Site is designed to be compatible so feel free to use another explorer if you fancy.
+
+The full schema for this tutorial is available [here](schema), but I would highly recommend leaving that tantalising box unopened for now in order to derive the most benefit (and understanding) from the step-by-step approach we'll take below.
 
 ## Preface
 
 This tutorial is designed to be an entry point for exploring Site's capabilities and therefore has minimal prerequisite knowledge. However, if at any point you're finding schemas, entities, requests, and directives turning to soup in your brain, I would recommend [Johanna Antonelli's presentation](https://www.youtube.com/watch?v=PZVYVAxbzmE) for reClojure 2021 which demonstrates how to build a slightly simpler GraphQL service using Site.
 
-We launch into our tutorial on the assumption that you already have Site running locally on your machine. Site set-up is not time consuming but it still deserves its [own instructions](installation). You need to have the GraphiQL, InSite, and SwaggerUI optional modules [installed as well](https://github.com/juxt/site/tree/master/opt).
+We launch into our tutorial on the assumption that you already have Site running locally on your machine. Site set-up is not time consuming but it still deserves its [own instructions](/learn/installation).
 
-Once you have the server running locally, head to (TODO permanent link to insite apis) and you are ready to begin.
+Once you have the server running locally, head to [the InSite Console](https://tb-site-console.vercel.app/apis) and you are ready to begin.
 
 ## Part 1: Exploring the InSite Console
 
-We've landed in the InSite console, and if your screen looks something like the one below (perhaps plus or minus some links) then you've arrived successfully too. If not, head back to [setup](installation) and check you've completed all the steps, then on to Troubleshooting (**TODO?**) if you've still got troubles to shoot.
+We've landed in the InSite console, and if your screen looks something like the one below (perhaps plus or minus some links) then you've arrived successfully too. If not, head back to [setup](../installation) and check you've completed all the steps. Still stuck? Check out JUXT's [Building Site](https://www.youtube.com/playlist?list=PLrCB9bq0iVIoCCV7SGJH1bXTrDfp2mP4i) YouTube playlist, or Tweet us [@juxtpro](https://twitter.com/juxtpro).
 
 <img src="/images/ss1.png"/>
 
-In this tutorial you are going to be setting up a fully functional back-end for your kanban app using a local Site server instance that will generate ( #Wording host? manage?) custom APIs that can be used by your app **and** any future productivity apps you turn your hand to.
+In this tutorial you are going to be setting up a fully functional back-end for your kanban app using a local Site server instance that will generate custom APIs that can be used by your app **and** any future productivity apps you turn your hand to.
 
-We are going to be using a GraphQL schema as the structure for our application, so go ahead and click on /\_site/graphql to check out your first ( #Wording schema? set of apis? implementation of schema? )
+We are going to be using a GraphQL schema as the structure for our application, so go ahead and click on /\_site/graphql to check out your first API.
 <img src="/images/ss2.png"/>
 
 On the left you should be able to see the operations used by Site itself (<em>how meta</em>)
-<img src="/images/ss3.png"/>
+<img src="/images/ss3.1.png"/>
 
-- Click on the >allUsers query, select id and username to return, hit play to run the query and ta-dah! You should see your own user details appear on the right.
-- Queries can also be passed arguments: click >user on the left to add it to your query and input your username in the pink quotes. Choose name to return and run the query as before. You've just queried Site for a list of all users and for a specific user's full name based on their username. At the moment your results may be short and relatively uninteresting, but in the next section we will start creating our own schema for storing, mutating, and querying data beyond your wildest (productivity-app-based) dreams...
+- Click on the >apis query, select type and id to return, hit play to run the query and ta-dah! You should see the same APIs listed that were visible on the landing page.
+- Queries can also be passed arguments: click >request on the left to add it to your query and you can see where you will be able to input a request ID to return its details. To find an ID to test, run the requests query returning summaries -> id. However, you might not get any IDs returned yet as your Site instance is fresh as a daisy.
+
+- At the moment your query results may be short and relatively uninteresting, but in the next section we will start creating our own schema for storing, mutating, and querying data beyond your wildest (productivity-app-based) dreams...
 
 ## Part 2: Uploading A Schema
 
@@ -101,17 +106,23 @@ A kanban board (or Workflow) has columns (or WorkflowStates eg To Do, In Progres
   ```
 
 - Save this file and navigate back to the APIs tab in InSite - you should now be able to select mykanban as an option
-- <img src="/images/ss4.png"/>
-  - As before we can see the queries on the left, but querying for all workflows won't give you much back!
-  - To add a workflow we need to use a mutation: select mutation from the dropdown in the lower left and add one. The left panel will now show the mutations available from our uploaded schema.
-  - <img src="/images/ss5.png"/>
-    - createWorkflow -> enter a name and return the name and ID (we will need this ID later so use the Query Variables panel to record it).
-    - Now when you query allWorkflows you should see your shiny new board!
-  - Repeat these steps and create a WorkflowState named "To Do" (or whatever you fancy)
-  - We can use updateWorkflow to add our state to our workflow using the IDs we saved previously
-  - <img src="/images/ss6.png"/>
-    - <em>Note that workflowStateIds need to be in an array</em>
-- With that we have created, read and updated, and...ah crud, we need a way to delete.
+  <img src="/images/ss4.png"/>
+
+As before we can see the queries on the left, but querying for allWorkflows won't give you much back...
+
+- To add a Workflow we need to use a mutation: select mutation from the dropdown in the lower left and add one. The left panel will now show the mutations available from our uploaded schema.
+
+<img src="/images/ss5.png"/>
+
+- createWorkflow -> enter a name and return the name and ID (we will need this ID later so use the Query Variables panel to record it).
+- Query allWorkflows you should see your shiny new Workflow!
+
+- Repeat these steps for createWorkflowState to create a WorkflowState named "To Do" (or whatever you fancy)
+- We can use updateWorkflow to add our state to our Workflow using the IDs we saved previously
+  <img src="/images/ss6.png"/>
+  <em>Note that workflowStateIds need to be in an array</em>
+
+With that we have created, read and updated, and...ah crud, we need a way to delete.
 
 ## Part 3: Extending the Schema
 
@@ -119,10 +130,10 @@ To complete the functionality of our kanban schema, we need to add additional op
 
 - Return to the schema and create a mutation called deleteWorkflow. To delete an entity you only need to pass its ID as an argument. By default, Site mutations are ‘Create’ operations and will auto-generate a unique ID for the new document, but you can specify other types of mutation with directives - used for example in @site(mutation: "update") in updateWorkflow.
 - deleteWorkflow uses the same mutation directive and should look like this:
-  ```
+  ```graphql
         deleteWorkflow(id: ID!): Workflow @site(mutation: "delete")
   ```
-- Repeat these steps to write deleteWorkflowState, and while you're at it you might as well get ahead and write deleteCard.
+- Repeat these steps to write deleteWorkflowState.
 
 Save the schema in site/apis, refresh the console page, and you should now be able to use your delete mutations in the InSite console. (Now is an excellent time to clean up your data and remove those typoed practice entities you inevitably made earlier.)
 
@@ -132,7 +143,7 @@ To record individual tasks on the board you need to create a Card type. Use the 
 
 **ref** and **each** are directives used to join documents - Site's [docs](../../reference/graphql/site-directive) explain further:
 
-#### ref
+### ref
 
 One of the more commonly used directives, used when you need to join across documents in the db.
 
@@ -164,32 +175,33 @@ type House {
 }
 ```
 
-This only works for one to one relationships. For one to many use `each`.
+This only works for one to one relationships. For one to many use [`each`](../../reference/graphql/site-directive#each).
 
 Using Site directives ref and each you should already have connections between Workflow <-> WorkflowState, Card -> Workflow, and Card -> WorkflowState. You can see that we don't have a reference to cards inside the workflow, instead we are going to reference cards in the workflow state.
 
 <img src="/images/diagram.png"/>
 
-- This diagram demonstrates the connection between different documents in a simplified way. We do not want to attach a single workflow ID to each workflowState, as a single state can be used by many different workflows. Eg a party planning board and a hiring board will both have a To Do state, but instead of creating two separate To Do WorkflowState documents, one connected to PartyPlanning and one connected to Hiring, we create a single ToDo state that is shared. This means we can query all our ToDos by looking up that single WorkflowState id, which will return all upcoming tasks regardless of the workflow they belong to.
-- In order for this to be possible we need to create a field in WorkflowState that contains all the Cards currently in that state.
+- This diagram demonstrates the connection between different documents in a simplified way. We do not want to attach a single workflow ID to each workflowState, as a single state can be used by many different workflows. Eg a party planning board and a hiring board will both have a To Do state, but instead of creating two separate To Do WorkflowState documents, one connected to PartyPlanning and one connected to Hiring, we create a single ToDo state that is shared. This means we can query all our ToDos by looking up that single WorkflowState id, which will return all upcoming tasks regardless of the Workflow they belong to.
 
-  ```graphql
-  type WorkflowState {
-    id: ID!
-    name: String!
-    description: String
-    workflow: Workflow! @site(ref: "workflowStateIds")
-    cards: [Card] @site(ref: "workflowStateId")
-  }
+In order for this to be possible we need to create a field in WorkflowState that contains all the Cards currently in that state.
 
-  type Card {
-    id: ID!
-    name: String!
-    description: String!
-    workflow: Workflow! @site(ref: "workflowId")
-    workflowState: WorkflowState! @site(ref: "workflowStateId")
-  }
-  ```
+```graphql
+type WorkflowState {
+  id: ID!
+  name: String!
+  description: String
+  workflow: Workflow! @site(ref: "workflowStateIds")
+  cards: [Card] @site(ref: "workflowStateId")
+}
+
+type Card {
+  id: ID!
+  name: String!
+  description: String!
+  workflow: Workflow! @site(ref: "workflowId")
+  workflowState: WorkflowState! @site(ref: "workflowStateId")
+}
+```
 
 - Line 6 is essentially saying 'return all the cards that have this WorkflowState in their workflowStateId field'. An alternative would be to use:
 
@@ -216,7 +228,7 @@ Using Site directives ref and each you should already have connections between W
   }
   ```
 
-Save and return to InSite. Play around with your new type and operations to check that everything is running smoothly and you don't feel that any basic queries or mutations are missing.
+Save and return to InSite. Play around with your new type and operations to check that everything is running smoothly and you don't feel that any basic queries or mutations are missing (perhaps deleteCard?).
 
 You may find more update operations helpul while you get the hang of things.
 When querying for a type, experiment with returning the details of other document types linked to yours:
@@ -224,9 +236,9 @@ When querying for a type, experiment with returning the details of other documen
 
 - From one simple schema we are able to create and visualise a range of relationships between documents in our database.
 
-If you are having trouble or want to double check your code, remember that the final schema for this project is available here (**TODO link**).
+If you are having trouble or want to double check your code, remember that the final schema for this project is available [here](schema).
 
-So far we have queried our data using Site's default queries - return all of a type, or lookup a type by id. To build a more sophisticated picture, in the next part we will be writing (marginally) more complex graphql queries and implementing Site directives that turn these queries into XTDB legible requests ( #wording).
+So far we have queried our data using Site's default queries - return all of a type, or lookup a type by id. To build a more sophisticated picture, in the next part we will be writing (marginally) more complex graphql queries and implementing Site directives that turn these queries into XTDB legible requests.
 
 ## Part 4: Querying the Data
 
@@ -251,15 +263,19 @@ Feel free to add more itemForId operations to query the data in ways you find us
 
 Site is based on an XTDB database system and therefore the **entire history** of your data is available to you (including, I'm afraid, the typos you thought you deleted earlier...) Updates to a document do not destroy its previous data, so auditing the history of your data or reviewing it at a certain point in time is possible (and with Site it's easy!)
 
-The **history** directive allows you to see all the changes to a given document. Say for example you updated the name of a card at some point:
+The [**history**](../../reference/graphql/site-directive#history) directive allows you to see all the changes to a given document. Say for example you updated the name of a card at some point, you can add the query:
+
+```graphql
+cardHistory(id: ID!): [Card] @site(history: "desc")
+```
+
+When this query is run, Site returns a list of Cards which represent the document at every iteration:
 
   <img src="/images/ss9.png"/>
 
-- Site returns a list of Cards which represent the document at every iteration.
-
 A list like this is all well and good, but you need to know _when_ a cat walked across your keyboard and turned "Deliver Prototype" into "cknkalielmkl.nm,cne". Without a timestamp to cross reference with your home security cameras, how will you be able to tell _which_ pet is the culprit?
 
-We can add the inbuilt fields \_siteCreatedAt and \_siteValidTime to our Card type to easily access the temporal power of XTDB.
+We can add the fields \_siteCreatedAt: String and \_siteValidTime: String to our Card type to easily access the temporal power of XTDB via Site's inbuilt \_site fields.
 
 <img src="/images/ss10.png"/>
 
@@ -317,13 +333,9 @@ type Query {
 
 </APIAnatomy>
 
-**TODO make APIAnatomy narrower ^**
-
-All cards that (#Wording satisfy?) e will be returned as a list.
+All cards that satisfy e will be returned as a list.
 
   <img src="/images/ss12.png"/>
-
-**Static example of resolver TODO**
 
 ## Part 5: Summary & Next Steps...
 
@@ -335,6 +347,6 @@ At this point we have a schema that allows us to record, update, query, and view
 
 If you have made it this far then congrats! You (should) have a ready to go back end and the required APIs for your fledgling kanban app. What to do next?
 
-- Now that you are familiar with Site and the console, you can experiment with adding and modifying your kanban schema further, or striking out alone and creating something from scratch. If you do, please share it with us by tweeting **(TODO socials / strangeloop slack)** as JUXT would love to see what you come up with.
+- Now that you are familiar with Site and the console, you can experiment with adding and modifying your kanban schema further, or striking out alone and creating something from scratch. If you do, please share it with us by Tweeting [@juxtpro](https://twitter.com/juxtpro) as JUXT would love to see what you come up with.
 - Check out Alex's video [Making a Kanban App with Site](https://www.youtube.com/watch?v=L9CytxUMCaA&t=122s), where he walks through a similar project and connects it with a React front end, to add a GUI to your project.
 - Take a look at JUXT's home-apps/hiring-kanban [public repo](https://github.com/juxt/home-apps/tree/main/apps/hiring-kanban) for inspiration on extending your kanban's functionality with custom Clojure code and building multiple apps on one Site instance.
