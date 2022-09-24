@@ -16,13 +16,13 @@ permalink: index.html
 
 The server behaviour is defined in a declarative manner using open-source formats for describing and documenting APIs.
 
-Site currently provides execution engines for [Open Api](https://spec.openapis.org/oas/v3.0.2) and [Graphql](https://graphql.org/)
+Site currently provides execution engines for [OpenAPI](https://spec.openapis.org/oas/v3.0.2) and [GraphQL](https://graphql.org/)
 
 APIs are also able to benefit from Site’s authorization module, [Pass](), providing Policy-Based Access Control, loosely based on XACML.
 
 </Intro>
 
-## Open API
+## OpenAPI
 
 The OpenAPI Specification (OAS) defines a standard, programming language-agnostic interface description for HTTP APIs.
 
@@ -30,7 +30,7 @@ If you PUT a JSON document with a Content-Type of `application/vnd.oai.openapi+j
 
 APIs served from Site are good web citizens. They implement HTTP method semantics properly, with support for content negotiation, conditional requests, range requests and authentication.
 
-## Graphql
+## GraphQL
 
 All that is needed to create a fully functioning GraphQL server is to create a schema.
-A single graphQL compliant schema file provides Site with all the data it needs to expose a GraphQL endpoint, transct or query data with XTDB and validate the incoming and outgoing data.
+A single GraphQL compliant schema file provides Site with all the data it needs to expose a GraphQL endpoint, transct or query data with XTDB and validate the incoming and outgoing data.
