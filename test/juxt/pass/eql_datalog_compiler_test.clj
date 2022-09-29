@@ -1267,29 +1267,7 @@
 
 ;;(update-in {:find ['(pull)]} [:find 1] (fnil assoc {}) :foo :bar)
 
-(defn compile-field [schema field]
-  (let [{::grab.document/keys [scoped-type-name] :as instance} field
-        gtype (some-> schema :juxt.grab.alpha.schema/types-by-name (get scoped-type-name))
-        sel-name (:juxt.grab.alpha.graphql/name field)
-        k (case sel-name
-            "id" :xt/id
-            "_type" ::site/type
-            (keyword sel-name))
-        field-def (some-> gtype :juxt.grab.alpha.graphql/field-definitions (->> (some (fn [fdef] (when (= (:juxt.grab.alpha.graphql/name fdef) sel-name) fdef)))))
-        site-dir (some-> field-def :juxt.grab.alpha.graphql/directives (->> (some (fn [dir] (when (= (:juxt.grab.alpha.graphql/name dir) "site") dir)))))
-        action (some-> site-dir :juxt.grab.alpha.graphql/arguments (get "action"))]
 
-    (cond
-      (:juxt.grab.alpha.graphql/selection-set field)
-      {:type :join
-       :dispatch-key k
-       :key k
-       :params (cond-> {} action (assoc ::pass/action action))
-       :children (mapv #(compile-field schema %) (:juxt.grab.alpha.graphql/selection-set field))}
-      :else
-      {:type :prop
-       :dispatch-key k
-       :key k})))
 
 
 (with-fixtures
@@ -1401,41 +1379,65 @@
               q (first
                  (eqlc/compile-ast
                   db
-                  (compile-field schema (grab.document/get-operation doc "GetDoctors"))
+
+                  {:type :root,
+                   :children
+                   [{:type :join,
+                     :dispatch-key :doctors,
+                     :key :doctors,
+                     :params
+                     {:search "jack",
+                      :juxt.pass.alpha/action "https://site.test/actions/get-doctor"},
+                     :children [{:type :prop, :dispatch-key :xt/id, :key :xt/id}]}]}
+
+                  #_{:type :join,
+                     :dispatch-key :GetDoctors,
+                     :key :GetDoctors,
+                     :params {},
+                     :children
+                     [{:type :join,
+                       :dispatch-key :doctors,
+                       :key :doctors,
+                       :params
+                       {:search "jack",
+                        :juxt.pass.alpha/action "https://site.test/actions/get-doctor"},
+                       :children [{:type :prop, :dispatch-key :xt/id, :key :xt/id}]}]}
+                  #_(compile-field schema (grab.document/get-operation doc "GetDoctors"))
                   #_(eql/query->ast
 
                      '[{(:doctors {::pass/action "https://site.test/actions/get-doctor"
-                                 :search "jack"})
-                      [:xt/id
-                       :name
-                       ::site/type
-                       {(:patients {::pass/action "https://site.test/actions/get-patient"})
+                                   :search "jack"})
                         [:xt/id
                          :name
                          ::site/type
-                         {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
-                          [:reading]}]}]}])))]
+                         {(:patients {::pass/action "https://site.test/actions/get-patient"})
+                          [:xt/id
+                           :name
+                           ::site/type
+                           {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
+                            [:reading]}]}]}])))]
 
           q
-          ;;(eqlc/prune-result (xt/q db q alice nil))
+          (eqlc/prune-result (xt/q db q alice nil))
 
           ))))
 
 ;; TODO: Compile schema, compile docs, do some testing on the compiler itself - put this in a graphql ns
 
 
-(eql/query->ast
- '[{(:doctors {::pass/action "https://site.test/actions/get-doctor"
-               :search "jack"})
-    [:xt/id
-     :name
-     ::site/type
-     {(:patients {::pass/action "https://site.test/actions/get-patient"})
+(comment
+  (eql/query->ast
+   '[{(:doctors {::pass/action "https://site.test/actions/get-doctor"
+                 :search "jack"})
       [:xt/id
        :name
        ::site/type
-       {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
-        [:reading]}]}]}])
+       {(:patients {::pass/action "https://site.test/actions/get-patient"})
+        [:xt/id
+         :name
+         ::site/type
+         {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
+          [:reading]}]}]}]))
 
 
 (comment
@@ -1456,43 +1458,7 @@
  (eql/query->ast
   '[{:root [:xt/id]}]))
 
-(set! *print-namespace-maps* false)
 
-(let [schema
-      (-> "juxt/pass/schema.graphql"
-          io/resource
-          slurp
-          grab.parser/parse
-          grab.schema/compile-schema)
+(eql/query->ast
 
-      doc (-> "query GetDoctors { doctors(search: \"jack\") { id name patients { id name } } }"
-              grab.parser/parse
-              (grab.document/compile-document schema))
-
-      compile-field
-      (fn compile-field [field]
-        (let [{::grab.document/keys [scoped-type-name] :as instance} field
-              gtype (some-> schema :juxt.grab.alpha.schema/types-by-name (get scoped-type-name))
-              sel-name (:juxt.grab.alpha.graphql/name field)
-              k (keyword sel-name)
-              field-def (some-> gtype :juxt.grab.alpha.graphql/field-definitions (->> (some (fn [fdef] (when (= (:juxt.grab.alpha.graphql/name fdef) sel-name) fdef)))))
-              site-dir (some-> field-def :juxt.grab.alpha.graphql/directives (->> (some (fn [dir] (when (= (:juxt.grab.alpha.graphql/name dir) "site") dir)))))
-              action (some-> site-dir :juxt.grab.alpha.graphql/arguments (get "action"))]
-
-          (cond
-            (:juxt.grab.alpha.graphql/selection-set field)
-            {(list k (cond-> {} action (assoc ::pass/action action)))
-             (mapv compile-field (:juxt.grab.alpha.graphql/selection-set field))}
-            :else k)))]
-
-  (second (first (compile-field (grab.document/get-operation doc "GetDoctors"))))
-
-  #_(->
-     (compile-selection-set
-      (:juxt.grab.alpha.graphql/selection-set (grab.document/get-operation doc "GetDoctors")))
-
-     #_:juxt.grab.alpha.graphql/selection-set
-     #_compile-selection-set
-     )
-
-  )
+ '[:foo])
