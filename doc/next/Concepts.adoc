@@ -123,7 +123,7 @@ The point is, to satisfy most access control requirements we should consider the
 To avoid making access control decisions based on stale data, we need the decision logic to be where the data resides.
 
 ****
-Site takes the view that data must be protected from unauthorized access.
+Site believes data should be protected from unauthorized access.
 
 The greater the distance between the data and the mechanisms that protect the data, the greater the 'attack surface' that must be defended.
 
