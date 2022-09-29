@@ -31,10 +31,7 @@
           "title": "Walkthrough: Build a Kanban API",
           "path": "/learn/kanban",
           "routes": [
-            {
-              "title": "Introduction",
-              "path": "/learn/kanban/kanban0"
-            },
+            
             {
               "title": "Part 1: Exploring the InSite Console",
               "path": "/learn/kanban/kanban1"
