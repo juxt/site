@@ -11,6 +11,7 @@
                         "juxt.site.graphql-compiler-test"
                         "juxt.site.graphql-auth-integration-test"
                         "juxt.pass.eql-datalog-compiler-test"
+                        "juxt.pass.graphql-compiler-test"
                         "juxt.site.return-test"
                         ]}]
 
