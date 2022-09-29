@@ -304,20 +304,21 @@ If this is successful, run `(ls)` to check the four entities have been installed
 This will look similar to:
 
 ----
-("https://site.test/_site/action-log/2662"
- "https://site.test/_site/action-log/2663"
- "https://site.test/_site/action-log/2664"
- "https://site.test/_site/action-log/2666"
- "https://site.test/_site/action-log/2667"
+("https://site.test/_site/events/4"
+ "https://site.test/_site/events/5"
+ "https://site.test/_site/events/6"
+ "https://site.test/_site/events/7"
+ "https://site.test/_site/events/8"
+ "https://site.test/_site/events/9"
  "https://site.test/_site/do-action"
  "https://site.test/_site/not-found"
  "https://site.test/actions/create-action"
  "https://site.test/actions/get-not-found"
  "https://site.test/actions/grant-permission"
- "https://site.test/actions/register-application"
+ "https://site.test/actions/install-not-found"
  "https://site.test/permissions/get-not-found"
  "https://site.test/permissions/system/bootstrap"
- "https://site.test/permissions/system/register-application"
+ "https://site.test/permissions/system/install-not-found"
  "https://site.test/subjects/system")
 ----
 --

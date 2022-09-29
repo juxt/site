@@ -404,8 +404,8 @@
                [:xtdb.api/put
                 (into
                  (cond->
-                     {:xt/id (format "%s/_site/action-log/%s" base-uri (::xt/tx-id tx))
-                      ::site/type "https://meta.juxt.site/site/action-log-entry"
+                     {:xt/id (format "%s/_site/events/%s" base-uri (::xt/tx-id tx))
+                      ::site/type "https://meta.juxt.site/site/event"
                       ::pass/subject-uri (:xt/id subject)
                       ::pass/action action
                       ::pass/purpose purpose
@@ -431,12 +431,12 @@
           result-fx))
 
       (catch Throwable e
-        (let [action-log-entry-uri (format "%s/_site/action-log/%d" base-uri (::xt/tx-id tx))]
-          (log/errorf e "Error when doing action: %s %s" action action-log-entry-uri)
+        (let [event-id (format "%s/_site/events/%d" base-uri (::xt/tx-id tx))]
+          (log/errorf e "Error when performing action: %s %s" action event-id)
 
           [[::xt/put
-            {:xt/id action-log-entry-uri
-             ::site/type "https://meta.juxt.site/site/action-log-entry"
+            {:xt/id event-id
+             ::site/type "https://meta.juxt.site/site/event"
              ::pass/subject subject
              ::pass/action action
              ::site/resource resource
@@ -541,7 +541,7 @@
       (let [result
             (xt/entity
              (xt/db xt-node)
-             (format "%s/_site/action-log/%d" base-uri tx-id))]
+             (format "%s/_site/events/%d" base-uri tx-id))]
         (if-let [error (::site/error result)]
           (do
             (log/errorf "Transaction error: %s" error)
