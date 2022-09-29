@@ -1,0 +1,30 @@
+schema {
+  query: Query
+}
+
+type Query {
+  doctors: [Doctor] @site(action: "https://site.test/actions/get-doctor")
+  patients: [Patient] @site(action: "https://site.test/actions/get-patient")
+}
+
+type Doctor {
+  id: ID
+  _type: String
+  name: String
+  patients: [Patient] @site(action: "https://site.test/actions/get-patient")
+}
+
+type Patient {
+  id: ID
+  _type: String
+  name: String
+  doctors: [Doctor] @site(action: "https://site.test/actions/get-patient")
+  readings: [Reading] @site(action: "https://site.test/actions/read-any-measurement")
+}
+
+type Reading {
+  id: ID
+  _type: String
+  bloodPressure: String
+  heartRate: String
+}

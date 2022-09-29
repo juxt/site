@@ -2,6 +2,10 @@
 
 (ns juxt.pass.eql-datalog-compiler-test
   (:require
+   [clojure.java.io :as io]
+   [juxt.grab.alpha.parser :as grab.parser]
+   [juxt.grab.alpha.document :as grab.document]
+   [juxt.grab.alpha.schema :as grab.schema]
    [edn-query-language.core :as eql]
    [jsonista.core :as json]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
@@ -1262,3 +1266,233 @@
      db))
 
 ;;(update-in {:find ['(pull)]} [:find 1] (fnil assoc {}) :foo :bar)
+
+(defn compile-field [schema field]
+  (let [{::grab.document/keys [scoped-type-name] :as instance} field
+        gtype (some-> schema :juxt.grab.alpha.schema/types-by-name (get scoped-type-name))
+        sel-name (:juxt.grab.alpha.graphql/name field)
+        k (case sel-name
+            "id" :xt/id
+            "_type" ::site/type
+            (keyword sel-name))
+        field-def (some-> gtype :juxt.grab.alpha.graphql/field-definitions (->> (some (fn [fdef] (when (= (:juxt.grab.alpha.graphql/name fdef) sel-name) fdef)))))
+        site-dir (some-> field-def :juxt.grab.alpha.graphql/directives (->> (some (fn [dir] (when (= (:juxt.grab.alpha.graphql/name dir) "site") dir)))))
+        action (some-> site-dir :juxt.grab.alpha.graphql/arguments (get "action"))]
+
+    (cond
+      (:juxt.grab.alpha.graphql/selection-set field)
+      {:type :join
+       :dispatch-key k
+       :key k
+       :params (cond-> {} action (assoc ::pass/action action))
+       :children (mapv #(compile-field schema %) (:juxt.grab.alpha.graphql/selection-set field))}
+      :else
+      {:type :prop
+       :dispatch-key k
+       :key k})))
+
+
+(with-fixtures
+  (let
+      [resources
+       (->
+        #{::init/system
+
+          "https://site.test/login"
+          "https://site.test/user-identities/alice/basic"
+          "https://site.test/user-identities/bob/basic"
+          "https://site.test/user-identities/carlos/basic"
+
+          "https://site.test/oauth/authorize"
+          "https://site.test/session-scopes/oauth"
+          "https://site.test/permissions/alice-can-authorize"
+          "https://site.test/permissions/bob-can-authorize"
+          "https://site.test/permissions/carlos-can-authorize"
+          "https://site.test/applications/local-terminal"
+
+          "https://site.test/actions/get-patient"
+          "https://site.test/permissions/alice/get-any-patient"
+          "https://site.test/permissions/bob/get-patient/004"
+          "https://site.test/permissions/bob/get-patient/009"
+          "https://site.test/permissions/bob/get-patient/010"
+          "https://site.test/actions/list-patients"
+          "https://site.test/permissions/alice/list-patients"
+          "https://site.test/permissions/bob/list-patients"
+
+          "https://site.test/actions/register-patient-measurement"
+          "https://site.test/permissions/system/register-patient-measurement"
+
+          "https://site.test/actions/get-doctor"
+          "https://site.test/permissions/alice/get-doctor"
+          "https://site.test/permissions/bob/get-doctor"
+
+          "https://site.test/patients"
+
+          "https://site.test/actions/read-any-measurement"
+          "https://site.test/permissions/alice/read-any-measurement"
+          "https://site.test/permissions/bob/read-any-measurement"}
+
+        ;; Add some patients
+        (into
+         (for [i (range 1 (inc 20))]
+           (format "https://site.test/patients/%03d" i)))
+
+        ;; Add some doctors
+        (into
+         (for [i (range 1 (inc 4))]
+           (format "https://site.test/doctors/%03d" i)))
+
+        (into
+         #{"https://site.test/assignments/patient/001/doctor/001"
+           "https://site.test/assignments/patient/002/doctor/001"
+           "https://site.test/assignments/patient/003/doctor/001"
+           "https://site.test/assignments/patient/004/doctor/002"
+           "https://site.test/assignments/patient/005/doctor/001"
+           "https://site.test/assignments/patient/005/doctor/002"
+           "https://site.test/assignments/patient/006/doctor/003"
+           "https://site.test/assignments/patient/010/doctor/003"}))]
+
+      (with-resources resources
+
+        (let [db (xt/db *xt-node*)
+              alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+              {alice-access-token "access_token" error "error"}
+              (book/authorize!
+               :session-id alice-session-id
+               "client_id" "local-terminal"
+               ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+               )
+              _ (is (nil? error) (format "OAuth2 grant error: %s" error))
+
+              bob-session-id (book/login-with-form! {"username" "bob" "password" "walrus"})
+              {bob-access-token "access_token"
+               error "error"}
+              (book/authorize!
+               :session-id bob-session-id
+               "client_id" "local-terminal"
+               ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+               )
+
+              db (xt/db *xt-node*)
+
+
+
+              extract-subject-with-token
+              (fn [token]
+                (::pass/subject
+                 (ffirst
+                  (xt/q db '{:find [(pull e [*])]
+                             :where [[e ::pass/token token]]
+                             :in [token]} token))))
+              alice (extract-subject-with-token alice-access-token)
+              bob (extract-subject-with-token bob-access-token)
+
+              schema
+              (-> "juxt/pass/schema.graphql"
+                  io/resource
+                  slurp
+                  grab.parser/parse
+                  grab.schema/compile-schema)
+
+              doc (-> "query GetDoctors { doctors(search: \"jack\") { id _type name patients { id _type name readings { id _type } } } }"
+                      grab.parser/parse
+                      (grab.document/compile-document schema))
+
+              q (first
+                 (eqlc/compile-ast
+                  db
+                  (compile-field schema (grab.document/get-operation doc "GetDoctors"))
+                  #_(eql/query->ast
+
+                     '[{(:doctors {::pass/action "https://site.test/actions/get-doctor"
+                                 :search "jack"})
+                      [:xt/id
+                       :name
+                       ::site/type
+                       {(:patients {::pass/action "https://site.test/actions/get-patient"})
+                        [:xt/id
+                         :name
+                         ::site/type
+                         {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
+                          [:reading]}]}]}])))]
+
+          q
+          ;;(eqlc/prune-result (xt/q db q alice nil))
+
+          ))))
+
+;; TODO: Compile schema, compile docs, do some testing on the compiler itself - put this in a graphql ns
+
+
+(eql/query->ast
+ '[{(:doctors {::pass/action "https://site.test/actions/get-doctor"
+               :search "jack"})
+    [:xt/id
+     :name
+     ::site/type
+     {(:patients {::pass/action "https://site.test/actions/get-patient"})
+      [:xt/id
+       :name
+       ::site/type
+       {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
+        [:reading]}]}]}])
+
+
+(comment
+  '[{(:doctors {::pass/action "https://site.test/actions/get-doctor"
+                :search "jack"})
+     [:xt/id
+      :name
+      ::site/type
+      {(:patients {::pass/action "https://site.test/actions/get-patient"})
+       [:xt/id
+        :name
+        ::site/type
+        {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
+         [:reading]}]}]}])
+
+#_(eqlc/compile-ast
+ nil
+ (eql/query->ast
+  '[{:root [:xt/id]}]))
+
+(set! *print-namespace-maps* false)
+
+(let [schema
+      (-> "juxt/pass/schema.graphql"
+          io/resource
+          slurp
+          grab.parser/parse
+          grab.schema/compile-schema)
+
+      doc (-> "query GetDoctors { doctors(search: \"jack\") { id name patients { id name } } }"
+              grab.parser/parse
+              (grab.document/compile-document schema))
+
+      compile-field
+      (fn compile-field [field]
+        (let [{::grab.document/keys [scoped-type-name] :as instance} field
+              gtype (some-> schema :juxt.grab.alpha.schema/types-by-name (get scoped-type-name))
+              sel-name (:juxt.grab.alpha.graphql/name field)
+              k (keyword sel-name)
+              field-def (some-> gtype :juxt.grab.alpha.graphql/field-definitions (->> (some (fn [fdef] (when (= (:juxt.grab.alpha.graphql/name fdef) sel-name) fdef)))))
+              site-dir (some-> field-def :juxt.grab.alpha.graphql/directives (->> (some (fn [dir] (when (= (:juxt.grab.alpha.graphql/name dir) "site") dir)))))
+              action (some-> site-dir :juxt.grab.alpha.graphql/arguments (get "action"))]
+
+          (cond
+            (:juxt.grab.alpha.graphql/selection-set field)
+            {(list k (cond-> {} action (assoc ::pass/action action)))
+             (mapv compile-field (:juxt.grab.alpha.graphql/selection-set field))}
+            :else k)))]
+
+  (second (first (compile-field (grab.document/get-operation doc "GetDoctors"))))
+
+  #_(->
+     (compile-selection-set
+      (:juxt.grab.alpha.graphql/selection-set (grab.document/get-operation doc "GetDoctors")))
+
+     #_:juxt.grab.alpha.graphql/selection-set
+     #_compile-selection-set
+     )
+
+  )

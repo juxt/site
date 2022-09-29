@@ -670,4 +670,7 @@
 (comment
   (sci/eval-string
    "(+ (clojure.core/rand) 10)"
-   {:namespaces {'clojure.core {'rand (constantly 0.5)}}}))
+   {:namespaces {'clojure.core {'rand (constantly 0.5)}}
+    ;;:deny '[+]
+    }
+   ))
