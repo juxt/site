@@ -1251,23 +1251,6 @@
 
         ))))
 
-;; The GraphQL compilation now targets the EQL, rather than direct to XTDB. This
-;; also makes the transition to XTDB/Core2 more straight-forward.
-
-#_(let [compiled-schema
-        (->
-         "juxt/site/graphql/basic.graphql"
-         io/resource
-         slurp
-         gcompiler/compile-schema)]
-
-    (gqp/graphql-query->xtdb-query
-     "query { patients { name heartRate } }"
-     compiled-schema
-     db))
-
-;;(update-in {:find ['(pull)]} [:find 1] (fnil assoc {}) :foo :bar)
-
 (deftest graphql-test
   (let [resources
         (->
