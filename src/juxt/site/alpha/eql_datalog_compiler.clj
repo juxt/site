@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.alpha.eql-datalog-compiler
+(ns juxt.site.alpha.eql-datalog-compiler
   (:require
    [clojure.walk :refer [postwalk]]
    [juxt.pass.alpha.actions :as actions]

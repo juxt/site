@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.alpha.graphql-eql-compiler
+(ns juxt.site.alpha.graphql-eql-compiler
   (:require
    [juxt.grab.alpha.document :as document]
    [juxt.site.alpha :as-alias site]
@@ -8,7 +8,7 @@
 
 (defn- graphql->eql-ast*
   [schema field]
-  (let [{::document/keys [scoped-type-name] :as instance} field
+  (let [{::document/keys [scoped-type-name]} field
         gtype (some-> schema :juxt.grab.alpha.schema/types-by-name (get scoped-type-name))
         sel-name (:juxt.grab.alpha.graphql/name field)
         k (case sel-name

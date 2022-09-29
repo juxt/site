@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.eql-datalog-compiler-test
+(ns juxt.site.eql-datalog-compiler-test
   (:require
    [clojure.java.io :as io]
    [juxt.pass.alpha.graphql-eql-compiler :refer [graphql->eql-ast]]
