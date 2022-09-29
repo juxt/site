@@ -3,12 +3,10 @@
 
 == Introduction
 
-For many record-keeping systems, it's necessary to protect resources from access
-and modification from unauthorized users.
+For many systems, it's necessary to protect resources from access and modification from unauthorized users.
 
-In this chapter we will create an Action for creating protected resources. These
-preliminaries will be useful later on as we explore different approaches to
-authentication.
+In this chapter we will create an Action for creating protected resources.
+These preliminaries will be useful later on as we explore different approaches to authentication.
 
 [[publishing-protected-resources]]
 == Create the Action to create a protected resource

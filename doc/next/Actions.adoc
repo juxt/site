@@ -2,11 +2,18 @@
 :toc: left
 :experimental:
 
-// Make this more of like reference material
+All interaction with Site is a series of explicit _actions_.
 
-Actions authorize all reads and writes to the database.
+Actions map onto business functions, such as 'create a customer account' or 'ship a product to a customer'.
 
-Actions also record all writes, and some reads from the database.
+An action are performed on the system.
+
+An _event_ is a record of the successful outcome when an action is performed.
+Events are stored as a log in the database.
+
+When defining an action, it is possible to specify who is allowed to perform the action, and in which circumstances.
+Actions define their access control in rules, which are sufficient powerful to
+model any access control policy (RBAC, ABAC, PBAC, etc.)
 
 ////
 TODO: Use xrefs from these bullet-points to more detailed explanations, such
@@ -14,18 +21,15 @@ that these set of items can become a launchpad for diving into the
 documentation.
 ////
 
-Actions run in transaction functions to ensure atomicity and consistency.
+Where necessary, actions run in transaction functions to ensure atomicity and consistency.
 
 Actions can provide involve input validation.
-
-Actions define their access control in rules, which are sufficient powerful to
-model any access control policy (RBAC, ABAC, PBAC, etc.)
 
 Actions leave an audit trail and may trigger alerts.
 
 Actions can be grouped into OAuth2 scopes.
 
-Actions can be exposed to the network, using OpenAPI and/or GraphQL operations.
+Actions can be exposed to the network, by being mapped to OpenAPI and/or GraphQL operations.
 
 Actions can cause side-effects (e.g. lambda functions).
 
@@ -81,12 +85,12 @@ A copy of the transaction metadata record is returned as a result of the `do-act
 
 [source,clojure]
 ----
-{:xt/id "urn:site:action-log:134"
+{:xt/id "https://example.org/_site/event-log/134"
  :xtdb.api/tx-id 134
- :juxt.pass.alpha/subject "urn:site:subjects:repl"
- :juxt.pass.alpha/action "https://site.test/actions/create-action"
+ :juxt.pass.alpha/subject "https://example.org/subjects/system"
+ :juxt.pass.alpha/action "https://example.org/actions/create-action"
  :juxt.pass.alpha/purpose nil
- :juxt.pass.alpha/puts ["https://site.test/actions/grant-permission"]
+ :juxt.pass.alpha/puts ["https://example.org/actions/grant-permission"]
  :juxt.pass.alpha/deletes []}
 ----
 ====

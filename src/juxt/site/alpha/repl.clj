@@ -26,7 +26,8 @@
    [juxt.site.alpha.main :as main]
    [juxt.site.alpha.util :as util]
    [selmer.parser :as selmer]
-   [xtdb.api :as xt])
+   [xtdb.api :as xt]
+   [juxt.site.alpha.repl :as repl])
   (:import (java.util Date)))
 
 (defn base64-reader [form]
@@ -455,6 +456,9 @@
 #_(defn update-site-graphql
   []
   (init/put-graphql-schema-endpoint! (xt-node) (config)))
+
+(defn bootstrap! []
+  (init/bootstrap!))
 
 ;; No longer any users so no username/password
 #_(defn init!

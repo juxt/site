@@ -690,3 +690,6 @@
                         ;;{:id id :status :error :error cause}
                         ))))
         [])))
+
+(defn bootstrap! []
+  (converge! #{::system} (substitute-actual-base-uri dependency-graph)))

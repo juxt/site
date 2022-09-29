@@ -8,13 +8,13 @@ In this chapter we will explain the bootstrap process initiated in <<bootstrap>>
 == The primordial entities
 
 (((primordial entities)))
-Before we can start to create and perform actions, we must start by installing four _primordial_ entities:
+Before we can start to create and perform actions, we must first install four _primordial_ entities:
 
 . A *subject* that will only be used to bootstrap the system to a point where we have real users (<<bootstrap-install-system-subject>>).
 
 . An *action* that allows the creation of other actions (<<bootstrap-install-create-action>>).
 
-. A *permission* to allow the *subject* (created in <<bootstrap-install-system-subject>>) to call the action (created in <<bootstrap-install-system-permissions>>).
+. A *permission* to allow the *subject* (created in <<bootstrap-install-system-subject>>) to call this action (created in <<bootstrap-install-system-permissions>>).
 
 . A *transaction function* that we can use to _perform_ an action (<<bootstrap-install-transaction-function>>).
 
@@ -56,9 +56,10 @@ modified if necessary to correspond to a different base URI.
 
 The system subject cannot call the `create-action` action without being granted permission.
 
-The permission document
+A permission is represented by a specific entity.
 
 .The initial system permissions
+[[ex-permission-document]]
 [source,clojure]
 ----
 include::../../src/juxt/site/alpha/init.clj[tag=install-system-permissions!,indent=0]

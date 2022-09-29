@@ -272,7 +272,7 @@ There are a few useful Site REPL commands you should be familiar with:
 [[bootstrap]]
 == Bootstrap
 
-Now we are ready to bootstrap the system by installing these four entities.
+Now we are ready to bootstrap the system by installing a collection of base entities.
 
 [TIP]
 --
@@ -288,6 +288,8 @@ If the database is not empty, you can clear it with:
 user> (factory-reset!)
 ----
 --
+
+TIP: Alternatively, you can delete the database directory `db` in `$HOME/.local/share/site`.
 
 Ensure that the database is empty. Now install the entities:
 

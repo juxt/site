@@ -239,6 +239,7 @@ A *rule* is written in terms of:
 
 - what is known about the person or machine requesting access (the *subject*)
 - what is known about the document being accessed, if applicable (the *resource*)
+- attributes of the permission document that grants access (the *permission*)
 
 For example, it might be that a person's access depends on a role they have been assigned, together with the value of the resource's document classification attribute.
 Or that only 'VIP' customers may access 'exclusive' special offers.
