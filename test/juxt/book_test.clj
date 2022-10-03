@@ -208,9 +208,8 @@
         (let [response (*handler* request)]
           response
           (is (= 302 (:ring.response/status response)))
-          (is (.startsWith
-               (get-in response [:ring.response/headers "location"])
-               "https://site.test/login?return-to=")))))))
+          (is (= "https://site.test/login?return-to=https%3A%2F%2Fsite.test%2Fprotected-by-session-scope%2Fdocument.html"
+                 (get-in response [:ring.response/headers "location"]))))))))
 
 (deftest login-with-form-test
   (with-resources #{"https://site.test/login"
