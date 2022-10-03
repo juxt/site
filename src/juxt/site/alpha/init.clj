@@ -693,3 +693,10 @@
 
 (defn bootstrap! []
   (converge! #{::system} (substitute-actual-base-uri dependency-graph)))
+
+
+;; Useful options (which may or may not show in 'status')
+
+;; TODO: Create an action that can be attached to a GET. It will create a
+;; temporary session cookie with a state value and redirect to the authorization
+;; endpoint of the OpenID-Connect provider.
