@@ -512,7 +512,7 @@
   ;; This should be in the tx-fn but getting this malli exception: No
   ;; implementation of method: :-form of protocol: #'malli.core/Schema found for
   ;; class: clojure.lang.PersistentVector
-  (let [action (xt/entity db action)]
+  #_(let [action (xt/entity db action)]
     (when-let [input-schema (-> action ::site/transact :juxt.site.alpha.malli/input-schema)]
       (when-not (malli/validate input-schema action-input)
         (throw
