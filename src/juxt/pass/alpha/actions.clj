@@ -353,11 +353,26 @@
                    (-> action-doc ::site/transact :juxt.site.alpha.sci/program)
                    {:namespaces
                     {'user
-                     {'*input* action-input}
+                     {'*input* action-input
+                      '*action* action-doc}
                      'xt
                      {'entity (fn [id] (xt/entity db id))}
                      'malli
-                     {'validate (fn [schema value] (malli/validate schema value))}}})
+                     {'validate (fn [schema value] (malli/validate schema value))
+                      'explain (fn [schema value] (malli/explain schema value))}
+                     'juxt.site.malli
+                     {'validate-input
+                      (fn []
+                        (let [schema (get-in action-doc [:juxt.site.alpha/transact :juxt.site.alpha.malli/input-schema])
+                              valid? (malli/validate schema action-input)]
+                          (when-not valid?
+                            (throw
+                             (ex-info
+                              "Validation failed"
+                              {:error :validation-failed
+                               :input action-input
+                               :schema schema
+                               })))))}}})
                   (catch clojure.lang.ExceptionInfo e
                     ;; The sci.impl/callstack contains a volatile which isn't freezable.
                     ;; Also, we want to unwrap the original cause exception.

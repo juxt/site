@@ -4,6 +4,7 @@
   (:require
    [clojure.java.io :as io]
    [ring.util.codec :as codec]
+   [jsonista.core :as json]
    juxt.book.login
    [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]
@@ -1666,6 +1667,15 @@ Password: <input name=password type=password>
                                                  :response response})))
     id))
 
+(defn login-with-openid!
+  "Return a session id (or nil) given a map of fields."
+  []
+  (let [req {:ring.request/method :get
+             :ring.request/path "/openid/login"}
+        response (*handler* req)]
+    ;; Return response for now
+    response))
+
 (defn authorize-response!
   "Authorize response"
   [& {:keys [session-id]
@@ -1688,7 +1698,7 @@ Password: <input name=password type=password>
                       {"response_type" "token"
                        "client_id" client-id
                        "state" state}
-                    scope (assoc "scope" (codec/url-encode (str/join " " scope)))))}]
+                      scope (assoc "scope" (codec/url-encode (str/join " " scope)))))}]
     (*handler* request)))
 
 (defn authorize!
@@ -1808,6 +1818,146 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/action "https://example.org/actions/put-user-owned-content"
        :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
        :juxt.pass.alpha/purpose nil}))))
+
+;; OpenID
+
+(defn create-action-install-openid-provider! [_]
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/install-openid-provider"
+
+       :juxt.site.alpha/transact
+       {:juxt.site.alpha.malli/input-schema
+        [:map
+         [:xt/id [:re "https://.*"]]
+         [:juxt.pass.alpha/openid-configuration
+          [:map
+           ["authorization_endpoint" :string]
+           ["token_endpoint" :string]]]]
+        :juxt.site.alpha.sci/program
+        (pr-str
+         '(let [input *input*
+                schema (get-in *action* [:juxt.site.alpha/transact :juxt.site.alpha.malli/input-schema])
+                valid? (malli/validate schema *input*)]
+            (if valid?
+              [[:xtdb.api/put *input*]]
+              (throw
+               (ex-info
+                "Validation failed"
+                {:error :validation-failed
+                 :input *input*
+                 :schema schema})))))}
+
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [permission :juxt.pass.alpha/subject subject]]
+
+         [(allowed? subject resource permission)
+          [subject :juxt.pass.alpha/user-identity id]
+          [id :juxt.pass.alpha/user user]
+          [permission :juxt.pass.alpha/user user]]]})))))
+
+(defn grant-permission-to-install-openid-provider! [_]
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/system/install-openid-provider"
+       :juxt.pass.alpha/subject "https://example.org/subjects/system"
+       :juxt.pass.alpha/action "https://example.org/actions/install-openid-provider"
+       :juxt.pass.alpha/purpose nil})))))
+
+(defn create-action-login-with-openid! [_]
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/login-with-openid"
+       :juxt.site.alpha/transact
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '(throw (ex-info "TODO" {:input *input*})))}
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [permission :xt/id]]]
+       })))))
+
+(defn grant-permission-to-invoke-action-login-with-openid! [_]
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/login-with-openid"
+       :juxt.pass.alpha/action "https://example.org/actions/login-with-openid"
+       :juxt.pass.alpha/purpose nil})))))
+
+(defn create-action-install-openid-login-endpoint! [_]
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/install-openid-login-endpoint"
+
+       :juxt.site.alpha/transact
+       {:juxt.site.alpha.malli/input-schema
+        [:map
+         [:xt/id [:re "https://example.org/.*"]]
+         [:juxt.pass.alpha/oauth-client [:re "https://.*"]]]
+        :juxt.site.alpha.sci/program
+        (pr-str
+         '(do
+            (juxt.site.malli/validate-input)
+            [[:xtdb.api/put
+              (assoc
+               *input*
+               :juxt.site.alpha/methods
+               {:get
+                {:juxt.pass.alpha/actions #{"https://example.org/actions/login-with-openid"}}})]]))}
+
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [permission :juxt.pass.alpha/subject subject]]
+
+         [(allowed? subject resource permission)
+          [subject :juxt.pass.alpha/user-identity id]
+          [id :juxt.pass.alpha/user user]
+          [permission :juxt.pass.alpha/user user]]]})))))
+
+(defn grant-permission-to-install-openid-login-endpoint! [_]
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/system/install-openid-login-endpoint"
+       :juxt.pass.alpha/subject "https://example.org/subjects/system"
+       :juxt.pass.alpha/action "https://example.org/actions/install-openid-login-endpoint"
+       :juxt.pass.alpha/purpose nil})))))
+
+(defn install-openid-login-endpoint! [{oauth-client :juxt.pass.alpha/oauth-client}]
+  (eval
+   (substitute-actual-base-uri
+    `(init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/install-openid-login-endpoint"
+      {:xt/id "https://example.org/openid/login"
+       :juxt.pass.alpha/oauth-client ~oauth-client}))))
 
 (def dependency-graph
   {"https://example.org/hello"
@@ -2128,17 +2278,59 @@ Password: <input name=password type=password>
    {:deps #{::init/system}
     :create (fn [_] (#'grant-permission-to-put-user-owned-content! "bob"))}
 
-   ;; Let's be careful before treating 'api resources' differently from 'normal'
-   ;; Site resources. They're the same thing really. The below should be treated
-   ;; with suspicion!
+   ;; OpenID
 
-   #_"https://example.org/actions/install-api-resource"
-   #_{:deps #{::init/system}
-    :create #'create-action-install-api-resource!}
+   "https://example.org/actions/install-openid-provider"
+   {:deps #{::init/system}
+    :create #'create-action-install-openid-provider!}
 
-   #_"https://example.org/permissions/system/install-api-resource"
-   #_{:deps #{::init/system}
-    :create #'grant-permission-to-install-api-resource!}
-   }
+   "https://example.org/permissions/system/install-openid-provider"
+   {:deps #{::init/system
+            "https://example.org/actions/install-openid-provider"}
+    :create #'grant-permission-to-install-openid-provider!}
 
-  )
+   "https://juxt.eu.auth0.com"
+   {:deps #{::init/system
+            "https://example.org/permissions/system/install-openid-provider"}
+    :create (fn [{:keys [id]}]
+              (let [
+                    ;; See https://openid.net/specs/openid-connect-discovery-1_0.html#rfc.section.4.1
+                    ;;
+                    ;; "If the Issuer value contains a path component, any terminating / MUST be
+                    ;; removed before appending /.well-known/openid-configuration."
+                    ;;
+                    ;; This uses a reluctant regex qualifier.
+                    config-uri (str (second (re-matches #"(.*?)/?" id)) "/.well-known/openid-configuration")
+                    config (json/read-value (slurp config-uri))]
+                (juxt.site.alpha.init/do-action
+                 (substitute-actual-base-uri "https://example.org/subjects/system")
+                 (substitute-actual-base-uri "https://example.org/actions/install-openid-provider")
+                 {:xt/id id
+                  :juxt.pass.alpha/openid-configuration config})))}
+
+   "https://example.org/actions/install-openid-login-endpoint"
+   {:deps #{::init/system}
+    :create #'create-action-install-openid-login-endpoint!}
+
+   "https://example.org/permissions/system/install-openid-login-endpoint"
+   {:deps #{::init/system
+            "https://example.org/actions/install-openid-login-endpoint"}
+    :create #'grant-permission-to-install-openid-login-endpoint!}
+
+   "https://example.org/actions/login-with-openid"
+   {:deps #{::init/system}
+    :create #'create-action-login-with-openid!}
+
+   "https://site.test/permissions/login-with-openid"
+   {:deps #{::init/system
+            "https://example.org/actions/login-with-openid"}
+    :create #'grant-permission-to-invoke-action-login-with-openid!}
+
+   "https://example.org/openid/login"
+   {:deps #{::init/system
+            "https://juxt.eu.auth0.com"
+            "https://example.org/permissions/system/install-openid-login-endpoint"
+            "https://example.org/actions/login-with-openid"}
+    :create (fn [_]
+              (install-openid-login-endpoint!
+               {:juxt.pass.alpha/oauth-client "https://juxt.eu.auth0.com"}))}})

@@ -885,3 +885,26 @@
 
 (comment
   (p/register! #'repl/e))
+
+
+;; Create an action: install-openid-provider
+
+(with-fixtures
+  (with-resources
+    #{"https://site.test/openid/login"
+      "https://site.test/permissions/login-with-openid"}
+
+    (repl/ls)
+
+
+    (repl/e "https://site.test/openid/login")
+
+    (let [req {:ring.request/method :get
+               :ring.request/path "/openid/login"}
+          response (*handler* req)]
+      ;; Return response for now
+      response)
+
+
+
+    ))

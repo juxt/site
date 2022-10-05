@@ -15,6 +15,7 @@
    [juxt.site.alpha :as-alias site]
    [juxt.site.alpha.main :as main]
    [xtdb.api :as xt]
+   [sci.core :as sci]
 
    ;; These are kept around just for the commented code sections
    [juxt.apex.alpha :as-alias apex]
@@ -510,6 +511,9 @@
      xt-node
      {:xt/id issuer-id
       :juxt.pass.alpha/openid-configuration config})))
+
+(comment
+  (json/read-value (slurp (openid-provider-configuration-url "https://juxt.eu.auth0.com"))))
 
 (defn install-openid-resources!
   [xt-node {::site/keys [base-uri] :as config}
