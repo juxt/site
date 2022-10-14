@@ -59,6 +59,10 @@
         ;; Required by OpenID Connect for http and retry resilience
         hato/hato {:mvn/version "0.8.2"}
         diehard/diehard {:mvn/version "0.11.3"}
+        ; Used by openidconnect for the URIBuilder
+        org.apache.httpcomponents/httpclient {:mvn/version "4.5.9"}
+        ; Used by openidconnect for determining TLD of issuer
+        com.google.guava/guava {:mvn/version "30.0-jre"}
 
         ;; Required for OAuth2, not necessarily only for Auth0 since it
         ;; implements the relevant standards so any OAuth2 provided should work.

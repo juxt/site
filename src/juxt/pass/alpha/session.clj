@@ -8,7 +8,9 @@
   (:require
    [juxt.pass.alpha.authentication :as authz]
    [ring.middleware.cookies :refer [cookies-request cookies-response]]
-   [clojure.tools.logging :as log]))
+   [clojure.tools.logging :as log])
+  (:import
+   (org.apache.http.client.utils URIBuilder)))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
@@ -48,7 +50,11 @@
 
     (-> req
         (set-cookie new-session-token-id!)
-        (update-in [:ring.response/headers "location"] #(str % "?code=" new-session-token-id!)))))
+        (update-in [:ring.response/headers "location"]
+            (fn [location]
+              (-> (new URIBuilder location)
+                  (.addParameter "code" new-session-token-id!)
+                  (.toString)))))))
 
 (defn wrap-associate-session [h]
   (fn [{::site/keys [db start-date] :as req}]

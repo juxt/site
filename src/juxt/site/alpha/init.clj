@@ -10,7 +10,9 @@
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.site.alpha.util :as util])
   (:import
-   (java.util Date)))
+   (java.util Date)
+   (com.google.common.net InternetDomainName)
+   (org.apache.http.client.utils URIBuilder)))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -256,7 +258,17 @@
         ;; the path <issuer-id>/.well-known/openid-configuration.
         config-uri (openid-provider-configuration-url issuer-id)
         _ (log/info "Loading OpenID configuration from" config-uri)
-        config (json/read-value (slurp config-uri))]
+        config (json/read-value (slurp config-uri))
+        auth-uri (new java.net.URI (get config "authorization_endpoint"))
+        app-tld (-> (InternetDomainName/from (.getHost auth-uri))
+                    (.topPrivateDomain)
+                    (.toString))
+        config (cond-> config
+                 (= app-tld "amazoncognito.com")
+                 (assoc "authorization_endpoint"
+                        (-> (new URIBuilder auth-uri)
+                            (.setPath "/logout")
+                            (.toString))))]
     (log/info "Issuer added:" (get config "issuer"))
     (put!
      crux-node
