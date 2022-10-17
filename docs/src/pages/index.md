@@ -8,17 +8,17 @@ permalink: index.html
 
 <Intro>
 
-[JUXT's Approach to software](https://www.juxt.pro/) details four primary concerns: **Time**, **Data**, **Form** and **Code**.
+[JUXT's approach to software](https://www.juxt.pro/) details four primary concerns: **Time**, **Data**, **Form** and **Code**.
 
 [XTDB](https://xtdb.com/) provides **Data** management, independent of any particular application or use-case, built upon a common model of **Time**.
 
-[Site](https://github.com/juxt/site) is a Resource Server, built on the XTDB database. It is a tool for adding **Form** to data, providing structure to application clients, relevent to a particular use-case.
+Site is a Resource Server, built on the XTDB database. It is a tool for adding **Form** to data, providing structure to application clients, relevant to a particular use-case.
 
 The server behaviour is defined in a declarative manner using open-source formats for describing and documenting APIs.
 
-Site currently provides execution engines for [OpenAPI](https://spec.openapis.org/oas/v3.0.2) and [GraphQL](https://graphql.org/)
+Site currently provides execution engines for [OpenAPI](https://spec.openapis.org/oas/v3.0.2) and [GraphQL](https://graphql.org/).
 
-APIs are also able to benefit from Site’s authorization module, [Pass](), providing Policy-Based Access Control, loosely based on XACML.
+APIs are also able to benefit from Site's authorization module Pass, providing Policy-Based Access Control, loosely based on XACML.
 
 </Intro>
 
@@ -33,4 +33,4 @@ APIs served from Site are good web citizens. They implement HTTP method semantic
 ## GraphQL
 
 All that is needed to create a fully functioning GraphQL server is to create a schema.
-A single GraphQL compliant schema file provides Site with all the data it needs to expose a GraphQL endpoint, transct or query data with XTDB and validate the incoming and outgoing data.
+A single GraphQL compliant schema file provides Site with all the data it needs to expose a GraphQL endpoint, transact or query data with XTDB, and validate the incoming and outgoing data.

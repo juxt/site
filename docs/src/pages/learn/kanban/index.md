@@ -6,9 +6,9 @@ Working with Site is a fast and straightforward way to build a fully functional 
 
 JUXT's InSite console (or indeed any preferred GraphQL visualiser) allows you to amend and test your data structures in real time, giving you the convenience and immediacy of existing no-code back end products, without their frustrating opacity or inevitable limits on customisation as your system becomes more complex.
 
-All the most commonly used back end functionality happens in one place in Site - a GraphQL schema - and requires only a basic knowledge of GraphQL. For more complex requirements Site can integrate custom queries and external code files, and each iteration can be built on the previous with no need for system-wide refactoring.
+All the most commonly used back end functionality happens in one place in Site - a GraphQL schema - and requires only a basic knowledge of GraphQL. For more complex requirements, Site can integrate custom queries and external code files, and each iteration can be built on the previous with no need for system-wide refactoring.
 
-I'm sure all of that is enough to whet your appetite, so lets crack on with a tutorial to build the back end for a simple kanban app. Hooking up a user interface is beyond the scope of this tutorial (for now...), but here is an example of a similar React based web-app that uses Site as its resource server:
+I'm sure all of that is enough to whet your appetite, so let's crack on with a tutorial to build the back end for a simple kanban app. Hooking up a user interface is beyond the scope of this tutorial (for now...), but here is an example of a similar React based web-app that uses Site as its resource server:
 
 <img src="/images/hiring.gif"/>
 
@@ -16,7 +16,7 @@ You can also [play with this kanban board](https://hire.juxt.site/) live.
 
 In this tutorial we will be using Site's packaged InSite GraphQL console to visualise our API as it develops, but Site is designed to be compatible so feel free to use another explorer if you fancy.
 
-The full schema for this tutorial is available [here](schema), but I would highly recommend leaving that tantalising box unopened for now in order to derive the most benefit (and understanding) from the step-by-step approach we'll take below.
+The full schema for this tutorial is available [here](kanban/schema), but I would highly recommend leaving that tantalising box unopened for now in order to derive the most benefit (and understanding) from the step-by-step approach we'll take below.
 
 ## Preface
 

@@ -2,7 +2,7 @@ A kanban board (or Workflow) has columns (or WorkflowStates eg To Do, In Progres
 
 - Open the site repo in your favourite IDE and navigate to site/apis/graphql
 
-  - create a new file called mykanban.graphql and copy into it the following:
+- Create a new file called mykanban.graphql and copy into it the following:
 
   ```graphql
   schema @site(type: "kanban/v1") {
@@ -63,16 +63,16 @@ A kanban board (or Workflow) has columns (or WorkflowStates eg To Do, In Progres
 
 As before we can see the queries on the left, but querying for allWorkflows won't give you much back...
 
-- To add a Workflow we need to use a mutation: select mutation from the dropdown in the lower left and add one. The left panel will now show the mutations available from our uploaded schema.
+- To add a Workflow we need to use a mutation: select mutation from the dropdown in the lower left and hit the plus. The left panel will now show the mutations available from our uploaded schema.
 
 <img src="/images/ss5.png"/>
 
-- createWorkflow -> enter a name and return the name and ID (we will need this ID later so use the Query Variables panel to record it).
-- Query allWorkflows you should see your shiny new Workflow!
+- createWorkflow -> enter a name and select the name and ID to return, then run the mutation. Tip: We will need the Workflow's ID later so note it down somewhere.
+- Query allWorkflows and you should see your shiny new Workflow! (Here's where you can grab that ID if you ignored the tip above...)
 
 - Repeat these steps for createWorkflowState to create a WorkflowState named "To Do" (or whatever you fancy)
-- We can use updateWorkflow to add our state to our Workflow using the IDs we saved previously
+- We can use updateWorkflow to add our state to our Workflow using the IDs we noted down previously
   <img src="/images/ss6.png"/>
   <em>Note that workflowStateIds need to be in an array</em>
 
-With that we have created, read and updated, and...ah crud, we need a way to delete.
+With that we have created, read, updated, and...ah crud, we need a way to delete.

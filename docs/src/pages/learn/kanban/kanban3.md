@@ -13,7 +13,7 @@ Site responds immediately to changes in the schema with no need to stop and rest
 
 To record individual tasks on the board you need to create a Card type. Use the existing types as a template and amend your schema - the Card will need to have a field for the Workflow it belongs to, connected with an @site(ref: ) directive.
 
-**ref** and **each** are directives used to join documents - Site's [docs](../../reference/graphql/site-directive) explain further:
+**ref** and **each** are directives used to join documents - Site's [docs](../../reference/graphql/site-directive) explain directives further, but I've copied the relevant sections below:
 
 ### ref
 
@@ -53,7 +53,7 @@ Using Site directives ref and each you should already have connections between W
 
 <img src="/images/diagram.png"/>
 
-- This diagram demonstrates the connection between different documents in a simplified way. We do not want to attach a single workflow ID to each workflowState, as a single state can be used by many different workflows. Eg a party planning board and a hiring board will both have a To Do state, but instead of creating two separate To Do WorkflowState documents, one connected to PartyPlanning and one connected to Hiring, we create a single ToDo state that is shared. This means we can query all our ToDos by looking up that single WorkflowState id, which will return all upcoming tasks regardless of the Workflow they belong to.
+This diagram demonstrates the connection between different documents in a simplified way. We do not want to attach a single workflow ID to each workflowState, as a single state can be used by many different workflows. Eg a party planning board and a hiring board will both have a ToDo state, but instead of creating two separate To Do WorkflowState documents, one connected to PartyPlanning and one connected to Hiring, we create a single ToDo state that is shared. This means we can query all our ToDos by looking up that single WorkflowState id, which will return all upcoming tasks regardless of the Workflow they belong to.
 
 In order for this to be possible we need to create a field in WorkflowState that contains all the Cards currently in that state.
 
@@ -110,4 +110,4 @@ When querying for a type, experiment with returning the details of other documen
 
 If you are having trouble or want to double check your code, remember that the final schema for this project is available [here](schema).
 
-So far we have queried our data using Site's default queries - return all of a type, or lookup a type by id. To build a more sophisticated picture, in the next part we will be writing (marginally) more complex graphql queries and implementing Site directives that turn these queries into XTDB legible requests.
+So far we have queried our data using Site's default queries - return all of a type, or lookup a type by id. To build a more sophisticated picture, in the next part we will be writing (marginally) more complex GraphQL queries and implementing Site directives that turn these queries into XTDB legible requests.

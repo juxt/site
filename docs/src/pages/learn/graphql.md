@@ -56,7 +56,7 @@ Or to pull all attributes rather than returning the ids:
 (q '{:find [(pull e *)] :where [[e :movies/local "Movie]]})
 ```
 
-You can learn more about the powerful Datalog query language used by XTDB here TODO
+You can learn more about the powerful Datalog query language used by XTDB [here](https://docs.xtdb.com/language-reference/1.22.0/datalog-queries/).
 
 ## Creating a GraphQL API
 
@@ -74,21 +74,13 @@ type Query {
 
 ### Site Type
 
-You may have noticed all of the documents transcacted from the REPL have a `:movies/local` attribute on them. And that this matches the value of the `type` directive in the above schema.
+You may have noticed all of the documents transacted from the REPL have a `:movies/local` attribute on them. And that this matches the value of the `type` directive in the above schema.
 
 Because XTDB is schemaless, we need a way to infer the correct XT query to perform given a GraphQL query, so we use a 'type' attribute to apply a structure to our documents that makes this easier.
 
-This isn't actually required as you can query any document in any shape using the `q` directive, but it does make structuring and maintaining your schema's much easier.
+This isn't actually required as you can query any document in any shape using the `q` directive, but it does make structuring and maintaining your schemas much easier.
 
 The `type` directive does two things:
-
-1. .
-
-Because XTDB is schemaless, we need a way to infer the correct XT query to perform given a GraphQL query, so we use a 'type' attribute to apply a structure to our documents that makes this easier.
-
-This isn't actually required as you can query any document in any shape using the `q` directive, but it does make structuring and maintaining your schema's much easier.
-
-The type directive does two things:
 
 1. Every entity inserted into XTDB has an attribute named the value of the `type` directive with a value of the return type of the mutation. So given the following mutation:
 
@@ -127,15 +119,15 @@ type Query {
 }
 ```
 
-as no directive is provided Site defaults to returning all documents that contain `:juxt.site/type "Person"`
+As no directive is provided Site defaults to returning all documents that contain `:juxt.site/type "Person"`
 
 ```shell
 site put-graphql -f schema.graphql -p /movies/graphql
 ```
 
-now you can explore with [Graphiql](https://graphiql-online.com), using the endpoint <http://localhost:5509/movies/graphql>
+Now you can explore with [Graphiql](https://graphiql-online.com), using the endpoint <http://localhost:5509/movies/graphql>
 
-Query all people and check the name works
+Query all people and check the name works.
 
 Let's add some schema for Movies:
 
@@ -153,7 +145,7 @@ type Query {
 }
 ```
 
-note we use the [ref site directive](../reference/graphql/site-directive#q) to join from the Movie entity to the director and cast. The actual document in XT has 'directorId' and 'castIds' attributes and ref will join those to their referenced documents and use the Person type to resolve it.
+Note we use the [ref site directive](../reference/graphql/site-directive#q) to join from the Movie entity to the director and cast. The actual document in XT has 'directorId' and 'castIds' attributes and ref will join those to their referenced documents and use the Person type to resolve it.
 
 ## Mutations
 

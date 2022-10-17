@@ -45,5 +45,3 @@ In the REPL:
 ```
 
 And that's it! To test things are up and running you can visit [here](http://localhost:5509/_site/graphql) in the browser to see the built in GraphQL schema, and POST to the same url with a GraphQL query to explore the DB.
-
-Try running the query below:

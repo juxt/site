@@ -1,6 +1,6 @@
-We've seen site directives for mutations and for linking database documents together, now you will implement some of the inbuilt query mutations.
+We've seen Site directives for mutations and for linking database documents together, now you will implement some of the inbuilt query mutations.
 
-To see all the cards associated with a particular WorkflowState we can use the **itemForId** directive, which gets all entities of the return type that reference the given id. Here all cards with a certain workflowId will be fetched:
+To see all the cards associated with a particular WorkflowState we can use the **itemForId** directive, which gets all entities of the return type that reference the given id. Here, all cards with a certain workflowId will be fetched:
 
 ```
       type Query {
@@ -31,7 +31,7 @@ When this query is run, Site returns a list of Cards which represent the documen
 
 A list like this is all well and good, but you need to know _when_ a cat walked across your keyboard and turned "Deliver Prototype" into "cknkalielmkl.nm,cne". Without a timestamp to cross reference with your home security cameras, how will you be able to tell _which_ pet is the culprit?
 
-We can add the fields \_siteCreatedAt: String and \_siteValidTime: String to our Card type to easily access the temporal power of XTDB via Site's inbuilt \_site fields.
+We can add the fields `_siteCreatedAt: String` and `_siteValidTime: String` to our Card type to easily access the temporal power of XTDB via Site's inbuilt \_site fields.
 
 <img src="/images/ss10.png"/>
 
@@ -43,7 +43,7 @@ The history directive also helps us see XTDB's flexibility as a [**schemaless da
 
 - If 'JXT' denies any ownership of the Market Research task, Site's history directive shows you exactly when they were assigned
 
-As well as Site's inbuilt query directives, you have the flexibility to write custom queries. Site's q directive can take a graphql object, or an edn string - three double quotes in graphql represents a multiline string. This can be more convenient for copying and pasting queries from the repl for example.
+As well as Site's inbuilt query directives, you have the flexibility to write custom queries. Site's q directive can take a GraphQL object, or an edn string - three double quotes in GraphQL represents a multiline string. This can be more convenient for copying and pasting queries from the repl for example.
 
 This example returns all the cards in a given workflow when searched for by **name**, as opposed to ID, which is a more likely direct interaction a user might have with the kanban app.
 
