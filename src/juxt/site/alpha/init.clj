@@ -52,7 +52,7 @@
 
 (defn put-superuser!
   "Create a superuser."
-  [crux-node username password fullname email {::site/keys [base-uri]}]
+  [crux-node username password fullname email {::site/keys [base-uri] :as config}]
   (let [user (str base-uri "/_site/users/" username)]
     (put!
      crux-node
@@ -67,6 +67,12 @@
       ::pass/user user
       ::pass/password-hash (password/encrypt password)
       ::pass/classification "RESTRICTED"}
+
+     {:crux.db/id (str user "/oauth-credentials")
+      ::site/type "OAuthCredentials"
+      ::pass/user user
+      :juxt.pass.jwt/iss (-> config :openid :issuer-id)
+      :juxt.pass.jwt/sub (-> config :openid :superuser-sub)}
 
      {:crux.db/id (format "%s/_site/roles/%s/users/%s" base-uri "superuser" username)
       ::site/type "UserRoleMapping"
