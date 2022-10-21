@@ -1,21 +1,25 @@
-(ns juxt.pass.alpha.session)
+(ns juxt.pass.alpha.session
 
 ;; Copyright © 2022, JUXT LTD.
 
 ;; References --
 ;; [OWASP-SM]: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
 
-(ns juxt.pass.alpha.session
   (:require
-   [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.pass.alpha.authentication :as authz]
    [ring.middleware.cookies :refer [cookies-request cookies-response]]
-   [clojure.tools.logging :as log]
-   [crux.api :as xt]))
+   [clojure.tools.logging :as log])
+  (:import
+   (org.apache.http.client.utils URIBuilder)))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
+
+;; The id cookie is only used during the OAuth Authorization Flow using
+;; OpenID Connect for Authentication. It is used to store the session-token-id
+;; created before calling the authorize endpoint. The session is used to prevent
+;; CSRF-attacks as it stores the random state and nonce values for comparison.
 
 (defn ->cookie [session-token-id]
   ;; TODO: In local testing (against home.test) it seems that setting
@@ -36,7 +40,7 @@
     ::pass/keys [session-token-id!] :as req} matched-identity]
   (let [session (authz/lookup-session session-token-id! start-date)
         _ (assert session)
-        new-session-token-id! (make-nonce 16)
+        new-session-token-id! (authz/access-token)
         expires-in (get resource ::pass/expires-in (* 24 3600))]
     (authz/remove-session! session-token-id!)
     (authz/put-session!
@@ -46,7 +50,11 @@
 
     (-> req
         (set-cookie new-session-token-id!)
-        (update-in [:ring.response/headers "location"] #(str % "?code=" new-session-token-id!)))))
+        (update-in [:ring.response/headers "location"]
+            (fn [location]
+              (-> (new URIBuilder location)
+                  (.addParameter "code" new-session-token-id!)
+                  (.toString)))))))
 
 (defn wrap-associate-session [h]
   (fn [{::site/keys [db start-date] :as req}]

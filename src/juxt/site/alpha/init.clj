@@ -10,7 +10,9 @@
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.site.alpha.util :as util])
   (:import
-   (java.util Date)))
+   (java.util Date)
+   (com.google.common.net InternetDomainName)
+   (org.apache.http.client.utils URIBuilder)))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -50,7 +52,7 @@
 
 (defn put-superuser!
   "Create a superuser."
-  [crux-node username password fullname email {::site/keys [base-uri]}]
+  [crux-node username password fullname email {::site/keys [base-uri] :as config}]
   (let [user (str base-uri "/_site/users/" username)]
     (put!
      crux-node
@@ -65,6 +67,12 @@
       ::pass/user user
       ::pass/password-hash (password/encrypt password)
       ::pass/classification "RESTRICTED"}
+
+     {:crux.db/id (str user "/oauth-credentials")
+      ::site/type "OAuthCredentials"
+      ::pass/user user
+      :juxt.pass.jwt/iss (-> config :openid :issuer-id)
+      :juxt.pass.jwt/sub (-> config :openid :superuser-sub)}
 
      {:crux.db/id (format "%s/_site/roles/%s/users/%s" base-uri "superuser" username)
       ::site/type "UserRoleMapping"
@@ -256,7 +264,17 @@
         ;; the path <issuer-id>/.well-known/openid-configuration.
         config-uri (openid-provider-configuration-url issuer-id)
         _ (log/info "Loading OpenID configuration from" config-uri)
-        config (json/read-value (slurp config-uri))]
+        config (json/read-value (slurp config-uri))
+        auth-uri (new java.net.URI (get config "authorization_endpoint"))
+        app-tld (-> (InternetDomainName/from (.getHost auth-uri))
+                    (.topPrivateDomain)
+                    (.toString))
+        config (cond-> config
+                 (= app-tld "amazoncognito.com")
+                 (assoc "authorization_endpoint"
+                        (-> (new URIBuilder auth-uri)
+                            (.setPath "/logout")
+                            (.toString))))]
     (log/info "Issuer added:" (get config "issuer"))
     (put!
      crux-node
