@@ -4,10 +4,10 @@
   (:require
    clojure.main
    [io.aviso.ansi :as ansi]
-   [juxt.site.alpha.main :as main]
+   [juxt.site.alpha.main]
    [clojure.tools.logging :as log]
    [clojure.java.io :as io]
-   [juxt.site.alpha.repl :refer :all]
+   [juxt.site.alpha.repl]
    [integrant.core :as ig]
    [xtdb.api :as xt]))
 
@@ -34,15 +34,15 @@
   (log/info "Starting development system")
 
 
-  (alter-var-root #'main/profile (constantly :dev))
-  (let [system-config (main/system-config)
+  (alter-var-root #'juxt.site.alpha.main/profile (constantly :dev))
+  (let [system-config (juxt.site.alpha.main/system-config)
         sys (ig/init system-config)]
-    (alter-var-root #'main/system (constantly sys)))
+    (alter-var-root #'juxt.site.alpha.main/system (constantly sys)))
   (log/info "System started and ready...")
 
   (println)
   (println "Welcome to Site!")
-  (status)
+  (juxt.site.alpha.repl/status)
 
   (println (ansi/yellow "Enter (help) for help"))
 
