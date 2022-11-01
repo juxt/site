@@ -15,7 +15,6 @@
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.pass.alpha.actions :as actions]
    [juxt.pass.alpha.session-scope :as session-scope]
-   [juxt.pass.alpha.session :as session]
    [juxt.pick.alpha.core :refer [rate-representation]]
    [juxt.pick.alpha.ring :refer [decode-maybe]]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
@@ -36,8 +35,7 @@
    [juxt.site.alpha :as-alias site]
    [juxt.flip.alpha :as-alias flip]
    [juxt.flip.alpha.core :as f]
-   [juxt.reap.alpha.rfc7230 :as-alias rfc7230]
-   [ring.util.codec :as codec])
+   [juxt.reap.alpha.rfc7230 :as-alias rfc7230])
   (:import (java.net URI)))
 
 (defn join-keywords
@@ -279,9 +277,7 @@
 
       ;; It's rare but sometimes a GET will evaluate a quotation. For example, the
       ;; Authorization Request (RFC 6749 Section 4.2.1).
-      (and permitted-action (-> permitted-action ::site/transact ::flip/quotation))
-      ;; TODO: Perhaps needs to be something to indicate whether or not the
-      ;; action will produce effects.
+      (and permitted-action (-> permitted-action ::site/transact))
       (actions/do-action
        (cond-> req
          permitted-action (assoc ::pass/action (:xt/id permitted-action))
@@ -289,8 +285,6 @@
          ;; "invalid tx-op: Unfreezable type: class
          ;; java.io.BufferedInputStream".
          (:ring.request/body req) (dissoc :ring.request/body)))
-
-      ;;(::pass/permitted-actions req)
 
       :else
       (response/add-payload req))))
@@ -464,10 +458,21 @@
 
 (defn wrap-find-current-representations
   [h]
-  (fn [{:ring.request/keys [method] :as req}]
+  (fn [{:ring.request/keys [method]
+        ::site/keys [resource]
+        :as req}]
     (if (#{:get :head :put} method)
       (let [cur-reps (seq (conneg/current-representations req))]
-        (when (and (#{:get :head} method) (empty? cur-reps))
+        (when (and
+               (#{:get :head} method)
+               (empty? cur-reps)
+                ;; We might have an action installed for the GET method. This is
+                ;; rare but used for certain cases such as special
+                ;; redirections. In this case, we don't throw a 404, but return
+               ;; the result of the action.
+               ;; New note: let's not do this, but rather ensure that there is content, even if it's null content, on the redirection resource.
+               ;;(empty? (get-in resource [:juxt.site.alpha/methods :get :juxt.pass.alpha/actions]))
+               )
           (throw
            (ex-info
             "Not Found"
@@ -1264,9 +1269,7 @@
 
    ;; Rewrite to work against a cookie-scope, which may use JWTs or sessions.
    ;; wrap-process-cookies
-   ;;oldsession/wrap-associate-session
-   session-scope/wrap-session-scopes
-   session/wrap-associate-session
+   session-scope/wrap-session-scope
 
    wrap-http-authenticate
 

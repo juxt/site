@@ -4,17 +4,22 @@
   (:require
    [clojure.edn :as edn]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
+   [java-http-clj.core :as http-client]
    [juxt.book :as book]
    [juxt.flip.alpha.core :as f]
    [juxt.flip.alpha.hiccup :as hc]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.session-scope :as session-scope]
+   [juxt.pass.alpha.session-scope :refer [infer-session-scope]]
+   [juxt.pass.session-scope :as session-scope]
+   [juxt.pass.user :as user]
    [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.site.alpha :as-alias site]
+   [juxt.site.bootstrap :as bootstrap]
    [juxt.http.alpha :as-alias http]
+   [juxt.pass.openid :as openid]
    [juxt.site.alpha.init :as init]
    [juxt.site.alpha.repl :as repl]
-   [juxt.test.util :refer [with-system-xt *xt-node* *handler* with-fixtures with-resources with-handler] :as tutil]
+   [juxt.test.util :refer [with-system-xt *xt-node* *handler* with-resources with-fixtures with-handler] :as tutil]
    [ring.util.codec :as codec]
    [xtdb.api :as xt])
   (:import (clojure.lang ExceptionInfo)))
@@ -29,15 +34,18 @@
 
 ;; Tests
 (deftest not-found-test
-  (with-resources #{::init/system}
+  (with-resources
+    #{::init/system}
     (let [req {:ring.request/method :get
                :ring.request/path "/hello"}
           invalid-req (assoc req :ring.request/path "/not-hello")]
       (is (= 404 (:ring.response/status (*handler* (finalize-request invalid-req))))))))
 
 (deftest public-resource-test
-  (with-resources #{::init/system
-                    "https://site.test/hello"}
+  (with-resources
+    ^{:dependency-graphs #{book/dependency-graph}}
+    #{::init/system
+      "https://site.test/hello"}
 
     (testing "The hello entity exists in the database"
       (is (xt/entity (xt/db *xt-node*) "https://site.test/hello")))
@@ -65,6 +73,10 @@
 
 (deftest user-directory-test
   (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
     #{"https://site.test/actions/put-user-owned-content"
       "https://site.test/permissions/alice/put-user-owned-content"
 
@@ -126,6 +138,7 @@
 
 (deftest protected-resource-not-publicly-accessible
   (with-resources
+    ^{:dependency-graphs #{book/dependency-graph}}
     #{"https://site.test/private/internal.html"}
 
     ;; Try to access /private/internal.html - there is no protection space so no
@@ -138,8 +151,10 @@
               :ring.request/path "/private/internal.html"}))))))
 
 (deftest protected-resource-prompt-for-bearer-auth
-  (with-resources #{"https://site.test/private/internal.html"
-                    "https://site.test/protection-spaces/bearer"}
+  (with-resources
+    ^{:dependency-graphs #{book/dependency-graph}}
+    #{"https://site.test/private/internal.html"
+      "https://site.test/protection-spaces/bearer"}
     (testing "Protected resource under Bearer protection space prompts Bearer authentication"
       (let [response (*handler*
                       {:ring.request/method :get
@@ -149,8 +164,11 @@
         (is (= "Bearer " (get-in response [:ring.response/headers "www-authenticate"])))))))
 
 (deftest protected-resource-prompt-for-basic-auth
-  (with-resources #{"https://site.test/private/internal.html"
-                    "https://site.test/protection-spaces/basic"}
+  (with-resources
+    ^{:dependency-graphs #{book/dependency-graph}}
+    #{"https://site.test/private/internal.html"
+      "https://site.test/protection-spaces/basic"}
+
     (testing "Protected resource under Basic protection space prompts Basic authentication"
       (let [response (*handler*
                       {:ring.request/method :get
@@ -159,10 +177,14 @@
         (is (= "Basic realm=Wonderland" (get-in response [:ring.response/headers "www-authenticate"])))))))
 
 (deftest protected-resource-with-basic-auth
-  (with-resources #{"https://site.test/private/internal.html"
-                    "https://site.test/protection-spaces/basic"
-                    "https://site.test/user-identities/alice/basic"
-                    "https://site.test/permissions/alice/private/internal.html"}
+  (with-resources
+    ^{:dependency-graphs
+      #{book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/private/internal.html"
+      "https://site.test/protection-spaces/basic"
+      "https://site.test/user-identities/alice/basic"
+      "https://site.test/permissions/alice/private/internal.html"}
 
     (testing "No credentials"
       (let [response
@@ -196,10 +218,14 @@
         (is (nil? (get-in response [:ring.response/headers "www-authenticate"])))))))
 
 (deftest session-scope-test
-  (with-resources #{"https://site.test/protected-by-session-scope/document.html"
-                    "https://site.test/session-scopes/example"}
-    (let [uri (some :juxt.pass.alpha/login-uri
-                    (session-scope/session-scopes (xt/db *xt-node*) "https://site.test/protected-by-session-scope/document.html"))]
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph}}
+    #{"https://site.test/protected-by-session-scope/document.html"
+      "https://site.test/session-scopes/example"}
+
+    (let [uri (:juxt.pass.alpha/login-uri (infer-session-scope (xt/db *xt-node*) "https://site.test/protected-by-session-scope/document.html"))]
       (is (string? uri)))
 
     (let [request {:ring.request/method :get
@@ -212,8 +238,13 @@
                  (get-in response [:ring.response/headers "location"]))))))))
 
 (deftest login-with-form-test
-  (with-resources #{"https://site.test/login"
-                    "https://site.test/user-identities/alice/basic"}
+  (with-resources
+    ^{:dependency-graphs
+      #{book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/login"
+      "https://site.test/user-identities/alice/basic"}
+
     (is (book/login-with-form! {"username" "alice" "password" "garden"}))
     (is (book/login-with-form! {"username" "ALICE" "password" "garden"}))
     (is (book/login-with-form! {"username" "ALiCe" "password" "garden"}))
@@ -229,7 +260,10 @@
         (is (= 400 (-> e ex-data :response :ring.response/status)))))))
 
 (deftest authorization-server-anonymous-access-forbidden
-  (with-resources #{"https://site.test/oauth/authorize"}
+  (with-resources
+    ^{:dependency-graphs #{book/dependency-graph}}
+    #{"https://site.test/oauth/authorize"}
+
     (testing "Anonymous access to authorization server forbidden"
       (let [response (*handler*
                       {:ring.request/method :get
@@ -237,8 +271,13 @@
         (is (= 403 (:ring.response/status response)))))))
 
 (deftest authorization-server-anonymous-access-via-session-scope-redirects
-  (with-resources #{"https://site.test/oauth/authorize"
-                    "https://site.test/session-scopes/oauth"}
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph}}
+    #{"https://site.test/oauth/authorize"
+      "https://site.test/session-scopes/oauth"}
+
     (testing "Anonymous access to authorization server redirects to login"
       (let [response (*handler*
                       {:ring.request/method :get
@@ -249,10 +288,16 @@
         (is (= 302 (:ring.response/status response)))))))
 
 (deftest authorization-server-forbidden-if-no-permission
-  (with-resources #{"https://site.test/oauth/authorize"
-                    "https://site.test/session-scopes/oauth"
-                    "https://site.test/login"
-                    "https://site.test/user-identities/alice/basic"}
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/oauth/authorize"
+      "https://site.test/session-scopes/oauth"
+      "https://site.test/login"
+      "https://site.test/user-identities/alice/basic"}
+
     (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})]
       (is session-id)
       (is
@@ -261,11 +306,16 @@
         (book/authorize! :session-id session-id "client_id" "local-terminal"))))))
 
 (deftest authorization-server-implicit-grant-with-unknown-app-client
-  (with-resources #{"https://site.test/oauth/authorize"
-                    "https://site.test/session-scopes/oauth"
-                    "https://site.test/login"
-                    "https://site.test/user-identities/alice/basic"
-                    "https://site.test/permissions/alice-can-authorize"}
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/oauth/authorize"
+      "https://site.test/session-scopes/oauth"
+      "https://site.test/login"
+      "https://site.test/user-identities/alice/basic"
+      "https://site.test/permissions/alice-can-authorize"}
 
     (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})]
       (is session-id)
@@ -285,14 +335,19 @@
         ))))
 
 (deftest authorization-server-invalid-scope
-  (with-resources #{"https://site.test/oauth/authorize"
-                    "https://site.test/session-scopes/oauth"
-                    "https://site.test/login"
-                    "https://site.test/user-identities/alice/basic"
-                    "https://site.test/permissions/alice-can-authorize"
-                    "https://site.test/applications/local-terminal"
-                    "https://site.test/oauth/scope/graphql/administer"
-                    "https://site.test/oauth/scope/graphql/develop"}
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/oauth/authorize"
+      "https://site.test/session-scopes/oauth"
+      "https://site.test/login"
+      "https://site.test/user-identities/alice/basic"
+      "https://site.test/permissions/alice-can-authorize"
+      "https://site.test/applications/local-terminal"
+      "https://site.test/oauth/scope/graphql/administer"
+      "https://site.test/oauth/scope/graphql/develop"}
 
     (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})]
 
@@ -328,12 +383,17 @@
           (is (nil? error)))))))
 
 (deftest authorization-server-implicit-grant-invalid-response-type
-  (with-resources #{"https://site.test/oauth/authorize"
-                    "https://site.test/session-scopes/oauth"
-                    "https://site.test/login"
-                    "https://site.test/user-identities/alice/basic"
-                    "https://site.test/permissions/alice-can-authorize"
-                    "https://site.test/applications/local-terminal"}
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/oauth/authorize"
+      "https://site.test/session-scopes/oauth"
+      "https://site.test/login"
+      "https://site.test/user-identities/alice/basic"
+      "https://site.test/permissions/alice-can-authorize"
+      "https://site.test/applications/local-terminal"}
 
     (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})
           initial-state (make-nonce 10)
@@ -391,12 +451,17 @@
 ;; With no client_id we have no way of determining the redirect URI. In this
 ;; case, we return a 400.
 (deftest authorization-server-implicit-grant-no-client-id
-  (with-resources #{"https://site.test/oauth/authorize"
-                    "https://site.test/session-scopes/oauth"
-                    "https://site.test/login"
-                    "https://site.test/user-identities/alice/basic"
-                    "https://site.test/permissions/alice-can-authorize"
-                    "https://site.test/applications/local-terminal"}
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/oauth/authorize"
+      "https://site.test/session-scopes/oauth"
+      "https://site.test/login"
+      "https://site.test/user-identities/alice/basic"
+      "https://site.test/permissions/alice-can-authorize"
+      "https://site.test/applications/local-terminal"}
 
     (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})
           state (make-nonce 10)
@@ -412,12 +477,17 @@
       (is (= 400 (:ring.response/status response))))))
 
 (deftest authorization-server-implicit-grant
-  (with-resources #{"https://site.test/oauth/authorize"
-                    "https://site.test/session-scopes/oauth"
-                    "https://site.test/login"
-                    "https://site.test/user-identities/alice/basic"
-                    "https://site.test/permissions/alice-can-authorize"
-                    "https://site.test/applications/local-terminal"}
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/oauth/authorize"
+      "https://site.test/session-scopes/oauth"
+      "https://site.test/login"
+      "https://site.test/user-identities/alice/basic"
+      "https://site.test/permissions/alice-can-authorize"
+      "https://site.test/applications/local-terminal"}
 
     (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})
           {access-token "access_token"}
@@ -428,14 +498,20 @@
       (is (= 32 (.length access-token))))))
 
 (deftest access-to-protected-resource-with-bearer-token-but-no-permission
-  (with-resources #{"https://site.test/private/internal.html"
-                    "https://site.test/protection-spaces/bearer"
-                    "https://site.test/oauth/authorize"
-                    "https://site.test/session-scopes/oauth"
-                    "https://site.test/login"
-                    "https://site.test/user-identities/alice/basic"
-                    "https://site.test/permissions/alice-can-authorize"
-                    "https://site.test/applications/local-terminal"})
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/private/internal.html"
+      "https://site.test/protection-spaces/bearer"
+      "https://site.test/oauth/authorize"
+      "https://site.test/session-scopes/oauth"
+      "https://site.test/login"
+      "https://site.test/user-identities/alice/basic"
+      "https://site.test/permissions/alice-can-authorize"
+      "https://site.test/applications/local-terminal"})
+
   (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})
         {access-token "access_token"} (book/authorize! :session-id session-id "client_id" "local-terminal")
         _ (is access-token)
@@ -447,36 +523,47 @@
     (is (= 403 (:ring.response/status response)))))
 
 (deftest access-to-protected-resource-with-bearer-token
-  (with-resources #{"https://site.test/private/internal.html"
-                    "https://site.test/protection-spaces/bearer"
-                    "https://site.test/oauth/authorize"
-                    "https://site.test/session-scopes/oauth"
-                    "https://site.test/login"
-                    "https://site.test/user-identities/alice/basic"
-                    "https://site.test/permissions/alice-can-authorize"
-                    "https://site.test/applications/local-terminal"
-                    "https://site.test/permissions/alice/private/internal.html"})
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/private/internal.html"
+      "https://site.test/protection-spaces/bearer"
+      "https://site.test/oauth/authorize"
+      "https://site.test/session-scopes/oauth"
+      "https://site.test/login"
+      "https://site.test/user-identities/alice/basic"
+      "https://site.test/permissions/alice-can-authorize"
+      "https://site.test/applications/local-terminal"
+      "https://site.test/permissions/alice/private/internal.html"})
+
   (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})
         {access-token "access_token"} (book/authorize! :session-id session-id "client_id" "local-terminal")
         response (*handler*
-                    {:ring.request/method :get
-                     :ring.request/headers {"authorization" (format "Bearer %s" access-token)}
-                     :ring.request/path "/private/internal.html"})]
+                  {:ring.request/method :get
+                   :ring.request/headers {"authorization" (format "Bearer %s" access-token)}
+                   :ring.request/path "/private/internal.html"})]
     (is (= 200 (:ring.response/status response)))))
 
 (deftest install-graphql-schema-endpoint
-  (with-resources #{"https://site.test/oauth/authorize"
-                    "https://site.test/session-scopes/oauth"
-                    "https://site.test/login"
-                    "https://site.test/user-identities/alice/basic"
-                    "https://site.test/permissions/alice-can-authorize"
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/oauth/authorize"
+      "https://site.test/session-scopes/oauth"
+      "https://site.test/login"
+      "https://site.test/user-identities/alice/basic"
+      "https://site.test/permissions/alice-can-authorize"
 
-                    "https://site.test/applications/local-terminal"
+      "https://site.test/applications/local-terminal"
 
-                    "https://site.test/actions/install-graphql-endpoint"
-                    "https://site.test/permissions/alice/install-graphql-endpoint"
-                    "https://site.test/oauth/scope/graphql/administer"
-                    "https://site.test/oauth/scope/graphql/develop"}
+      "https://site.test/actions/install-graphql-endpoint"
+      "https://site.test/permissions/alice/install-graphql-endpoint"
+      "https://site.test/oauth/scope/graphql/administer"
+      "https://site.test/oauth/scope/graphql/develop"}
 
     (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})]
 
@@ -538,9 +625,15 @@
           (is (= 201 (:ring.response/status response))))))))
 
 (deftest install-graphql-schema-with-wrong-user
-  (with-resources #{"https://site.test/graphql"
-                    "https://site.test/user-identities/bob/basic"
-                    "https://site.test/permissions/bob-can-authorize"}
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
+    #{"https://site.test/graphql"
+      "https://site.test/user-identities/bob/basic"
+      "https://site.test/permissions/bob-can-authorize"}
+
     (let [session-id (book/login-with-form! {"username" "bob" "password" "walrus"})
           {access-token "access-token"
            error "error"}
@@ -597,9 +690,14 @@
 
 (deftest put-graphql-schema
   (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
     #{"https://site.test/graphql"
       "https://site.test/permissions/alice/put-graphql-schema"
       "https://site.test/permissions/alice/get-graphql-schema"}
+
     (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
           {access-token "access_token"
            error "error"}
@@ -728,6 +826,10 @@
 
 (deftest post-graphql-request
   (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        book/dependency-graph
+        user/dependency-graph}}
     #{"https://site.test/graphql"
       "https://site.test/permissions/alice/put-graphql-schema"
       "https://site.test/permissions/alice/get-graphql-schema"}
@@ -738,9 +840,9 @@
 
           #_{access-token "access_token" error "error"}
           #_(book/authorize!
-           :session-id session-id
-           "client_id" "local-terminal"
-           "scope" ["https://site.test/oauth/scope/graphql/query"])
+             :session-id session-id
+             "client_id" "local-terminal"
+             "scope" ["https://site.test/oauth/scope/graphql/query"])
           ;;_ (is (nil? error) (format "OAuth2 grant error: %s" error))
           ]
 
@@ -888,23 +990,3 @@
 
 
 ;; Create an action: install-openid-provider
-
-(with-fixtures
-  (with-resources
-    #{"https://site.test/openid/login"
-      "https://site.test/permissions/login-with-openid"}
-
-    (repl/ls)
-
-
-    (repl/e "https://site.test/openid/login")
-
-    (let [req {:ring.request/method :get
-               :ring.request/path "/openid/login"}
-          response (*handler* req)]
-      ;; Return response for now
-      response)
-
-
-
-    ))

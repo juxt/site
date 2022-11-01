@@ -457,9 +457,6 @@
   []
   (init/put-graphql-schema-endpoint! (xt-node) (config)))
 
-(defn bootstrap! []
-  (init/bootstrap!))
-
 ;; No longer any users so no username/password
 #_(defn init!
     [username password]
@@ -521,10 +518,10 @@
 (defn check-permissions [actions options]
   (actions/check-permissions (db) actions options))
 
-(defn install-openid-provider! [issuer]
+#_(defn install-openid-provider! [issuer]
   (init/install-openid-provider! (xt-node) issuer))
 
-(defn install-openid-resources!
+#_(defn install-openid-resources!
   [& options]
   (apply init/install-openid-resources! (xt-node) (config) options))
 

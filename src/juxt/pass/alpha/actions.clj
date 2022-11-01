@@ -3,17 +3,23 @@
 (ns juxt.pass.alpha.actions
   (:require
    [clojure.tools.logging :as log]
+   [juxt.pass.alpha.openid-connect :as openid-connect]
+   [java-http-clj.core :as hc]
    [sci.core :as sci]
    [malli.core :as malli]
    [malli.error :a me]
    [ring.util.codec :as codec]
+   [crypto.password.bcrypt :as bcrypt]
    [juxt.pass.alpha :as-alias pass]
+   [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.site.alpha.util :refer [random-bytes]]
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
    [juxt.flip.alpha.core :as f :refer [eval-quotation]]
    [juxt.flip.alpha :as-alias flip]
    [xtdb.api :as xt]
-   juxt.site.alpha.schema))
+   juxt.site.alpha.schema
+   [jsonista.core :as json]))
 
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
@@ -289,6 +295,50 @@
              (group-by :xt/id))]
     (map #(update % join-key (comp first idx)) coll)))
 
+(defn common-sci-namespaces [db action-doc action-input]
+  {
+   'com.auth0.jwt.JWT
+   {'decode (fn [x] (com.auth0.jwt.JWT/decode x))}
+
+   'crypto.password.bcrypt {'encrypt bcrypt/encrypt}
+
+   'java-http-clj.core
+   {'send hc/send}
+
+   'jsonista.core
+   {'write-value-as-string json/write-value-as-string
+    'read-value json/read-value}
+
+   'juxt.pass
+   {'decode-id-token juxt.pass.alpha.openid-connect/decode-id-token
+    'match-identity (fn [m]
+                      (ffirst
+                       (xt/q db {:find ['id]
+                                 :where (into
+                                         [['id :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"]]                                         (for [[k v] m] ['id k v] ))})))}
+
+   'juxt.site.malli
+   {'validate (fn [schema value] (malli/validate schema value))
+    'explain (fn [schema value] (malli/explain schema value))
+    'validate-input
+    (fn []
+      (let [schema (get-in action-doc [:juxt.site.alpha.malli/input-schema])
+            valid? (malli/validate schema action-input)]
+        (when-not valid?
+          (throw
+           (ex-info
+            "Validation failed"
+            {:error :validation-failed
+             :input action-input
+             :schema schema
+;;             :explain (malli/explain schema action-input)
+             })))))}
+
+   'ring.util.codec {'form-encode codec/form-encode
+                     'form-decode codec/form-decode}
+
+   'xt {'entity (fn [id] (xt/entity db id))}})
+
 (defn do-action-in-tx-fn
   "This function is applied within a transaction function. It should be fast, but
   at least doesn't have to worry about the database being stale!"
@@ -300,6 +350,7 @@
     resource ::site/resource
     purpose ::pass/purpose
     base-uri ::site/base-uri
+    prepare ::pass/prepare
     :as ctx} args]
   (let [db (xt/db xt-ctx)
         tx (xt/indexing-tx xt-ctx)]
@@ -352,32 +403,34 @@
                   (sci/eval-string
                    (-> action-doc ::site/transact :juxt.site.alpha.sci/program)
                    {:namespaces
-                    {'user
-                     {'*input* action-input
-                      '*action* action-doc}
-                     'xt
-                     {'entity (fn [id] (xt/entity db id))}
-                     'malli
-                     {'validate (fn [schema value] (malli/validate schema value))
-                      'explain (fn [schema value] (malli/explain schema value))}
-                     'juxt.site.malli
-                     {'validate-input
-                      (fn []
-                        (let [schema (get-in action-doc [:juxt.site.alpha/transact :juxt.site.alpha.malli/input-schema])
-                              valid? (malli/validate schema action-input)]
-                          (when-not valid?
-                            (throw
-                             (ex-info
-                              "Validation failed"
-                              {:error :validation-failed
-                               :input action-input
-                               :schema schema
-                               })))))}}})
+                    (merge
+                     {'user
+                      {'*input* action-input
+                       '*action* action-doc
+                       '*resource* resource
+                       '*prepare* prepare
+                       '*ctx* ctx}}
+                     (common-sci-namespaces db action-doc action-input))
+                    :classes
+                    {'java.util.Date java.util.Date
+                     'java.time.Instant java.time.Instant}
+
+                    ;; We can't allow random numbers to be computed as they
+                    ;; won't be the same on each node. If this is a problem, we
+                    ;; can replace with a (non-secure) PRNG seeded from the
+                    ;; tx-instant of the tx. Note that secure random numbers
+                    ;; should not be generated this way anyway, since then it
+                    ;; would then be possible to mount an attack based on
+                    ;; knowledge of the current time. Instead, secure random
+                    ;; numbers should be generated in the action's 'prepare'
+                    ;; step.
+                    :deny `[loop recur rand rand-int]})
+
                   (catch clojure.lang.ExceptionInfo e
                     ;; The sci.impl/callstack contains a volatile which isn't freezable.
                     ;; Also, we want to unwrap the original cause exception.
                     ;; Possibly, in future, we should get the callstack
-                    (throw (ex-info (.getMessage e) (or (ex-data (.getCause e)) {})))))
+                    (throw (ex-info (.getMessage e) (or (ex-data (.getCause e)) {}) (.getCause e)))))
 
                 ;; Deprecated: flip
                 (-> action-doc ::site/transact ::flip/quotation)
@@ -408,9 +461,19 @@
                     (throw (ex-info "Invalid effect" {::pass/action action :effect effect}))))
 
               xtdb-ops (filter (fn [[effect]] (= (namespace effect) "xtdb.api")) fx)
-              apply-to-request-context-fx (filter (fn [[effect]]  (= effect :juxt.site.alpha/apply-to-request-context)) fx)
-
               _ (log/infof "xtdb ops is %s" (pr-str xtdb-ops))
+
+              ;; Deprecated
+              apply-to-request-context-fx (filter (fn [[effect]] (= effect :juxt.site.alpha/apply-to-request-context)) fx)
+              ;; Decisions we've made which don't update the database but should
+              ;; be record and reflected in the response.
+              other-response-fx
+              (remove
+               (fn [[kw]]
+                 (or
+                  (= (namespace kw) "xtdb.api")
+                  (= kw :juxt.site.alpha/apply-to-request-context)))
+               fx)
 
               result-fx
               (conj
@@ -437,8 +500,14 @@
                      tx (into tx)
 
                      ;; Any quotations that we want to apply to the request context?
+                     ;; (deprecated)
                      (seq apply-to-request-context-fx)
-                     (assoc :juxt.site.alpha/apply-to-request-context-ops apply-to-request-context-fx)))])]
+                     (assoc :juxt.site.alpha/apply-to-request-context-ops apply-to-request-context-fx)
+
+                     (seq other-response-fx)
+                     (assoc :juxt.site.alpha/response-fx other-response-fx)
+
+                     ))])]
 
           ;; This isn't the best debugger :( - need a better one!
           ;;(log/tracef "XXXX Result is: %s" result-ops)
@@ -483,13 +552,7 @@
 ;; only transitory for the purposes of responnding to the request.
 
 (defn sanitize-ctx [ctx]
-  (-> ctx
-      (dissoc ::site/xt-node ::site/db)
-      ;; We take the ids, because it saves on serialization cost and we only
-      ;; need the ids in do-action-in-tx-fn
-      ;;(update ::pass/subject :xt/id)
-      ;;(update ::site/resource :xt/id)
-      ))
+  (dissoc ctx ::site/xt-node ::site/db))
 
 (defn apply-request-context-operations [ctx ops]
   (let [res
@@ -503,6 +566,40 @@
          ops)]
     res))
 
+(defn apply-response-fx [ctx fx]
+  (reduce
+   (fn [ctx [op & args]]
+     (case op
+       :ring.response/status (assoc ctx :ring.response/status (first args))
+       :ring.response/headers (update ctx :ring.response/headers (fnil {} into) (first args))
+       (throw
+        (ex-info
+         (format "Op not recognized: %s" op)
+         {:op op :args args}))))
+   ctx fx))
+
+(defn do-prepare [{::site/keys [db resource] :as ctx} action-doc action-input]
+  (when-let [prepare-program (some-> action-doc :juxt.site.alpha/prepare :juxt.site.alpha.sci/program)]
+    (try
+      (sci/eval-string
+       prepare-program
+       {:namespaces
+        (merge
+         {'user {'*input* action-input
+                 '*action* action-doc
+                 '*resource* resource
+                 '*ctx* (sanitize-ctx ctx)
+                 'logf (fn [& args] (eval `(log/tracef ~@args)))
+                 'log (fn [& args] (eval `(log/trace ~@args)))}
+          'juxt.pass.util {'make-nonce make-nonce}}
+         (common-sci-namespaces db action-doc action-input))
+        :classes
+        {'java.util.Date java.util.Date
+         'java.time.Instant java.time.Instant
+         'java.time.Duration java.time.Duration}})
+      (catch clojure.lang.ExceptionInfo e
+        (throw (ex-info "Failure during prepare" {:cause-ex-info (ex-data e)} e))))))
+
 (defn do-action
   [{::site/keys [xt-node db base-uri resource]
     ;; TODO: Arguably action should passed as a map
@@ -510,7 +607,28 @@
     :as ctx}]
   (assert (::site/xt-node ctx) "xt-node must be present")
   (assert (::site/db ctx) "db must be present")
+
+  (when-not (xt/entity db action)
+    (throw (ex-info "No action found"
+                    {:action action
+                     :ls (->> (xt/q db '{:find [(pull e [:xt/id ::site/type])]
+                                      :where [[e :xt/id]]})
+                              (map first)
+                              (filter (fn [e]
+                                        (not (#{"Request"
+                                                "ActionLogEntry"
+                                                "Session"
+                                                "SessionToken"
+                                                }
+                                              (::site/type e)))))
+                              (map :xt/id)
+                              (sort-by str))}))
+    )
+
   (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
+
+
+  (log/debugf "Doing action: %s" action)
 
   (when-not (or (nil? subject) (map? subject))
     (throw
@@ -524,66 +642,84 @@
       "Resource to do-action expected to be a map, or null"
       {::site/request-context ctx :resource resource})))
 
+  ;; Prepare the transaction - this work happens prior to the transaction, one a
+  ;; single node, and may be wasted work if the transaction ultimately
+  ;; fails. However, it is a good place to compute any secure random numbers
+  ;; which can't be done in the transaction.
+
+
   ;; This should be in the tx-fn but getting this malli exception: No
   ;; implementation of method: :-form of protocol: #'malli.core/Schema found for
   ;; class: clojure.lang.PersistentVector
   #_(let [action (xt/entity db action)]
-    (when-let [input-schema (-> action ::site/transact :juxt.site.alpha.malli/input-schema)]
-      (when-not (malli/validate input-schema action-input)
-        (throw
-         (ex-info
-          "Input to action is not valid"
-          {:action (:xt/id action)
-           :explain (malli/explain input-schema action-input)})))))
+      (when-let [input-schema (-> action ::site/transact :juxt.site.alpha.malli/input-schema)]
+        (when-not (malli/validate input-schema action-input)
+          (throw
+           (ex-info
+            "Input to action is not valid"
+            {:action (:xt/id action)
+             :explain (malli/explain input-schema action-input)})))))
 
 
   ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed
   ;; by an anonymous user.
-  (let [tx-fn (str base-uri "/_site/do-action")]
-    (assert (xt/entity db tx-fn) "do-action must exist in database")
-    (let [tx (xt/submit-tx xt-node [[::xt/fn tx-fn (sanitize-ctx ctx)]])
-          {::xt/keys [tx-id]} (xt/await-tx xt-node tx)
-          ctx (assoc ctx ::site/db (xt/db xt-node))]
+  (let [action-doc (xt/entity db action)
+        _ (when-not action-doc
+            (throw (ex-info (format "Action not found in the database: %s" action) {:action action})))
+        prepare (do-prepare ctx action-doc action-input)
+        tx-fn (str base-uri "/_site/do-action")
+        _ (assert (xt/entity db tx-fn) (format "do-action must exist in database: %s" tx-fn))
+        tx-ctx (cond-> (sanitize-ctx ctx) prepare (assoc ::pass/prepare prepare))
+        tx (xt/submit-tx xt-node [[::xt/fn tx-fn tx-ctx]])
+        {::xt/keys [tx-id] :as tx} (xt/await-tx xt-node tx)
+        ctx (assoc ctx ::site/db (xt/db xt-node tx))]
 
-      (when-not (xt/tx-committed? xt-node tx)
-        (throw
-         (ex-info
-          (format "Transaction failed to be committed for action %s" action)
-          {::xt/tx-id tx-id
-           ::pass/action action
-           ::site/request-context ctx})))
+    (when-not (xt/tx-committed? xt-node tx)
+      (throw
+       (ex-info
+        (format "Transaction failed to be committed for action %s" action)
+        {::xt/tx-id tx-id
+         ::pass/action action
+         ::site/request-context ctx})))
 
-      (let [result
-            (xt/entity
-             (xt/db xt-node)
-             (format "%s/_site/events/%d" base-uri tx-id))]
-        (if-let [error (::site/error result)]
-          (do
-            (log/errorf "Transaction error: %s" error)
-            (let [status (:ring.response/status (:ex-data error))]
-              (throw
-               (ex-info
-                (format "Transaction error performing action %s: %s%s"
-                        action
-                        (:message error)
-                        (if status (format "(status: %s)" status) ""))
-                (into
-                 (cond-> {::site/request-context ctx}
-                   status (assoc :ring.response/status status))
+    (let [result
+          (xt/entity
+           (xt/db xt-node)
+           (format "%s/_site/events/%d" base-uri tx-id))]
+      (if-let [error (::site/error result)]
+        (do
+          (log/errorf "Transaction error: %s" error)
+          (let [status (:ring.response/status (:ex-data error))]
+            (throw
+             (ex-info
+              (format
+               "Transaction error performing action %s: %s%s"
+               action
+               (:message error)
+               (if status (format "(status: %s)" status) ""))
+              (into
+               (cond-> {::site/request-context ctx}
+                 status (assoc :ring.response/status status))
+               (merge
+                (dissoc result ::site/type :xt/id ::site/error)
+                (:ex-data error)))))))
 
-                 (merge
-                  (dissoc result ::site/type :xt/id ::site/error)
-                  (:ex-data error)))))))
+        (cond-> ctx
+          result (assoc ::pass/action-result result)
 
-          (let [apply-to-request-context-ops (:juxt.site.alpha/apply-to-request-context-ops result)]
-            (cond-> ctx
-              result (assoc ::pass/action-result result)
+          ;;:juxt.site.alpha/request-context
 
-              ;; These ops are quotations that can be applied to the request
-              ;; context.  The intention if for these quotations to set the
-              ;; response status and add headers.
-              (seq apply-to-request-context-ops)
-              (apply-request-context-operations (reverse apply-to-request-context-ops)))))))))
+          ;; These ops are quotations that can be applied to the request
+          ;; context.  The intention if for these quotations to set the
+          ;; response status and add headers.
+          ;; (deprecated)
+          (seq (:juxt.site.alpha/apply-to-request-context-ops result))
+          (apply-request-context-operations (reverse (:juxt.site.alpha/apply-to-request-context-ops result)))
+
+          (seq (:juxt.site.alpha/response-fx result))
+          (apply-response-fx (:juxt.site.alpha/response-fx result))
+
+          )))))
 
 ;; TODO: Since it is possible that a permission is in the queue which might
 ;; grant or revoke an action, it is necessary to run this check 'head-of-line'
@@ -620,7 +756,7 @@
              subject (assoc ::pass/subject subject)
              resource (assoc ::site/resource resource)))]
 
-      (log/debugf "Permitted actions: %s" (pr-str permitted-actions))
+      #_(log/debugf "Permitted actions: %s" (pr-str permitted-actions))
 
       (if (seq permitted-actions)
         (h (assoc req ::pass/permitted-actions permitted-actions))
@@ -658,8 +794,8 @@
             ;; respond with a redirect to a page that will establish (immediately
             ;; or eventually), the cookie.
 
-            (if-let [session-scopes (::pass/session-scopes req)]
-              (let [login-uri (some->> session-scopes (some :juxt.pass.alpha/login-uri))
+            (if-let [session-scope (::pass/session-scope req)]
+              (let [login-uri (:juxt.pass.alpha/login-uri session-scope)
                     redirect (str login-uri "?return-to=" (codec/url-encode uri))]
                 ;; If we are in a session-scope that contains a login-uri, let's redirect to that
                 (throw
@@ -689,3 +825,8 @@
     ;;:deny '[+]
     }
    ))
+
+
+#_(sci/eval-string (pr-str '(java.util.Date/from (.plusSeconds (java.time.Instant/now) 10)))
+                 {:classes {'java.util.Date java.util.Date
+                            'java.time.Instant java.time.Instant}})

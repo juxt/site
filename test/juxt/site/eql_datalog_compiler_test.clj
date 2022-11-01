@@ -3,7 +3,7 @@
 (ns juxt.site.eql-datalog-compiler-test
   (:require
    [clojure.java.io :as io]
-   [juxt.pass.alpha.graphql-eql-compiler :refer [graphql->eql-ast]]
+   [juxt.site.alpha.graphql-eql-compiler :refer [graphql->eql-ast]]
    [juxt.grab.alpha.parser :as grab.parser]
    [juxt.grab.alpha.document :as grab.document]
    [juxt.grab.alpha.schema :as grab.schema]
@@ -11,13 +11,15 @@
    [jsonista.core :as json]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [juxt.book :as book]
+   [juxt.pass.session-scope :as session-scope]
+   [juxt.pass.user :as user]
    [juxt.flip.alpha.core :as f]
-   [juxt.pass.alpha.eql-datalog-compiler :as eqlc]
+   [juxt.site.alpha.eql-datalog-compiler :as eqlc]
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha :as-alias pass]
    [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init]
-   [juxt.test.util :refer [with-system-xt *xt-node* *handler*] :as tutil]
+   [juxt.test.util :refer [with-system-xt with-resources *xt-node* *handler*] :as tutil]
    [xtdb.api :as xt]))
 
 ;; TODO: Dedupe between this test ns and juxt.book-test
@@ -605,15 +607,6 @@
               "https://site.test/actions/assign-doctor-to-patient"
               "https://site.test/permissions/system/assign-doctor-to-patient"})}})
 
-(defmacro with-resources [resources & body]
-  `(do
-     (let [resources# ~resources]
-       (init/converge!
-        (conj resources# ::init/system)
-        (init/substitute-actual-base-uri
-         (merge init/dependency-graph book/dependency-graph dependency-graph))))
-     ~@body))
-
 (deftest eql-with-acl-test
   (let [resources
         (->
@@ -674,7 +667,12 @@
             "https://site.test/assignments/patient/010/doctor/003"}))]
 
     (with-resources
-      resources
+      (with-meta resources
+        {:dependency-graphs
+         #{book/dependency-graph
+           session-scope/dependency-graph
+           user/dependency-graph
+           dependency-graph}})
 
       ;; Create some measurements
       (init/do-action
@@ -1310,7 +1308,13 @@
             "https://site.test/assignments/patient/006/doctor/003"
             "https://site.test/assignments/patient/010/doctor/003"}))]
 
-    (with-resources resources
+    (with-resources
+      (with-meta resources
+        {:dependency-graphs
+         #{book/dependency-graph
+           session-scope/dependency-graph
+           user/dependency-graph
+           dependency-graph}})
 
       (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
             {alice-access-token "access_token" error "error"}
@@ -1345,7 +1349,7 @@
             bob (extract-subject-with-token bob-access-token)
 
             schema
-            (-> "juxt/pass/schema.graphql"
+            (-> "juxt/site/schema.graphql"
                 io/resource
                 slurp
                 grab.parser/parse

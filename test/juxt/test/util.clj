@@ -8,6 +8,7 @@
    [juxt.pass.alpha.actions :as authz]
    [juxt.apex.alpha :as-alias apex]
    [juxt.site.alpha.init :as init]
+   [juxt.site.bootstrap :as bootstrap]
    [juxt.http.alpha :as-alias http]
    [juxt.mail.alpha :as-alias mail]
    [juxt.pass.alpha :as-alias pass]
@@ -35,7 +36,6 @@
   (->>
    (xt/submit-tx *xt-node* transactions)
    (xt/await-tx *xt-node*)))
-
 
 (defn make-handler [opts]
   ((apply comp
@@ -78,7 +78,7 @@
    ::pass/effect ::pass/allow})
 
 (defmacro with-fixtures [& body]
-  `((t/join-fixtures [with-system-xt with-handler])
+  `((clojure.test/join-fixtures [with-system-xt with-handler])
     (fn [] ~@body)))
 
 (defmacro with-resources [resources & body]
@@ -87,10 +87,11 @@
        (init/converge!
         (conj resources# ::init/system)
         (init/substitute-actual-base-uri
-         (merge init/dependency-graph book/dependency-graph))))
+         (apply merge
+                bootstrap/dependency-graph
+                (:dependency-graphs (meta resources#))))
+        {:dry-run? false :recreate? false}))
      ~@body))
-
-
 
 ;; Deprecated
 (def access-all-apis

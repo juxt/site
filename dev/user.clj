@@ -20,6 +20,8 @@
    juxt.pass.alpha.schema
    juxt.pass.alpha.actions
    [juxt.book :as book]
+   [juxt.site.bootstrap :as bootstrap :refer [bootstrap bootstrap! bootstrap!!]]
+   [juxt.pass.openid :as openid]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
    [juxt.site.alpha :as-alias site]
@@ -79,7 +81,11 @@
   (md/start!
    {:report
     (fn [type data]
-      (throw (ex-info (format "Malli validation failure: %s" type) {:type type :data data})))})
+      (throw (ex-info (format "Malli validation failure: %s" type)
+                      {:type type
+                       ;; Sometimes this can include the whole db!
+                       ;;:data data
+                       })))})
 
   (log/info "System started and ready...")
 

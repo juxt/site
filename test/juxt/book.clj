@@ -2,6 +2,7 @@
 
 (ns juxt.book
   (:require
+   [clojure.edn :as edn]
    [clojure.java.io :as io]
    [ring.util.codec :as codec]
    [jsonista.core :as json]
@@ -30,138 +31,6 @@
    }
   ;; end::example-action[]
   )
-
-;; User actions
-
-(defn create-action-put-user! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/put-user"
-
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc-with-checks
-            [(site/push-fx
-              (f/dip
-               [site/request-body-as-edn
-                (site/validate
-                 [:map
-                  [:xt/id [:re "https://example.org/users/.*"]]])
-
-                (site/set-type "https://meta.juxt.site/pass/user")
-
-                (site/set-methods
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user"}}
-                  :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user"}}
-                  :options {}})
-
-                xtdb.api/put]))]))}
-
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
-
-         [(allowed? subject resource permission) ; <5>
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [user :role role]
-          [permission :role role]]]})))))
-
-(defn grant-permission-to-invoke-action-put-user! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-invoke-action-put-user![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/repl/put-user"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/put-user"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-invoke-action-put-user![]
-     ))))
-
-(defn create-action-put-basic-user-identity! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/put-basic-user-identity"
-
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc-with-checks
-            [(site/push-fx
-              (f/dip
-               [(xtdb.api/put
-                 site/request-body-as-edn
-                 (site/validate
-                  [:map
-                   [:xt/id [:re "https://example.org/.*"]]
-                   [:juxt.pass.alpha/user [:re "https://example.org/users/.+"]]
-
-                   ;; Required by basic-user-identity
-                   [:juxt.pass.alpha/username [:re "[A-Za-z0-9]{2,}"]]
-                   ;; NOTE: Can put in some password rules here
-                   [:juxt.pass.alpha/password [:string {:min 6}]]
-                   ;;[:juxt.pass.jwt/iss {:optional true} [:re "https://.+"]]
-                   ;;[:juxt.pass.jwt/sub {:optional true} [:string {:min 1}]]
-                   ])
-
-                 (site/set-type
-                  #{"https://meta.juxt.site/pass/user-identity"
-                    "https://meta.juxt.site/pass/basic-user-identity"})
-
-                 ;; Lowercase username
-                 (f/set-at
-                  (f/keep
-                   [(f/of :juxt.pass.alpha/username) f/>lower :juxt.pass.alpha/username]))
-
-                 ;; Hash password
-                 (f/set-at
-                  (f/keep
-                   [(f/of :juxt.pass.alpha/password) juxt.pass.alpha/encrypt-password :juxt.pass.alpha/password-hash]))
-                 (f/delete-at (f/dip [:juxt.pass.alpha/password]))
-
-                 (site/set-methods
-                  {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-basic-user-identity"}}
-                   :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-basic-user-identity"}}
-                   :options {}}))
-
-                ]))]))}
-
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
-
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [user :role role]
-          [permission :role role]]]})))))
-
-(defn grant-permission-to-invoke-action-put-basic-user-identity! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/repl/put-basic-user-identity"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/put-basic-user-identity"
-       :juxt.pass.alpha/purpose nil})))))
 
 (defn create-action-put-subject! [_]
   (eval
@@ -207,7 +76,7 @@
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/repl/put-subject"
+      {:xt/id "https://example.org/permissions/system/put-subject"
        :juxt.pass.alpha/subject "https://example.org/subjects/system"
        :juxt.pass.alpha/action "https://example.org/actions/put-subject"
        :juxt.pass.alpha/purpose nil})))))
@@ -274,7 +143,7 @@
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/repl/put-immutable-public-resource"
+      {:xt/id "https://example.org/permissions/system/put-immutable-public-resource"
        :juxt.pass.alpha/subject "https://example.org/subjects/system"
        :juxt.pass.alpha/action "https://example.org/actions/put-immutable-public-resource"
        :juxt.pass.alpha/purpose nil})
@@ -441,7 +310,7 @@
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/repl/put-immutable-protected-resource"
+      {:xt/id "https://example.org/permissions/system/put-immutable-protected-resource"
        :juxt.pass.alpha/subject "https://example.org/subjects/system"
        :juxt.pass.alpha/action "https://example.org/actions/put-immutable-protected-resource"
        :juxt.pass.alpha/purpose nil})
@@ -519,7 +388,7 @@
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/repl/put-protection-space"
+      {:xt/id "https://example.org/permissions/system/put-protection-space"
        :juxt.pass.alpha/subject "https://example.org/subjects/system"
        :juxt.pass.alpha/action "https://example.org/actions/put-protection-space"
        :juxt.pass.alpha/purpose nil})
@@ -647,62 +516,6 @@
        :juxt.pass.alpha/auth-scheme "Bearer"
        :juxt.pass.alpha/authentication-scope "/protected-by-bearer-auth/.*" ; regex pattern
        })))))
-
-;; Session Scopes Preliminaries
-
-(defn create-action-put-session-scope! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-put-session-scope![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/put-session-scope"
-
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [site/request-body-as-edn
-                (site/validate
-                 [:map
-                  [:xt/id [:re "https://example.org/session-scopes/(.+)"]]
-                  [:juxt.pass.alpha/cookie-domain [:re "https?://[^/]*"]]
-                  [:juxt.pass.alpha/cookie-path [:re "/.*"]]
-                  [:juxt.pass.alpha/login-uri [:re "https?://[^/]*"]]])
-                (site/set-type "https://meta.juxt.site/pass/session-scope")
-                xtdb.api/put]))]))}
-
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
-
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :role role]
-          [user :role role]]]})
-     ;; end::create-action-put-session-scope![]
-     ))))
-
-(defn grant-permission-to-put-session-scope! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-put-session-scope![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/repl/put-session-scope"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/put-session-scope"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-put-session-scope![]
-     ))))
 
 ;; Session Scope Example
 
@@ -1135,6 +948,7 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/register-application"
       {:juxt.pass.alpha/client-id "local-terminal"
+       ;; TODO: What is this redirect-uri doing here?
        :juxt.pass.alpha/redirect-uri "https://example.org/terminal/callback"})
      ;; end::register-example-application![]
      ))))
@@ -1486,6 +1300,15 @@ Password: <input name=password type=password>
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/get-graphql-schema"
        :juxt.pass.alpha/scope "https://example.org/oauth/scope/graphql/develop"
+       #_:juxt.site.alpha/transact
+       #_{:juxt.site.alpha.sci/program
+        (pr-str
+         '(do
+            ;; Note: This logic has only been added here as a workaround.
+            ;; The problem is we need the OAuth2 login handler not to trigger a 404
+            (if-let [selected-representation (:juxt.site.alpha/selected-representation *ctx*)]
+              [[:continue]]
+              [[:ring.response/status 404]])))}
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
@@ -1625,6 +1448,7 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
        }))))
 
+;; TODO: Rename to openid?
 (defn create-oauth-session-scope [_]
   (eval
    (substitute-actual-base-uri
@@ -1666,15 +1490,6 @@ Password: <input name=password type=password>
     (when-not id (throw (ex-info "Login failed" {:args args
                                                  :response response})))
     id))
-
-(defn login-with-openid!
-  "Return a session id (or nil) given a map of fields."
-  []
-  (let [req {:ring.request/method :get
-             :ring.request/path "/openid/login"}
-        response (*handler* req)]
-    ;; Return response for now
-    response))
 
 (defn authorize-response!
   "Authorize response"
@@ -1819,152 +1634,12 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
        :juxt.pass.alpha/purpose nil}))))
 
-;; OpenID
-
-(defn create-action-install-openid-provider! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/install-openid-provider"
-
-       :juxt.site.alpha/transact
-       {:juxt.site.alpha.malli/input-schema
-        [:map
-         [:xt/id [:re "https://.*"]]
-         [:juxt.pass.alpha/openid-configuration
-          [:map
-           ["authorization_endpoint" :string]
-           ["token_endpoint" :string]]]]
-        :juxt.site.alpha.sci/program
-        (pr-str
-         '(let [input *input*
-                schema (get-in *action* [:juxt.site.alpha/transact :juxt.site.alpha.malli/input-schema])
-                valid? (malli/validate schema *input*)]
-            (if valid?
-              [[:xtdb.api/put *input*]]
-              (throw
-               (ex-info
-                "Validation failed"
-                {:error :validation-failed
-                 :input *input*
-                 :schema schema})))))}
-
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
-
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})))))
-
-(defn grant-permission-to-install-openid-provider! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/system/install-openid-provider"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/install-openid-provider"
-       :juxt.pass.alpha/purpose nil})))))
-
-(defn create-action-login-with-openid! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/login-with-openid"
-       :juxt.site.alpha/transact
-       {:juxt.site.alpha.sci/program
-        (pr-str
-         '(throw (ex-info "TODO" {:input *input*})))}
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :xt/id]]]
-       })))))
-
-(defn grant-permission-to-invoke-action-login-with-openid! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/login-with-openid"
-       :juxt.pass.alpha/action "https://example.org/actions/login-with-openid"
-       :juxt.pass.alpha/purpose nil})))))
-
-(defn create-action-install-openid-login-endpoint! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/install-openid-login-endpoint"
-
-       :juxt.site.alpha/transact
-       {:juxt.site.alpha.malli/input-schema
-        [:map
-         [:xt/id [:re "https://example.org/.*"]]
-         [:juxt.pass.alpha/oauth-client [:re "https://.*"]]]
-        :juxt.site.alpha.sci/program
-        (pr-str
-         '(do
-            (juxt.site.malli/validate-input)
-            [[:xtdb.api/put
-              (assoc
-               *input*
-               :juxt.site.alpha/methods
-               {:get
-                {:juxt.pass.alpha/actions #{"https://example.org/actions/login-with-openid"}}})]]))}
-
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
-
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})))))
-
-(defn grant-permission-to-install-openid-login-endpoint! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/system/install-openid-login-endpoint"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/install-openid-login-endpoint"
-       :juxt.pass.alpha/purpose nil})))))
-
-(defn install-openid-login-endpoint! [{oauth-client :juxt.pass.alpha/oauth-client}]
-  (eval
-   (substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/install-openid-login-endpoint"
-      {:xt/id "https://example.org/openid/login"
-       :juxt.pass.alpha/oauth-client ~oauth-client}))))
-
 (def dependency-graph
   {"https://example.org/hello"
    {:create #'create-hello-world-resource!
     :deps #{::init/system
             "https://example.org/actions/put-immutable-public-resource"
-            "https://example.org/permissions/repl/put-immutable-public-resource"}}
+            "https://example.org/permissions/system/put-immutable-public-resource"}}
 
    "https://example.org/actions/put-immutable-public-resource"
    {:create #'create-action-put-immutable-public-resource!
@@ -1972,7 +1647,7 @@ Password: <input name=password type=password>
             "https://example.org/actions/get-public-resource"
             "https://example.org/permissions/public-resources-to-all"}}
 
-   "https://example.org/permissions/repl/put-immutable-public-resource"
+   "https://example.org/permissions/system/put-immutable-public-resource"
    {:create #'grant-permission-to-invoke-action-put-immutable-public-resource!
     :deps #{::init/system}}
 
@@ -1984,19 +1659,11 @@ Password: <input name=password type=password>
    {:create #'grant-permission-to-invoke-get-public-resource!
     :deps #{::init/system}}
 
-   "https://example.org/actions/put-user"
-   {:create #'create-action-put-user!
-    :deps #{::init/system}}
-
-   "https://example.org/permissions/repl/put-user"
-   {:create #'grant-permission-to-invoke-action-put-user!
-    :deps #{::init/system}}
-
    "https://example.org/actions/put-immutable-protected-resource"
    {:create #'create-action-put-immutable-protected-resource!
     :deps #{::init/system}}
 
-   "https://example.org/permissions/repl/put-immutable-protected-resource"
+   "https://example.org/permissions/system/put-immutable-protected-resource"
    {:create #'grant-permission-to-put-immutable-protected-resource!
     :deps #{::init/system}}
 
@@ -2008,16 +1675,8 @@ Password: <input name=password type=password>
    {:create #'create-action-put-protection-space!
     :deps #{::init/system}}
 
-   "https://example.org/permissions/repl/put-protection-space"
+   "https://example.org/permissions/system/put-protection-space"
    {:create #'grant-permission-to-put-protection-space!
-    :deps #{::init/system}}
-
-   "https://example.org/actions/put-basic-user-identity"
-   {:create #'create-action-put-basic-user-identity!
-    :deps #{::init/system}}
-
-   "https://example.org/permissions/repl/put-basic-user-identity"
-   {:create #'grant-permission-to-invoke-action-put-basic-user-identity!
     :deps #{::init/system}}
 
    "https://example.org/users/{username}"
@@ -2028,7 +1687,7 @@ Password: <input name=password type=password>
                   :name (str (str/upper-case (first username)) (subs username 1))})))
     :deps #{::init/system
             "https://example.org/actions/put-user"
-            "https://example.org/permissions/repl/put-user"}}
+            "https://example.org/permissions/system/put-user"}}
 
    "https://example.org/user-identities/{username}/basic"
    {:create (fn [{:keys [params]}]
@@ -2043,21 +1702,21 @@ Password: <input name=password type=password>
     :deps (fn [{:strs [username]} {::site/keys [base-uri]}]
             #{::init/system
               (format "%s/actions/put-basic-user-identity" base-uri)
-              (format "%s/permissions/repl/put-basic-user-identity" base-uri)
+              (format "%s/permissions/system/put-basic-user-identity" base-uri)
               (format "%s/users/%s" base-uri username)})}
 
    "https://example.org/protected-by-session-scope/document.html"
    {:create #'create-resource-protected-by-session-scope!
     :deps #{::init/system
             "https://example.org/actions/put-immutable-protected-resource"
-            "https://example.org/permissions/repl/put-immutable-protected-resource"
+            "https://example.org/permissions/system/put-immutable-protected-resource"
             "https://example.org/actions/get-protected-resource"}}
 
    "https://example.org/session-scopes/example"
    {:create #'create-session-scope!
     :deps #{::init/system
             "https://example.org/actions/put-session-scope"
-            "https://example.org/permissions/repl/put-session-scope"}}
+            "https://example.org/permissions/system/put-session-scope"}}
 
    "https://example.org/actions/oauth/authorize"
    {:create #'create-action-oauth-authorize!
@@ -2077,14 +1736,6 @@ Password: <input name=password type=password>
             "https://example.org/actions/install-authorization-server"
             "https://example.org/permissions/system/install-authorization-server"
             "https://example.org/actions/oauth/authorize"}}
-
-   "https://example.org/actions/put-session-scope"
-   {:create #'create-action-put-session-scope!
-    :deps #{::init/system}}
-
-   "https://example.org/permissions/repl/put-session-scope"
-   {:create #'grant-permission-to-put-session-scope!
-    :deps #{::init/system}}
 
    "https://example.org/actions/login"
    {:create #'create-action-login!
@@ -2137,7 +1788,7 @@ Password: <input name=password type=password>
             "https://example.org/_site/do-action"
             "https://example.org/subjects/system"
             "https://example.org/actions/put-immutable-protected-resource"
-            "https://example.org/permissions/repl/put-immutable-protected-resource"
+            "https://example.org/permissions/system/put-immutable-protected-resource"
             "https://example.org/actions/get-protected-resource"}
     :create #'create-internal-resource!}
 
@@ -2153,7 +1804,7 @@ Password: <input name=password type=password>
             "https://example.org/_site/do-action"
             "https://example.org/subjects/system"
             "https://example.org/actions/put-protection-space"
-            "https://example.org/permissions/repl/put-protection-space"}
+            "https://example.org/permissions/system/put-protection-space"}
     :create #'create-bearer-protection-space}
 
    "https://example.org/protection-spaces/basic"
@@ -2161,13 +1812,13 @@ Password: <input name=password type=password>
             "https://example.org/_site/do-action"
             "https://example.org/subjects/system"
             "https://example.org/actions/put-protection-space"
-            "https://example.org/permissions/repl/put-protection-space"}
+            "https://example.org/permissions/system/put-protection-space"}
     :create #'create-basic-protection-space}
 
    "https://example.org/session-scopes/oauth"
    {:deps #{::init/system
             "https://example.org/actions/put-session-scope"
-            "https://example.org/permissions/repl/put-session-scope"}
+            "https://example.org/permissions/system/put-session-scope"}
     :create #'create-oauth-session-scope}
 
    "https://example.org/actions/put-graphql-schema"
@@ -2276,61 +1927,4 @@ Password: <input name=password type=password>
 
    "https://example.org/permissions/bob/put-user-owned-content"
    {:deps #{::init/system}
-    :create (fn [_] (#'grant-permission-to-put-user-owned-content! "bob"))}
-
-   ;; OpenID
-
-   "https://example.org/actions/install-openid-provider"
-   {:deps #{::init/system}
-    :create #'create-action-install-openid-provider!}
-
-   "https://example.org/permissions/system/install-openid-provider"
-   {:deps #{::init/system
-            "https://example.org/actions/install-openid-provider"}
-    :create #'grant-permission-to-install-openid-provider!}
-
-   "https://juxt.eu.auth0.com"
-   {:deps #{::init/system
-            "https://example.org/permissions/system/install-openid-provider"}
-    :create (fn [{:keys [id]}]
-              (let [
-                    ;; See https://openid.net/specs/openid-connect-discovery-1_0.html#rfc.section.4.1
-                    ;;
-                    ;; "If the Issuer value contains a path component, any terminating / MUST be
-                    ;; removed before appending /.well-known/openid-configuration."
-                    ;;
-                    ;; This uses a reluctant regex qualifier.
-                    config-uri (str (second (re-matches #"(.*?)/?" id)) "/.well-known/openid-configuration")
-                    config (json/read-value (slurp config-uri))]
-                (juxt.site.alpha.init/do-action
-                 (substitute-actual-base-uri "https://example.org/subjects/system")
-                 (substitute-actual-base-uri "https://example.org/actions/install-openid-provider")
-                 {:xt/id id
-                  :juxt.pass.alpha/openid-configuration config})))}
-
-   "https://example.org/actions/install-openid-login-endpoint"
-   {:deps #{::init/system}
-    :create #'create-action-install-openid-login-endpoint!}
-
-   "https://example.org/permissions/system/install-openid-login-endpoint"
-   {:deps #{::init/system
-            "https://example.org/actions/install-openid-login-endpoint"}
-    :create #'grant-permission-to-install-openid-login-endpoint!}
-
-   "https://example.org/actions/login-with-openid"
-   {:deps #{::init/system}
-    :create #'create-action-login-with-openid!}
-
-   "https://site.test/permissions/login-with-openid"
-   {:deps #{::init/system
-            "https://example.org/actions/login-with-openid"}
-    :create #'grant-permission-to-invoke-action-login-with-openid!}
-
-   "https://example.org/openid/login"
-   {:deps #{::init/system
-            "https://juxt.eu.auth0.com"
-            "https://example.org/permissions/system/install-openid-login-endpoint"
-            "https://example.org/actions/login-with-openid"}
-    :create (fn [_]
-              (install-openid-login-endpoint!
-               {:juxt.pass.alpha/oauth-client "https://juxt.eu.auth0.com"}))}})
+    :create (fn [_] (#'grant-permission-to-put-user-owned-content! "bob"))}})

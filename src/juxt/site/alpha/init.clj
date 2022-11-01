@@ -49,275 +49,37 @@
        (string? s) (str/replace "https://example.org" (base-uri))))
    form))
 
-(defn install-system-subject! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/put!
-      ;; tag::install-system-subject![]
-      {:xt/id "https://example.org/subjects/system"
-       :juxt.site.alpha/description "The system subject"
-       :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"}
-      ;; end::install-system-subject![]
-      )))))
-
-(defn install-create-action! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/put!
-      ;; tag::install-create-action![]
-      {:xt/id "https://example.org/actions/create-action"
-       :juxt.site.alpha/description "The action to create all other actions"
-       :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
-
-       :juxt.pass.alpha/rules
-       '[
-         ;; Creating actions should only be available to the most trusted
-         ;; subjects. Actions can write directly to the database, if they wish.
-         [(allowed? subject resource permission) ; <1>
-          [permission :juxt.pass.alpha/subject subject]]]
-
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [juxt.site.alpha/request-body-as-edn
-
-                (site/validate
-                 [:map                  ; <2>
-                  [:xt/id [:re "https://example.org/actions/(.+)"]]
-                  [:juxt.pass.alpha/rules [:vector [:vector :any]]]])
-
-                (site/set-type "https://meta.juxt.site/pass/action") ; <3>
-
-                xtdb.api/put]))]))}}
-      ;; end::install-create-action![]
-      )))))
-
-(defn install-system-permissions! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/put!
-      ;; tag::install-system-permissions![]
-      {:xt/id "https://example.org/permissions/system/bootstrap"
-       :juxt.site.alpha/type "https://meta.juxt.site/pass/permission" ; <1>
-       :juxt.pass.alpha/action #{"https://example.org/actions/create-action"
-                                 "https://example.org/actions/grant-permission"} ; <2>
-       :juxt.pass.alpha/purpose nil      ; <3>
-       :juxt.pass.alpha/subject "https://example.org/subjects/system" ; <4>
-       }
-      ;; end::install-system-permissions![]
-      )))))
-
-(defn install-do-action-fn! [_]
-  (put! (actions/install-do-action-fn (base-uri))))
-
 (defn make-repl-request-context [subject action edn-arg]
   (let [xt-node (xt-node)]
-    {::site/xt-node xt-node
-     ::site/db (xt/db xt-node)
-     ::pass/subject subject
-     ::pass/action action
-     ::pass/action-input edn-arg
-     ::site/base-uri (base-uri)
-     ::site/received-representation
-     {::http/content-type "application/edn"
-      ::http/body (.getBytes (pr-str edn-arg))}}))
+    (cond->
+        {::site/xt-node xt-node
+         ::site/db (xt/db xt-node)
+         ::pass/subject subject
+         ::pass/action action
+         ::pass/action-input edn-arg
+         ::site/base-uri (base-uri)}
+      edn-arg (merge {::site/received-representation
+                      {::http/content-type "application/edn"
+                       ::http/body (.getBytes (pr-str edn-arg))}}))))
 
-(defn do-action [subject-id action-id edn-arg]
-  (assert (or (nil? subject-id) (string? subject-id)) "Subject must a string or nil")
-  (let [xt-node (xt-node)
-        db (xt/db xt-node)
-        subject (when subject-id (xt/entity db subject-id))]
-    (::pass/action-result
-     (actions/do-action
-      (make-repl-request-context subject action-id edn-arg)))))
+(re-seq #"example.org" "https://example.org/o")
 
-(defn create-grant-permission-action! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-grant-permission-action![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/grant-permission"
-       :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
+(defn do-action
+  ([subject-id action-id]
+   (do-action subject-id action-id nil))
+  ([subject-id action-id edn-arg]
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
+   (assert (or (nil? subject-id) (string? subject-id)) "Subject must a string or nil")
 
-         ;; This might be overly powerful, as a general way of granting anyone a
-         ;; permission on any action! Let's comment for now
-         #_[(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [user :role role]
-          [permission :role role]]]
+   (when (re-seq #"example.org" action-id)
+     (throw (ex-info "Oh no, an example.org got through!" {:action action-id})))
 
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [juxt.site.alpha/request-body-as-edn
-                (juxt.site.alpha/validate
-                 [:map
-                  [:xt/id [:re "https://example.org/permissions/(.+)"]]
-                  [:juxt.pass.alpha/action [:re "https://example.org/actions/(.+)"]]
-                  [:juxt.pass.alpha/purpose [:maybe :string]]])
-                (f/set-at (f/dip ["https://meta.juxt.site/pass/permission" :juxt.site.alpha/type]))
-                xtdb.api/put]))]))}})
-     ;; end::create-grant-permission-action![]
-     ))))
-
-(defn create-action-get-not-found! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/get-not-found"
-       :juxt.pass.alpha/rules
-       [
-        ['(allowed? subject resource permission)
-         ['permission :xt/id]]]})))))
-
-(defn create-action-install-not-found! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/install-not-found"
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [site/request-body-as-edn
-                (site/validate
-                 [:map
-                  [:xt/id [:re "https://example.org/.*"]]])
-                (site/set-type "https://meta.juxt.site/not-found")
-                (site/set-methods
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}
-                  :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}})
-                xtdb.api/put]))]))}
-       :juxt.pass.alpha/rules
-       [
-        ['(allowed? subject resource permission)
-         '[permission :juxt.pass.alpha/subject subject]]]})))))
-
-(defn grant-permission-install-not-found! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/system/install-not-found"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/install-not-found"
-       :juxt.pass.alpha/purpose nil})))))
-
-(defn install-not-found-resource! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (do
-       (juxt.site.alpha.init/do-action
-        "https://example.org/subjects/system"
-        "https://example.org/actions/install-not-found"
-        {:xt/id "https://example.org/_site/not-found"}))))))
-
-(defn grant-permission-get-not-found! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (do
-       (juxt.site.alpha.init/do-action
-        "https://example.org/subjects/system"
-        "https://example.org/actions/grant-permission"
-        {:xt/id "https://example.org/permissions/get-not-found"
-         :juxt.pass.alpha/action "https://example.org/actions/get-not-found"
-         :juxt.pass.alpha/purpose nil}))))))
-
-#_(defn ^{:deprecated "This is the original function prior to adding the dependency graph approach."}
-  install-not-found
-  "Install an action to perform on '404'."
-  []
-  (create-action-get-not-found!)
-  (create-action-install-not-found!)
-  (grant-permission-install-not-found!)
-  (install-not-found-resource!)
-  (grant-permission-get-not-found!))
-
-;; TODO: In the context of an application, rename 'put' to 'register'
-(defn create-action-register-application!
-  "Install an action to register an application"
-  [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/register-application"
-
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [site/request-body-as-edn
-                (site/validate
-                 [:map
-                  [::pass/client-id [:re "[a-z-]{3,}"]]
-                  [::pass/redirect-uri [:re "https://"]]])
-
-                (site/set-type "https://meta.juxt.site/pass/application")
-                (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes 20)) ::pass/client-secret]))
-
-                (f/set-at
-                 (f/keep
-                  [(f/of ::pass/client-id) "/applications/" f/str (f/env ::site/base-uri) f/str
-                   :xt/id]))
-
-                xtdb.api/put]))]))}
-
-       :juxt.pass.alpha/rules
-       '[[(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject "https://example.org/subjects/system"]]
-
-         [(allowed? subject resource permission)
-          [id :juxt.pass.alpha/user user]
-          [subject :juxt.pass.alpha/user-identity id]
-          [user :role role]
-          [permission :role role]]]})))))
-
-(defn grant-permission-to-invoke-action-register-application! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/system/register-application"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/register-application"
-       :juxt.pass.alpha/purpose nil})))))
+   (let [xt-node (xt-node)
+         db (xt/db xt-node)
+         subject (when subject-id (xt/entity db subject-id))]
+     (::pass/action-result
+      (actions/do-action
+       (make-repl-request-context subject action-id edn-arg))))))
 
 #_(defn put-graphql-schema-endpoint!
     "Initialise the resource that will host Site's GraphQL schema, as well as the
@@ -482,7 +244,7 @@
      (p/pattern-parser #"(?<scheme>https?)://" {:group {:juxt.reap.alpha.rfc7230/scheme "scheme"}})
      host-parser))))
 
-(defn openid-provider-configuration-url
+#_(defn openid-provider-configuration-url
   "Returns the URL of the OpenID Provider Configuration Information."
   [issuer-id]
   ;; See https://openid.net/specs/openid-connect-discovery-1_0.html#rfc.section.4.1
@@ -494,12 +256,12 @@
   (str (second (re-matches #"(.*?)/?" issuer-id)) "/.well-known/openid-configuration"))
 
 ;; Should be true
-(comment
+#_(comment
   (=
    (openid-provider-configuration-url "https://juxt.eu.auth0.com")
    (openid-provider-configuration-url "https://juxt.eu.auth0.com/")))
 
-(defn install-openid-provider! [xt-node issuer-id]
+#_(defn install-openid-provider! [xt-node issuer-id]
   (let [;; https://openid.net/specs/openid-connect-discovery-1_0.html#rfc.section.4
         ;; tells us we rely on the configuration information being available at
         ;; the path <issuer-id>/.well-known/openid-configuration.
@@ -512,10 +274,10 @@
      {:xt/id issuer-id
       :juxt.pass.alpha/openid-configuration config})))
 
-(comment
+#_(comment
   (json/read-value (slurp (openid-provider-configuration-url "https://juxt.eu.auth0.com"))))
 
-(defn install-openid-resources!
+#_(defn install-openid-resources!
   [xt-node {::site/keys [base-uri] :as config}
    & {:keys [name issuer-id client-id client-secret]}]
 
@@ -557,92 +319,11 @@
       {:login-uri (get-in login [::pass/puts 0])
        :callback-uri (get-in callback [::pass/puts 0])})))
 
-(def ^{::malli/schema
-       [:map-of [:or :string :keyword]
-        [:map
-         [:create {:optional true} :any]
-         [:deps {:optional true}
-          ;; :deps can be a set, but also, where necessary a function.
-          [:or
-           [:set [:or :string :keyword]]
-           [:=> [:cat
-                 [:map-of :string :string]
-                 [:map {::site/base-uri :string}]]
-            [:set [:or :string :keyword]]]]]]]}
-  dependency-graph
-  {"https://example.org/_site/do-action"
-   {:create install-do-action-fn!}
-
-   "https://example.org/subjects/system"
-   {:create install-system-subject!}
-
-   "https://example.org/permissions/system/bootstrap"
-   {:create install-system-permissions!}
-
-   "https://example.org/permissions/get-not-found"
-   {:create grant-permission-get-not-found!}
-
-   "https://example.org/actions/create-action"
-   {:create install-create-action!}
-
-   "https://example.org/actions/grant-permission"
-   {:create create-grant-permission-action!
-    :deps #{"https://example.org/_site/do-action"
-            "https://example.org/subjects/system"
-            "https://example.org/actions/create-action"
-            "https://example.org/permissions/system/bootstrap"}}
-
-   "https://example.org/actions/get-not-found"
-   {:create create-action-get-not-found!
-    :deps #{"https://example.org/_site/do-action"
-            "https://example.org/subjects/system"
-            "https://example.org/actions/create-action"}}
-
-   "https://example.org/actions/install-not-found"
-   {:create create-action-install-not-found!
-    :deps #{"https://example.org/_site/do-action"
-            "https://example.org/subjects/system"
-            "https://example.org/actions/create-action"}}
-
-   "https://example.org/permissions/system/install-not-found"
-   {:create grant-permission-install-not-found!
-    :deps #{"https://example.org/_site/do-action"
-            "https://example.org/subjects/system"
-            "https://example.org/actions/grant-permission"}}
-
-   "https://example.org/_site/not-found"
-   {:create install-not-found-resource!
-    :deps #{"https://example.org/_site/do-action"
-            "https://example.org/subjects/system"
-            "https://example.org/actions/install-not-found"}}
-
-   ::system {:deps #{"https://example.org/_site/do-action"
-                     "https://example.org/_site/not-found"
-
-                     "https://example.org/subjects/system"
-
-                     "https://example.org/actions/create-action"
-                     "https://example.org/actions/grant-permission"
-                     "https://example.org/actions/install-not-found"
-                     "https://example.org/actions/get-not-found"
-
-                     "https://example.org/permissions/system/bootstrap"
-                     "https://example.org/permissions/system/install-not-found"
-                     "https://example.org/permissions/get-not-found"}}
-
-   "https://example.org/actions/register-application"
-   {:create create-action-register-application!
-    :deps #{::system}}
-
-   "https://example.org/permissions/system/register-application"
-   {:create grant-permission-to-invoke-action-register-application!
-    :deps #{::system}}})
-
-
 (defn lookup [g id]
   (or
    (when-let [v (get g id)] (assoc v :id id))
    (some (fn [[k v]]
+           ;;(when-not (string? id) (throw (ex-info "DEBUG" {:id id})))
            (when-let [matches (re-matches (to-regex k) id)]
              (assoc v
                     :id id
@@ -652,55 +333,76 @@
                      (next matches)))))
          g)))
 
+(def dependency-graph-malli-schema
+  [:map-of [:or :string :keyword]
+   [:map
+    [:create {:optional true} :any]
+    [:deps {:optional true}
+     ;; :deps can be a set, but also, where necessary a function.
+     [:or
+      [:set [:or :string :keyword]]
+      [:=> [:cat
+            [:map-of :string :string]
+            [:map {::site/base-uri :string}]]
+       [:set [:or :string :keyword]]]]]]])
+
 (defn converge!
   "Given a set of resource ids and a dependency graph, create resources and their
   dependencies. A resource id that is a keyword is a proxy for a set of
   resources that are included together but where there is no common dependant."
-  [ids graph]
+  [ids graph {:keys [dry-run? recreate?]}]
   {:pre [(malli/validate [:or [:set [:or :string :keyword]] [:sequential [:or :string :keyword]]] ids)
-         (malli/validate (::malli/schema (meta #'dependency-graph)) graph)]
+         ;;(malli/validate dependency-graph-malli-schema graph)
+         ]
    :post [(malli/validate
            [:sequential
             [:map
              [:id :string]
              [:status :keyword]
              [:error {:optional true} :any]]] %)]}
-  (->> ids
-       (mapcat (fn [id]
-                 (->> id
-                      (tree-seq some?
-                                (fn [id]
-                                  (let [{:keys [deps params]} (lookup graph id)]
-                                    (cond
-                                      (nil? deps) nil
-                                      (fn? deps) (deps params {::site/base-uri (base-uri)})
-                                      (set? deps) deps
-                                      :else (throw (ex-info "Unexpected deps type" {:deps deps}))))))
-                      (keep (fn [id]
-                              (if-let [v (lookup graph id)]
-                                (when-not (keyword? id) [id v])
-                                (throw (ex-info (format "No dependency graph entry for %s" id) {:id id}))))))))
-       reverse distinct
-       (reduce
-        (fn [acc [id {:keys [create] :as v}]]
-          (when-not create (throw (ex-info (format "No creator for %s" id) {:id id})))
-          (conj acc (try
-                      (let [{::pass/keys [puts] :as result} (create v)]
-                        (when (and puts (not (contains? (set puts) id)))
-                          (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
-                        {:id id :status :created :result result})
-                      (catch Throwable cause
-                        (throw (ex-info (format "Failed to converge %s" id) {:id id} cause))
-                        ;;{:id id :status :error :error cause}
-                        ))))
-        [])))
 
-(defn bootstrap! []
-  (converge! #{::system} (substitute-actual-base-uri dependency-graph)))
+  (let [db (xt/db (xt-node))]
 
+    (when-not (malli/validate dependency-graph-malli-schema graph)
+      (throw
+       (ex-info
+        "Graph failed to validate"
+        {:graph graph
+         :explain (malli/explain dependency-graph-malli-schema graph)})))
 
-;; Useful options (which may or may not show in 'status')
-
-;; TODO: Create an action that can be attached to a GET. It will create a
-;; temporary session cookie with a state value and redirect to the authorization
-;; endpoint of the OpenID-Connect provider.
+    (->> ids
+         (mapcat (fn [id]
+                   (->> id
+                        (tree-seq some?
+                                  (fn [id]
+                                    (let [{:keys [deps params]} (lookup graph id)]
+                                      (cond
+                                        (nil? deps) nil
+                                        (fn? deps) (deps params {::site/base-uri (base-uri)})
+                                        (set? deps) deps
+                                        :else (throw (ex-info "Unexpected deps type" {:deps deps}))))))
+                        (keep (fn [id]
+                                (if-let [v (lookup graph id)]
+                                  (when-not (keyword? id) [id v])
+                                  (throw (ex-info (format "No dependency graph entry for %s" id) {:id id}))))))))
+         reverse distinct
+         (reduce
+          (fn [acc [id {:keys [create] :as v}]]
+            (if (or (not (xt/entity db id)) recreate?)
+              (do
+                (when-not create (throw (ex-info (format "No creator for %s" id) {:id id})))
+                (if-not dry-run?
+                  (conj acc (try
+                              (let [{::pass/keys [puts] :as result} (create v)]
+                                (when (and puts (not (contains? (set puts) id)))
+                                  (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
+                                {:id id :status :created :result result})
+                              (catch Throwable cause
+                                (throw (ex-info (format "Failed to converge %s" id) {:id id} cause))
+                                ;;{:id id :status :error :error cause}
+                                )))
+                  ;; Dry run
+                  (conj acc {:id id :status :dry-run})
+                  ))
+              acc))
+          []))))
