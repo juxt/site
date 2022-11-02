@@ -399,6 +399,7 @@
 (comment
   (put!
    {:xt/id "https://site.test/actions/whoami"
+    :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
@@ -416,3 +417,13 @@
     {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/whoami"}}}
     :juxt.http.alpha/content-type "text/plain"
     :juxt.http.alpha/content "Hello - who are you?"}))
+
+(comment
+  (put!
+   {:xt/id "https://site.test/permissions/malcolm/whoami"
+    :juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
+    :juxt.pass.alpha/user "https://site.test/users/mal"
+    :juxt.pass.alpha/action "https://site.test/actions/whoami"
+    :juxt.pass.alpha/purpose nil
+
+    }))
