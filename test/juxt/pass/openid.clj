@@ -81,8 +81,8 @@
         [:map
          [:xt/id [:re "https://example.org/.*"]]
          [:juxt.pass.alpha/issuer-configuration [:re "https://example.org/.*"]]
-         [:juxt.pass.alpha/openid-client-id [:string {:min 12}]]
-         [:juxt.pass.alpha/openid-client-secret [:string {:min 20}]]
+         [:juxt.pass.alpha/client-id [:string {:min 12}]]
+         [:juxt.pass.alpha/client-secret [:string {:min 20}]]
          [:juxt.pass.alpha/redirect-uri [:re "https://example.org/.*"]]]
 
        :juxt.site.alpha/prepare
@@ -120,7 +120,7 @@
         [:map
          [:xt/id [:re "https://example.org/.*"]]
          [:juxt.pass.alpha/session-scope [:re "https://example.org/.*"]]
-         [:juxt.pass.alpha/openid-client [:re "https://example.org/.*"]]]
+         [:juxt.pass.alpha/openid-client-configuration [:re "https://example.org/.*"]]]
 
        :juxt.site.alpha/transact
        {
@@ -159,7 +159,7 @@
        :juxt.site.alpha.malli/input-schema
         [:map
          [:xt/id [:re "https://example.org/.*"]]
-         [:juxt.pass.alpha/openid-client [:re "https://example.org/.*"]]]
+         [:juxt.pass.alpha/openid-client-configuration [:re "https://example.org/.*"]]]
 
        :juxt.site.alpha/transact
        {
@@ -206,19 +206,26 @@
        :juxt.site.alpha/transact
        {:juxt.site.alpha.sci/program
         (pr-str
-         '(let [client (:juxt.pass.alpha/openid-client *resource*)
-                _ (when-not client
+         '(let [openid-client-configuration-id (:juxt.pass.alpha/openid-client-configuration *resource*)
+                _ (when-not openid-client-configuration-id
                     (throw
-                     (ex-info "No :juxt.pass.alpha/openid-client on resource"
-                              {:resource *resource*})))
+                     (ex-info
+                      "No :juxt.pass.alpha/openid-client-configuration on resource"
+                      {:resource *resource*})))
 
-                client-doc (xt/entity client)
-                _ (when-not client-doc
-                    (throw (ex-info "No client doc in client" {:client client})))
+                openid-client-configuration (xt/entity openid-client-configuration-id)
+                _ (when-not openid-client-configuration
+                    (throw
+                     (ex-info
+                      "No openid-client-configuration doc in database"
+                      {:openid-client-configuration openid-client-configuration-id})))
 
-                issuer-config (:juxt.pass.alpha/issuer-configuration client-doc)
+                issuer-config (:juxt.pass.alpha/issuer-configuration openid-client-configuration)
                 _ (when-not issuer-config
-                    (throw (ex-info "No :juxt.pass.alpha/issuer-configuration on client doc" {:client-doc client-doc})))
+                    (throw
+                     (ex-info
+                      "No :juxt.pass.alpha/issuer-configuration on client doc"
+                      {:openid-client-configuration openid-client-configuration})))
 
                 issuer-config-doc (xt/entity issuer-config)
                 _ (when-not issuer-config-doc
@@ -275,9 +282,9 @@
                  :juxt.pass.alpha/session-token session-token
                  :juxt.pass.alpha/session (:xt/id session)}
 
-                client-id (:juxt.pass.alpha/openid-client-id client-doc)
+                client-id (:juxt.pass.alpha/client-id openid-client-configuration)
 
-                redirect-uri (:juxt.pass.alpha/redirect-uri client-doc)
+                redirect-uri (:juxt.pass.alpha/redirect-uri openid-client-configuration)
                 _ (when-not redirect-uri
                     (throw
                      (ex-info
@@ -369,46 +376,117 @@
                     (throw
                      (ex-info "No code in query params" {})))
 
-                openid-client-id (:juxt.pass.alpha/openid-client *resource*)
-                _ (when-not openid-client-id
+                openid-client-configuration-id (:juxt.pass.alpha/openid-client-configuration *resource*)
+                _ (when-not openid-client-configuration-id
                     (throw
                      (ex-info
                       "Resource does not have a non-nil :juxt.pass.alpha/openid-client entry"
                       {:resource *resource*})))
 
-                openid-client (xt/entity openid-client-id)
-                _ (when-not openid-client
+                ;; The use of the asterisk as a suffix is meant to indicate that
+                ;; this data may be stale, and shouldn't be used to make
+                ;; decisions. However, in this case, we need to make an HTTP
+                ;; request and this cannot be done in a transaction
+                ;; function. The returned ID_TOKEN will be checked and verified
+                ;; in the transaction function.
+                {:juxt.pass.alpha/keys [client-id client-secret redirect-uri]
+                 :as openid-client-configuration*}
+                (xt/entity* openid-client-configuration-id)
+                _ (when-not openid-client-configuration*
                     (throw
                      (ex-info
                       "OpenID client document not found in database"
-                      {:openid-client-id openid-client-id})))
+                      {:openid-client-configuration-id openid-client-configuration-id})))
 
-                issuer-config-id (:juxt.pass.alpha/issuer-configuration openid-client)
-                _ (when-not issuer-config-id
+                issuer-config-id* (:juxt.pass.alpha/issuer-configuration openid-client-configuration*)
+                _ (when-not issuer-config-id*
                     (throw (ex-info "No issuer config in client" {})))
 
-                issuer-configuration (xt/entity issuer-config-id)
-                _ (when-not issuer-configuration
+                issuer-configuration* (xt/entity* issuer-config-id*)
+                _ (when-not issuer-configuration*
                     (throw (ex-info "Issuer configuation document not found in database"
-                                    {:issuer-config-id issuer-config-id})))
+                                    {:issuer-config-id issuer-config-id*})))
 
-                openid-configuration (:juxt.pass.alpha/openid-configuration issuer-configuration)
-                _ (when-not openid-configuration
+                openid-configuration* (:juxt.pass.alpha/openid-configuration issuer-configuration*)
+                _ (when-not openid-configuration*
                     (throw
                      (ex-info
                       "OpenID configuration has not yet been fetched"
-                      {:issuer-configuration issuer-configuration})))
+                      {:issuer-configuration issuer-configuration*})))
 
-                jwks (:juxt.pass.alpha/jwks issuer-configuration)
-                _ (when-not jwks
-                    (throw
-                     (ex-info
-                      "JSON Web Key Set for OpenID issuer have not yet been fetched"
-                      {:issuer-configuration issuer-configuration})))
-
-                token-endpoint (get openid-configuration "token_endpoint")
-                _ (when-not token-endpoint
+                token-endpoint* (get openid-configuration* "token_endpoint")
+                _ (when-not token-endpoint*
                     (throw (ex-info "No token_endpoint found in configuration" {})))
+
+                ;; TODO: Promote this, e.g. (juxt.pass/get-token {:uri token-endpoint :grant-type "authorization_code" ...}) => id-token
+                token-response
+                (java-http-clj.core/send
+                 {:method :post
+                  :uri token-endpoint*
+                  :headers {"Content-Type" "application/json" #_"application/x-www-form-urlencoded"
+                            "Accept" "application/json"}
+                  :body (jsonista.core/write-value-as-string
+                         {"grant_type" "authorization_code"
+                          "client_id" client-id
+                          "client_secret" client-secret
+                          "code" code
+                          "redirect_uri" redirect-uri})}
+                 {:as :byte-array})
+
+                ;; The id_token is a JWT embedded in the JSON object returned in
+                ;; the response body .
+                json (jsonista.core/read-value (:body token-response))
+                encoded-id-token (get json "id_token")
+
+                _ (when-not encoded-id-token
+                    (throw (ex-info "ID_TOKEN not returned in JSON response" {:json-response json})))
+
+                ;; The subject-id will be randomized, so we can't generate this
+                ;; in the transaction function (since different nodes would
+                ;; almost certainly generate different values!)
+                subject-id (juxt.pass.util/make-nonce 10)]
+
+            ;; We send the issuer and the encoded-id-token. Although the client
+            ;; configuration may still change prior to this transaction reaching
+            ;; the head of the queue, the id token is still valid with respect
+            ;; to the issuer. We include the issuer to allow the transaction to
+            ;; check it hasn't changed (if it has, the id-token must be
+            ;; reacquired from the new issuer). Note that while this might
+            ;; appear to be an unreasonable about of caution to preserve strict
+            ;; serializability of data.
+            {:issuer (:juxt.pass.alpha/issuer issuer-configuration*)
+             :encoded-id-token encoded-id-token
+             :received-state received-state
+             :subject-id subject-id
+             :new-session-token (juxt.pass.util/make-nonce 16)}))}
+
+       :juxt.site.alpha/transact
+       {:juxt.site.alpha.sci/program
+        (pr-str
+
+         '(let [{issuer :issuer
+                 encoded-id-token :encoded-id-token
+                 received-state :received-state
+                 subject-id :subject-id
+                 new-session-token :new-session-token}
+                *prepare*
+
+                openid-client-configuration-id (:juxt.pass.alpha/openid-client-configuration *resource*)
+                openid-client-configuration (xt/entity openid-client-configuration-id)
+                client-id (:juxt.pass.alpha/client-id openid-client-configuration)
+                issuer-config-id (:juxt.pass.alpha/issuer-configuration openid-client-configuration)
+                issuer-configuration (xt/entity issuer-config-id)
+                openid-configuration (:juxt.pass.alpha/openid-configuration issuer-configuration)
+
+                id-token
+                (juxt.pass/decode-id-token
+                 {:id-token encoded-id-token
+                  :jwks (:juxt.pass.alpha/jwks issuer-configuration)
+                  :openid-configuration openid-configuration
+                  :client-id client-id})
+
+                ;; Arguably do the nonce check below in the validation of the
+                ;; ID_TOKEN.  Pass in the session if necessary.
 
                 session (:juxt.pass.alpha/session *ctx*)
                 _ (when-not session
@@ -427,40 +505,13 @@
                       {:received-state received-state
                        :expected-state expected-state})))
 
-                ;; TODO: Promote this, e.g. (juxt.pass/get-token {:uri token-endpoint :grant-type "authorization_code" ...}) => id-token
-                token-response
-                (java-http-clj.core/send
-                 {:method :post
-                  :uri token-endpoint
-                  :headers {"Content-Type" "application/json" #_"application/x-www-form-urlencoded"
-                            "Accept" "application/json"}
-                  :body (jsonista.core/write-value-as-string
-                         {"grant_type" "authorization_code"
-                          "client_id" (:juxt.pass.alpha/openid-client-id openid-client)
-                          "client_secret" (:juxt.pass.alpha/openid-client-secret openid-client)
-                          "code" code
-                          "redirect_uri" (:juxt.pass.alpha/redirect-uri openid-client)})}
-                 {:as :byte-array})
-
-                jwt (jsonista.core/read-value (:body token-response))
-
-                id-token
-                (juxt.pass/decode-id-token
-                 {:id-token (get jwt "id_token")
-                  :jwks jwks
-                  :openid-configuration openid-configuration
-                  :oauth-client-id (:juxt.pass.alpha/openid-client-id openid-client)})
-
-                ;; Arguably do all the below checks in the validation of the
-                ;; ID_TOKEN.  Pass in the session if necessary.
-
                 session-nonce (:juxt.pass.alpha/nonce session)
                 _ (when-not session-nonce
                     (throw (ex-info "Expected to find nonce in session" {:session session})))
 
                 claimed-nonce (get-in id-token [:claims "nonce"])
                 _ (when-not claimed-nonce
-                    (throw (ex-info "Expected to find nonce claim in ID_TOKEN" {:jwt jwt})))
+                    (throw (ex-info "Expected to find nonce claim in ID_TOKEN" {})))
 
                 ;; TODO: This really ought to be promoted to library code
                 _ (when-not (= claimed-nonce session-nonce)
@@ -486,8 +537,6 @@
                        [(keyword "juxt.pass.jwt.claims" (clojure.string/replace c "_" "-")) v])
                      (into {}))))
 
-                ;; TODO: Match the user-identity. This can be coded inline.
-
                 claims (extract-standard-claims (:claims id-token))
 
                 matched-identity
@@ -496,31 +545,73 @@
                   :juxt.pass.jwt.claims/nickname (get claims :juxt.pass.jwt.claims/nickname)})
 
                 issued-date (get-in id-token [:claims "iat"])
-                expiry-date (java.util.Date/from (.plusSeconds (java.time.Instant/now) 30)) ;;(get-in id-token [:claims "exp"])
-
-                subject-id (juxt.pass.util/make-nonce 10)
+                expiry-date (get-in id-token [:claims "exp"]) ;;(java.util.Date/from (.plusSeconds (java.time.Instant/now) 30)) ;;
 
                 subject
-                (into
-                 {:xt/id (str "https://example.org/subjects/" subject-id)
-                  :juxt.pass.alpha/id-token-claims (:claims id-token)
-                  :juxt.pass.alpha/matched-identity matched-identity
-                  :juxt.pass.alpha/issued-date issued-date
-                  :juxt.pass.alpha/expiry-date expiry-date}
-                 claims)]
+                (when matched-identity
+                  (into
+                   {:xt/id (str "https://example.org/subjects/" subject-id)
+                    :juxt.pass.alpha/id-token-claims (:claims id-token)
+                    :juxt.pass.alpha/matched-identity matched-identity
+                    :juxt.pass.alpha/issued-date issued-date
+                    :juxt.pass.alpha/expiry-date expiry-date}
+                   claims))
 
-            subject))}
+                new-session-token-doc
+                (when subject
+                  {:xt/id (str "https://example.org/session-tokens/" new-session-token)
+                   :juxt.site.alpha/type "https://meta.juxt.site/pass/session-token"
+                   :juxt.pass.alpha/session-token new-session-token
+                   :juxt.pass.alpha/session (:xt/id session)})]
 
-       :juxt.site.alpha/transact
-       {:juxt.site.alpha.sci/program
-        (pr-str
-         '[[:xtdb.api/put *prepare*
-            (get-in *prepare* [:juxt.pass.alpha/id-token-claims "iat"])
-            ;; TODO: Expire the subject in the bitemporal timeline according
-            ;; to the 'exp' (expiry) in the claims. This has the added
-            ;; desirable effect of keeping the database free from clutter.
-            (get-in *prepare* [:juxt.pass.alpha/id-token-claims "exp"])]
-           ])}
+            (cond-> [[:xtdb.api/put
+                      {:xt/id :result
+                       :subject subject
+                       :matched-identity matched-identity
+                       :session session
+                       :claims claims}]]
+              subject
+              (conj
+               [:xtdb.api/put subject
+                (get-in subject [:juxt.pass.alpha/id-token-claims "iat"])
+                ;; TODO: Expire the subject in the bitemporal timeline according
+                ;; to the 'exp' (expiry) in the claims. This has the added
+                ;; desirable effect of keeping the database free from clutter.
+                (get-in subject [:juxt.pass.alpha/id-token-claims "exp"])]
+
+               ;; Update session with subject
+               [:xtdb.api/put (assoc session :juxt.pass.alpha/subject (:xt/id subject))]
+
+               ;; Escalate session (as recommended by OWASP as this session has
+               ;; been promoted)
+               [:xtdb.api/put new-session-token-doc]
+
+               ;; TODO: Original return-to query param should be in session -
+               ;; use it here.
+               ;; [:ring.response/status 303]
+
+               [:ring.response/headers
+                (let [session-scope (:juxt.pass.alpha/session-scope *ctx*)
+                      _ (when-not session-scope
+                          (throw
+                           (ex-info
+                            "No :juxt.pass.alpha/session-scope attached to context"
+                            {})))
+
+                      cookie-name (:juxt.pass.alpha/cookie-name session-scope)
+                      _ (when-not cookie-name
+                          (throw
+                           (ex-info
+                            "No :juxt.pass.alpha/cookie-name found in session-scope"
+                            {:juxt.pass.alpha/session-scope session-scope})))
+
+                      cookie-path (or (:juxt.pass.alpha/cookie-path session-scope) "/")]
+                  { ;;"location" return-to
+                   "set-cookie"
+                   (format "%s=%s; Path=%s; Secure; HttpOnly; SameSite=Lax"
+                           cookie-name
+                           new-session-token
+                           cookie-path)})]))))}
 
        :juxt.pass.alpha/rules
        '[
@@ -547,7 +638,7 @@
          '(do
             (juxt.site.malli/validate-input)
             (let [issuer (:xt/id *input*)
-                  issuer-doc (xt/entity issuer)
+                  issuer-doc (xt/entity* issuer)
                   _ (when-not issuer-doc
                       (throw (ex-info "Issuer not installed in database" {:issuer (:juxt.pass.alpha/issuer *input*)})))
                   jwks-uri (get-in issuer-doc [:juxt.pass.alpha/openid-configuration "jwks_uri"])
@@ -574,13 +665,17 @@
                       (throw (ex-info "Failed to get JWKS from issuer" {:issuer issuer})))
 
                   jwks (jsonista.core/read-value (:body get-jwks-response))]
-              {:juxt.pass.alpha/jwks jwks})))}
+              {:jwks-uri jwks-uri
+               :juxt.pass.alpha/jwks jwks})))}
 
        :juxt.site.alpha/transact
        {:juxt.site.alpha.sci/program
         (pr-str
-         '(let [issuer-doc (xt/entity (:xt/id *input*))]
-            [[:xtdb.api/put (merge issuer-doc *prepare*)]]))}
+         '(let [issuer-doc (xt/entity (:xt/id *input*))
+                jwks-uri (get-in issuer-doc [:juxt.pass.alpha/openid-configuration "jwks_uri"])]
+            (cond-> []
+              (= jwks-uri (:jwks-uri *prepare*))
+              (conj [:xtdb.api/put (assoc issuer-doc :juxt.pass.alpha/jwks (:juxt.pass.alpha/jwks *prepare*))]))))}
 
        :juxt.pass.alpha/rules
        '[
@@ -825,7 +920,7 @@
                   :juxt.pass.alpha/issuer issuer})
                 (fetch-jwks! id)))}
 
-   "https://example.org/openid/auth0/client"
+   "https://example.org/openid/auth0/client-configuration"
    {:deps #{"https://example.org/openid/auth0/issuer"}
     :create (fn [{:keys [id]}]
               (install-openid-client
@@ -834,18 +929,18 @@
                  :juxt.pass.alpha/issuer-configuration "https://example.org/openid/auth0/issuer"}
                 (select-keys
                  (openid-config)
-                 [:juxt.pass.alpha/openid-client-id
-                  :juxt.pass.alpha/openid-client-secret
+                 [:juxt.pass.alpha/client-id
+                  :juxt.pass.alpha/client-secret
                   :juxt.pass.alpha/redirect-uri]))))}
 
    "https://example.org/openid/login"
    {:deps #{"https://example.org/openid/callback"
-            "https://example.org/openid/auth0/client"
+            "https://example.org/openid/auth0/client-configuration"
             "https://example.org/permissions/system/install-openid-login-endpoint"}
     :create (fn [{:keys [id]}]
               (install-openid-login-endpoint!
                {:xt/id id
-                :juxt.pass.alpha/openid-client "https://example.org/openid/auth0/client"
+                :juxt.pass.alpha/openid-client-configuration "https://example.org/openid/auth0/client-configuration"
                 :juxt.pass.alpha/session-scope "https://example.org/session-scopes/openid"}))}
 
    "https://example.org/openid/callback"
@@ -853,7 +948,7 @@
     :create (fn [{:keys [id]}]
               (install-openid-callback-endpoint!
                {:xt/id id
-                :juxt.pass.alpha/openid-client "https://example.org/openid/auth0/client"}))}
+                :juxt.pass.alpha/openid-client-configuration "https://example.org/openid/auth0/client-configuration"}))}
 
    "https://example.org/session-scopes/openid"
    {:deps #{"https://example.org/permissions/system/put-session-scope"}

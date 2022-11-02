@@ -79,13 +79,13 @@
   (when kid
     (some (fn [m] (when (= kid (get m "kid")) m)) (get jwks "keys"))))
 
-(defn decode-id-token [{:keys [id-token jwks openid-configuration oauth-client-id]}]
+(defn decode-id-token [{:keys [id-token jwks openid-configuration client-id]}]
   ;; TODO: Use Malli to validate arguments? This may be called from untrusted
   ;; user-provided code
   (assert id-token)
   (assert jwks)
   (assert openid-configuration)
-  (assert oauth-client-id)
+  (assert client-id)
 
   (let [decoded-jwt (JWT/decode id-token)
         kid (.getKeyId decoded-jwt)
@@ -124,11 +124,11 @@
 
     ;; Also see https://openid.net/specs/openid-connect-core-1_0.html section
     ;; 2, aud MUST be the OAuth 2.0 client_id.
-    (when-not (= oauth-client-id (get claims "aud"))
+    (when-not (= client-id (get claims "aud"))
       (throw
        (ex-info
         "Audience claim must be the OAuth 2.0 client id"
-        {:client-id oauth-client-id
+        {:client-id client-id
          :aud (get claims "aud")})))
 
     ;; 6. The Client MUST validate the signature of all other ID Tokens

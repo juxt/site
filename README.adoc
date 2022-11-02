@@ -63,8 +63,8 @@ For testing:
 [source,clojure]
 ----
 {:juxt.pass.alpha/issuer "https://juxt.eu.auth0.com"
- :juxt.pass.alpha/openid-client-id "d8X0TfEIcTl5oaltA4oy9ToEPdn5nFUK"
- :juxt.pass.alpha/openid-client-secret "XXXX"
+ :juxt.pass.alpha/client-id "d8X0TfEIcTl5oaltA4oy9ToEPdn5nFUK"
+ :juxt.pass.alpha/client-secret "XXXX"
  :juxt.pass.alpha/redirect-uri "https://site.test/openid/callback"}
 ----
 

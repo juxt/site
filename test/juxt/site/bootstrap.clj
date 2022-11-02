@@ -365,7 +365,7 @@
      :juxt.pass.openid/all-actions
      :juxt.pass.openid/default-permissions
      (substitute-actual-base-uri "https://example.org/openid/auth0/issuer")
-     (substitute-actual-base-uri "https://example.org/openid/auth0/client")
+     (substitute-actual-base-uri "https://example.org/openid/auth0/client-configuration")
      (substitute-actual-base-uri "https://example.org/openid/login")
      ;;(substitute-actual-base-uri "https://example.org/openid/callback")
      (substitute-actual-base-uri "https://example.org/session-scopes/openid")
@@ -377,54 +377,6 @@
      session-scope/dependency-graph
      user/dependency-graph))
    {:dry-run? false :recreate? true}))
-
-(defn install-openid-bak! []
-  (let [{::pass/keys [issuer] :as client-config}
-        (-> "user.home"
-            System/getProperty
-            (io/file ".config/site/openid-client.edn")
-            slurp
-            edn/read-string)
-        openid-client-id (substitute-actual-base-uri "https://example.org/openid/auth0/client")
-        login (substitute-actual-base-uri "https://example.org/openid/login")
-        callback (substitute-actual-base-uri "https://example.org/openid/callback")
-        session-scope (substitute-actual-base-uri "https://example.org/session-scopes/openid")]
-
-    {:install-issuer
-     (do
-       (openid/install-openid-issuer! issuer)
-       (openid/fetch-jwks! issuer))
-
-     :install-client
-     (openid/install-openid-client
-      (merge
-       (substitute-actual-base-uri
-        {:xt/id openid-client-id})
-       client-config))
-
-     :install-session-scope
-     (do-action
-      (substitute-actual-base-uri "https://example.org/subjects/system")
-      (substitute-actual-base-uri "https://example.org/actions/put-session-scope")
-      (substitute-actual-base-uri
-       {:xt/id session-scope
-        :juxt.pass.alpha/cookie-name "sid"
-        :juxt.pass.alpha/cookie-domain "https://example.org"
-        :juxt.pass.alpha/cookie-path "/"
-        :juxt.pass.alpha/login-uri login}))
-
-     :login-endpoint
-     (openid/install-openid-login-endpoint!
-      (substitute-actual-base-uri
-       {:xt/id login
-        :juxt.pass.alpha/session-scope session-scope
-        :juxt.pass.alpha/openid-client openid-client-id}))
-
-     :callback-endpoint
-     (openid/install-openid-callback-endpoint!
-      (substitute-actual-base-uri
-       {:xt/id callback
-        :juxt.pass.alpha/openid-client openid-client-id}))}))
 
 (defn install-openid-user!
   [& {:keys [name username]
@@ -442,3 +394,25 @@
    :name "Malcolm Sparks"
    :juxt.pass.jwt.claims/iss "https://juxt.eu.auth0.com/"
    :juxt.pass.jwt.claims/nickname "malcolmsparks"))
+
+
+(comment
+  (put!
+   {:xt/id "https://site.test/actions/whoami"
+    :juxt.pass.alpha/rules
+    '[
+      [(allowed? subject resource permission)
+       [permission :juxt.pass.alpha/subject subject]]
+
+      [(allowed? subject resource permission)
+       [subject :juxt.pass.alpha/user-identity id]
+       [id :juxt.pass.alpha/user user]
+       [permission :juxt.pass.alpha/user user]]]}))
+
+(comment
+  (put!
+   {:xt/id "https://site.test/whoami"
+    :juxt.site.alpha/methods
+    {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/whoami"}}}
+    :juxt.http.alpha/content-type "text/plain"
+    :juxt.http.alpha/content "Hello - who are you?"}))

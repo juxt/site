@@ -295,7 +295,7 @@
              (group-by :xt/id))]
     (map #(update % join-key (comp first idx)) coll)))
 
-(defn common-sci-namespaces [db action-doc action-input]
+(defn common-sci-namespaces [action-doc action-input]
   {
    'com.auth0.jwt.JWT
    {'decode (fn [x] (com.auth0.jwt.JWT/decode x))}
@@ -311,11 +311,7 @@
 
    'juxt.pass
    {'decode-id-token juxt.pass.alpha.openid-connect/decode-id-token
-    'match-identity (fn [m]
-                      (ffirst
-                       (xt/q db {:find ['id]
-                                 :where (into
-                                         [['id :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"]]                                         (for [[k v] m] ['id k v] ))})))}
+    }
 
    'juxt.site.malli
    {'validate (fn [schema value] (malli/validate schema value))
@@ -337,7 +333,7 @@
    'ring.util.codec {'form-encode codec/form-encode
                      'form-decode codec/form-decode}
 
-   'xt {'entity (fn [id] (xt/entity db id))}})
+   })
 
 (defn do-action-in-tx-fn
   "This function is applied within a transaction function. It should be fast, but
@@ -403,14 +399,27 @@
                   (sci/eval-string
                    (-> action-doc ::site/transact :juxt.site.alpha.sci/program)
                    {:namespaces
-                    (merge
+                    (merge-with
+                     merge
                      {'user
                       {'*input* action-input
                        '*action* action-doc
                        '*resource* resource
                        '*prepare* prepare
-                       '*ctx* ctx}}
-                     (common-sci-namespaces db action-doc action-input))
+                       '*ctx* ctx}
+                      ;; Allowed to access the database
+                      'xt
+                      {'entity (fn [id] (xt/entity db id))}
+
+                      'juxt.pass
+                      {'match-identity
+                       (fn [m]
+                         (ffirst
+                          (xt/q db {:find ['id]
+                                    :where (into
+                                            [['id :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"]]                                         (for [[k v] m] ['id k v] ))})))}
+                      }
+                     (common-sci-namespaces action-doc action-input))
                     :classes
                     {'java.util.Date java.util.Date
                      'java.time.Instant java.time.Instant}
@@ -591,8 +600,15 @@
                  '*ctx* (sanitize-ctx ctx)
                  'logf (fn [& args] (eval `(log/tracef ~@args)))
                  'log (fn [& args] (eval `(log/trace ~@args)))}
+
+          'xt
+          { ;; Unsafe due to violation of strict serializability, hence marked as
+           ;; entity*
+           'entity*
+           (fn [id] (xt/entity db id))}
+
           'juxt.pass.util {'make-nonce make-nonce}}
-         (common-sci-namespaces db action-doc action-input))
+         (common-sci-namespaces action-doc action-input))
         :classes
         {'java.util.Date java.util.Date
          'java.time.Instant java.time.Instant
@@ -830,3 +846,48 @@
 #_(sci/eval-string (pr-str '(java.util.Date/from (.plusSeconds (java.time.Instant/now) 10)))
                  {:classes {'java.util.Date java.util.Date
                             'java.time.Instant java.time.Instant}})
+
+
+
+#_(let [action-input :action-input
+      action-doc :action-doc
+      resource {}
+      prepare {}
+      ctx {}
+      db nil]
+  {:namespaces
+   (merge-with
+    merge
+    {'user
+     {'*input* action-input
+      '*action* action-doc
+      '*resource* resource
+      '*prepare* prepare
+      '*ctx* ctx}
+     ;; Allowed to access the database
+     'xt
+     {'entity (fn [id] (xt/entity db id))}
+
+     'juxt.pass
+     {'match-identity
+      (fn [m]
+        (ffirst
+         (xt/q db {:find ['id]
+                   :where (into
+                           [['id :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"]]                                         (for [[k v] m] ['id k v] ))})))}
+     }
+    (common-sci-namespaces action-doc action-input))
+   :classes
+   {'java.util.Date java.util.Date
+    'java.time.Instant java.time.Instant}
+
+   ;; We can't allow random numbers to be computed as they
+   ;; won't be the same on each node. If this is a problem, we
+   ;; can replace with a (non-secure) PRNG seeded from the
+   ;; tx-instant of the tx. Note that secure random numbers
+   ;; should not be generated this way anyway, since then it
+   ;; would then be possible to mount an attack based on
+   ;; knowledge of the current time. Instead, secure random
+   ;; numbers should be generated in the action's 'prepare'
+   ;; step.
+   :deny `[loop recur rand rand-int]})
