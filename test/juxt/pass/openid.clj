@@ -539,7 +539,7 @@
 
                 claims (extract-standard-claims (:claims id-token))
 
-                matched-identity
+                user-identity
                 (juxt.pass/match-identity
                  {:juxt.pass.jwt.claims/iss (get claims :juxt.pass.jwt.claims/iss)
                   :juxt.pass.jwt.claims/nickname (get claims :juxt.pass.jwt.claims/nickname)})
@@ -548,11 +548,11 @@
                 expiry-date (get-in id-token [:claims "exp"]) ;;(java.util.Date/from (.plusSeconds (java.time.Instant/now) 30)) ;;
 
                 subject
-                (when matched-identity
+                (when user-identity
                   (into
                    {:xt/id (str "https://example.org/subjects/" subject-id)
                     :juxt.pass.alpha/id-token-claims (:claims id-token)
-                    :juxt.pass.alpha/matched-identity matched-identity
+                    :juxt.pass.alpha/user-identity user-identity
                     :juxt.pass.alpha/issued-date issued-date
                     :juxt.pass.alpha/expiry-date expiry-date}
                    claims))
@@ -564,12 +564,7 @@
                    :juxt.pass.alpha/session-token new-session-token
                    :juxt.pass.alpha/session (:xt/id session)})]
 
-            (cond-> [[:xtdb.api/put
-                      {:xt/id :result
-                       :subject subject
-                       :matched-identity matched-identity
-                       :session session
-                       :claims claims}]]
+            (cond-> []
               subject
               (conj
                [:xtdb.api/put subject
