@@ -7,12 +7,9 @@
    [ring.util.codec :as codec]
    [jsonista.core :as json]
    juxt.book.login
-   [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]
    [juxt.site.alpha.graphql.flip :as graphql-flip]
    [juxt.pass.alpha.util :refer [make-nonce]]
-   [juxt.site.alpha :as-alias site]
-   [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
    [juxt.test.util :refer [*handler*]]
    [malli.core :as malli]
