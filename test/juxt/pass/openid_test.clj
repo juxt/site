@@ -26,7 +26,7 @@
             "https://example.org/permissions/system/install-openid-issuer"
             "https://example.org/permissions/system/fetch-jwks"}
     :create (fn [{:keys [id]}]
-              (openid/install-openid-issuer id)
+              (openid/install-openid-issuer! id)
               ;; TODO: We should refresh this resource periodically by attaching the
               ;; https://example.org/actions/openid/fetch-jwks action to a Site scheduler.
               (openid/fetch-jwks! id))}
