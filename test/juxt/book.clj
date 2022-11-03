@@ -66,7 +66,7 @@
           [id :juxt.pass.alpha/user user]
           [user :role role]
           [permission :role role]]]})
-       ;; end::create-action-put-subject![]
+     ;; end::create-action-put-subject![]
      ))))
 
 (defn grant-permission-to-invoke-action-put-subject! [_]
@@ -165,7 +165,7 @@
          [(allowed? subject resource permission)
           [permission :xt/id "https://example.org/permissions/public-resources-to-all"] ; <2>
           ]]})
-       ;; end::create-action-get-public-resource![]
+     ;; end::create-action-get-public-resource![]
      ))))
 
 (defn grant-permission-to-invoke-get-public-resource! [_]
@@ -193,7 +193,7 @@
       {:xt/id "https://example.org/hello"
        :juxt.http.alpha/content-type "text/plain"
        :juxt.http.alpha/content "Hello World!\r\n"})
-       ;; end::create-hello-world-resource![]
+     ;; end::create-hello-world-resource![]
      ))))
 
 ;; Representations
@@ -445,7 +445,7 @@
        :juxt.pass.alpha/auth-scheme "Basic"
        :juxt.pass.alpha/authentication-scope "/protected-by-basic-auth/.*" ; regex pattern
        })
-       ;; end::put-basic-protection-space![]
+     ;; end::put-basic-protection-space![]
      ))))
 
 (defn create-basic-user-identity! [& {:juxt.pass.alpha/keys [username password realm]}]
@@ -481,7 +481,7 @@
        :juxt.http.alpha/content-type "text/html;charset=utf-8"
        :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"
        })
-       ;; end::create-resource-protected-by-bearer-auth![]
+     ;; end::create-resource-protected-by-bearer-auth![]
      ))))
 
 (defn grant-permission-to-resource-protected-by-bearer-auth! [_]
@@ -498,7 +498,7 @@
        :juxt.site.alpha/uri "https://example.org/protected-by-bearer-auth/document.html"
        :juxt.pass.alpha/purpose nil
        })
-       ;; end::grant-permission-to-resource-protected-by-bearer-auth![]
+     ;; end::grant-permission-to-resource-protected-by-bearer-auth![]
      ))))
 
 (defn put-bearer-protection-space! [_]
@@ -807,9 +807,9 @@ Password: <input name=password type=password>
                    (f/of :scope) :juxt.pass.alpha/scope f/rot f/set-at
                    (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes access-token-length)) :juxt.pass.alpha/token]))
                    ;; :xt/id (as a function of :juxt.pass.alpha/token)
-                   (f/set-at (f/keep [(f/of :juxt.pass.alpha/token) (f/env ::site/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
-                   ;; ::site/type
-                   (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" ::site/type]))
+                   (f/set-at (f/keep [(f/of :juxt.pass.alpha/token) (f/env :juxt.site.alpha/base-uri) "/access-tokens/" f/swap f/str f/str :xt/id]))
+                   ;; :juxt.site.alpha/type
+                   (f/set-at (f/dip ["https://meta.juxt.site/pass/access-token" :juxt.site.alpha/type]))
                    ;; TODO: Add scope
                    ;; key in map
                    :access-token]))])
@@ -956,51 +956,51 @@ Password: <input name=password type=password>
 ;; APIs
 
 #_(defn create-action-install-api-resource! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/install-api-resource"
+    (eval
+     (substitute-actual-base-uri
+      (quote
+       (juxt.site.alpha.init/do-action
+        "https://example.org/subjects/system"
+        "https://example.org/actions/create-action"
+        {:xt/id "https://example.org/actions/install-api-resource"
 
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [juxt.site.alpha/request-body-as-edn
+         :juxt.site.alpha/transact
+         {:juxt.flip.alpha/quotation
+          `(
+            (site/with-fx-acc
+              [(site/push-fx
+                (f/dip
+                 [juxt.site.alpha/request-body-as-edn
 
-                (site/validate
-                 [:map
-                  [:xt/id [:re "https://example.org/(.+)"]]])
+                  (site/validate
+                   [:map
+                    [:xt/id [:re "https://example.org/(.+)"]]])
 
-                xtdb.api/put
-                ]))]))}
+                  xtdb.api/put
+                  ]))]))}
 
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
+         :juxt.pass.alpha/rules
+         '[
+           [(allowed? subject resource permission)
+            [permission :juxt.pass.alpha/subject subject]]
 
-         [(allowed? subject resource permission) ; <3>
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :role role]
-          [user :role role]]]})))))
+           [(allowed? subject resource permission) ; <3>
+            [subject :juxt.pass.alpha/user-identity id]
+            [id :juxt.pass.alpha/user user]
+            [permission :role role]
+            [user :role role]]]})))))
 
 #_(defn grant-permission-to-install-api-resource! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/system/install-api-resource"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/install-api-resource"
-       :juxt.pass.alpha/purpose nil})))))
+    (eval
+     (substitute-actual-base-uri
+      (quote
+       (juxt.site.alpha.init/do-action
+        "https://example.org/subjects/system"
+        "https://example.org/actions/grant-permission"
+        {:xt/id "https://example.org/permissions/system/install-api-resource"
+         :juxt.pass.alpha/subject "https://example.org/subjects/system"
+         :juxt.pass.alpha/action "https://example.org/actions/install-api-resource"
+         :juxt.pass.alpha/purpose nil})))))
 
 ;; GraphQL
 
@@ -1036,14 +1036,14 @@ Password: <input name=password type=password>
                 :input]))])
 
           (f/define extract-permissions
-            [(f/set-at (f/dip [(f/env ::pass/permissions) :permissions]))])
+            [(f/set-at (f/dip [(f/env :juxt.pass.alpha/permissions) :permissions]))])
 
           (f/define determine-if-match-resource-pattern
             ;; We check that the permission resource matches the xt/id
             [(f/set-at
               (f/keep
                [f/dup (f/of :input) (f/of :xt/id) f/swap (f/of :permissions)
-                (f/any? [(f/of ::site/resource-pattern) f/<regex> f/matches?])
+                (f/any? [(f/of :juxt.site.alpha/resource-pattern) f/<regex> f/matches?])
                 f/nip :matches?]))])
 
           (f/define throw-if-not-match
@@ -1158,7 +1158,7 @@ Password: <input name=password type=password>
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      ;; TODO: We need a specialist grant-permission for this because we want to documnent/validate the ::site/resource-pattern
+      ;; TODO: We need a specialist grant-permission for this because we want to documnent/validate the :juxt.site.alpha/resource-pattern
       {:xt/id "https://example.org/permissions/alice/install-graphql-endpoint"
        :juxt.pass.alpha/user "https://example.org/users/alice"
        :juxt.pass.alpha/action "https://example.org/actions/install-graphql-endpoint"
@@ -1199,10 +1199,10 @@ Password: <input name=password type=password>
 
           (f/define ^{:f/stack-effect '[ctx key -- ctx]} update-base-resource
             [(f/dip
-              [(f/env ::site/resource)
-               (f/set-at (f/dip [f/dup (f/of :input) ::http/content]))
-               (f/set-at (f/dip ["application/graphql" ::http/content-type]))
-               (f/set-at (f/dip [f/dup (f/of :compiled-schema) ::site/graphql-compiled-schema]))])
+              [(f/env :juxt.site.alpha/resource)
+               (f/set-at (f/dip [f/dup (f/of :input) :juxt.http.alpha/content]))
+               (f/set-at (f/dip ["application/graphql" :juxt.http.alpha/content-type]))
+               (f/set-at (f/dip [f/dup (f/of :compiled-schema) :juxt.site.alpha/graphql-compiled-schema]))])
              f/rot
              f/set-at])
 
@@ -1210,10 +1210,10 @@ Password: <input name=password type=password>
             [(f/dip
               ;; Perhaps could we use a template with eval-embedded-quotations?
               [{}
-               (f/set-at (f/dip ["application/edn" ::http/content-type]))
-               (f/set-at (f/dip [(f/env ::site/resource) (f/of :xt/id) ".edn" f/swap f/str :xt/id]))
-               (f/set-at (f/dip [(f/env ::site/resource) (f/of :xt/id) ::site/variant-of]))
-               (f/set-at (f/dip [f/dup (f/of :compiled-schema) f/pr-str ::http/content]))])
+               (f/set-at (f/dip ["application/edn" :juxt.http.alpha/content-type]))
+               (f/set-at (f/dip [(f/env :juxt.site.alpha/resource) (f/of :xt/id) ".edn" f/swap f/str :xt/id]))
+               (f/set-at (f/dip [(f/env :juxt.site.alpha/resource) (f/of :xt/id) :juxt.site.alpha/variant-of]))
+               (f/set-at (f/dip [f/dup (f/of :compiled-schema) f/pr-str :juxt.http.alpha/content]))])
              f/rot
              f/set-at])
 
@@ -1223,11 +1223,11 @@ Password: <input name=password type=password>
                f/dupd
                f/of
                (f/unless* [(f/throw-exception (f/ex-info "No object to push as an fx" {}))]))
-              ::site/fx
+              :juxt.site.alpha/fx
               f/rot)])
 
           (f/define ^{:f/stack-effect '[ctx -- ctx]} determine-status
-            [(f/of (f/env ::site/resource) ::http/content)
+            [(f/of (f/env :juxt.site.alpha/resource) :juxt.http.alpha/content)
              [200 :status f/rot f/set-at]
              [201 :status f/rot f/set-at]
              f/if])
@@ -1269,7 +1269,7 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       ;; TODO: We need a specialist grant-permission for this because we want to
-      ;; documnent/validate the ::site/resource
+      ;; documnent/validate the :juxt.site.alpha/resource
       {:xt/id "https://example.org/permissions/alice/put-graphql-schema"
        :juxt.pass.alpha/user "https://example.org/users/alice"
        :juxt.pass.alpha/action "https://example.org/actions/put-graphql-schema"
@@ -1284,7 +1284,7 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       ;; TODO: We need a specialist grant-permission for this because we want to
-      ;; documnent/validate the ::site/resource
+      ;; documnent/validate the :juxt.site.alpha/resource
       {:xt/id "https://example.org/permissions/alice/get-graphql-schema"
        :juxt.pass.alpha/user "https://example.org/users/alice"
        :juxt.pass.alpha/action "https://example.org/actions/get-graphql-schema"
@@ -1302,13 +1302,13 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/scope "https://example.org/oauth/scope/graphql/develop"
        #_:juxt.site.alpha/transact
        #_{:juxt.site.alpha.sci/program
-        (pr-str
-         '(do
-            ;; Note: This logic has only been added here as a workaround.
-            ;; The problem is we need the OAuth2 login handler not to trigger a 404
-            (if-let [selected-representation (:juxt.site.alpha/selected-representation *ctx*)]
-              [[:continue]]
-              [[:ring.response/status 404]])))}
+          (pr-str
+           '(do
+              ;; Note: This logic has only been added here as a workaround.
+              ;; The problem is we need the OAuth2 login handler not to trigger a 404
+              (if-let [selected-representation (:juxt.site.alpha/selected-representation *ctx*)]
+                [[:continue]]
+                [[:ring.response/status 404]])))}
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
@@ -1414,9 +1414,9 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id (format "https://example.org/permissions/%s-can-authorize" ~(str/lower-case username))
-       ::pass/action "https://example.org/actions/oauth/authorize"
-       ::pass/user (format "https://example.org/users/%s" ~(str/lower-case username))
-       ::pass/purpose nil}))))
+       :juxt.pass.alpha/action "https://example.org/actions/oauth/authorize"
+       :juxt.pass.alpha/user (format "https://example.org/users/%s" ~(str/lower-case username))
+       :juxt.pass.alpha/purpose nil}))))
 
 (defn create-bearer-protection-space [_]
   (eval
@@ -1453,13 +1453,13 @@ Password: <input name=password type=password>
   (eval
    (substitute-actual-base-uri
     `(init/do-action
-     "https://example.org/subjects/system"
-     "https://example.org/actions/put-session-scope"
-     {:xt/id "https://example.org/session-scopes/oauth"
-      :juxt.pass.alpha/cookie-name "id"
-      :juxt.pass.alpha/cookie-domain "https://example.org"
-      :juxt.pass.alpha/cookie-path "/oauth"
-      :juxt.pass.alpha/login-uri "https://example.org/login"}))))
+      "https://example.org/subjects/system"
+      "https://example.org/actions/put-session-scope"
+      {:xt/id "https://example.org/session-scopes/oauth"
+       :juxt.pass.alpha/cookie-name "id"
+       :juxt.pass.alpha/cookie-domain "https://example.org"
+       :juxt.pass.alpha/cookie-path "/oauth"
+       :juxt.pass.alpha/login-uri "https://example.org/login"}))))
 
 (defn with-body [req body-bytes]
   (if body-bytes
@@ -1513,7 +1513,7 @@ Password: <input name=password type=password>
                       {"response_type" "token"
                        "client_id" client-id
                        "state" state}
-                      scope (assoc "scope" (codec/url-encode (str/join " " scope)))))}]
+                    scope (assoc "scope" (codec/url-encode (str/join " " scope)))))}]
     (*handler* request)))
 
 (defn authorize!
@@ -1693,13 +1693,13 @@ Password: <input name=password type=password>
    {:create (fn [{:keys [params]}]
               (let [username (get params "username")]
                 (create-basic-user-identity!
-                 {::pass/username username
-                  ::pass/password (case username
-                                    "alice" "garden"
-                                    "bob" "walrus"
-                                    "carlos" "toothpick")
-                  ::pass/realm "Wonderland"})))
-    :deps (fn [{:strs [username]} {::site/keys [base-uri]}]
+                 {:juxt.pass.alpha/username username
+                  :juxt.pass.alpha/password (case username
+                                              "alice" "garden"
+                                              "bob" "walrus"
+                                              "carlos" "toothpick")
+                  :juxt.pass.alpha/realm "Wonderland"})))
+    :deps (fn [{:strs [username]} {:juxt.site.alpha/keys [base-uri]}]
             #{::init/system
               (format "%s/actions/put-basic-user-identity" base-uri)
               (format "%s/permissions/system/put-basic-user-identity" base-uri)
@@ -1764,7 +1764,7 @@ Password: <input name=password type=password>
    "https://example.org/permissions/{username}-can-authorize"
    {:create (fn [{:keys [params]}]
               (grant-permission-to-authorize! :username (get params "username")))
-    :deps (fn [{:strs [username]} {::site/keys [base-uri]}]
+    :deps (fn [{:strs [username]} {:juxt.site.alpha/keys [base-uri]}]
             #{::init/system
               (format "%s/actions/oauth/authorize" base-uri)
               (format "%s/users/%s" base-uri username)})}
