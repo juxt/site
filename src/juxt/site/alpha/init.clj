@@ -56,13 +56,10 @@
          ::site/db (xt/db xt-node)
          ::pass/subject subject
          ::pass/action action
-         ::pass/action-input edn-arg
          ::site/base-uri (base-uri)}
       edn-arg (merge {::site/received-representation
                       {::http/content-type "application/edn"
                        ::http/body (.getBytes (pr-str edn-arg))}}))))
-
-(re-seq #"example.org" "https://example.org/o")
 
 (defn do-action
   ([subject-id action-id]
@@ -70,9 +67,6 @@
   ([subject-id action-id edn-arg]
 
    (assert (or (nil? subject-id) (string? subject-id)) "Subject must a string or nil")
-
-   (when (re-seq #"example.org" action-id)
-     (throw (ex-info "Oh no, an example.org got through!" {:action action-id})))
 
    (let [xt-node (xt-node)
          db (xt/db xt-node)
@@ -323,7 +317,7 @@
   (or
    (when-let [v (get g id)] (assoc v :id id))
    (some (fn [[k v]]
-           ;;(when-not (string? id) (throw (ex-info "DEBUG" {:id id})))
+;;           (when-not (string? id) (throw (ex-info "DEBUG" {:id id})))
            (when-let [matches (re-matches (to-regex k) id)]
              (assoc v
                     :id id

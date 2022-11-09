@@ -81,9 +81,15 @@
 
      (:children ast))))
 
-(defn compile-ast "This function compiles an annotated EQL query to an XTDB/Core1 query"
+(defn compile-ast
+  "This function compiles an annotated EQL query to an XTDB/Core1 query"
   [db ast]
-  (map (fn [child] (compile-ast* db {:depth 0} child)) (:children ast)))
+  (map
+   (fn [child]
+     (compile-ast* db {:depth 0} child))
+   (:children ast)))
 
 (defn prune-result [result]
-  (postwalk (fn [x] (if (:root x) (merge (:root x) (:joins x)) x)) result))
+  (postwalk
+   (fn [x] (if (:root x) (merge (:root x) (:joins x)) x))
+   result))

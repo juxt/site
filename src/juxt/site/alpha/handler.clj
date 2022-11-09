@@ -6,36 +6,39 @@
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [xtdb.api :as xt]
    [crypto.password.bcrypt :as password]
+   [jsonista.core :as json]
+   [juxt.apex.alpha :as-alias apex]
    [juxt.apex.alpha.openapi :as openapi]
    [juxt.dave.alpha :as dave]
    [juxt.dave.alpha.methods :as dave.methods]
+   [juxt.flip.alpha :as-alias flip]
+   [juxt.flip.alpha.core :as f]
+   [juxt.http.alpha :as-alias http]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
-   [juxt.pass.alpha.http-authentication :as http-authn]
+   [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.actions :as actions]
+   [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.pass.alpha.session-scope :as session-scope]
    [juxt.pick.alpha.core :refer [rate-representation]]
    [juxt.pick.alpha.ring :refer [decode-maybe]]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
    [juxt.reap.alpha.regex :as re]
+   [juxt.reap.alpha.rfc7230 :as-alias rfc7230]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
+   [juxt.site.alpha :as-alias site]
    [juxt.site.alpha.cache :as cache]
    [juxt.site.alpha.conditional :as conditional]
    [juxt.site.alpha.content-negotiation :as conneg]
    [juxt.site.alpha.locator :as locator]
-   [juxt.site.alpha.util :as util]
    [juxt.site.alpha.response :as response]
-   [juxt.site.alpha.triggers :as triggers]
    [juxt.site.alpha.rules :as rules]
-   [juxt.apex.alpha :as-alias apex]
-   [juxt.http.alpha :as-alias http]
-   [juxt.pass.alpha :as-alias pass]
-   [juxt.site.alpha :as-alias site]
-   [juxt.flip.alpha :as-alias flip]
-   [juxt.flip.alpha.core :as f]
-   [juxt.reap.alpha.rfc7230 :as-alias rfc7230])
+   [juxt.site.alpha.triggers :as triggers]
+   [juxt.site.alpha.util :as util]
+   [sci.core :as sci]
+   [xtdb.api :as xt]
+   )
   (:import (java.net URI)))
 
 (defn join-keywords
@@ -53,6 +56,8 @@
   "Check and load the representation enclosed in the request message payload."
   [{::site/keys [resource start-date] :ring.request/keys [method] :as req}]
 
+  (log/tracef "Receiving representation, for resource %s" (:xt/id resource))
+
   (let [content-length
         (try
           (some->
@@ -65,6 +70,8 @@
               {:ring.response/status 400
                ::site/request-context req}
               e))))]
+
+    (log/tracef "Content length is %s" content-length)
 
     (when (nil? content-length)
       (throw
@@ -191,6 +198,9 @@
       (with-open [in (:ring.request/body req)]
         (let [body (.readNBytes in content-length)
               content-type (:juxt.reap.alpha.rfc7231/content-type decoded-representation)]
+
+          (log/tracef "body is %s" (String. body))
+
           (assoc
            req
            ::site/received-representation
@@ -220,13 +230,14 @@
   (let [req (assoc req :ring.response/status 200)
         ;; This use of 'first' is worrisome. Perhaps we should be merging the
         ;; results of every permitted action? TODO: resolve this
-        permitted-action (::pass/action (first (::pass/permitted-actions req)))
-        quotation (get-in selected-representation [::site/methods method ::flip/quotation])]
+        permitted-action (::pass/action (first (::pass/permitted-actions req)))]
 
     (cond
-      quotation
+
+      ;; DEPRECATED: Flip is legacy and being replaced with SCI
+      (get-in selected-representation [::site/methods method ::flip/quotation])
       (let [env (-> req
-                    ;; Security hack: We want to guarentee that 'safe' methods are
+                    ;; Security hack: We want to guarantee that 'safe' methods are
                     ;; safe. They can be made safe if we ensure they cannot write
                     ;; to the database. Therefore, we remove the ::site/xt-node.
 
@@ -238,45 +249,14 @@
             ;; :ring.response/body (bytes) or ::site/content (content)
             (f/eval-quotation
              []
-             quotation
+             (get-in selected-representation [::site/methods method ::flip/quotation])
              env
              )]
 
-        (assoc req :ring.response/body (first stack))
-        #_(throw (ex-info "TODO" {:selected-representation selected-representation
-                                :quotation quotation
-                                :result stack
-                                ;;:env env
-                                })))
-      #_(::site/query permitted-action)
-      #_(assoc
-         req
-         :ring.response/body
-         ;; We now have a map, but where should the responsibility lie to convert
-         ;; the data to the content-type of the current (negotiated)
-         ;; representation? This feels like it should be the responsibility of
-         ;; the quotation, since that is the most flexible and otherwise we will
-         ;; require a slew of additional data conventions.
-         (let [quotation (-> permitted-action ::site/query :juxt.flip.alpha/quotation)]
-           (cond
-             quotation
-             (try
-               (first (f/eval-quotation '[] quotation req))
-               (catch Exception cause
-                 (throw
-                  (ex-info
-                   "Failure running query quotation"
-                   {::site/request-context req}
-                   cause))))
-             :else
-             (throw
-              (ex-info
-               "Query must (currently) have a :juxt.flip.alpha/quotation entry"
-               {:query (::site/query permitted-action)
-                ::site/request-context req})))))
+        (assoc req :ring.response/body (first stack)))
 
-      ;; It's rare but sometimes a GET will evaluate a quotation. For example, the
-      ;; Authorization Request (RFC 6749 Section 4.2.1).
+      ;; It's rare but sometimes a GET will involve a transaction. For example,
+      ;; the Authorization Request (RFC 6749 Section 4.2.1).
       (and permitted-action (-> permitted-action ::site/transact))
       (actions/do-action
        (cond-> req
@@ -285,6 +265,60 @@
          ;; "invalid tx-op: Unfreezable type: class
          ;; java.io.BufferedInputStream".
          (:ring.request/body req) (dissoc :ring.request/body)))
+
+      (-> selected-representation :juxt.http.alpha/respond :juxt.site.alpha.sci/program)
+      (let [state
+            (when-let [program (-> permitted-action :juxt.site.alpha/state :juxt.site.alpha.sci/program)]
+              (sci/eval-string
+               program
+               {:namespaces
+                (merge
+                 {'user {'*action* permitted-action
+                         '*resource* (:juxt.site.alpha/resource req)
+                         '*ctx* (dissoc req ::site/xt-node)
+                         'logf (fn [& args] (eval `(log/tracef ~@args)))
+                         'log (fn [& args] (eval `(log/trace ~@args)))}
+                  'xt
+                  {'entity
+                   (fn [id] (xt/entity (:juxt.site.alpha/db req) id))
+                   'pull
+                   (fn [query eid]
+                     (xt/pull (:juxt.site.alpha/db req) query eid))
+                   }})
+
+                :classes
+                {'java.util.Date java.util.Date
+                 'java.time.Instant java.time.Instant
+                 'java.time.Duration java.time.Duration}}))
+
+            respond-program (-> selected-representation :juxt.http.alpha/respond :juxt.site.alpha.sci/program)
+
+            response
+            (sci/eval-string
+             respond-program
+             {:namespaces
+              (merge
+               {'user (cond->
+                          {'*action* permitted-action
+                           '*resource* (:juxt.site.alpha/resource req)
+                           '*ctx* (dissoc req ::site/xt-node)
+                           'logf (fn [& args] (eval `(log/tracef ~@args)))
+                           'log (fn [& args] (eval `(log/trace ~@args)))}
+                          state (assoc '*state* state))
+
+                'jsonista.core
+                {'write-value-as-string json/write-value-as-string
+                 'read-value json/read-value}
+
+                'xt
+                { ;; Unsafe due to violation of strict serializability, hence marked as
+                 ;; entity*
+                 'entity*
+                 (fn [id] (xt/entity (:juxt.site.alpha/db req) id))}})})
+
+            _ (assert (::site/start-date response)"Rerpresentation response script must return a request context")]
+
+        response)
 
       :else
       (response/add-payload req))))
@@ -1109,27 +1143,38 @@
   [h {::site/keys [xt-node base-uri uri-prefix] :as opts}]
   (assert xt-node)
   (assert base-uri)
-  (fn [{:ring.request/keys [scheme] :as req}]
+  (fn [{:ring.request/keys [scheme path]
+        ::site/keys [uri] :as req}]
+
+    (assert (not (and uri path)))
+
     (let [db (xt/db xt-node)
           req-id (new-request-id base-uri)
-          scheme+authority
-          (or uri-prefix
-              (->
-               (let [{::rfc7230/keys [host]}
-                     (host-header-parser
-                      (re/input
-                       (or
-                        (get-in req [:ring.request/headers "x-forwarded-host"])
-                        (get-in req [:ring.request/headers "host"]))))]
-                 (str (or (get-in req [:ring.request/headers "x-forwarded-proto"])
-                          (name scheme))
-                      "://" host))
-               (str/lower-case)         ; See Section 6.2.2.1 of RFC 3986
-               (http-scheme-normalize scheme)))
 
-          ;; The scheme+authority is already normalized (by transforming to
-          ;; lower-case). The path, however, needs to be normalized here.
-          uri (str scheme+authority (normalize-path (:ring.request/path req)))
+          ;; TODO: Infer path if necessary: uri = base-uri + path
+
+          uri (or uri
+                  (let [host (or
+                              (get-in req [:ring.request/headers "x-forwarded-host"])
+                              (get-in req [:ring.request/headers "host"]))
+                        scheme+authority
+                        (or uri-prefix
+                            (when host
+                              (->
+                               (let [{::rfc7230/keys [host]}
+                                     (host-header-parser
+                                      (re/input
+                                       host))]
+                                 (str (or (get-in req [:ring.request/headers "x-forwarded-proto"])
+                                          (name scheme))
+                                      "://" host))
+                               (str/lower-case) ; See Section 6.2.2.1 of RFC 3986
+                               (http-scheme-normalize scheme)))
+                            base-uri)]
+
+                    ;; The scheme+authority is already normalized (by transforming to
+                    ;; lower-case). The path, however, needs to be normalized here.
+                    (str scheme+authority (normalize-path (:ring.request/path req)))))
 
           req (into req (merge
                          {::site/start-date (java.util.Date.)

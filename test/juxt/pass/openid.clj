@@ -551,6 +551,7 @@
                 (when user-identity
                   (into
                    {:xt/id (str "https://example.org/subjects/" subject-id)
+                    :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"
                     :juxt.pass.alpha/id-token-claims (:claims id-token)
                     :juxt.pass.alpha/user-identity user-identity
                     :juxt.pass.alpha/issued-date issued-date

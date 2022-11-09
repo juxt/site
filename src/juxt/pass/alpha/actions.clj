@@ -3,6 +3,7 @@
 (ns juxt.pass.alpha.actions
   (:require
    [clojure.tools.logging :as log]
+   [crypto.password.bcrypt :as bcrypt]
    [juxt.pass.alpha.openid-connect :as openid-connect]
    [java-http-clj.core :as hc]
    [sci.core :as sci]
@@ -295,7 +296,7 @@
              (group-by :xt/id))]
     (map #(update % join-key (comp first idx)) coll)))
 
-(defn common-sci-namespaces [action-doc action-input]
+(defn common-sci-namespaces [action-doc]
   {
    'com.auth0.jwt.JWT
    {'decode (fn [x] (com.auth0.jwt.JWT/decode x))}
@@ -310,30 +311,26 @@
     'read-value json/read-value}
 
    'juxt.pass
-   {'decode-id-token juxt.pass.alpha.openid-connect/decode-id-token
-    }
+   {'decode-id-token juxt.pass.alpha.openid-connect/decode-id-token}
 
    'juxt.site.malli
    {'validate (fn [schema value] (malli/validate schema value))
     'explain (fn [schema value] (malli/explain schema value))
     'validate-input
-    (fn []
+    (fn [input]
       (let [schema (get-in action-doc [:juxt.site.alpha.malli/input-schema])
-            valid? (malli/validate schema action-input)]
+            valid? (malli/validate schema input)]
         (when-not valid?
           (throw
            (ex-info
             "Validation failed"
             {:error :validation-failed
-             :input action-input
-             :schema schema
-;;             :explain (malli/explain schema action-input)
-             })))))}
+             :input input
+             :schema schema})))
+        input))}
 
    'ring.util.codec {'form-encode codec/form-encode
-                     'form-decode codec/form-decode}
-
-   })
+                     'form-decode codec/form-decode}})
 
 (defn do-action-in-tx-fn
   "This function is applied within a transaction function. It should be fast, but
@@ -341,7 +338,6 @@
   [xt-ctx
    {subject ::pass/subject
     action ::pass/action
-    action-input ::pass/action-input
     access-token ::pass/access-token
     resource ::site/resource
     purpose ::pass/purpose
@@ -402,8 +398,7 @@
                     (merge-with
                      merge
                      {'user
-                      {'*input* action-input
-                       '*action* action-doc
+                      {'*action* action-doc
                        '*resource* resource
                        '*prepare* prepare
                        '*ctx* ctx}
@@ -417,9 +412,23 @@
                          (ffirst
                           (xt/q db {:find ['id]
                                     :where (into
-                                            [['id :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"]]                                         (for [[k v] m] ['id k v] ))})))}
-                      }
-                     (common-sci-namespaces action-doc action-input))
+                                            [['id :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"]]
+                                            (for [[k v] m] ['id k v] ))})))
+
+                       'match-identity-with-password
+                       (fn [m password password-hash-key]
+                         (ffirst
+                          (xt/q db {:find ['id]
+                                    :where (into
+                                            [['id :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"]
+                                             ['id password-hash-key 'password-hash]
+                                             ['(crypto.password.bcrypt/check password password-hash)]
+                                             ]
+                                            (for [[k v] m] ['id k v]))
+                                    :in ['password]} password)))}}
+
+                     (common-sci-namespaces action-doc))
+
                     :classes
                     {'java.util.Date java.util.Date
                      'java.time.Instant java.time.Instant}
@@ -581,21 +590,21 @@
      (case op
        :ring.response/status (assoc ctx :ring.response/status (first args))
        :ring.response/headers (update ctx :ring.response/headers (fnil {} into) (first args))
+       :ring.response/body (assoc ctx :ring.response/body (first args))
        (throw
         (ex-info
          (format "Op not recognized: %s" op)
          {:op op :args args}))))
    ctx fx))
 
-(defn do-prepare [{::site/keys [db resource] :as ctx} action-doc action-input]
+(defn do-prepare [{::site/keys [db resource] :as ctx} action-doc]
   (when-let [prepare-program (some-> action-doc :juxt.site.alpha/prepare :juxt.site.alpha.sci/program)]
     (try
       (sci/eval-string
        prepare-program
        {:namespaces
         (merge
-         {'user {'*input* action-input
-                 '*action* action-doc
+         {'user {'*action* action-doc
                  '*resource* resource
                  '*ctx* (sanitize-ctx ctx)
                  'logf (fn [& args] (eval `(log/tracef ~@args)))
@@ -608,7 +617,7 @@
            (fn [id] (xt/entity db id))}
 
           'juxt.pass.util {'make-nonce make-nonce}}
-         (common-sci-namespaces action-doc action-input))
+         (common-sci-namespaces action-doc))
         :classes
         {'java.util.Date java.util.Date
          'java.time.Instant java.time.Instant
@@ -619,7 +628,7 @@
 (defn do-action
   [{::site/keys [xt-node db base-uri resource]
     ;; TODO: Arguably action should passed as a map
-    ::pass/keys [subject action action-input]
+    ::pass/keys [subject action]
     :as ctx}]
   (assert (::site/xt-node ctx) "xt-node must be present")
   (assert (::site/db ctx) "db must be present")
@@ -663,26 +672,12 @@
   ;; fails. However, it is a good place to compute any secure random numbers
   ;; which can't be done in the transaction.
 
-
-  ;; This should be in the tx-fn but getting this malli exception: No
-  ;; implementation of method: :-form of protocol: #'malli.core/Schema found for
-  ;; class: clojure.lang.PersistentVector
-  #_(let [action (xt/entity db action)]
-      (when-let [input-schema (-> action ::site/transact :juxt.site.alpha.malli/input-schema)]
-        (when-not (malli/validate input-schema action-input)
-          (throw
-           (ex-info
-            "Input to action is not valid"
-            {:action (:xt/id action)
-             :explain (malli/explain input-schema action-input)})))))
-
-
   ;; The :juxt.pass.alpha/subject can be nil, if this action is being performed
   ;; by an anonymous user.
   (let [action-doc (xt/entity db action)
         _ (when-not action-doc
             (throw (ex-info (format "Action not found in the database: %s" action) {:action action})))
-        prepare (do-prepare ctx action-doc action-input)
+        prepare (do-prepare ctx action-doc)
         tx-fn (str base-uri "/_site/do-action")
         _ (assert (xt/entity db tx-fn) (format "do-action must exist in database: %s" tx-fn))
         tx-ctx (cond-> (sanitize-ctx ctx) prepare (assoc ::pass/prepare prepare))
@@ -841,53 +836,3 @@
     ;;:deny '[+]
     }
    ))
-
-
-#_(sci/eval-string (pr-str '(java.util.Date/from (.plusSeconds (java.time.Instant/now) 10)))
-                 {:classes {'java.util.Date java.util.Date
-                            'java.time.Instant java.time.Instant}})
-
-
-
-#_(let [action-input :action-input
-      action-doc :action-doc
-      resource {}
-      prepare {}
-      ctx {}
-      db nil]
-  {:namespaces
-   (merge-with
-    merge
-    {'user
-     {'*input* action-input
-      '*action* action-doc
-      '*resource* resource
-      '*prepare* prepare
-      '*ctx* ctx}
-     ;; Allowed to access the database
-     'xt
-     {'entity (fn [id] (xt/entity db id))}
-
-     'juxt.pass
-     {'match-identity
-      (fn [m]
-        (ffirst
-         (xt/q db {:find ['id]
-                   :where (into
-                           [['id :juxt.site.alpha/type "https://meta.juxt.site/pass/user-identity"]]                                         (for [[k v] m] ['id k v] ))})))}
-     }
-    (common-sci-namespaces action-doc action-input))
-   :classes
-   {'java.util.Date java.util.Date
-    'java.time.Instant java.time.Instant}
-
-   ;; We can't allow random numbers to be computed as they
-   ;; won't be the same on each node. If this is a problem, we
-   ;; can replace with a (non-secure) PRNG seeded from the
-   ;; tx-instant of the tx. Note that secure random numbers
-   ;; should not be generated this way anyway, since then it
-   ;; would then be possible to mount an attack based on
-   ;; knowledge of the current time. Instead, secure random
-   ;; numbers should be generated in the action's 'prepare'
-   ;; step.
-   :deny `[loop recur rand rand-int]})

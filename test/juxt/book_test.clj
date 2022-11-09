@@ -12,6 +12,7 @@
    [juxt.pass.alpha.session-scope :refer [infer-session-scope]]
    [juxt.pass.session-scope :as session-scope]
    [juxt.pass.user :as user]
+   [juxt.pass.form-based-auth :as form-based-auth]
    [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.site.alpha :as-alias site]
    [juxt.site.bootstrap :as bootstrap]
@@ -24,6 +25,7 @@
    [xtdb.api :as xt])
   (:import (clojure.lang ExceptionInfo)))
 
+;; TODO: This should just be a 'conversational' API on request - e.g. (assoc-body request body)
 (defn finalize-request [request]
   (book/with-body request (::body-bytes request)))
 
@@ -76,12 +78,13 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/actions/put-user-owned-content"
       "https://site.test/permissions/alice/put-user-owned-content"
 
       "https://site.test/oauth/authorize"
-      "https://site.test/session-scopes/oauth"
+      "https://site.test/session-scopes/default"
       "https://site.test/login"
       "https://site.test/user-identities/alice/basic"
       "https://site.test/permissions/alice-can-authorize"
@@ -105,7 +108,7 @@
                  :ring.request/path "/~bob/index.html"}]
         (is (= 404 (:ring.response/status (*handler* req))))))
 
-    (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+    (let [session-id (book/login-with-form! "username" "alice" "password" "garden")
           _ (is session-id)
 
           {access-token "access_token"
@@ -223,7 +226,7 @@
       #{session-scope/dependency-graph
         book/dependency-graph}}
     #{"https://site.test/protected-by-session-scope/document.html"
-      "https://site.test/session-scopes/example"}
+      "https://site.test/session-scopes/default"}
 
     (let [uri (:juxt.pass.alpha/login-uri (infer-session-scope (xt/db *xt-node*) "https://site.test/protected-by-session-scope/document.html"))]
       (is (string? uri)))
@@ -241,23 +244,22 @@
   (with-resources
     ^{:dependency-graphs
       #{book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        session-scope/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/login"
+      "https://site.test/session-scopes/default"
       "https://site.test/user-identities/alice/basic"}
 
-    (is (book/login-with-form! {"username" "alice" "password" "garden"}))
-    (is (book/login-with-form! {"username" "ALICE" "password" "garden"}))
-    (is (book/login-with-form! {"username" "ALiCe" "password" "garden"}))
+    (is (book/login-with-form! "username" "alice" "password" "garden"))
+    (is (book/login-with-form! "username" "ALICE" "password" "garden"))
+    (is (book/login-with-form! "username" "ALiCe" "password" "garden"))
     (is (thrown-with-msg?
-         clojure.lang.ExceptionInfo #"Login failed"
-         (book/login-with-form! {"username" "ALICE" "password" "badpassword"})))
+           clojure.lang.ExceptionInfo #"Login failed"
+           (book/login-with-form! "username" "ALICE" "password" "badpassword")))
     (is (thrown-with-msg?
-         clojure.lang.ExceptionInfo #"Login failed"
-         (book/login-with-form! {"username" "bob" "password" "garden"})))
-    (try
-      (book/login-with-form! {"username" "bob" "password" "walrus"})
-      (catch clojure.lang.ExceptionInfo e
-        (is (= 400 (-> e ex-data :response :ring.response/status)))))))
+           clojure.lang.ExceptionInfo #"Login failed"
+           (book/login-with-form! "username" "bob" "password" "garden")))))
 
 (deftest authorization-server-anonymous-access-forbidden
   (with-resources
@@ -276,7 +278,7 @@
       #{session-scope/dependency-graph
         book/dependency-graph}}
     #{"https://site.test/oauth/authorize"
-      "https://site.test/session-scopes/oauth"}
+      "https://site.test/session-scopes/default"}
 
     (testing "Anonymous access to authorization server redirects to login"
       (let [response (*handler*
@@ -292,13 +294,14 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
-      "https://site.test/session-scopes/oauth"
+      "https://site.test/session-scopes/default"
       "https://site.test/login"
       "https://site.test/user-identities/alice/basic"}
 
-    (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})]
+    (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")]
       (is session-id)
       (is
        (thrown-with-msg?
@@ -310,14 +313,15 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
-      "https://site.test/session-scopes/oauth"
+      "https://site.test/session-scopes/default"
       "https://site.test/login"
       "https://site.test/user-identities/alice/basic"
       "https://site.test/permissions/alice-can-authorize"}
 
-    (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})]
+    (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")]
       (is session-id)
 
       (let [state (make-nonce 10)
@@ -339,9 +343,10 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
-      "https://site.test/session-scopes/oauth"
+      "https://site.test/session-scopes/default"
       "https://site.test/login"
       "https://site.test/user-identities/alice/basic"
       "https://site.test/permissions/alice-can-authorize"
@@ -349,7 +354,7 @@
       "https://site.test/oauth/scope/graphql/administer"
       "https://site.test/oauth/scope/graphql/develop"}
 
-    (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})]
+    (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")]
 
       (testing "valid scope"
         (let [{access-token "access_token"
@@ -387,15 +392,16 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
-      "https://site.test/session-scopes/oauth"
+      "https://site.test/session-scopes/default"
       "https://site.test/login"
       "https://site.test/user-identities/alice/basic"
       "https://site.test/permissions/alice-can-authorize"
       "https://site.test/applications/local-terminal"}
 
-    (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})
+    (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")
           initial-state (make-nonce 10)
           request {:ring.request/method :get
                    :ring.request/path "/oauth/authorize"
@@ -455,15 +461,16 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
-      "https://site.test/session-scopes/oauth"
+      "https://site.test/session-scopes/default"
       "https://site.test/login"
       "https://site.test/user-identities/alice/basic"
       "https://site.test/permissions/alice-can-authorize"
       "https://site.test/applications/local-terminal"}
 
-    (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})
+    (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")
           state (make-nonce 10)
           request {:ring.request/method :get
                    :ring.request/path "/oauth/authorize"
@@ -481,15 +488,16 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
-      "https://site.test/session-scopes/oauth"
+      "https://site.test/session-scopes/default"
       "https://site.test/login"
       "https://site.test/user-identities/alice/basic"
       "https://site.test/permissions/alice-can-authorize"
       "https://site.test/applications/local-terminal"}
 
-    (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})
+    (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")
           {access-token "access_token"}
           (book/authorize!
            :session-id session-id
@@ -502,17 +510,18 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/private/internal.html"
       "https://site.test/protection-spaces/bearer"
       "https://site.test/oauth/authorize"
-      "https://site.test/session-scopes/oauth"
+      "https://site.test/session-scopes/default"
       "https://site.test/login"
       "https://site.test/user-identities/alice/basic"
       "https://site.test/permissions/alice-can-authorize"
       "https://site.test/applications/local-terminal"})
 
-  (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})
+  (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")
         {access-token "access_token"} (book/authorize! :session-id session-id "client_id" "local-terminal")
         _ (is access-token)
         response
@@ -527,11 +536,12 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/private/internal.html"
       "https://site.test/protection-spaces/bearer"
       "https://site.test/oauth/authorize"
-      "https://site.test/session-scopes/oauth"
+      "https://site.test/session-scopes/default"
       "https://site.test/login"
       "https://site.test/user-identities/alice/basic"
       "https://site.test/permissions/alice-can-authorize"
@@ -551,9 +561,10 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
-      "https://site.test/session-scopes/oauth"
+      "https://site.test/session-scopes/default"
       "https://site.test/login"
       "https://site.test/user-identities/alice/basic"
       "https://site.test/permissions/alice-can-authorize"
@@ -565,7 +576,7 @@
       "https://site.test/oauth/scope/graphql/administer"
       "https://site.test/oauth/scope/graphql/develop"}
 
-    (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})]
+    (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")]
 
       (testing "Installation with insufficient scope"
         (let [{access-token "access_token"
@@ -629,12 +640,13 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/graphql"
       "https://site.test/user-identities/bob/basic"
       "https://site.test/permissions/bob-can-authorize"}
 
-    (let [session-id (book/login-with-form! {"username" "bob" "password" "walrus"})
+    (let [session-id (book/login-with-form! "username" "bob" "password" "walrus")
           {access-token "access-token"
            error "error"}
           (book/authorize! :session-id session-id
@@ -646,7 +658,8 @@
                :ring.request/path "/graphql"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/graphql"}
+                "content-type" "application/graphql"
+                "cookie" (format "id=%s" session-id)}
                ::body-bytes (.getBytes "schema { }")})
 
           response (*handler* (finalize-request request))]
@@ -693,12 +706,13 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/graphql"
       "https://site.test/permissions/alice/put-graphql-schema"
       "https://site.test/permissions/alice/get-graphql-schema"}
 
-    (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+    (let [session-id (book/login-with-form! "username" "alice" "password" "garden")
           {access-token "access_token"
            error "error"}
           (book/authorize!
@@ -829,12 +843,13 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
-        user/dependency-graph}}
+        user/dependency-graph
+        form-based-auth/dependency-graph}}
     #{"https://site.test/graphql"
       "https://site.test/permissions/alice/put-graphql-schema"
       "https://site.test/permissions/alice/get-graphql-schema"}
 
-    (let [session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+    (let [session-id (book/login-with-form! "username" "alice" "password" "garden")
 
           response (deploy-schema session-id "type Query { myName: String }")
 

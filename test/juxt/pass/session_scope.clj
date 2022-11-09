@@ -62,6 +62,19 @@
      ;; end::grant-permission-to-put-session-scope![]
      ))))
 
+(defn create-session-scope! [_]
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/put-session-scope"
+      {:xt/id "https://example.org/session-scopes/default"
+       :juxt.pass.alpha/cookie-name "id"
+       :juxt.pass.alpha/cookie-domain "https://example.org"
+       :juxt.pass.alpha/cookie-path "/"
+       :juxt.pass.alpha/login-uri "https://example.org/login"})))))
+
 (def dependency-graph
   {"https://example.org/actions/put-session-scope"
    {:create #'create-action-put-session-scope!
@@ -70,4 +83,10 @@
    "https://example.org/permissions/system/put-session-scope"
    {:create #'grant-permission-to-put-session-scope!
     :deps #{::init/system
-            "https://example.org/actions/put-session-scope"}}})
+            "https://example.org/actions/put-session-scope"}}
+
+   "https://site.test/session-scopes/default"
+   {:deps #{::init/system
+            "https://example.org/actions/put-session-scope"
+            "https://example.org/permissions/system/put-session-scope"}
+    :create #'create-session-scope!}})

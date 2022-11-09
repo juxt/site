@@ -7,9 +7,14 @@
    [ring.util.codec :as codec]
    [jsonista.core :as json]
    juxt.book.login
+   [juxt.pass.session-scope :as session-scope]
+   [juxt.pass.form-based-auth :as form-based-auth]
+   [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]
    [juxt.site.alpha.graphql.flip :as graphql-flip]
    [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.site.alpha :as-alias site]
+   [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
    [juxt.test.util :refer [*handler*]]
    [malli.core :as malli]
@@ -548,24 +553,6 @@
      ;; end::grant-permission-to-resource-protected-by-session-scope![]
      ))))
 
-;; TODO: Poorly named since it only creates a session scope around /protected-by-session-scope/
-(defn
-  create-session-scope! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-session-scope![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/put-session-scope"
-      {:xt/id "https://example.org/session-scopes/example"
-       :juxt.pass.alpha/cookie-name "id"
-       :juxt.pass.alpha/cookie-domain "https://example.org"
-       :juxt.pass.alpha/cookie-path "/protected-by-session-scope/"
-       :juxt.pass.alpha/login-uri "https://example.org/login"})
-     ;; end::create-session-scope![]
-     ))))
-
 (defn create-internal-resource! [_]
   (eval
    (substitute-actual-base-uri
@@ -588,111 +575,6 @@
        :juxt.pass.alpha/action "https://example.org/actions/get-protected-resource"
        :juxt.pass.alpha/user "https://example.org/users/alice"
        :juxt.site.alpha/uri "https://example.org/private/internal.html"
-       :juxt.pass.alpha/purpose nil})))))
-
-(defn create-action-create-login-resource!
-  "A very specific action that creates a login form."
-  ;; TODO: We could make the HTML content a parameter, but it helps security if
-  ;; the http methods remain unconfigurable.
-  [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/create-login-resource"
-
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [(xtdb.api/put
-                 {:xt/id "https://example.org/login"
-                  :juxt.site.alpha/methods
-                  {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-public-resource"}}
-                   :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-public-resource"}}
-                   :post {:juxt.pass.alpha/actions #{"https://example.org/actions/login"}}
-                   :options {:juxt.pass.alpha/actions #{"https://example.org/actions/get-options"}}
-                   }
-                  :juxt.http.alpha/content-type "text/html;charset=utf-8"
-                  :juxt.http.alpha/content
-                  "
-<html>
-<head>
-<link rel='icon' href='data:,'>
-</head>
-<body>
-<form method=POST>
-<p>
-Username: <input name=username type=text>
-</p>
-<p>
-Password: <input name=password type=password>
-</p>
-<p>
-<input type=submit value=Login>
-</p>
-</form>
-</body>
-</html>
-\r\n"})]))]))}
-
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :xt/id]]]})))))
-
-(defn grant-permission-to-create-login-resource! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-create-login-resource![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/system/create-login-resource"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/create-login-resource"
-       :juxt.pass.alpha/purpose nil
-       })
-     ;; end::grant-permission-to-create-login-resource![]
-     ))))
-
-(defn create-login-resource! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-login-resource"
-      {})))))
-
-(defn create-action-login! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/login"
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :xt/id]]]
-       :juxt.site.alpha/transact juxt.book.login/login-quotation})))))
-
-(defn grant-permission-to-invoke-action-login! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/login"
-       :juxt.pass.alpha/action "https://example.org/actions/login"
        :juxt.pass.alpha/purpose nil})))))
 
 ;; Applications
@@ -1445,19 +1327,6 @@ Password: <input name=password type=password>
        :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
        }))))
 
-;; TODO: Rename to openid?
-(defn create-oauth-session-scope [_]
-  (eval
-   (substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/put-session-scope"
-      {:xt/id "https://example.org/session-scopes/oauth"
-       :juxt.pass.alpha/cookie-name "id"
-       :juxt.pass.alpha/cookie-domain "https://example.org"
-       :juxt.pass.alpha/cookie-path "/oauth"
-       :juxt.pass.alpha/login-uri "https://example.org/login"}))))
-
 (defn with-body [req body-bytes]
   (if body-bytes
     (-> req
@@ -1468,25 +1337,12 @@ Password: <input name=password type=password>
 (defn login-with-form!
   "Return a session id (or nil) given a map of fields."
   [& {:strs [username password] :as args}]
-  {:pre [(malli/validate
-          [:map
-           ["username" [:string {:min 2}]]
-           ["password" [:string {:min 6}]]] args)]
-   :post [(malli/validate [:string] %)]}
-  (let [form (codec/form-encode args)
-        body (.getBytes form)
-        req {:ring.request/method :post
-             :ring.request/path "/login"
-             :ring.request/headers
-             {"content-length" (str (count body))
-              "content-type" "application/x-www-form-urlencoded"}
-             :ring.request/body (io/input-stream body)}
-        response (*handler* req)
-        {:strs [set-cookie]} (:ring.response/headers response)
-        [_ id] (when set-cookie (re-matches #"id=(.*?);.*" set-cookie))]
-    (when-not id (throw (ex-info "Login failed" {:args args
-                                                 :response response})))
-    id))
+  (let [result
+        (form-based-auth/login-with-form! *handler*
+         :juxt.site.alpha/uri (substitute-actual-base-uri "https://example.org/login")
+         "username" username
+         "password" password)]
+    (:juxt.pass.alpha/session-token result)))
 
 (defn authorize-response!
   "Authorize response"
@@ -1510,7 +1366,7 @@ Password: <input name=password type=password>
                       {"response_type" "token"
                        "client_id" client-id
                        "state" state}
-                    scope (assoc "scope" (codec/url-encode (str/join " " scope)))))}]
+                      scope (assoc "scope" (codec/url-encode (str/join " " scope)))))}]
     (*handler* request)))
 
 (defn authorize!
@@ -1537,7 +1393,7 @@ Password: <input name=password type=password>
     (codec/form-decode encoded)))
 
 (defn create-graphql-endpoint [_]
-  (let [session-id (login-with-form! {"username" "ALICE" "password" "garden"})
+  (let [session-id (login-with-form! "username" "ALICE" "password" "garden")
         {access-token "access_token"
          error "error"}
         (authorize!
@@ -1709,12 +1565,6 @@ Password: <input name=password type=password>
             "https://example.org/permissions/system/put-immutable-protected-resource"
             "https://example.org/actions/get-protected-resource"}}
 
-   "https://example.org/session-scopes/example"
-   {:create #'create-session-scope!
-    :deps #{::init/system
-            "https://example.org/actions/put-session-scope"
-            "https://example.org/permissions/system/put-session-scope"}}
-
    "https://example.org/actions/oauth/authorize"
    {:create #'create-action-oauth-authorize!
     :deps #{::init/system}}
@@ -1733,30 +1583,6 @@ Password: <input name=password type=password>
             "https://example.org/actions/install-authorization-server"
             "https://example.org/permissions/system/install-authorization-server"
             "https://example.org/actions/oauth/authorize"}}
-
-   "https://example.org/actions/login"
-   {:create #'create-action-login!
-    :deps #{::init/system}}
-
-   "https://example.org/permissions/login"
-   {:create #'grant-permission-to-invoke-action-login!
-    :deps #{::init/system}}
-
-   "https://example.org/actions/create-login-resource"
-   {:create #'create-action-create-login-resource!
-    :deps #{::init/system
-            "https://example.org/actions/login"
-            "https://example.org/permissions/login"}}
-
-   "https://example.org/permissions/system/create-login-resource"
-   {:create #'grant-permission-to-create-login-resource!
-    :deps #{::init/system}}
-
-   "https://example.org/login"
-   {:create #'create-login-resource!
-    :deps #{::init/system
-            "https://example.org/actions/create-login-resource"
-            "https://example.org/permissions/system/create-login-resource"}}
 
    "https://example.org/permissions/{username}-can-authorize"
    {:create (fn [{:keys [params]}]
@@ -1812,12 +1638,6 @@ Password: <input name=password type=password>
             "https://example.org/permissions/system/put-protection-space"}
     :create #'create-basic-protection-space}
 
-   "https://example.org/session-scopes/oauth"
-   {:deps #{::init/system
-            "https://example.org/actions/put-session-scope"
-            "https://example.org/permissions/system/put-session-scope"}
-    :create #'create-oauth-session-scope}
-
    "https://example.org/actions/put-graphql-schema"
    {:deps #{::init/system}
     :create #'create-action-put-graphql-schema}
@@ -1845,7 +1665,7 @@ Password: <input name=password type=password>
    "https://example.org/graphql"
    {:deps #{::init/system
             "https://example.org/oauth/authorize"
-            "https://example.org/session-scopes/oauth"
+            "https://example.org/session-scopes/default"
             "https://example.org/login"
             "https://example.org/user-identities/alice/basic"
             "https://example.org/permissions/alice-can-authorize"

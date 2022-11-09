@@ -368,14 +368,15 @@
      (substitute-actual-base-uri "https://example.org/openid/auth0/client-configuration")
      (substitute-actual-base-uri "https://example.org/openid/login")
      ;;(substitute-actual-base-uri "https://example.org/openid/callback")
-     (substitute-actual-base-uri "https://example.org/session-scopes/openid")
-     }
+     (substitute-actual-base-uri "https://example.org/session-scopes/openid")}
+
    (substitute-actual-base-uri
     (merge
      dependency-graph
      openid/dependency-graph
      session-scope/dependency-graph
      user/dependency-graph))
+
    {:dry-run? false :recreate? true}))
 
 (defn install-openid-user!
@@ -394,7 +395,6 @@
    :name "Malcolm Sparks"
    :juxt.pass.jwt.claims/iss "https://juxt.eu.auth0.com/"
    :juxt.pass.jwt.claims/nickname "malcolmsparks"))
-
 
 (comment
   (put!
@@ -424,6 +424,4 @@
     :juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
     :juxt.pass.alpha/user "https://site.test/users/mal"
     :juxt.pass.alpha/action "https://site.test/actions/whoami"
-    :juxt.pass.alpha/purpose nil
-
-    }))
+    :juxt.pass.alpha/purpose nil}))

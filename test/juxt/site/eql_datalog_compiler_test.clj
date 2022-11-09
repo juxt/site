@@ -13,12 +13,14 @@
    [juxt.book :as book]
    [juxt.pass.session-scope :as session-scope]
    [juxt.pass.user :as user]
+   [juxt.pass.form-based-auth :as form-based-auth]
    [juxt.flip.alpha.core :as f]
    [juxt.site.alpha.eql-datalog-compiler :as eqlc]
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha :as-alias pass]
    [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init]
+   [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt with-resources *xt-node* *handler*] :as tutil]
    [xtdb.api :as xt]))
 
@@ -131,21 +133,52 @@
     ;; A POST to a patient URL?
     ;; What if there are a number of actions one can perform on a patient?
     ;; A PATCH to a patient????
+
+    :juxt.site.alpha.malli/input-schema
+    [:map
+     [:patient [:re "https://site.test/patients/.*"]]
+     [:doctor [:re "https://site.test/doctors/.*"]]]
+
+    :juxt.site.alpha/prepare
+    {:juxt.site.alpha.sci/program
+     (pr-str
+      '(let [content-type (-> *ctx*
+                              :juxt.site.alpha/received-representation
+                              :juxt.http.alpha/content-type)
+             body (-> *ctx*
+                      :juxt.site.alpha/received-representation
+                      :juxt.http.alpha/body)]
+         (let [input
+               (case content-type
+                 "application/edn"
+                 (some->
+                  body
+                  (String.)
+                  clojure.edn/read-string
+                  juxt.site.malli/validate-input
+                  ))]
+
+           (when-not input
+             (throw (ex-info "No input" {})))
+
+           (let [[_ patient-id] (re-matches #"https://site.test/patients/(.*)" (:patient input))
+                 [_ doctor-id] (re-matches #"https://site.test/doctors/(.*)" (:doctor input))
+                 id (format "https://site.test/assignments/patient/%s/doctor/%s" patient-id doctor-id)]
+             {:patient-id (:patient input)
+              :doctor-id (:doctor input)
+              :id id}))))}
+
     :juxt.site.alpha/transact
-    {:juxt.site.alpha.malli/input-schema
-     [:map
-      [:patient [:re "https://site.test/patients/.*"]]
-      [:doctor [:re "https://site.test/doctors/.*"]]]
+    {
      :juxt.site.alpha.sci/program
      (pr-str
-      '(let [[_ patient-id] (re-matches #"https://site.test/patients/(.*)" (:patient *input*))
-             [_ doctor-id] (re-matches #"https://site.test/doctors/(.*)" (:doctor *input*))
-             id (format "https://site.test/assignments/patient/%s/doctor/%s" patient-id doctor-id)]
+      '(let [{:keys [id patient-id doctor-id]} *prepare*]
          [[:xtdb.api/put
            {:xt/id id
-            :patient (:patient *input*)
-            :doctor (:doctor *input*)
+            :patient patient-id
+            :doctor doctor-id
             ::site/type "https://site.test/types/doctor-patient-assignment"}]]))}
+
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
@@ -226,8 +259,8 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/list-patients"
 
-    ;; What if this was the resource will target with GET?
-    ;; The /patients is more simply an alias.
+    ;; What if this was the resource we will target with GET?
+    ;; The /patients is merely an alias.
 
     ;; Are actions just resources with ACL rules?
     ;; Actions are already resources.
@@ -618,7 +651,7 @@
            "https://site.test/user-identities/carlos/basic"
 
            "https://site.test/oauth/authorize"
-           "https://site.test/session-scopes/oauth"
+           "https://site.test/session-scopes/default"
            "https://site.test/permissions/alice-can-authorize"
            "https://site.test/permissions/bob-can-authorize"
            "https://site.test/permissions/carlos-can-authorize"
@@ -672,6 +705,7 @@
          #{book/dependency-graph
            session-scope/dependency-graph
            user/dependency-graph
+           form-based-auth/dependency-graph
            dependency-graph}})
 
       ;; Create some measurements
@@ -1247,6 +1281,7 @@
         ;; identity types to delete. Create HTML from /graphql to show a nice
         ;; HTML page with a list of types.
 
+
         ))))
 
 (deftest graphql-test
@@ -1260,7 +1295,7 @@
            "https://site.test/user-identities/carlos/basic"
 
            "https://site.test/oauth/authorize"
-           "https://site.test/session-scopes/oauth"
+           "https://site.test/session-scopes/default"
            "https://site.test/permissions/alice-can-authorize"
            "https://site.test/permissions/bob-can-authorize"
            "https://site.test/permissions/carlos-can-authorize"
@@ -1314,6 +1349,7 @@
          #{book/dependency-graph
            session-scope/dependency-graph
            user/dependency-graph
+           form-based-auth/dependency-graph
            dependency-graph}})
 
       (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})

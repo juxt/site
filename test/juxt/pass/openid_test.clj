@@ -89,7 +89,7 @@
                 {:xt/id id
                  :juxt.pass.alpha/openid-client "https://example.org/openid/auth0/client"})))}})
 
-(with-fixtures
+#_(with-fixtures
   (with-resources
     ^{:dependency-graphs
       #{openid/dependency-graph
@@ -99,6 +99,7 @@
       "https://site.test/openid/callback"}
 
     (repl/e ISSUER)
+    (repl/ls)
 
     #_(let [login-request
           {:ring.request/method :get

@@ -48,7 +48,7 @@
                 "Unexpected type of template body"
                 {:template-body-type (type template-body)})))))))))
 
-(defn expand-queries [template-model db]
+#_(defn expand-queries [template-model db]
   (postwalk
    (fn [m]
      (cond

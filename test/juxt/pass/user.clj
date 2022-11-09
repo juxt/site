@@ -3,6 +3,9 @@
 (ns juxt.pass.user
   (:require
    [clojure.string :as str]
+   [clojure.java.io :as io]
+   [malli.core :as malli]
+   [ring.util.codec :as codec]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]))
 
 (defn create-action-put-user! [_]
@@ -16,20 +19,29 @@
 
        :juxt.site.alpha.malli/input-schema
        [:map
-        [:xt/id [:re "https://example.org/users/.*"]]]
+        [:xt/id [:re "https://example.org/.*"]]]
 
        :juxt.site.alpha/prepare
        {:juxt.site.alpha.sci/program
         (pr-str
-         '(do
-            (juxt.site.malli/validate-input)
-            (merge
-             *input*
-             {:juxt.site.alpha/type "https://meta.juxt.site/pass/user"
-              :juxt.site.alpha/methods
-              {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user"}}
-               :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user"}}
-               :options {}}})))}
+         '(let [content-type (-> *ctx*
+                                 :juxt.site.alpha/received-representation
+                                 :juxt.http.alpha/content-type)
+                body (-> *ctx*
+                         :juxt.site.alpha/received-representation
+                         :juxt.http.alpha/body)]
+            (case content-type
+              "application/edn"
+              (some->
+               body
+               (String.)
+               clojure.edn/read-string
+               juxt.site.malli/validate-input
+               (assoc
+                :juxt.site.alpha/methods
+                {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user"}}
+                 :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user"}}
+                 :options {}})))))}
 
        :juxt.site.alpha/transact
        {:juxt.site.alpha.sci/program
@@ -74,7 +86,7 @@
        :juxt.site.alpha.malli/input-schema
        [:map
         [:xt/id [:re "https://example.org/.*"]]
-        [:juxt.pass.alpha/user [:re "https://example.org/users/.+"]]
+        [:juxt.pass.alpha/user [:re "https://example.org/.+"]]
 
         ;; Required by basic-user-identity
         [:juxt.pass.alpha/username [:re "[A-Za-z0-9]{2,}"]]
@@ -86,24 +98,38 @@
 
        :juxt.site.alpha/prepare
        {:juxt.site.alpha.sci/program
+
         (pr-str
-         '(do
-            (juxt.site.malli/validate-input)
-            (-> *input*
-                (assoc :juxt.site.alpha/type #{"https://meta.juxt.site/pass/user-identity"
-                                               "https://meta.juxt.site/pass/basic-user-identity"}
-                       :juxt.site.alpha/methods
-                       {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user-identity"}}
-                        :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user-identity"}}
-                        :options {}})
-                ;; We want usernames to be case-insensitive, as per OWASP
-                ;; guidelines.
-                (update :juxt.pass.alpha/username clojure.string/lower-case)
-                ;; Hash the password
-                (assoc :juxt.pass.alpha/password-hash (crypto.password.bcrypt/encrypt (:juxt.pass.alpha/password *input*)))
-                ;; Remove clear-text password from input, so it doesn't go into
-                ;; the database.
-                (dissoc :juxt.pass.alpha/password))))}
+         '(let [content-type (-> *ctx*
+                                 :juxt.site.alpha/received-representation
+                                 :juxt.http.alpha/content-type)
+                body (-> *ctx*
+                         :juxt.site.alpha/received-representation
+                         :juxt.http.alpha/body)]
+            (case content-type
+              "application/edn"
+              (let [input
+                    (some->
+                     body
+                     (String.)
+                     clojure.edn/read-string
+                     juxt.site.malli/validate-input
+                     (assoc
+                      :juxt.site.alpha/type #{"https://meta.juxt.site/pass/user-identity"
+                                              "https://meta.juxt.site/pass/basic-user-identity"}
+                      :juxt.site.alpha/methods
+                      {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user-identity"}}
+                       :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user-identity"}}
+                       :options {}}))]
+                (-> input
+                    ;; We want usernames to be case-insensitive, as per OWASP
+                    ;; guidelines.
+                    (update :juxt.pass.alpha/username clojure.string/lower-case)
+                    ;; Hash the password
+                    (assoc :juxt.pass.alpha/password-hash (crypto.password.bcrypt/encrypt (:juxt.pass.alpha/password input)))
+                    ;; Remove clear-text password from input, so it doesn't go into
+                    ;; the database.
+                    (dissoc :juxt.pass.alpha/password))))))}
 
        :juxt.site.alpha/transact
        {:juxt.site.alpha.sci/program
@@ -133,6 +159,7 @@
        :juxt.pass.alpha/action "https://example.org/actions/put-basic-user-identity"
        :juxt.pass.alpha/purpose nil})))))
 
+;; TODO: Move to openid
 (defn create-action-put-openid-user-identity! [_]
   (eval
    (substitute-actual-base-uri
@@ -229,13 +256,13 @@
             "https://example.org/permissions/system/put-basic-user-identity"
             "https://example.org/permissions/system/put-openid-user-identity"}}})
 
-(defn put-user! [& {:keys [username name]}]
+(defn put-user! [& {:keys [id username name]}]
   (eval
    (substitute-actual-base-uri
     `(init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/put-user"
-      {:xt/id ~(format "https://example.org/users/%s" username)
+      {:xt/id ~(or id (format "https://example.org/users/%s" username))
        :name ~name}))))
 
 (defn put-openid-user-identity! [& {:keys [username]
