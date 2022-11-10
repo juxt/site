@@ -13,6 +13,7 @@
    [juxt.book :as book]
    [juxt.pass.session-scope :as session-scope]
    [juxt.pass.user :as user]
+   [juxt.pass.oauth :as oauth]
    [juxt.pass.form-based-auth :as form-based-auth]
    [juxt.flip.alpha.core :as f]
    [juxt.site.alpha.eql-datalog-compiler :as eqlc]
@@ -706,6 +707,7 @@
            session-scope/dependency-graph
            user/dependency-graph
            form-based-auth/dependency-graph
+           oauth/dependency-graph
            dependency-graph}})
 
       ;; Create some measurements
@@ -1350,6 +1352,7 @@
            session-scope/dependency-graph
            user/dependency-graph
            form-based-auth/dependency-graph
+           oauth/dependency-graph
            dependency-graph}})
 
       (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})

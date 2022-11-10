@@ -11,6 +11,7 @@
    [java-http-clj.core :as hc]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.openid :as openid]
+   [juxt.pass.oauth :as oauth]
    [juxt.pass.session-scope :as session-scope]
    [juxt.pass.user :as user]
    [juxt.pass.form-based-auth :as form-based-auth]
@@ -142,9 +143,7 @@
                       (-> *ctx*
                           (assoc :ring.response/body content)
                           (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
-                          )))}}
-
-                )))}})
+                          )))}})))}})
 
 (deftest get-subject
   (with-resources
@@ -158,8 +157,7 @@
       "https://site.test/whoami"
       "https://site.test/whoami.json"
       "https://site.test/whoami.html"
-      "https://site.test/permissions/alice/whoami"
-      })
+      "https://site.test/permissions/alice/whoami"})
 
   (let [result
         (form-based-auth/login-with-form!
@@ -196,3 +194,21 @@
 ;; Login alice with basic (ensuring session scope exists)
 ;; Passing the session-token as a cookie, call the /whoami resource.
 ;; Build the functionality of GET /whoami into the action (in the prepare part of the transaction)
+
+
+(with-fixtures
+  (with-resources
+    ^{:dependency-graphs
+      #{session-scope/dependency-graph
+        user/dependency-graph
+        form-based-auth/dependency-graph
+        oauth/dependency-graph
+        dependency-graph}}
+    #{"https://site.test/login"
+      "https://site.test/user-identities/alice"
+      "https://site.test/whoami"
+      "https://site.test/whoami.json"
+      "https://site.test/whoami.html"
+      "https://site.test/permissions/alice/whoami"
+      "https://site.test/applications/local-terminal"
+      }))

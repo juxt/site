@@ -18,6 +18,7 @@
    [juxt.site.bootstrap :as bootstrap]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.openid :as openid]
+   [juxt.pass.oauth :as oauth]
    [juxt.site.alpha.init :as init]
    [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt *xt-node* *handler* with-resources with-fixtures with-handler] :as tutil]
@@ -79,7 +80,8 @@
       #{session-scope/dependency-graph
         book/dependency-graph
         user/dependency-graph
-        form-based-auth/dependency-graph}}
+        form-based-auth/dependency-graph
+        oauth/dependency-graph}}
     #{"https://site.test/actions/put-user-owned-content"
       "https://site.test/permissions/alice/put-user-owned-content"
 
@@ -344,7 +346,8 @@
       #{session-scope/dependency-graph
         book/dependency-graph
         user/dependency-graph
-        form-based-auth/dependency-graph}}
+        form-based-auth/dependency-graph
+        oauth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
       "https://site.test/session-scopes/default"
       "https://site.test/login"
@@ -393,7 +396,8 @@
       #{session-scope/dependency-graph
         book/dependency-graph
         user/dependency-graph
-        form-based-auth/dependency-graph}}
+        form-based-auth/dependency-graph
+        oauth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
       "https://site.test/session-scopes/default"
       "https://site.test/login"
@@ -462,7 +466,8 @@
       #{session-scope/dependency-graph
         book/dependency-graph
         user/dependency-graph
-        form-based-auth/dependency-graph}}
+        form-based-auth/dependency-graph
+        oauth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
       "https://site.test/session-scopes/default"
       "https://site.test/login"
@@ -489,7 +494,8 @@
       #{session-scope/dependency-graph
         book/dependency-graph
         user/dependency-graph
-        form-based-auth/dependency-graph}}
+        form-based-auth/dependency-graph
+        oauth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
       "https://site.test/session-scopes/default"
       "https://site.test/login"
@@ -511,7 +517,8 @@
       #{session-scope/dependency-graph
         book/dependency-graph
         user/dependency-graph
-        form-based-auth/dependency-graph}}
+        form-based-auth/dependency-graph
+        oauth/dependency-graph}}
     #{"https://site.test/private/internal.html"
       "https://site.test/protection-spaces/bearer"
       "https://site.test/oauth/authorize"
@@ -537,7 +544,8 @@
       #{session-scope/dependency-graph
         book/dependency-graph
         user/dependency-graph
-        form-based-auth/dependency-graph}}
+        form-based-auth/dependency-graph
+        oauth/dependency-graph}}
     #{"https://site.test/private/internal.html"
       "https://site.test/protection-spaces/bearer"
       "https://site.test/oauth/authorize"
@@ -562,7 +570,8 @@
       #{session-scope/dependency-graph
         book/dependency-graph
         user/dependency-graph
-        form-based-auth/dependency-graph}}
+        form-based-auth/dependency-graph
+        oauth/dependency-graph}}
     #{"https://site.test/oauth/authorize"
       "https://site.test/session-scopes/default"
       "https://site.test/login"
@@ -641,7 +650,8 @@
       #{session-scope/dependency-graph
         book/dependency-graph
         user/dependency-graph
-        form-based-auth/dependency-graph}}
+        form-based-auth/dependency-graph
+        oauth/dependency-graph}}
     #{"https://site.test/graphql"
       "https://site.test/user-identities/bob/basic"
       "https://site.test/permissions/bob-can-authorize"}
@@ -707,7 +717,8 @@
       #{session-scope/dependency-graph
         book/dependency-graph
         user/dependency-graph
-        form-based-auth/dependency-graph}}
+        form-based-auth/dependency-graph
+        oauth/dependency-graph}}
     #{"https://site.test/graphql"
       "https://site.test/permissions/alice/put-graphql-schema"
       "https://site.test/permissions/alice/get-graphql-schema"}
@@ -844,7 +855,8 @@
       #{session-scope/dependency-graph
         book/dependency-graph
         user/dependency-graph
-        form-based-auth/dependency-graph}}
+        form-based-auth/dependency-graph
+        oauth/dependency-graph}}
     #{"https://site.test/graphql"
       "https://site.test/permissions/alice/put-graphql-schema"
       "https://site.test/permissions/alice/get-graphql-schema"}

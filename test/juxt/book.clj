@@ -816,22 +816,6 @@
        :juxt.http.alpha/content-type "text/html;charset=utf-8"
        :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"})))))
 
-;; First Application
-
-(defn register-example-application! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::register-example-application![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/register-application"
-      {:juxt.pass.alpha/client-id "local-terminal"
-       ;; TODO: What is this redirect-uri doing here?
-       :juxt.pass.alpha/redirect-uri "https://example.org/terminal/callback"})
-     ;; end::register-example-application![]
-     ))))
-
 ;; APIs
 
 #_(defn create-action-install-api-resource! [_]
@@ -1591,12 +1575,6 @@
             #{::init/system
               (format "%s/actions/oauth/authorize" base-uri)
               (format "%s/users/%s" base-uri username)})}
-
-   "https://example.org/applications/local-terminal"
-   {:create #'register-example-application!
-    :deps #{::init/system
-            "https://example.org/actions/register-application"
-            "https://example.org/permissions/system/register-application"}}
 
    "https://example.org/actions/install-graphql-endpoint"
    {:create #'create-action-install-graphql-endpoint!
