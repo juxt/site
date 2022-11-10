@@ -7,22 +7,17 @@
 
 ;; First Application
 
-(defn register-example-application! [_]
-  (eval
+(defn register-example-application! [{:keys [params]}]
+  (init/do-action
+   (substitute-actual-base-uri "https://example.org/subjects/system")
+   (substitute-actual-base-uri "https://example.org/actions/register-application")
    (substitute-actual-base-uri
-    (quote
-     ;; tag::register-example-application![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/register-application"
-      {:juxt.pass.alpha/client-id "local-terminal"
-       ;; TODO: What is this redirect-uri doing here?
-       :juxt.pass.alpha/redirect-uri "https://example.org/terminal/callback"})
-     ;; end::register-example-application![]
-     ))))
+    {:juxt.pass.alpha/client-id (get params "client")
+     ;; TODO: What is this redirect-uri doing here?
+     :juxt.pass.alpha/redirect-uri "https://example.org/terminal/callback"})))
 
 (def dependency-graph
-  {"https://example.org/applications/local-terminal"
+  {"https://example.org/applications/{client}"
    {:create #'register-example-application!
     :deps #{::init/system
             "https://example.org/actions/register-application"
