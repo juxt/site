@@ -41,10 +41,8 @@
 ;; This is broken out into its own function to assist debugging when
 ;; authorization is denied and we don't know why. A better authorization
 ;; debugger is definitely required.
-(defn
-  ^{:private true
-    }
-  query-permissions [{:keys [db rules subject actions resource purpose] :as args}]
+(defn ^{:private true} query-permissions
+  [{:keys [db rules subject actions resource purpose] :as args}]
   (assert (or (nil? subject) (string? subject)))
   (assert (or (nil? resource) (string? resource)))
   (let [query {:find '[(pull permission [*]) (pull action [*])]

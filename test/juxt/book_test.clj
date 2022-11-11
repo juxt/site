@@ -110,14 +110,14 @@
                  :ring.request/path "/~bob/index.html"}]
         (is (= 404 (:ring.response/status (*handler* req))))))
 
-    (let [session-id (book/login-with-form! "username" "alice" "password" "garden")
-          _ (is session-id)
+    (let [session-token (book/login-with-form! "username" "alice" "password" "garden")
+          _ (is session-token)
 
           {access-token "access_token"
            error "error"}
-          (book/authorize!
-           :session-id session-id
-           "client_id" "local-terminal")
+          (oauth/authorize!
+           {:juxt.pass.alpha/session-token session-token
+            "client_id" "local-terminal"})
 
           _ (is (nil? error) (format "OAuth2 grant error: %s" error))]
 
@@ -303,12 +303,14 @@
       "https://site.test/login"
       "https://site.test/user-identities/alice/basic"}
 
-    (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")]
-      (is session-id)
+    (let [session-token (book/login-with-form! "username" "ALICE" "password" "garden")]
+      (is session-token)
       (is
        (thrown-with-msg?
         ExceptionInfo #"Forbidden to authorize"
-        (book/authorize! :session-id session-id "client_id" "local-terminal"))))))
+        (oauth/authorize!
+         {:juxt.pass.alpha/session-token session-token
+          "client_id" "local-terminal"}))))))
 
 (deftest authorization-server-implicit-grant-with-unknown-app-client
   (with-resources
@@ -357,36 +359,36 @@
       "https://site.test/oauth/scope/graphql/administer"
       "https://site.test/oauth/scope/graphql/develop"}
 
-    (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")]
+    (let [session-token (book/login-with-form! "username" "ALICE" "password" "garden")]
 
       (testing "valid scope"
         (let [{access-token "access_token"
                error "error"}
-              (book/authorize!
-               :session-id session-id
-               "client_id" "local-terminal"
-               "scope" ["https://site.test/oauth/scope/graphql/administer"
-                        "https://site.test/oauth/scope/graphql/develop"])]
+              (oauth/authorize!
+               {:juxt.pass.alpha/session-token session-token
+                "client_id" "local-terminal"
+                "scope" ["https://site.test/oauth/scope/graphql/administer"
+                         "https://site.test/oauth/scope/graphql/develop"]})]
           (is access-token)
           (is (nil? error))))
 
       (testing "invalid scope"
         (let [{access-token "access_token"
                error "error"}
-              (book/authorize!
-               :session-id session-id
-               "client_id" "local-terminal"
-               "scope" ["https://site.test/oauth/scope/graphql/administer"
-                        "https://site.test/oauth/scope/graphql/bad-scope"])]
+              (oauth/authorize!
+               {:juxt.pass.alpha/session-token session-token
+                "client_id" "local-terminal"
+                "scope" ["https://site.test/oauth/scope/graphql/administer"
+                         "https://site.test/oauth/scope/graphql/bad-scope"]})]
           (is (nil? access-token))
           (is (= "invalid_scope" error))))
 
       (testing "no scope"
         (let [{access-token "access_token"
                error "error"}
-              (book/authorize!
-               :session-id session-id
-               "client_id" "local-terminal")]
+              (oauth/authorize!
+               {:juxt.pass.alpha/session-token session-token
+                "client_id" "local-terminal"})]
           (is access-token)
           (is (nil? error)))))))
 
@@ -503,11 +505,11 @@
       "https://site.test/permissions/alice-can-authorize"
       "https://site.test/applications/local-terminal"}
 
-    (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")
+    (let [session-token (book/login-with-form! "username" "ALICE" "password" "garden")
           {access-token "access_token"}
-          (book/authorize!
-           :session-id session-id
-           "client_id" "local-terminal")]
+          (oauth/authorize!
+           {:juxt.pass.alpha/session-token session-token
+            "client_id" "local-terminal"})]
       (is access-token)
       (is (= 32 (.length access-token))))))
 
@@ -528,8 +530,11 @@
       "https://site.test/permissions/alice-can-authorize"
       "https://site.test/applications/local-terminal"})
 
-  (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")
-        {access-token "access_token"} (book/authorize! :session-id session-id "client_id" "local-terminal")
+  (let [session-token (book/login-with-form! "username" "ALICE" "password" "garden")
+        {access-token "access_token"}
+        (oauth/authorize!
+         {:juxt.pass.alpha/session-token session-token
+          "client_id" "local-terminal"})
         _ (is access-token)
         response
         (*handler*
@@ -556,8 +561,11 @@
       "https://site.test/applications/local-terminal"
       "https://site.test/permissions/alice/private/internal.html"})
 
-  (let [session-id (book/login-with-form! {"username" "ALICE" "password" "garden"})
-        {access-token "access_token"} (book/authorize! :session-id session-id "client_id" "local-terminal")
+  (let [session-token (book/login-with-form! {"username" "ALICE" "password" "garden"})
+        {access-token "access_token"}
+        (oauth/authorize!
+         {:juxt.pass.alpha/session-token session-token
+          "client_id" "local-terminal"})
         response (*handler*
                   {:ring.request/method :get
                    :ring.request/headers {"authorization" (format "Bearer %s" access-token)}
@@ -585,14 +593,16 @@
       "https://site.test/oauth/scope/graphql/administer"
       "https://site.test/oauth/scope/graphql/develop"}
 
-    (let [session-id (book/login-with-form! "username" "ALICE" "password" "garden")]
+    (let [session-token (book/login-with-form! "username" "ALICE" "password" "garden")]
 
       (testing "Installation with insufficient scope"
         (let [{access-token "access_token"
                error "error"}
-              (book/authorize! :session-id session-id
-                               "client_id" "local-terminal"
-                               "scope" ["https://site.test/oauth/scope/graphql/develop"])
+              (oauth/authorize!
+               {:juxt.pass.alpha/session-token session-token
+                "client_id" "local-terminal"
+                "scope" ["https://site.test/oauth/scope/graphql/develop"]})
+
 
               _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
@@ -609,9 +619,10 @@
       (testing "Installation at wrong endpoint denied"
         (let [{access-token "access_token"
                error "error"}
-              (book/authorize! :session-id session-id
-                               "client_id" "local-terminal"
-                               "scope" ["https://site.test/oauth/scope/graphql/administer"])
+              (oauth/authorize!
+               {:juxt.pass.alpha/session-token session-token
+                "client_id" "local-terminal"
+                "scope" ["https://site.test/oauth/scope/graphql/administer"]})
 
               _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
@@ -628,9 +639,10 @@
       (testing "Installation successful"
         (let [{access-token "access_token"
                error "error"}
-              (book/authorize! :session-id session-id
-                               "client_id" "local-terminal"
-                               "scope" ["https://site.test/oauth/scope/graphql/administer"])
+              (oauth/authorize!
+               {:juxt.pass.alpha/session-token session-token
+                "client_id" "local-terminal"
+                "scope" ["https://site.test/oauth/scope/graphql/administer"]})
 
               _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
@@ -656,12 +668,14 @@
       "https://site.test/user-identities/bob/basic"
       "https://site.test/permissions/bob-can-authorize"}
 
-    (let [session-id (book/login-with-form! "username" "bob" "password" "walrus")
+    (let [session-token (book/login-with-form! "username" "bob" "password" "walrus")
           {access-token "access-token"
            error "error"}
-          (book/authorize! :session-id session-id
-                           "client_id" "local-terminal"
-                           "scope" ["https://site.test/oauth/scope/graphql/develop"])
+          (oauth/authorize!
+           {:juxt.pass.alpha/session-token session-token
+            "client_id" "local-terminal"
+            "scope" ["https://site.test/oauth/scope/graphql/develop"]})
+
           _ (is (nil? error) (format "OAuth2 grant error: %s" error))
           request
           (-> {:ring.request/method :put
@@ -669,7 +683,7 @@
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
                 "content-type" "application/graphql"
-                "cookie" (format "id=%s" session-id)}
+                "cookie" (format "id=%s" session-token)}
                ::body-bytes (.getBytes "schema { }")})
 
           response (*handler* (finalize-request request))]
@@ -723,15 +737,16 @@
       "https://site.test/permissions/alice/put-graphql-schema"
       "https://site.test/permissions/alice/get-graphql-schema"}
 
-    (let [session-id (book/login-with-form! "username" "alice" "password" "garden")
+    (let [session-token (book/login-with-form! "username" "alice" "password" "garden")
           {access-token "access_token"
            error "error"}
-          (book/authorize!
-           :session-id session-id
-           "client_id" "local-terminal"
-           ;; The graphql/develop scope is going to let us perform
-           ;; put-graphql-schema and get-graphql-schema.
-           "scope" ["https://site.test/oauth/scope/graphql/develop"])
+          (oauth/authorize!
+           {:juxt.pass.alpha/session-token session-token
+            "client_id" "local-terminal"
+            ;; The graphql/develop scope is going to let us perform
+            ;; put-graphql-schema and get-graphql-schema.
+            "scope" ["https://site.test/oauth/scope/graphql/develop"]})
+
           _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
           get-request
@@ -816,13 +831,13 @@
       ;; output. Possibly this can be Selmer templated in the future.
       )))
 
-(defn deploy-schema [session-id ^String schema]
+(defn deploy-schema [session-token ^String schema]
   (let [{access-token "access_token"
          error "error"}
-        (book/authorize!
-         :session-id session-id
-         "client_id" "local-terminal"
-         "scope" ["https://site.test/oauth/scope/graphql/develop"])
+        (oauth/authorize!
+         {:juxt.pass.alpha/session-token session-token
+          "client_id" "local-terminal"
+          "scope" ["https://site.test/oauth/scope/graphql/develop"]})
         _ (is (nil? error) (format "OAuth2 grant error: %s" error))
         put-request
         {:ring.request/method :put

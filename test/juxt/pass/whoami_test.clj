@@ -145,7 +145,7 @@
                           (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
                           )))}})))}})
 
-(deftest get-subject
+(deftest get-subject-test
   (with-resources
     ^{:dependency-graphs
       #{session-scope/dependency-graph
@@ -159,14 +159,14 @@
       "https://site.test/whoami.html"
       "https://site.test/permissions/alice/whoami"})
 
-  (let [result
+  (let [login-result
         (form-based-auth/login-with-form!
          *handler*
          "username" "alice"
          "password" "garden"
          :juxt.site.alpha/uri "https://site.test/login")
 
-        session-token (:juxt.pass.alpha/session-token result)
+        session-token (:juxt.pass.alpha/session-token login-result)
         _ (assert session-token)
 
         response
@@ -195,7 +195,6 @@
 ;; Passing the session-token as a cookie, call the /whoami resource.
 ;; Build the functionality of GET /whoami into the action (in the prepare part of the transaction)
 
-
 (with-fixtures
   (with-resources
     ^{:dependency-graphs
@@ -210,5 +209,30 @@
       "https://site.test/whoami.json"
       "https://site.test/whoami.html"
       "https://site.test/permissions/alice/whoami"
-      "https://site.test/applications/local-terminal"
-      }))
+      "https://site.test/applications/test-app"
+
+      ::oauth/authorization-server
+      "https://example.org/permissions/alice-can-authorize"
+
+      ;; Authorize the app
+      }
+
+    (let [login-result
+          (form-based-auth/login-with-form!
+           *handler*
+           "username" "alice"
+           "password" "garden"
+           :juxt.site.alpha/uri "https://site.test/login")
+
+          session-token (:juxt.pass.alpha/session-token login-result)
+          _ (assert session-token)
+
+          {access-token "access_token"
+           error "error"}
+          (oauth/authorize!
+           {:juxt.pass.alpha/session-token session-token
+            "client_id" "local-terminal"})]
+
+      login-result
+      #_{:access-token access-token
+         :error error})))

@@ -743,32 +743,35 @@
         :reading {"heartRate" "87"
                   "bloodPressure" "127/80"}})
 
-      (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+      (let [alice-session-token (book/login-with-form! {"username" "alice" "password" "garden"})
+
             {alice-access-token "access_token" error "error"}
-            (book/authorize!
-             :session-id alice-session-id
-             "client_id" "local-terminal"
-             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
-             )
+            (oauth/authorize!
+             {:juxt.pass.alpha/session-token alice-session-token
+              "client_id" "local-terminal"
+              ;; "scope" ["https://site.test/oauth/scope/read-personal-data"]
+              })
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
-            bob-session-id (book/login-with-form! {"username" "bob" "password" "walrus"})
+            bob-session-token (book/login-with-form! {"username" "bob" "password" "walrus"})
             {bob-access-token "access_token"
              error "error"}
-            (book/authorize!
-             :session-id bob-session-id
-             "client_id" "local-terminal"
-             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+            (oauth/authorize!
+             {:juxt.pass.alpha/session-token bob-session-token
+              "client_id" "local-terminal"
+              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+              }
              )
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
-            carlos-session-id (book/login-with-form! {"username" "carlos" "password" "toothpick"})
+            carlos-session-token (book/login-with-form! {"username" "carlos" "password" "toothpick"})
             {carlos-access-token "access_token"
              error "error"}
-            (book/authorize!
-             :session-id carlos-session-id
-             "client_id" "local-terminal"
-             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+            (oauth/authorize!
+             {:juxt.pass.alpha/session-token carlos-session-token
+              "client_id" "local-terminal"
+              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+              }
              )
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
@@ -1355,22 +1358,22 @@
            oauth/dependency-graph
            dependency-graph}})
 
-      (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+      (let [alice-session-token (book/login-with-form! {"username" "alice" "password" "garden"})
             {alice-access-token "access_token" error "error"}
-            (book/authorize!
-             :session-id alice-session-id
-             "client_id" "local-terminal"
-             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
-             )
+            (oauth/authorize!
+             {:juxt.pass.alpha/session-id alice-session-token
+              "client_id" "local-terminal"
+              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+              })
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
-            bob-session-id (book/login-with-form! {"username" "bob" "password" "walrus"})
+            bob-session-token (book/login-with-form! {"username" "bob" "password" "walrus"})
             {bob-access-token "access_token"}
-            (book/authorize!
-             :session-id bob-session-id
-             "client_id" "local-terminal"
-             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
-             )
+            (oauth/authorize!
+             {:juxt.pass.alpha/session-token bob-session-token
+              "client_id" "local-terminal"
+              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+              })
 
             db (xt/db *xt-node*)
 
