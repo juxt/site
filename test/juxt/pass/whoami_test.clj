@@ -60,18 +60,20 @@
                    [id :juxt.pass.alpha/user user]
                    [permission :juxt.pass.alpha/user user]]]}))}
 
-   "https://example.org/permissions/alice/whoami"
+   "https://example.org/permissions/{username}/whoami"
    {:deps #{::init/system
             "https://example.org/actions/whoami"}
-    :create (fn [{:keys [id]}]
-              (juxt.site.alpha.init/do-action
-               (init/substitute-actual-base-uri "https://example.org/subjects/system")
-               (init/substitute-actual-base-uri "https://example.org/actions/grant-permission")
-               (init/substitute-actual-base-uri
-                {:xt/id id
-                 :juxt.pass.alpha/action "https://example.org/actions/whoami"
-                 :juxt.pass.alpha/purpose nil
-                 :juxt.pass.alpha/user "https://example.org/~alice"})))}
+    :create (fn [{:keys [id params]}]
+              (let [username (get params "username")]
+                (juxt.site.alpha.init/do-action
+                 (init/substitute-actual-base-uri "https://example.org/subjects/system")
+                 (init/substitute-actual-base-uri "https://example.org/actions/grant-permission")
+                 (let [user (format "https://example.org/users/%s" username)]
+                   (init/substitute-actual-base-uri
+                    {:xt/id id
+                     :juxt.pass.alpha/action "https://example.org/actions/whoami"
+                     :juxt.pass.alpha/purpose nil
+                     :juxt.pass.alpha/user user})))))}
 
    "https://example.org/whoami"
    {:deps #{::init/system
@@ -129,15 +131,14 @@
       #{session-scope/dependency-graph
         user/dependency-graph
         form-based-auth/dependency-graph
-
+        example-users/dependency-graph
         dependency-graph}}
     #{"https://site.test/login"
       "https://site.test/user-identities/alice"
       "https://site.test/whoami"
       "https://site.test/whoami.json"
       "https://site.test/whoami.html"
-      "https://site.test/permissions/alice/whoami"
-      })
+      "https://site.test/permissions/alice/whoami"})
 
   (let [login-result
         (form-based-auth/login-with-form!
@@ -158,7 +159,8 @@
            }
           (assoc-session-token session-token)))
 
-        json (json/read-value (:ring.response/body response))]
+        json (json/read-value (:ring.response/body response))
+        ]
 
     (is (:ring.response/status response))
     (is (= "Alice"
@@ -217,9 +219,12 @@
              {:juxt.pass.alpha/session-token session-token
               "client_id" "local-terminal"})]
 
-      (oauth/authorize!
+      (oauth/authorize-response!
        {:juxt.pass.alpha/session-token session-token
         "client_id" "local-terminal"})
+
+      (repl/e :authz-result)
+
 
       ;; Who's the subject?
 

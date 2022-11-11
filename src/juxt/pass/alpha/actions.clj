@@ -402,7 +402,8 @@
                        '*ctx* ctx}
                       ;; Allowed to access the database
                       'xt
-                      {'entity (fn [id] (xt/entity db id))}
+                      {'entity (fn [id] (xt/entity db id))
+                       'q (fn [& args] (apply xt/q db args))}
 
                       'juxt.pass
                       {'match-identity

@@ -110,7 +110,7 @@
        ;; render the form appropriately given the attributes therein.
        ;;
        :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
+       {#_#_:juxt.flip.alpha/quotation
         `(
           (site/with-fx-acc
             [
@@ -263,7 +263,35 @@
                collate-error-response])
 
              encode-fragment
-             redirect-to-application-redirect-uri]))}
+             redirect-to-application-redirect-uri]))
+
+        :juxt.site.alpha.sci/program
+        (with-out-str
+          (clojure.pprint/pprint
+           '(let [qs (:ring.request/query *ctx*)
+                  _ (when-not qs
+                      (throw
+                       (ex-info "No query string" {:ring.response/status 400})))
+
+                  query (ring.util.codec/form-decode qs)
+
+                  client-id (get query "client_id")
+                  _ (when-not client-id
+                      (throw
+                       (ex-info "A client_id parameter is required" {:ring.response/status 400})))
+
+                  application
+                  (xt/q
+                   '{:find [(pull e [*])]
+                     :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                             [e :juxt.pass.alpha/client-id client-id]]
+                     :in [client-id]} client-id)]
+
+              [[:xtdb.api/put
+                {:xt/id :authz-result
+                 :qs qs
+                 :query query
+                 :application application}]])))}
 
        :juxt.pass.alpha/rules
        '[
@@ -300,16 +328,14 @@
             "https://example.org/actions/oauth/authorize"}}
 
    ::authorization-server
-   {:deps #{"https://example.org/oauth/authorize"}}
-
-})
+   {:deps #{"https://example.org/oauth/authorize"}}})
 
 (defn authorize-response!
   "Authorize response"
   [{:juxt.pass.alpha/keys [session-token]
-      client-id "client_id"
-      scope "scope"
-      :as args}]
+    client-id "client_id"
+    scope "scope"
+    :as args}]
   (let [state (make-nonce 10)
         request {:ring.request/method :get
                  :juxt.site.alpha/uri (substitute-actual-base-uri "https://example.org/oauth/authorize")
