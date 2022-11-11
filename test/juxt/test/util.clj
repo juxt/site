@@ -130,18 +130,21 @@
     [::xt/put (authz/install-do-action-fn)]]))
 
 
+(defn lookup-session-details [session-token]
+  (let [db (xt/db *xt-node*)]
+    (first
+     (xt/q db '{:find [(pull session [*]) (pull scope [*])]
+                :keys [session scope]
+                :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/session-token"]
+                        [e :juxt.pass.alpha/session-token session-token]
+                        [e :juxt.pass.alpha/session session]
+                        [session :juxt.pass.alpha/session-scope scope]]
+                :in [session-token]}
+           session-token))))
+
 (defn assoc-session-token [req session-token]
-  (let [db (xt/db *xt-node*)
-        {:keys [session scope]}
-        (first
-         (xt/q db '{:find [(pull session [*]) (pull scope [*])]
-                    :keys [session scope]
-                    :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/session-token"]
-                            [e :juxt.pass.alpha/session-token session-token]
-                            [e :juxt.pass.alpha/session session]
-                            [session :juxt.pass.alpha/session-scope scope]]
-                    :in [session-token]}
-               session-token))
+  (let [{:keys [session scope]}
+        (lookup-session-details session-token)
 
         {:juxt.pass.alpha/keys [cookie-name]} scope]
     (assoc-in req [:ring.request/headers "cookie"] (format "%s=%s" cookie-name session-token))))

@@ -17,9 +17,10 @@
    [juxt.pass.form-based-auth :as form-based-auth]
    [juxt.site.alpha :as-alias site]
    [juxt.site.alpha.init :as init]
+   [juxt.example-users :as example-users]
    [juxt.site.alpha.repl :as repl]
    [juxt.site.bootstrap :as bootstrap]
-   [juxt.test.util :refer [with-system-xt with-resources *handler* *xt-node* with-fixtures with-resources assoc-session-token with-handler]]
+   [juxt.test.util :refer [with-system-xt with-resources *handler* *xt-node* with-fixtures with-resources assoc-session-token with-handler assoc-session-token lookup-session-details]]
    [ring.util.codec :as codec]
    [xtdb.api :as xt]
    [juxt.reap.alpha.regex :as re]))
@@ -27,30 +28,7 @@
 (use-fixtures :each with-system-xt with-handler)
 
 (def dependency-graph
-  {"https://example.org/user-identities/alice"
-   {:deps #{::init/system
-            "https://example.org/~alice"}
-    :create (fn [{:keys [id]}]
-              ;; TODO: Make this data rather than calling a function! (The
-              ;; intention here is to demote this graphs to data;
-              (init/do-action
-               (init/substitute-actual-base-uri "https://example.org/subjects/system")
-               (init/substitute-actual-base-uri "https://example.org/actions/put-basic-user-identity")
-               (init/substitute-actual-base-uri
-                {:xt/id "https://example.org/user-identities/alice"
-                 :juxt.pass.alpha/user "https://example.org/~alice"
-                 :juxt.pass.alpha/username "alice"
-                 :juxt.pass.alpha/password "garden"})))}
-
-   "https://example.org/~alice"
-   {:deps #{::init/system
-            ::user/all-actions
-            ::user/default-permissions}
-    :create (fn [{:keys [id]}]
-              (user/put-user!
-               {:id id :username "alice" :name "Alice"}))}
-
-   "https://example.org/actions/whoami"
+  {"https://example.org/actions/whoami"
    {:deps #{::init/system}
     :create (fn [{:keys [id]}]
               (init/do-action
@@ -151,13 +129,15 @@
       #{session-scope/dependency-graph
         user/dependency-graph
         form-based-auth/dependency-graph
+
         dependency-graph}}
     #{"https://site.test/login"
       "https://site.test/user-identities/alice"
       "https://site.test/whoami"
       "https://site.test/whoami.json"
       "https://site.test/whoami.html"
-      "https://site.test/permissions/alice/whoami"})
+      "https://site.test/permissions/alice/whoami"
+      })
 
   (let [login-result
         (form-based-auth/login-with-form!
@@ -202,7 +182,9 @@
         user/dependency-graph
         form-based-auth/dependency-graph
         oauth/dependency-graph
-        dependency-graph}}
+        example-users/dependency-graph
+        dependency-graph
+        }}
     #{"https://site.test/login"
       "https://site.test/user-identities/alice"
       "https://site.test/whoami"
@@ -212,10 +194,12 @@
       "https://site.test/applications/test-app"
 
       ::oauth/authorization-server
-      "https://example.org/permissions/alice-can-authorize"
+      "https://site.test/permissions/alice-can-authorize"
 
       ;; Authorize the app
       }
+
+    (repl/e "https://site.test/permissions/alice-can-authorize")
 
     (let [login-result
           (form-based-auth/login-with-form!
@@ -227,12 +211,32 @@
           session-token (:juxt.pass.alpha/session-token login-result)
           _ (assert session-token)
 
-          {access-token "access_token"
-           error "error"}
-          (oauth/authorize!
-           {:juxt.pass.alpha/session-token session-token
-            "client_id" "local-terminal"})]
+          #_{access-token "access_token"
+             error "error"}
+          #_(oauth/authorize!
+             {:juxt.pass.alpha/session-token session-token
+              "client_id" "local-terminal"})]
 
-      login-result
+      (oauth/authorize!
+       {:juxt.pass.alpha/session-token session-token
+        "client_id" "local-terminal"})
+
+      ;; Who's the subject?
+
+      #_(let [db (xt/db *xt-node*)
+            lookup (fn [id] (xt/entity db id))]
+        (->
+         (lookup-session-details session-token)
+         :session
+         :juxt.pass.alpha/subject
+         lookup
+         :juxt.pass.alpha/user-identity
+         lookup
+         ;;:juxt.pass.alpha/user
+         ))
+      ;;(repl/e (first (repl/ls "session-token")))
+
+
+      ;;login-result
       #_{:access-token access-token
          :error error})))

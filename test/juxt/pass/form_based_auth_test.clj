@@ -28,6 +28,7 @@
 
 (def dependency-graph
   {"https://example.org/~{username}"
+   ;; TODO: Note this predates example-users, so is now redundant
    {:deps #{::init/system
             ::user/all-actions
             ::user/default-permissions}
@@ -84,5 +85,4 @@
                  "username" "ALICE"
                  "password" "garden")]
 
-      (is (malli/validate [:map [:juxt.pass.alpha/session-token :string]] result))
-      )))
+      (is (malli/validate [:map [:juxt.pass.alpha/session-token :string]] result)))))

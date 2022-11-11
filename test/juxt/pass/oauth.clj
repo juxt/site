@@ -272,20 +272,6 @@
           [id :juxt.pass.alpha/user user]
           [permission :juxt.pass.alpha/user user]]]})))))
 
-(defn grant-permission-to-authorize!
-  [& {:keys [username] :as args}]
-  {:pre [(malli/validate [:map [:username [:string]]] args)]}
-  ;; Grant user permission to perform /actions/oauth/authorize
-  (eval
-   (substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id (format "https://example.org/permissions/%s-can-authorize" ~(str/lower-case username))
-       :juxt.pass.alpha/action "https://example.org/actions/oauth/authorize"
-       :juxt.pass.alpha/user (format "https://example.org/users/%s" ~(str/lower-case username))
-       :juxt.pass.alpha/purpose nil}))))
-
 (def dependency-graph
   {"https://example.org/applications/{client}"
    {:create #'register-example-application!
@@ -306,14 +292,6 @@
    {:create #'create-action-oauth-authorize!
     :deps #{::init/system}}
 
-   "https://example.org/permissions/{username}-can-authorize"
-   {:create (fn [{:keys [params]}]
-              (grant-permission-to-authorize! :username (get params "username")))
-    :deps (fn [{:strs [username]} {:juxt.site.alpha/keys [base-uri]}]
-            #{::init/system
-              (format "%s/actions/oauth/authorize" base-uri)
-              (format "%s/users/%s" base-uri username)})}
-
    "https://example.org/oauth/authorize"
    {:create #'install-authorization-server!
     :deps #{::init/system
@@ -322,7 +300,9 @@
             "https://example.org/actions/oauth/authorize"}}
 
    ::authorization-server
-   {:deps #{"https://example.org/oauth/authorize"}}})
+   {:deps #{"https://example.org/oauth/authorize"}}
+
+})
 
 (defn authorize-response!
   "Authorize response"
