@@ -437,7 +437,7 @@
                                                   [e :juxt.pass.alpha/client-id client-id]]
                                           :in [client-id]} client-id)]
                            (if (= 1 (count results))
-                             (first results)
+                             (ffirst results)
                              (if (seq results)
                                (throw
                                 (ex-info
@@ -447,7 +447,27 @@
                                (throw
                                 (ex-info
                                  (format "No application with client-id: %s" client-id)
-                                 {:client-id client-id}))))))}}
+                                 {:client-id client-id}))))))
+
+                       'lookup-scope
+                       (fn [scope]
+                         (let [results (xt/q
+                                        db
+                                        '{:find [(pull e [*])]
+                                          :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/oauth-scope"]]})]
+
+                           (if (= 1 (count results))
+                             (ffirst results)
+                             (if (seq results)
+                               (throw
+                                (ex-info
+                                 (format "Multiple documents for scope: %s" scope)
+                                 {:scope scope
+                                  :documents (map :xt/id results)}))
+                               (throw
+                                (ex-info
+                                 (format "No such scope: %s" scope)
+                                 {:error "invalid_scope"}))))))}}
 
                      (common-sci-namespaces action-doc))
 

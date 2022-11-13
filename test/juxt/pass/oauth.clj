@@ -107,7 +107,9 @@
        ;; parameter, from which it can look up the pending approval document and
        ;; render the form appropriately given the attributes therein.
        ;;
-       :juxt.site.alpha/transact
+
+
+       :juxt.site.alpha/prepare
        {#_#_:juxt.flip.alpha/quotation
         `(
           (site/with-fx-acc
@@ -278,14 +280,6 @@
                       (throw
                        (ex-info "A client_id parameter is required" {:ring.response/status 400})))
 
-                  application (juxt.pass/lookup-application client-id)
-
-                  _ (when-not application
-                      (throw
-                       (ex-info
-                        (format "No application found with client-id of %s" client-id)
-                        {:client-id client-id})))
-
                   response-type (get query "response_type")
                   _ (when-not response-type
                       (throw
@@ -297,42 +291,65 @@
                       (throw
                        (ex-info
                         "The response_type parameter must only be provided once"
-                        {"error" "invalid_request"}))
-                      )
+                        {"error" "invalid_request"})))
 
                   _ (when-not (contains? #{"code" "token"} response-type)
                       (throw (ex-info "Only response types of 'code' and 'token' are currently supported" {})))
+
+                  subject (:juxt.pass.alpha/subject *ctx*)
+                  _ (when-not subject
+                      (throw (ex-info "Cannot create access-token: no subject" {})))
+
+                  ;; "The authorization server SHOULD document the size of any
+                  ;; value it issues." -- RFC 6749 Section 4.2.2
+                  access-token-length 16
+
+                  access-token (juxt.pass.util/make-nonce access-token-length)
                   ]
 
-              #_(f/define check-response-type
-                  [(f/keep
-                    [(f/of :query) (f/of "response_type")
-                     (f/unless* [(f/throw
-                                  {"error" "invalid_request"
-                                   "error_description" "A response_type parameter is required"})])
-                     f/dup f/sequential?
-                     (f/when [(f/throw
-                               {"error" "invalid_request"
-                                "error_description" "The response_type parameter is provided more than once"})])
-                     (f/in? #{"code" "token"})
-                     (f/unless [(f/throw
-                                 {"error" "unsupported_response_type"
-                                  "error_description" "Only a response type of 'token' is currently supported"})])])])
+              {:xt/id :authz-result
+               :client-id client-id
+               :query query
+               :access-token access-token
+               :subject (:xt/id subject)})))}
 
-              #_[check-response-type
-                 extract-subject
-                 assert-subject
-                 extract-and-decode-scope
-                 validate-scope
-                 make-access-token
-                 push-access-token-fx
-                 collate-response]
+       :juxt.site.alpha/transact
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '(let [{:keys [client-id query access-token subject]} *prepare*
+                application (juxt.pass/lookup-application client-id)
+                _ (when-not application
+                    (throw
+                     (ex-info
+                      (format "No application found with client-id of %s" client-id)
+                      {:client-id client-id})))
 
-              [[:xtdb.api/put
-                {:xt/id :authz-result
-                 :qs qs
-                 :query query
-                 :application application}]])))}
+                ;; Leave scope for now for tests to flush out
+                scopes (some-> *prepare* (get-in [:query "scope"]) ring.util.codec/form-decode (clojure.string/split #"\\s") set)
+                _ (doall (map juxt.pass/lookup-scope scopes))
+
+                access-token-doc
+                (cond->
+                    {:xt/id (format "%s/access-tokens/%s" (:juxt.site.alpha/base-uri *ctx*) access-token)
+                     :juxt.site.alpha/type "https://meta.juxt.site/pass/access-token"
+                     :juxt.pass.alpha/subject subject
+                     :juxt.pass.alpha/application (:xt/id application)
+                     :juxt.pass.alpha/token access-token}
+                    scopes (assoc :juxt.pass.alpha/scope scopes))
+
+                fragment
+                (ring.util.codec/form-encode
+                 {"access_token" access-token
+                  "token_type" "bearer"
+                  "state" (get query "state")})]
+
+            [[:xtdb.api/put
+              (assoc
+               *prepare*
+               :application application
+               :access-token access-token
+               :access-token-doc access-token-doc
+               :fragment fragment)]]))}
 
        :juxt.pass.alpha/rules
        '[
