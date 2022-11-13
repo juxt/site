@@ -223,6 +223,7 @@
            {:juxt.pass.alpha/session-token session-token
             "client_id" "local-terminal"})]
 
+      authz-response
       {:access-token access-token
        :error error
        :document (repl/e :authz-result)}

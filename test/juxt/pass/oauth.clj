@@ -284,7 +284,49 @@
                       (throw
                        (ex-info
                         (format "No application found with client-id of %s" client-id)
-                        {:client-id client-id})))]
+                        {:client-id client-id})))
+
+                  response-type (get query "response_type")
+                  _ (when-not response-type
+                      (throw
+                       (ex-info
+                        "A response_type parameter is required"
+                        {"error" "invalid_request"})))
+
+                  _ (when (sequential? response-type)
+                      (throw
+                       (ex-info
+                        "The response_type parameter must only be provided once"
+                        {"error" "invalid_request"}))
+                      )
+
+                  _ (when-not (contains? #{"code" "token"} response-type)
+                      (throw (ex-info "Only response types of 'code' and 'token' are currently supported" {})))
+                  ]
+
+              #_(f/define check-response-type
+                  [(f/keep
+                    [(f/of :query) (f/of "response_type")
+                     (f/unless* [(f/throw
+                                  {"error" "invalid_request"
+                                   "error_description" "A response_type parameter is required"})])
+                     f/dup f/sequential?
+                     (f/when [(f/throw
+                               {"error" "invalid_request"
+                                "error_description" "The response_type parameter is provided more than once"})])
+                     (f/in? #{"code" "token"})
+                     (f/unless [(f/throw
+                                 {"error" "unsupported_response_type"
+                                  "error_description" "Only a response type of 'token' is currently supported"})])])])
+
+              #_[check-response-type
+                 extract-subject
+                 assert-subject
+                 extract-and-decode-scope
+                 validate-scope
+                 make-access-token
+                 push-access-token-fx
+                 collate-response]
 
               [[:xtdb.api/put
                 {:xt/id :authz-result
