@@ -403,7 +403,9 @@
                       ;; Allowed to access the database
                       'xt
                       {'entity (fn [id] (xt/entity db id))
-                       'q (fn [& args] (apply xt/q db args))}
+                       ;; Definitely can't do this! But we may be able to give access to an action that can do it.
+                       ;;'q (fn [& args] (apply xt/q db args))
+                       }
 
                       'juxt.pass
                       {'match-identity
@@ -424,7 +426,28 @@
                                              ['(crypto.password.bcrypt/check password password-hash)]
                                              ]
                                             (for [[k v] m] ['id k v]))
-                                    :in ['password]} password)))}}
+                                    :in ['password]} password)))
+
+                       'lookup-application
+                       (fn [client-id]
+                         (let [results (xt/q
+                                        db
+                                        '{:find [(pull e [*])]
+                                          :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                                                  [e :juxt.pass.alpha/client-id client-id]]
+                                          :in [client-id]} client-id)]
+                           (if (= 1 (count results))
+                             (first results)
+                             (if (seq results)
+                               (throw
+                                (ex-info
+                                 (format "Too many applications for client-id: %s" client-id)
+                                 {:client-id client-id
+                                  :applications results}))
+                               (throw
+                                (ex-info
+                                 (format "No application with client-id: %s" client-id)
+                                 {:client-id client-id}))))))}}
 
                      (common-sci-namespaces action-doc))
 

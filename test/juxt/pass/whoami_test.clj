@@ -223,8 +223,7 @@
        {:juxt.pass.alpha/session-token session-token
         "client_id" "local-terminal"})
 
-      (repl/e :authz-result)
-
+      #_(repl/e :authz-result)
 
       ;; Who's the subject?
 

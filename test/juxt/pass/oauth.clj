@@ -281,11 +281,8 @@
                        (ex-info "A client_id parameter is required" {:ring.response/status 400})))
 
                   application
-                  (xt/q
-                   '{:find [(pull e [*])]
-                     :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
-                             [e :juxt.pass.alpha/client-id client-id]]
-                     :in [client-id]} client-id)]
+                  (juxt.pass/lookup-application client-id)
+                  ]
 
               [[:xtdb.api/put
                 {:xt/id :authz-result
