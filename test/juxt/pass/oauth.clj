@@ -278,9 +278,13 @@
                       (throw
                        (ex-info "A client_id parameter is required" {:ring.response/status 400})))
 
-                  application
-                  (juxt.pass/lookup-application client-id)
-                  ]
+                  application (juxt.pass/lookup-application client-id)
+
+                  _ (when-not application
+                      (throw
+                       (ex-info
+                        (format "No application found with client-id of %s" client-id)
+                        {:client-id client-id})))]
 
               [[:xtdb.api/put
                 {:xt/id :authz-result
