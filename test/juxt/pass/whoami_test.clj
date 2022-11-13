@@ -18,6 +18,7 @@
    [juxt.site.alpha :as-alias site]
    [juxt.site.alpha.init :as init]
    [juxt.example-users :as example-users]
+   [juxt.example-applications :as example-applications]
    [juxt.site.alpha.repl :as repl]
    [juxt.site.bootstrap :as bootstrap]
    [juxt.test.util :refer [with-system-xt with-resources *handler* *xt-node* with-fixtures with-resources assoc-session-token with-handler assoc-session-token lookup-session-details]]
@@ -185,6 +186,7 @@
         form-based-auth/dependency-graph
         oauth/dependency-graph
         example-users/dependency-graph
+        example-applications/dependency-graph
         dependency-graph
         }}
     #{"https://site.test/login"
@@ -197,6 +199,8 @@
 
       ::oauth/authorization-server
       "https://site.test/permissions/alice-can-authorize"
+
+      "https://site.test/applications/local-terminal"
 
       ;; Authorize the app
       }
@@ -213,31 +217,29 @@
           session-token (:juxt.pass.alpha/session-token login-result)
           _ (assert session-token)
 
-          #_{access-token "access_token"
-             error "error"}
-          #_(oauth/authorize!
-             {:juxt.pass.alpha/session-token session-token
-              "client_id" "local-terminal"})]
+          {access-token "access_token"
+           error "error" :as authz-response}
+          (oauth/authorize-response!
+           {:juxt.pass.alpha/session-token session-token
+            "client_id" "local-terminal"})]
 
-      (oauth/authorize-response!
-       {:juxt.pass.alpha/session-token session-token
-        "client_id" "local-terminal"})
-
-      #_(repl/e :authz-result)
+      {:access-token access-token
+       :error error
+       :document (repl/e :authz-result)}
 
       ;; Who's the subject?
 
       #_(let [db (xt/db *xt-node*)
-            lookup (fn [id] (xt/entity db id))]
-        (->
-         (lookup-session-details session-token)
-         :session
-         :juxt.pass.alpha/subject
-         lookup
-         :juxt.pass.alpha/user-identity
-         lookup
-         ;;:juxt.pass.alpha/user
-         ))
+              lookup (fn [id] (xt/entity db id))]
+          (->
+           (lookup-session-details session-token)
+           :session
+           :juxt.pass.alpha/subject
+           lookup
+           :juxt.pass.alpha/user-identity
+           lookup
+           ;;:juxt.pass.alpha/user
+           ))
       ;;(repl/e (first (repl/ls "session-token")))
 
 

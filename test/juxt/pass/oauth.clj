@@ -11,9 +11,7 @@
    [malli.core :as malli]
    [ring.util.codec :as codec]))
 
-;; First Application
-
-(defn register-example-application! [{:keys [params]}]
+(defn register-application! [{:keys [params]}]
   (init/do-action
    (substitute-actual-base-uri "https://example.org/subjects/system")
    (substitute-actual-base-uri "https://example.org/actions/register-application")

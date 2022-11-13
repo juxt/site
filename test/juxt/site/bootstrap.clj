@@ -214,27 +214,58 @@
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/register-application"
 
+       :juxt.site.alpha.malli/input-schema
+       [:map
+        [:juxt.pass.alpha/client-id [:re "[a-z-]{3,}"]]
+        [:juxt.pass.alpha/redirect-uri [:re "https://"]]]
+
+       :juxt.site.alpha/prepare
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '(let [content-type (-> *ctx*
+                                 :juxt.site.alpha/received-representation
+                                 :juxt.http.alpha/content-type)
+                body (-> *ctx*
+                         :juxt.site.alpha/received-representation
+                         :juxt.http.alpha/body)]
+            (case content-type
+              "application/edn"
+              (let [input (some->
+                           body
+                           (String.)
+                           clojure.edn/read-string
+                           juxt.site.malli/validate-input)
+                    client-id (:juxt.pass.alpha/client-id input)]
+                (into
+                 {:xt/id (format "%s/applications/%s" (:juxt.site.alpha/base-uri *ctx*) client-id)
+                  :juxt.site.alpha/type "https://meta.juxt.site/pass/application"}
+                 input)))))}
+
        :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [site/request-body-as-edn
-                (site/validate
-                 [:map
-                  [:juxt.pass.alpha/client-id [:re "[a-z-]{3,}"]]
-                  [:juxt.pass.alpha/redirect-uri [:re "https://"]]])
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '[[:xtdb.api/put *prepare*]])}
 
-                (site/set-type "https://meta.juxt.site/pass/application")
-                (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes 20)) :juxt.pass.alpha/client-secret]))
+       #_{:juxt.flip.alpha/quotation
+          `(
+            (site/with-fx-acc
+              [(site/push-fx
+                (f/dip
+                 [site/request-body-as-edn
+                  (site/validate
+                   [:map
+                    [:juxt.pass.alpha/client-id [:re "[a-z-]{3,}"]]
+                    [:juxt.pass.alpha/redirect-uri [:re "https://"]]])
 
-                (f/set-at
-                 (f/keep
-                  [(f/of :juxt.pass.alpha/client-id) "/applications/" f/str (f/env :juxt.site.alpha/base-uri) f/str
-                   :xt/id]))
+                  (site/set-type "https://meta.juxt.site/pass/application")
+                  (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes 20)) :juxt.pass.alpha/client-secret]))
 
-                xtdb.api/put]))]))}
+                  (f/set-at
+                   (f/keep
+                    [(f/of :juxt.pass.alpha/client-id) "/applications/" f/str (f/env :juxt.site.alpha/base-uri) f/str
+                     :xt/id]))
+
+                  xtdb.api/put]))]))}
 
        :juxt.pass.alpha/rules
        '[[(allowed? subject resource permission)
