@@ -307,8 +307,7 @@
                   access-token (juxt.pass.util/make-nonce access-token-length)
                   ]
 
-              {:xt/id :authz-result
-               :client-id client-id
+              {:client-id client-id
                :query query
                :access-token access-token
                :subject (:xt/id subject)})))}
@@ -341,15 +340,13 @@
                 (ring.util.codec/form-encode
                  {"access_token" access-token
                   "token_type" "bearer"
-                  "state" (get query "state")})]
+                  "state" (get query "state")})
 
-            [[:xtdb.api/put
-              (assoc
-               *prepare*
-               :application application
-               :access-token access-token
-               :access-token-doc access-token-doc
-               :fragment fragment)]]))}
+                location (format "%s#%s" (:juxt.pass.alpha/redirect-uri application) fragment)]
+
+            [[:xtdb.api/put access-token-doc]
+             [:ring.response/status 303]
+             [:ring.response/headers {"location" location}]]))}
 
        :juxt.pass.alpha/rules
        '[
@@ -423,15 +420,16 @@
   [args]
   (let [response (authorize-response! args)
         _ (case (:ring.response/status response)
-            302 :ok
+            (302 303) :ok
             400 (throw (ex-info "Client error" (assoc args :response response)))
             403 (throw (ex-info "Forbidden to authorize" (assoc args :response response)))
             (throw (ex-info "Unexpected error" (assoc args :response response))))
 
         location-header (-> response :ring.response/headers (get "location"))
 
-        [_ _ encoded] (re-matches #"https://(.*?)/terminal/callback#(.*)" location-header)]
+        [_ _ encoded] (re-matches #"https://(.*?)/.*?#(.*)" location-header)]
 
+    (assert encoded)
     (codec/form-decode encoded)))
 
 (malli/=>

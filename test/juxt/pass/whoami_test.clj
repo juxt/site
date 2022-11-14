@@ -219,14 +219,13 @@
 
           {access-token "access_token"
            error "error" :as authz-response}
-          (oauth/authorize-response!
+          (oauth/authorize!
            {:juxt.pass.alpha/session-token session-token
             "client_id" "local-terminal"})]
 
       authz-response
       {:access-token access-token
-       :error error
-       :document (repl/e :authz-result)}
+       :error error}
 
       ;; Who's the subject?
 
