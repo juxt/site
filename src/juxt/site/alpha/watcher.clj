@@ -151,7 +151,8 @@
   [config {:keys [type path]}]
   (log/info "Handling graphql file change" type path)
   (let [file (when (#{:create :modify} type) (file-contents path))
-        relativePath (absolute-path-to-relative (.toString path))]
+        relativePath (cond-> (.toString path)
+                      (.isAbsolute path) (absolute-path-to-relative))]
     (case type
       :create
       (upsert-schema config relativePath file)
