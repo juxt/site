@@ -509,7 +509,7 @@
                   "Submitted actions should have a valid juxt.site.alpha/transact entry"
                   {:action action-doc})))
 
-              _ (log/infof "FX are %s" (pr-str fx))
+              _ (log/debugf "FX are %s" (pr-str fx))
 
               ;; Validate
               _ (doseq [effect fx]
@@ -521,7 +521,6 @@
                     (throw (ex-info "Invalid effect" {::pass/action action :effect effect}))))
 
               xtdb-ops (filter (fn [[effect]] (= (namespace effect) "xtdb.api")) fx)
-              _ (log/infof "xtdb ops is %s" (pr-str xtdb-ops))
 
               ;; Deprecated
               apply-to-request-context-fx (filter (fn [[effect]] (= effect :juxt.site.alpha/apply-to-request-context)) fx)
@@ -570,7 +569,7 @@
                      ))])]
 
           ;; This isn't the best debugger :( - need a better one!
-          ;;(log/tracef "XXXX Result is: %s" result-ops)
+          ;;(log/debugf "XXXX Result is: %s" result-ops)
 
           result-fx))
 
@@ -649,8 +648,8 @@
          {'user {'*action* action-doc
                  '*resource* resource
                  '*ctx* (sanitize-ctx ctx)
-                 'logf (fn [& args] (eval `(log/tracef ~@args)))
-                 'log (fn [& args] (eval `(log/trace ~@args)))}
+                 'logf (fn [& args] (eval `(log/debugf ~@args)))
+                 'log (fn [& args] (eval `(log/debug ~@args)))}
 
           'xt
           { ;; Unsafe due to violation of strict serializability, hence marked as
@@ -822,7 +821,7 @@
              ::site/request-context req}))
 
           ;; No subject?
-          (if-let [protection-spaces (::pass/protection-spaces req)]
+          (if-let [protection-spaces (::pass/protection-space resource)]
             ;; We are in a protection space, so this is HTTP Authentication (401
             ;; + WWW-Authenticate header)
             (throw
@@ -830,7 +829,7 @@
               (format "No anonymous permission for actions (try authenticating!): %s" (pr-str actions))
               {:ring.response/status 401
                :ring.response/headers
-                {"www-authenticate" (http-authn/www-authenticate-header protection-spaces)}
+               {"www-authenticate" (http-authn/www-authenticate-header db protection-spaces)}
                ::site/request-context req}))
 
             ;; We are outside a protection space, there is nothing we can do

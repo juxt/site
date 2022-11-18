@@ -3,6 +3,8 @@
 (ns juxt.pass.whoami-test
   (:require
    [clojure.edn :as edn]
+   [juxt.site.alpha.logging :refer [with-logging]]
+   [clojure.tools.logging :as log]
    [jsonista.core :as json]
    [edn-query-language.core :as eql]
    [juxt.site.alpha.eql-datalog-compiler :as eqlc]
@@ -76,15 +78,26 @@
                      :juxt.pass.alpha/purpose nil
                      :juxt.pass.alpha/user user})))))}
 
+   ;; TODO: Create an action for establishing a protection space
+   "https://example.org/bearer-protection-space"
+   {:deps #{::init/system}
+    :create (fn [{:keys [id]}]
+              (init/put!
+               (init/substitute-actual-base-uri
+                {:xt/id id
+                 :juxt.pass.alpha/auth-scheme "Bearer"})))}
+
    "https://example.org/whoami"
    {:deps #{::init/system
-            "https://example.org/actions/whoami"}
+            "https://example.org/actions/whoami"
+            "https://example.org/bearer-protection-space"}
     :create (fn [{:keys [id]}]
               (init/put!
                (init/substitute-actual-base-uri
                 {:xt/id id
                  :juxt.site.alpha/methods
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/whoami"}}}})))}
+                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/whoami"}}}
+                 :juxt.pass.alpha/protection-spaces #{"https://example.org/bearer-protection-space"}})))}
 
    "https://example.org/whoami.json"
    {:deps #{::init/system
@@ -217,32 +230,19 @@
           session-token (:juxt.pass.alpha/session-token login-result)
           _ (assert session-token)
 
-          {access-token "access_token"
-           error "error" :as authz-response}
+          {access-token "access_token"}
           (oauth/authorize!
            {:juxt.pass.alpha/session-token session-token
             "client_id" "local-terminal"})]
 
-      authz-response
-      {:access-token access-token
-       :error error}
+      (with-logging
+        (when access-token
+          (*handler*
+           {:juxt.site.alpha/uri "https://site.test/whoami"
+            :ring.request/method :get
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)
+             "accept" "application/json"}}))))))
 
-      ;; Who's the subject?
-
-      #_(let [db (xt/db *xt-node*)
-              lookup (fn [id] (xt/entity db id))]
-          (->
-           (lookup-session-details session-token)
-           :session
-           :juxt.pass.alpha/subject
-           lookup
-           :juxt.pass.alpha/user-identity
-           lookup
-           ;;:juxt.pass.alpha/user
-           ))
-      ;;(repl/e (first (repl/ls "session-token")))
-
-
-      ;;login-result
-      #_{:access-token access-token
-         :error error})))
+(with-logging
+  (log/debug "hello"))

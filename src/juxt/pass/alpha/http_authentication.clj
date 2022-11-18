@@ -232,7 +232,7 @@
       (cookies-response)
       ((fn [req] (assoc-in req [:ring.response/headers "set-cookie"] (get-in req [:headers "Set-Cookie"]))))))
 
-(defn protection-spaces [db uri]
+#_(defn protection-spaces [db uri]
   (seq
    (for [{:keys [protection-space]}
          (xt/q
@@ -251,18 +251,20 @@
      protection-space)))
 
 (defn authenticate-with-bearer-auth [req db token68 protection-spaces]
-  (let [{:keys [subject access-token]}
-        (first
-         (xt/q db '{:find [(pull sub [*]) (pull at [*])]
-                    :keys [subject access-token]
-                    :where [[at ::pass/token tok]
-                            [at ::site/type "https://meta.juxt.site/pass/access-token"]
-                            [at ::pass/subject sub]
-                            [sub ::site/type "https://meta.juxt.site/pass/subject"]]
-                    :in [tok]} token68))]
-    (cond-> req
-      subject (assoc ::pass/subject subject
-                     ::pass/access-token access-token))))
+  (log/tracef "Protection-spaces are %s" (pr-str protection-spaces))
+  (or
+   (when (seq protection-spaces)
+     (let [{:keys [subject access-token]}
+           (first
+            (xt/q db '{:find [(pull sub [*]) (pull at [*])]
+                       :keys [subject access-token]
+                       :where [[at ::pass/token tok]
+                               [at ::site/type "https://meta.juxt.site/pass/access-token"]
+                               [at ::pass/subject sub]
+                               [sub ::site/type "https://meta.juxt.site/pass/subject"]]
+                       :in [tok]} token68))]
+       (when subject (assoc req ::pass/subject subject ::pass/access-token access-token))))
+   req))
 
 ;; TODO (idea): Tie bearer token to other security aspects such as remote IP so that
 ;; the bearer token is more difficult to use if intercepted.
@@ -313,10 +315,12 @@
 
 (defn www-authenticate-header
   "Create the WWW-Authenticate header value"
-  [protection-spaces]
+  [db protection-spaces]
+  (log/tracef "protection-spaces: %s" protection-spaces)
   (www-authenticate
-   (for [ps protection-spaces
-         :let [realm (::pass/realm ps)]]
+   (for [ps-id protection-spaces
+         :let [ps (xt/entity db ps-id)
+               realm (::pass/realm ps)]]
      {:juxt.reap.alpha.rfc7235/auth-scheme (::pass/auth-scheme ps)
       :juxt.reap.alpha.rfc7235/auth-params
       (cond-> []
@@ -324,38 +328,41 @@
                {:juxt.reap.alpha.rfc7235/auth-param-name "realm"
                 :juxt.reap.alpha.rfc7235/auth-param-value realm}))})))
 
+(defn authenticate-with-authorization-header
+  [{:juxt.site.alpha/keys [db] :as req}
+   authorization-header protection-spaces]
+  (let [{::rfc7235/keys [auth-scheme token68]} (reap/authorization authorization-header)]
+    (case (.toLowerCase auth-scheme)
+      "basic" (or
+               (authenticate-with-basic-auth req db token68 (filter #(= (::pass/auth-scheme %) "Basic") protection-spaces))
+               req)
+      "bearer" (authenticate-with-bearer-auth req db token68 (filter #(= (::pass/auth-scheme %) "Bearer") protection-spaces))
+      (throw
+       (ex-info
+        "Auth scheme unsupported"
+        {::site/request-context
+         (cond-> (assoc req :ring.response/status 401)
+           protection-spaces
+           (assoc
+            :ring.response/headers
+            {"www-authenticate"
+             (www-authenticate-header db protection-spaces)}))})))))
+
 (defn authenticate
   "Authenticate a request. Return a modified request, with information about user,
   roles and other credentials."
-  [{::site/keys [db uri] :as req}]
+  [{::site/keys [db uri resource] :as req}]
 
   ;; TODO: This might be where we also add the 'on-behalf-of' info
 
-  (let [protection-spaces (protection-spaces db uri)
-        req (cond-> req protection-spaces (assoc ::pass/protection-spaces protection-spaces))
+  (log/tracef "RESOURCE is %s" (pr-str resource))
+
+  (let [protection-spaces (keep #(xt/entity db %) (::pass/protection-spaces resource []))
+        ;;req (cond-> req protection-spaces (assoc ::pass/protection-spaces protection-spaces))
         authorization-header (get-in req [:ring.request/headers "authorization"])]
 
-    (or
-     (when authorization-header
-       (let [{::rfc7235/keys [auth-scheme token68]}
-             (reap/authorization authorization-header)]
-
-         (or
-          (case (.toLowerCase auth-scheme)
-            "basic" (authenticate-with-basic-auth req db token68 (filter #(= (::pass/auth-scheme %) "Basic") protection-spaces))
-            "bearer" (authenticate-with-bearer-auth req db token68 (filter #(= (::pass/auth-scheme %) "Bearer") protection-spaces))
-            (throw
-             (ex-info
-              "Auth scheme unsupported"
-              {::site/request-context
-               (cond-> (assoc req :ring.response/status 401)
-                 protection-spaces
-                 (assoc
-                  :ring.response/headers
-                  {"www-authenticate"
-                   (www-authenticate-header protection-spaces)}))})))
-          req)))
-     req)))
+    (cond-> req
+      authorization-header (authenticate-with-authorization-header authorization-header protection-spaces))))
 
 (defn ^:deprecated login-template-model [req]
   {:query (str (:ring.request/query req))})

@@ -27,21 +27,20 @@
 (defmethod aero/reader 'ig/ref [_ _ value]
   (ig/ref value))
 
-(defn config
+(def config
   "Read EDN config, with the given aero options. See Aero docs at
   https://github.com/juxt/aero for details."
-  []
-  (log/infof "Configuration profile: %s" (name profile))
-  (let [custom-config (System/getProperty "site.config")
-        config-file (or (when-not (empty? custom-config) (io/file custom-config))
-                        (io/file (System/getProperty "user.home") ".config/site/config.edn"))]
-    (when-not (.exists config-file)
-      (log/error (str "Configuration file does not exist: " (.getAbsolutePath config-file)))
-      (throw (ex-info
-              (str "Please copy a configuration file to " (.getAbsolutePath config-file))
-              {})))
-    (log/debug "Loading configuration from" (.getAbsolutePath config-file))
-    (aero/read-config config-file {:profile profile})))
+  (memoize
+   (fn []
+     (log/infof "Configuration profile: %s" (name profile))
+     (let [config-file (io/file (System/getProperty "user.home") ".config/site/config.edn")]
+       (when-not (.exists config-file)
+         (log/error (str "Configuration file does not exist: " (.getAbsolutePath config-file)))
+         (throw (ex-info
+                 (str "Please copy a configuration file to " (.getAbsolutePath config-file))
+                 {})))
+       (log/debug "Loading configuration from" (.getAbsolutePath config-file))
+       (aero/read-config config-file {:profile profile})))))
 
 (defn system-config
   "Construct a new system, configured with the given profile"

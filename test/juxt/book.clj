@@ -365,8 +365,7 @@
                   [:xt/id [:re "https://example.org/protection-spaces/(.+)"]]
                   [:juxt.pass.alpha/canonical-root-uri [:re "https?://[^/]*"]]
                   [:juxt.pass.alpha/realm {:optional true} [:string {:min 1}]]
-                  [:juxt.pass.alpha/auth-scheme [:enum "Basic" "Bearer"]]
-                  [:juxt.pass.alpha/authentication-scope [:string {:min 1}]]])
+                  [:juxt.pass.alpha/auth-scheme [:enum "Basic" "Bearer"]]])
                 (site/set-type "https://meta.juxt.site/pass/protection-space")
                 xtdb.api/put]))]))}
 
@@ -411,6 +410,8 @@
       {:xt/id "https://example.org/protected-by-basic-auth/document.html"
        :juxt.http.alpha/content-type "text/html;charset=utf-8"
        :juxt.http.alpha/content "<p>This is a protected message that those authorized are allowed to read.</p>"
+       ;; TODO: Will need to explicitly refer to a protection space otherwise
+       ;; this won't work
        })
      ;; end::create-resource-protected-by-basic-auth![]
      ))))
@@ -445,9 +446,7 @@
        :juxt.pass.alpha/canonical-root-uri "https://example.org"
        :juxt.pass.alpha/realm "Wonderland" ; optional
 
-       :juxt.pass.alpha/auth-scheme "Basic"
-       :juxt.pass.alpha/authentication-scope "/protected-by-basic-auth/.*" ; regex pattern
-       })
+       :juxt.pass.alpha/auth-scheme "Basic"})
      ;; end::put-basic-protection-space![]
      ))))
 
@@ -516,9 +515,7 @@
        :juxt.pass.alpha/canonical-root-uri "https://example.org"
        :juxt.pass.alpha/realm "Wonderland" ; optional
 
-       :juxt.pass.alpha/auth-scheme "Bearer"
-       :juxt.pass.alpha/authentication-scope "/protected-by-bearer-auth/.*" ; regex pattern
-       })))))
+       :juxt.pass.alpha/auth-scheme "Bearer"})))))
 
 ;; Session Scope Example
 
@@ -1042,9 +1039,7 @@
        :juxt.pass.alpha/canonical-root-uri "https://example.org"
        ;;:juxt.pass.alpha/realm "Wonderland" ; optional
 
-       :juxt.pass.alpha/auth-scheme "Bearer"
-       :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
-       }))))
+       :juxt.pass.alpha/auth-scheme "Bearer"}))))
 
 (defn create-basic-protection-space [_]
   (eval
@@ -1057,9 +1052,7 @@
        :juxt.pass.alpha/canonical-root-uri "https://example.org"
        :juxt.pass.alpha/realm "Wonderland"   ; optional
 
-       :juxt.pass.alpha/auth-scheme "Basic"
-       :juxt.pass.alpha/authentication-scope "/private/.*" ; regex pattern
-       }))))
+       :juxt.pass.alpha/auth-scheme "Basic"}))))
 
 (defn with-body [req body-bytes]
   (if body-bytes

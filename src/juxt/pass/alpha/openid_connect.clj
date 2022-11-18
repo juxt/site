@@ -157,7 +157,7 @@
                          (build))]
         (try
           (let [verification (.verify verifier id-token)]
-            (log/tracef "JWT successfully verified: %s" verification))
+            (log/debugf "JWT successfully verified: %s" verification))
           (catch JWTVerificationException e
             (throw (ex-info "" {} e)))))
 
@@ -185,7 +185,7 @@
   (let [cached (xt/entity db uri)]
     (if (and cached (.after (:expiry cached) (java.util.Date.)))
       (do
-        (log/tracef "Returning JWKS from cache")
+        (log/debugf "Returning JWKS from cache")
         (::pass/jwks cached))
       (do
         (log/infof "Fetching JWKS from %s" uri)

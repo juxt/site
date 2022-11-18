@@ -31,7 +31,8 @@
 
        :juxt.site.alpha.malli/input-schema
        [:map
-        [:xt/id [:re "https://example.org/.*"]]]
+        [:xt/id [:re "https://example.org/.*"]]
+        [:juxt.pass.alpha/session-scope {:optional true} [:re "https://example.org/.*"]]]
 
        :juxt.site.alpha/prepare
        {:juxt.site.alpha.sci/program
@@ -72,16 +73,15 @@
        :juxt.pass.alpha/action "https://example.org/actions/install-authorization-server"
        :juxt.pass.alpha/purpose nil})))))
 
-(defn install-authorization-server! [_]
-  (eval
+(defn install-authorization-server! [{:juxt.pass.alpha/keys [session-scope]}]
+  (init/do-action
+   (substitute-actual-base-uri "https://example.org/subjects/system")
+   (substitute-actual-base-uri "https://example.org/actions/install-authorization-server")
    (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/install-authorization-server"
-      {:xt/id "https://example.org/oauth/authorize"
-       :juxt.http.alpha/content-type "text/html;charset=utf-8"
-       :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"})))))
+    {:xt/id "https://example.org/oauth/authorize"
+     :juxt.http.alpha/content-type "text/html;charset=utf-8"
+     :juxt.http.alpha/content "<p>Welcome to the Site authorization server.</p>"
+     :juxt.pass.alpha/session-scope session-scope})))
 
 (defn create-action-oauth-authorize! [_]
   (eval
@@ -357,7 +357,7 @@
 
 (def dependency-graph
   {"https://example.org/applications/{client}"
-   {:create #'register-example-application!
+   {:create #'register-application!
     :deps #{::init/system
             "https://example.org/actions/register-application"
             "https://example.org/permissions/system/register-application"}}
@@ -376,8 +376,11 @@
     :deps #{::init/system}}
 
    "https://example.org/oauth/authorize"
-   {:create #'install-authorization-server!
+   {:create (fn [_]
+              (install-authorization-server!
+               {:juxt.pass.alpha/session-scope "https://example.org/session-scopes/default"}))
     :deps #{::init/system
+            "https://example.org/session-scopes/default"
             "https://example.org/actions/install-authorization-server"
             "https://example.org/permissions/system/install-authorization-server"
             "https://example.org/actions/oauth/authorize"}}

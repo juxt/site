@@ -134,26 +134,27 @@
    ;; (openapi/locate-resource db uri req)
 
    ;; Is it in XTDB?
-   (when-let [e (some-> (xt/entity db uri) (assoc ::site/resource-provider ::db))]
+   (when-let [e (xt/entity db uri)]
      (when-not (::site/uri-template e)
-       e))
+       (assoc e ::site/resource-provider ::db)))
 
    ;; Is it found by any resource locators registered in the database?
    (match-uri-templated-uris db uri)
 
-   ;; Is it a redirect?
-   (when-let [[r loc] (first
-                       (xt/q db '{:find [r loc]
-                                  :where [[r ::site/resource uri]
-                                          [r ::site/location loc]
-                                          [r ::site/type "Redirect"]]
-                                  :in [uri]}
-                             uri))]
-     {::site/uri uri
-      ::site/methods {:get {} :head {} :options {}}
-      ::site/resource-provider r
-      ::http/redirect (cond-> loc (.startsWith loc base-uri)
-                              (subs (count base-uri)))})
+   ;; Is it a redirect?  Deprecated - not sure we need such a resource - we can
+   ;; always create a normal resource with a GET action now
+   #_(when-let [[r loc] (first
+                         (xt/q db '{:find [r loc]
+                                    :where [[r ::site/resource uri]
+                                            [r ::site/location loc]
+                                            [r ::site/type "Redirect"]]
+                                    :in [uri]}
+                               uri))]
+       {::site/uri uri
+        ::site/methods {:get {} :head {} :options {}}
+        ::site/resource-provider r
+        ::http/redirect (cond-> loc (.startsWith loc base-uri)
+                                (subs (count base-uri)))})
 
    ;; This can be put into the database to override the ::default-empty-resource
    ;; default.

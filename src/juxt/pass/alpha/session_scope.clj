@@ -8,7 +8,10 @@
    [xtdb.api :as xt]
    [clojure.tools.logging :as log]))
 
-(defn infer-session-scope [db uri]
+;; Deprecated, because from now on we want resources to EXPLICITLY reference
+;; session scopes. Basing security on something as arbitary as the format of the
+;; URI is definitely NOT simple, as well as insecure.
+#_(defn infer-session-scope [db uri]
   (let [scopes
         (for [{:keys [session-scope]}
               (xt/q
@@ -53,10 +56,14 @@
       subject (assoc ::pass/subject (xt/entity db subject)))))
 
 (defn wrap-session-scope [h]
-  (fn [{::site/keys [db uri] :as req}]
-    (let [scope (infer-session-scope db uri)
+  (fn [{::site/keys [db uri resource] :as req}]
 
-          _ (log/tracef "Scope for %s is %s" uri (pr-str scope))
+    (let [scope-id (::pass/session-scope resource)
+
+          _ (log/debugf "session-scope for %s is %s" uri scope-id)
+          _ (log/debugf "resources is %s" (pr-str resource))
+
+          scope (when scope-id (xt/entity db scope-id))
 
           cookie-name (when scope (:juxt.pass.alpha/cookie-name scope))
 
@@ -66,13 +73,13 @@
                 cookies-request
                 :cookies (get cookie-name) :value))
 
-          _ (log/tracef "session-token-id is %s" session-token-id!)
+          _ (log/debugf "session-token-id is %s" session-token-id!)
 
           session-details
           (when session-token-id!
             (lookup-session-details db session-token-id!))
 
-          _ (log/tracef "Session details for %s is %s" uri (pr-str session-details))
+          _ (log/debugf "Session details for %s is %s" uri (pr-str session-details))
           ]
 
       (h (cond-> req
