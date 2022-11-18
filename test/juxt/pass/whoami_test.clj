@@ -200,8 +200,7 @@
         oauth/dependency-graph
         example-users/dependency-graph
         example-applications/dependency-graph
-        dependency-graph
-        }}
+        dependency-graph}}
     #{"https://site.test/login"
       "https://site.test/user-identities/alice"
       "https://site.test/whoami"
@@ -209,16 +208,8 @@
       "https://site.test/whoami.html"
       "https://site.test/permissions/alice/whoami"
       "https://site.test/applications/test-app"
-
       ::oauth/authorization-server
-      "https://site.test/permissions/alice-can-authorize"
-
-      "https://site.test/applications/local-terminal"
-
-      ;; Authorize the app
-      }
-
-    (repl/e "https://site.test/permissions/alice-can-authorize")
+      "https://site.test/permissions/alice-can-authorize"}
 
     (let [login-result
           (form-based-auth/login-with-form!
@@ -233,16 +224,12 @@
           {access-token "access_token"}
           (oauth/authorize!
            {:juxt.pass.alpha/session-token session-token
-            "client_id" "local-terminal"})]
+            "client_id" "test-app"})]
 
-      (with-logging
-        (when access-token
-          (*handler*
-           {:juxt.site.alpha/uri "https://site.test/whoami"
-            :ring.request/method :get
-            :ring.request/headers
-            {"authorization" (format "Bearer %s" access-token)
-             "accept" "application/json"}}))))))
-
-(with-logging
-  (log/debug "hello"))
+      (when access-token
+        (*handler*
+         {:juxt.site.alpha/uri "https://site.test/whoami"
+          :ring.request/method :get
+          :ring.request/headers
+          {"authorization" (format "Bearer %s" access-token)
+           "accept" "application/json"}})))))
