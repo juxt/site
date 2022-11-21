@@ -640,8 +640,7 @@
               "https://site.test/actions/assign-doctor-to-patient"
               "https://site.test/permissions/system/assign-doctor-to-patient"})}})
 
-;; deftest eql-with-acl-test
-(with-fixtures
+(deftest eql-with-acl-test
   (let [resources
         (->
          #{::init/system
@@ -706,7 +705,6 @@
          #{session-scope/dependency-graph
            user/dependency-graph
            form-based-auth/dependency-graph
-;;           basic-auth/dependency-graph
            example-users/dependency-graph
            oauth/dependency-graph
            dependency-graph}})
@@ -824,26 +822,18 @@
         ;; broad permission on the get-patient action
 
         (testing "Access to /patient/005"
-          (with-logging
-            (let [response (*handler*
-                            {:ring.request/method :get
-                             :ring.request/path "/patients/005"
-                             :ring.request/headers
-                             {"authorization" (format "Bearer %s" alice-access-token)
-                              "accept" "application/json"}})]
-              #_(is (= (json/write-value-as-string {"name" "Angie Solis"})
-                       (String. (:ring.response/body response))))
-              #_(is (= 200 (:ring.response/status response)))
-
-              ;; Create a protection space
-
-              response
-            ;;;;;;;;;;;;;;;;;;;
-
-              ))
+          (let [response (*handler*
+                          {:ring.request/method :get
+                           :ring.request/path "/patients/005"
+                           :ring.request/headers
+                           {"authorization" (format "Bearer %s" alice-access-token)
+                            "accept" "application/json"}})]
+            (is (= (json/write-value-as-string {"name" "Angie Solis"})
+                     (String. (:ring.response/body response))))
+            (is (= 200 (:ring.response/status response))))
 
           ;; Bob can't see the patient details of Angie Solis
-          #_(let [response (*handler*
+          (let [response (*handler*
                           {:ring.request/method :get
                            :ring.request/path "/patients/005"
                            :ring.request/headers
@@ -851,7 +841,7 @@
                             "accept" "application/json"}})]
             (is (= 403 (:ring.response/status response)))))
 
-        #_(testing "List patients with /patients"
+        (testing "List patients with /patients"
 
           ;; Alice sees all 20 patients
           (let [response
