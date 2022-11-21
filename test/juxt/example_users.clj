@@ -45,13 +45,8 @@
 
    "https://example.org/users/{username}"
    {:deps #{::init/system
-            "https://example.org/actions/put-user"
-            ;;"https://example.org/actions/put-user-identity"
-            ;;"https://example.org/actions/put-openid-user-identity"
-            "https://example.org/permissions/system/put-user"
-            ;;"https://example.org/permissions/system/put-basic-user-identity"
-            ;;"https://example.org/permissions/system/put-openid-user-identity"
-            }
+            (substitute-actual-base-uri "https://example.org/actions/put-user")
+            (substitute-actual-base-uri "https://example.org/permissions/system/put-user")}
     :create (fn [{:keys [id params]}]
               (let [username (get params "username")]
                 (user/put-user!
