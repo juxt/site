@@ -13,8 +13,8 @@
                         "juxt.site.return-test"
                         "juxt.pass.form-based-auth-test"
                         "juxt.site.eql-datalog-compiler-test"
+                        "juxt.pass.whoami-test"
                         #_"juxt.book-test"
-                        #_"juxt.pass.whoami-test"
                         ]}]
 
  :reporter kaocha.report/documentation}

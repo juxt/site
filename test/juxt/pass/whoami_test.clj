@@ -145,58 +145,6 @@
       #{session-scope/dependency-graph
         user/dependency-graph
         form-based-auth/dependency-graph
-        example-users/dependency-graph
-        dependency-graph}}
-    #{"https://site.test/login"
-      "https://site.test/user-identities/alice"
-      "https://site.test/whoami"
-      "https://site.test/whoami.json"
-      "https://site.test/whoami.html"
-      "https://site.test/permissions/alice/whoami"})
-
-  (let [login-result
-        (form-based-auth/login-with-form!
-         *handler*
-         "username" "alice"
-         "password" "garden"
-         :juxt.site.alpha/uri "https://site.test/login")
-
-        session-token (:juxt.pass.alpha/session-token login-result)
-        _ (assert session-token)
-
-        response
-        (*handler*
-         (->
-          {:juxt.site.alpha/uri "https://site.test/whoami"
-           :ring.request/method :get
-           :ring.request/headers {"accept" "application/json"}
-           }
-          (assoc-session-token session-token)))
-
-        json (json/read-value (:ring.response/body response))
-        ]
-
-    (is (:ring.response/status response))
-    (is (= "Alice"
-           (get-in json ["subject" "juxt.pass.alpha/user-identity" "juxt.pass.alpha/user" "name"])))
-
-    ))
-
-;; Note: If we try to login (with basic), we'll won't need to user 'put' (which will
-;; lead to dangerously brittle tests if/when we change the structure of internal
-;; documents like sessions and session-tokens).
-
-;; TODO
-;; Login alice with basic (ensuring session scope exists)
-;; Passing the session-token as a cookie, call the /whoami resource.
-;; Build the functionality of GET /whoami into the action (in the prepare part of the transaction)
-
-(with-fixtures
-  (with-resources
-    ^{:dependency-graphs
-      #{session-scope/dependency-graph
-        user/dependency-graph
-        form-based-auth/dependency-graph
         oauth/dependency-graph
         example-users/dependency-graph
         example-applications/dependency-graph
@@ -227,9 +175,27 @@
             "client_id" "test-app"})]
 
       (when access-token
-        (*handler*
-         {:juxt.site.alpha/uri "https://site.test/whoami"
-          :ring.request/method :get
-          :ring.request/headers
-          {"authorization" (format "Bearer %s" access-token)
-           "accept" "application/json"}})))))
+        (let [{:ring.response/keys [status body]}
+              (*handler*
+               {:juxt.site.alpha/uri "https://site.test/whoami"
+                :ring.request/method :get
+                :ring.request/headers
+                {"authorization" (format "Bearer %s" access-token)
+                 "accept" "application/json"}})]
+          (is (= 200 status))
+          (is (= "Alice"
+                 (-> body
+                     json/read-value
+                     (get-in ["subject"
+                              "juxt.pass.alpha/user-identity"
+                              "juxt.pass.alpha/user"
+                              "name"] body)))))))))
+
+;; Note: If we try to login (with basic), we'll won't need to user 'put' (which will
+;; lead to dangerously brittle tests if/when we change the structure of internal
+;; documents like sessions and session-tokens).
+
+;; TODO
+;; Login alice with basic (ensuring session scope exists)
+;; Passing the session-token as a cookie, call the /whoami resource.
+;; Build the functionality of GET /whoami into the action (in the prepare part of the transaction)
