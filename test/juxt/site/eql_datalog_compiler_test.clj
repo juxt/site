@@ -3,6 +3,7 @@
 (ns juxt.site.eql-datalog-compiler-test
   (:require
    [clojure.java.io :as io]
+;;   [juxt.pass.basic-auth :as basic-auth]
    [juxt.site.alpha.graphql-eql-compiler :refer [graphql->eql-ast]]
    [juxt.grab.alpha.parser :as grab.parser]
    [juxt.grab.alpha.document :as grab.document]
@@ -10,33 +11,31 @@
    [edn-query-language.core :as eql]
    [jsonista.core :as json]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
-   [juxt.book :as book]
    [juxt.pass.session-scope :as session-scope]
+   [juxt.example-users :as example-users]
    [juxt.pass.user :as user]
    [juxt.pass.oauth :as oauth]
    [juxt.pass.form-based-auth :as form-based-auth]
    [juxt.flip.alpha.core :as f]
    [juxt.site.alpha.eql-datalog-compiler :as eqlc]
+   [juxt.site.alpha.logging :refer [with-logging]]
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha :as-alias pass]
    [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init]
    [juxt.site.alpha.repl :as repl]
-   [juxt.test.util :refer [with-system-xt with-resources *xt-node* *handler*] :as tutil]
+   [juxt.test.util :refer [with-system-xt with-resources with-handler *xt-node* *handler*] :as tutil]
    [xtdb.api :as xt]))
 
 ;; TODO: Dedupe between this test ns and juxt.book-test
 
-(defn with-handler [f]
+#_(defn with-handler [f]
   (binding [*handler*
             (tutil/make-handler
              {::site/xt-node *xt-node*
               ::site/base-uri "https://site.test"
               ::site/uri-prefix "https://site.test"})]
     (f)))
-
-(defn call-handler [request]
-  (*handler* (book/with-body request (::body-bytes request))))
 
 (use-fixtures :each with-system-xt with-handler)
 
@@ -641,15 +640,16 @@
               "https://site.test/actions/assign-doctor-to-patient"
               "https://site.test/permissions/system/assign-doctor-to-patient"})}})
 
-(deftest eql-with-acl-test
+;; deftest eql-with-acl-test
+(with-fixtures
   (let [resources
         (->
          #{::init/system
 
            "https://site.test/login"
-           "https://site.test/user-identities/alice/basic"
-           "https://site.test/user-identities/bob/basic"
-           "https://site.test/user-identities/carlos/basic"
+           "https://site.test/user-identities/alice"
+           "https://site.test/user-identities/bob"
+           "https://site.test/user-identities/carlos"
 
            "https://site.test/oauth/authorize"
            "https://site.test/session-scopes/default"
@@ -703,10 +703,11 @@
     (with-resources
       (with-meta resources
         {:dependency-graphs
-         #{book/dependency-graph
-           session-scope/dependency-graph
+         #{session-scope/dependency-graph
            user/dependency-graph
            form-based-auth/dependency-graph
+;;           basic-auth/dependency-graph
+           example-users/dependency-graph
            oauth/dependency-graph
            dependency-graph}})
 
@@ -743,35 +744,53 @@
         :reading {"heartRate" "87"
                   "bloodPressure" "127/80"}})
 
-      (let [alice-session-token (book/login-with-form! {"username" "alice" "password" "garden"})
+      (let [alice-session-token
+            (form-based-auth/login-with-form!
+             *handler*
+             :juxt.site.alpha/uri "https://site.test/login"
+             "username" "alice"
+             "password" "garden")
 
             {alice-access-token "access_token" error "error"}
             (oauth/authorize!
-             {:juxt.pass.alpha/session-token alice-session-token
-              "client_id" "local-terminal"
-              ;; "scope" ["https://site.test/oauth/scope/read-personal-data"]
-              })
+             (merge
+              alice-session-token
+              {"client_id" "local-terminal"
+               ;; "scope" ["https://site.test/oauth/scope/read-personal-data"]
+               }))
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
-            bob-session-token (book/login-with-form! {"username" "bob" "password" "walrus"})
+            bob-session-token
+            (form-based-auth/login-with-form!
+             *handler*
+             :juxt.site.alpha/uri "https://site.test/login"
+             "username" "bob"
+             "password" "walrus")
             {bob-access-token "access_token"
              error "error"}
             (oauth/authorize!
-             {:juxt.pass.alpha/session-token bob-session-token
-              "client_id" "local-terminal"
-              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
-              }
+             (merge
+              bob-session-token
+              {"client_id" "local-terminal"
+               ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+               })
              )
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
-            carlos-session-token (book/login-with-form! {"username" "carlos" "password" "toothpick"})
+            carlos-session-token
+            (form-based-auth/login-with-form!
+             *handler*
+             :juxt.site.alpha/uri "https://site.test/login"
+             "username" "carlos"
+             "password" "jackal")
             {carlos-access-token "access_token"
              error "error"}
             (oauth/authorize!
-             {:juxt.pass.alpha/session-token carlos-session-token
-              "client_id" "local-terminal"
-              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
-              }
+             (merge
+              carlos-session-token
+              {"client_id" "local-terminal"
+               ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+               })
              )
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
@@ -803,19 +822,28 @@
 
         ;; Alice can access a particular patient because she has a particularly
         ;; broad permission on the get-patient action
+
         (testing "Access to /patient/005"
-          (let [response (*handler*
-                          {:ring.request/method :get
-                           :ring.request/path "/patients/005"
-                           :ring.request/headers
-                           {"authorization" (format "Bearer %s" alice-access-token)
-                            "accept" "application/json"}})]
-            (is (= (json/write-value-as-string {"name" "Angie Solis"})
-                   (String. (:ring.response/body response))))
-            (is (= 200 (:ring.response/status response))))
+          (with-logging
+            (let [response (*handler*
+                            {:ring.request/method :get
+                             :ring.request/path "/patients/005"
+                             :ring.request/headers
+                             {"authorization" (format "Bearer %s" alice-access-token)
+                              "accept" "application/json"}})]
+              #_(is (= (json/write-value-as-string {"name" "Angie Solis"})
+                       (String. (:ring.response/body response))))
+              #_(is (= 200 (:ring.response/status response)))
+
+              ;; Create a protection space
+
+              response
+            ;;;;;;;;;;;;;;;;;;;
+
+              ))
 
           ;; Bob can't see the patient details of Angie Solis
-          (let [response (*handler*
+          #_(let [response (*handler*
                           {:ring.request/method :get
                            :ring.request/path "/patients/005"
                            :ring.request/headers
@@ -823,7 +851,7 @@
                             "accept" "application/json"}})]
             (is (= 403 (:ring.response/status response)))))
 
-        (testing "List patients with /patients"
+        #_(testing "List patients with /patients"
 
           ;; Alice sees all 20 patients
           (let [response
@@ -863,7 +891,7 @@
         ;; Metadata attributed to the EQL contains actions.
         ;; The EQL could be the target of the compilation of a GraphQL query.
 
-        (let [db (xt/db *xt-node*)
+        #_(let [db (xt/db *xt-node*)
               extract-subject-with-token
               (fn [token]
                 (::pass/subject
@@ -1295,9 +1323,9 @@
          #{::init/system
 
            "https://site.test/login"
-           "https://site.test/user-identities/alice/basic"
-           "https://site.test/user-identities/bob/basic"
-           "https://site.test/user-identities/carlos/basic"
+           "https://site.test/user-identities/alice"
+           "https://site.test/user-identities/bob"
+           "https://site.test/user-identities/carlos"
 
            "https://site.test/oauth/authorize"
            "https://site.test/session-scopes/default"
@@ -1351,29 +1379,41 @@
     (with-resources
       (with-meta resources
         {:dependency-graphs
-         #{book/dependency-graph
-           session-scope/dependency-graph
+         #{session-scope/dependency-graph
            user/dependency-graph
            form-based-auth/dependency-graph
+           ;;basic-auth/dependency-graph
+           example-users/dependency-graph
            oauth/dependency-graph
            dependency-graph}})
 
-      (let [alice-session-token (book/login-with-form! {"username" "alice" "password" "garden"})
+      (let [alice-session-token
+            (form-based-auth/login-with-form!
+             *handler*
+             :juxt.site.alpha/uri "https://site.test/login"
+             "username" "alice"
+             "password" "garden")
             {alice-access-token "access_token" error "error"}
             (oauth/authorize!
-             {:juxt.pass.alpha/session-id alice-session-token
-              "client_id" "local-terminal"
-              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
-              })
-            _ (is (nil? error) (format "OAuth2 grant error: %s" error))
+             (merge
+              alice-session-token
+              {"client_id" "local-terminal"
+               ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+               }))
 
-            bob-session-token (book/login-with-form! {"username" "bob" "password" "walrus"})
+            bob-session-token
+            (form-based-auth/login-with-form!
+             *handler*
+             :juxt.site.alpha/uri "https://site.test/login"
+             "username" "bob"
+             "password" "walrus")
             {bob-access-token "access_token"}
             (oauth/authorize!
-             {:juxt.pass.alpha/session-token bob-session-token
-              "client_id" "local-terminal"
-              ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
-              })
+             (merge
+              bob-session-token
+              {"client_id" "local-terminal"
+               ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+               }))
 
             db (xt/db *xt-node*)
 
@@ -1405,55 +1445,58 @@
                  (grab.document/compile-document schema)
                  (grab.document/get-operation "GetDoctors")))
 
-            q (first (eqlc/compile-ast db eql-ast))]
+            q (first (eqlc/compile-ast db eql-ast))
+
+            ]
+
 
         (testing "From GraphQL to database results"
-          (testing "Alice's view"
+              (testing "Alice's view"
+                (is (= #{{:name "Dr. Jack Conway",
+                          :juxt.site.alpha/type "https://site.test/types/doctor",
+                          :xt/id "https://site.test/doctors/001",
+                          :patients
+                          [{:name "Terry Levine",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/001",
+                            :readings nil}
+                           {:name "Jeannie Finley",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/002",
+                            :readings nil}
+                           {:name "Jewel Blackburn",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/003",
+                            :readings nil}
+                           {:name "Angie Solis",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/005",
+                            :readings nil}]}
+                         {:name "Dr. Jackson",
+                          :juxt.site.alpha/type "https://site.test/types/doctor",
+                          :xt/id "https://site.test/doctors/003",
+                          :patients
+                          [{:name "Floyd Castro",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/006",
+                            :readings nil}
+                           {:name "Sondra Richardson",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/010",
+                            :readings nil}]}}
+                       (eqlc/prune-result (xt/q db q alice nil))))))
+
+          (testing "Bob's view"
             (is (= #{{:name "Dr. Jack Conway",
                       :juxt.site.alpha/type "https://site.test/types/doctor",
                       :xt/id "https://site.test/doctors/001",
-                      :patients
-                      [{:name "Terry Levine",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/001",
-                        :readings nil}
-                       {:name "Jeannie Finley",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/002",
-                        :readings nil}
-                       {:name "Jewel Blackburn",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/003",
-                        :readings nil}
-                       {:name "Angie Solis",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/005",
-                        :readings nil}]}
+                      :patients nil}
                      {:name "Dr. Jackson",
                       :juxt.site.alpha/type "https://site.test/types/doctor",
                       :xt/id "https://site.test/doctors/003",
                       :patients
-                      [{:name "Floyd Castro",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/006",
-                        :readings nil}
-                       {:name "Sondra Richardson",
+                      [{:name "Sondra Richardson",
                         :juxt.site.alpha/type "https://site.test/types/patient",
                         :xt/id "https://site.test/patients/010",
                         :readings nil}]}}
-                   (eqlc/prune-result (xt/q db q alice nil))))))
-
-        (testing "Bob's view"
-          (is (= #{{:name "Dr. Jack Conway",
-                    :juxt.site.alpha/type "https://site.test/types/doctor",
-                    :xt/id "https://site.test/doctors/001",
-                    :patients nil}
-                   {:name "Dr. Jackson",
-                    :juxt.site.alpha/type "https://site.test/types/doctor",
-                    :xt/id "https://site.test/doctors/003",
-                    :patients
-                    [{:name "Sondra Richardson",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/010",
-                      :readings nil}]}}
-                 (eqlc/prune-result (xt/q db q bob nil)))))))))
+                   (eqlc/prune-result (xt/q db q bob nil)))))))))

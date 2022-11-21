@@ -4,31 +4,26 @@
   (:require
    [clojure.edn :as edn]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
-   [java-http-clj.core :as http-client]
    [juxt.book :as book]
+   [juxt.example-users :as example-users]
    [juxt.flip.alpha.core :as f]
    [juxt.flip.alpha.hiccup :as hc]
+   [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.session-scope :refer [infer-session-scope]]
+   [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.pass.form-based-auth :as form-based-auth]
+   [juxt.pass.oauth :as oauth]
+   [juxt.pass.openid :as openid]
    [juxt.pass.session-scope :as session-scope]
    [juxt.pass.user :as user]
-   [juxt.pass.form-based-auth :as form-based-auth]
-   [juxt.pass.alpha.util :refer [make-nonce]]
    [juxt.site.alpha :as-alias site]
-   [juxt.site.bootstrap :as bootstrap]
-   [juxt.http.alpha :as-alias http]
-   [juxt.pass.openid :as openid]
-   [juxt.pass.oauth :as oauth]
    [juxt.site.alpha.init :as init]
    [juxt.site.alpha.repl :as repl]
-   [juxt.test.util :refer [with-system-xt *xt-node* *handler* with-resources with-fixtures with-handler] :as tutil]
+   [juxt.site.bootstrap :as bootstrap]
+   [juxt.test.util :refer [with-system-xt *xt-node* *handler* with-resources with-fixtures with-handler assoc-body] :as tutil]
    [ring.util.codec :as codec]
    [xtdb.api :as xt])
   (:import (clojure.lang ExceptionInfo)))
-
-;; TODO: This should just be a 'conversational' API on request - e.g. (assoc-body request body)
-(defn finalize-request [request]
-  (book/with-body request (::body-bytes request)))
 
 (use-fixtures :each with-system-xt with-handler)
 
@@ -42,7 +37,7 @@
     (let [req {:ring.request/method :get
                :ring.request/path "/hello"}
           invalid-req (assoc req :ring.request/path "/not-hello")]
-      (is (= 404 (:ring.response/status (*handler* (finalize-request invalid-req))))))))
+      (is (= 404 (:ring.response/status (*handler* invalid-req)))))))
 
 (deftest public-resource-test
   (with-resources
@@ -60,7 +55,7 @@
                :ring.request/path "/hello"}]
 
       (testing "Can retrieve a public immutable resource"
-        (let [{:ring.response/keys [status body]} (*handler* (finalize-request req))]
+        (let [{:ring.response/keys [status body]} (*handler* req)]
           (is (= 200 status))
           (is (= "Hello World!\r\n" (String. body)))))
 
@@ -79,6 +74,7 @@
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         book/dependency-graph
+        example-users/dependency-graph
         user/dependency-graph
         form-based-auth/dependency-graph
         oauth/dependency-graph}}
@@ -88,7 +84,7 @@
       "https://site.test/oauth/authorize"
       "https://site.test/session-scopes/default"
       "https://site.test/login"
-      "https://site.test/user-identities/alice/basic"
+      "https://site.test/user-identities/alice"
       "https://site.test/permissions/alice-can-authorize"
       "https://site.test/applications/local-terminal"
       }
@@ -611,9 +607,11 @@
                :ring.request/path "/actions/install-graphql-endpoint"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/edn"}
-               ::body-bytes (.getBytes (pr-str {:xt/id "https://site.test/graphql"}))}
-              response (*handler* (finalize-request request))]
+                "content-type" "application/edn"}}
+              response (*handler*
+                        (-> request
+                            (assoc-body
+                             (.getBytes (pr-str {:xt/id "https://site.test/graphql"})))))]
           (is (= 403 (:ring.response/status response)))))
 
       (testing "Installation at wrong endpoint denied"
@@ -631,9 +629,8 @@
                :ring.request/path "/actions/install-graphql-endpoint"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/edn"}
-               ::body-bytes (.getBytes (pr-str {:xt/id "https://site.test/wrong-graphql"}))}
-              response (*handler* (finalize-request request))]
+                "content-type" "application/edn"}}
+              response (*handler* (-> request (assoc-body (.getBytes (pr-str {:xt/id "https://site.test/wrong-graphql"})))))]
           (is (= 403 (:ring.response/status response)))))
 
       (testing "Installation successful"
@@ -651,9 +648,10 @@
                :ring.request/path "/actions/install-graphql-endpoint"
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
-                "content-type" "application/edn"}
-               ::body-bytes (.getBytes (pr-str {:xt/id "https://site.test/graphql"}))}
-              response (*handler* (finalize-request request))]
+                "content-type" "application/edn"}}
+              response (*handler*
+                        (-> request
+                            (assoc-body (.getBytes (pr-str {:xt/id "https://site.test/graphql"})))))]
           (is (= 201 (:ring.response/status response))))))))
 
 (deftest install-graphql-schema-with-wrong-user
@@ -683,10 +681,8 @@
                :ring.request/headers
                {"authorization" (format "Bearer %s" access-token)
                 "content-type" "application/graphql"
-                "cookie" (format "id=%s" session-token)}
-               ::body-bytes (.getBytes "schema { }")})
-
-          response (*handler* (finalize-request request))]
+                "cookie" (format "id=%s" session-token)}})
+          response (*handler* (assoc-body request (.getBytes "schema { }")))]
       (testing "Attempting for an unauthorized user to PUT a graphql schema"
         (is (= 403 (:ring.response/status response)))))))
 
@@ -762,13 +758,13 @@
 
           put-response-bad-content
           (*handler*
-           (finalize-request
+           (->
             {:ring.request/method :put
              :ring.request/path "/graphql"
              :ring.request/headers
              {"authorization" (format "Bearer %s" access-token)
-              "content-type" "text/csv"}
-             ::body-bytes (.getBytes "schema { }")}))
+              "content-type" "text/csv"}}
+            (assoc-body (.getBytes "schema { }"))))
 
           _ (is (= 415 (:ring.response/status put-response-bad-content)))
 
@@ -777,36 +773,33 @@
            :ring.request/path "/graphql"
            :ring.request/headers
            {"authorization" (format "Bearer %s" access-token)
-            "content-type" "application/graphql"}
-           ::body-bytes (.getBytes "type Query { myName: String }")}
+            "content-type" "application/graphql"}}
 
-          put-response (*handler* (finalize-request put-request))
+          put-response (*handler* (assoc-body put-request (.getBytes "type Query { myName: String }")))
 
           _ (is (= 201 (:ring.response/status put-response)))
           _ (is (nil? (get-in put-response [:ring.response/headers "location"])))
 
-          second-put-response (*handler* (finalize-request put-request))
+          second-put-response (*handler* (assoc-body put-request (.getBytes "type Query { myName: String }")))
           _ (is (= 200 (:ring.response/status second-put-response)))
 
           get-response
           (*handler*
-           (finalize-request
-            {:ring.request/method :get
-             :ring.request/path "/graphql"
-             :ring.request/headers
-             {"authorization" (format "Bearer %s" access-token)}}))
+           {:ring.request/method :get
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)}})
           _ (is (= 200 (:ring.response/status get-response)))
           _ (is (= "type Query { myName: String }" (String. (:ring.response/body get-response))))
           _ (is (= "application/graphql" (get-in get-response [:ring.response/headers "content-type"])))
 
           get-response-for-edn
           (*handler*
-           (finalize-request
-            {:ring.request/method :get
-             :ring.request/path "/graphql"
-             :ring.request/headers
-             {"authorization" (format "Bearer %s" access-token)
-              "accept" "application/edn"}}))
+           {:ring.request/method :get
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)
+             "accept" "application/edn"}})
           _ (is (= 200 (:ring.response/status get-response-for-edn)))
 
           errors (:errors (edn/read-string (String. (:ring.response/body get-response))))
@@ -815,12 +808,11 @@
 
           get-response-for-json
           (*handler*
-           (finalize-request
-            {:ring.request/method :get
-             :ring.request/path "/graphql"
-             :ring.request/headers
-             {"authorization" (format "Bearer %s" access-token)
-              "accept" "application/json"}}))
+           {:ring.request/method :get
+            :ring.request/path "/graphql"
+            :ring.request/headers
+            {"authorization" (format "Bearer %s" access-token)
+             "accept" "application/json"}})
 
           _ (is (= 406 (:ring.response/status get-response-for-json)))
 
@@ -844,22 +836,21 @@
          :ring.request/path "/graphql"
          :ring.request/headers
          {"authorization" (format "Bearer %s" access-token)
-          "content-type" "application/graphql"}
-         ::body-bytes (.getBytes schema)}
-        put-response (*handler* (finalize-request put-request))]
+          "content-type" "application/graphql"}}
+        put-response (*handler* (assoc-body put-request (.getBytes schema)))]
     (is (= 201 (:ring.response/status put-response)))
     put-response))
 
 (defn graphql-query [^String access-token ^String query]
   (let [post-response
         (*handler*
-         (finalize-request
+         (assoc-body
           {:ring.request/method :post
            :ring.request/path "/graphql"
            :ring.request/headers
            {"authorization" (format "Bearer %s" access-token)
-            "content-type" "application/graphql"}
-           ::body-bytes (.getBytes query)}))
+            "content-type" "application/graphql"}}
+          (.getBytes query)))
 
         _ (is (= 200 (:ring.response/status post-response)))]
     (:ring.response/body post-response)))

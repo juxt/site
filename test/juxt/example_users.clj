@@ -30,7 +30,9 @@
   :any])
 
 (def username->user-details
-  {"alice" {:name "Alice" :password "garden"}})
+  {"alice" {:name "Alice" :password "garden"}
+   "bob" {:name "Bob" :password "walrus"}
+   "carlos" {:name "Carlos" :password "jackal"}})
 
 (def dependency-graph
   {"https://example.org/permissions/{username}-can-authorize"
@@ -43,8 +45,13 @@
 
    "https://example.org/users/{username}"
    {:deps #{::init/system
-            ::user/all-actions
-            ::user/default-permissions}
+            "https://example.org/actions/put-user"
+            ;;"https://example.org/actions/put-user-identity"
+            ;;"https://example.org/actions/put-openid-user-identity"
+            "https://example.org/permissions/system/put-user"
+            ;;"https://example.org/permissions/system/put-basic-user-identity"
+            ;;"https://example.org/permissions/system/put-openid-user-identity"
+            }
     :create (fn [{:keys [id params]}]
               (let [username (get params "username")]
                 (user/put-user!
@@ -60,14 +67,19 @@
    "https://example.org/user-identities/{username}"
    {:deps (fn [params {:juxt.site.alpha/keys [base-uri]}]
             #{::init/system
-              (format "%s/users/%s" base-uri (get params "username"))})
+              (format "%s/users/%s" base-uri (get params "username"))
+              ;; TODO: Why do we have to substitute here and not in the other
+              ;; deps? Is it because this is a function?
+              (substitute-actual-base-uri "https://example.org/actions/put-user-identity")
+              (substitute-actual-base-uri "https://example.org/permissions/system/put-user-identity")
+              })
     :create (fn [{:keys [id params]}]
               ;; TODO: Make this data rather than calling a function! (The
               ;; intention here is to demote this graphs to data;
               (let [username (get params "username")]
                 (init/do-action
                  (init/substitute-actual-base-uri "https://example.org/subjects/system")
-                 (init/substitute-actual-base-uri "https://example.org/actions/put-basic-user-identity")
+                 (init/substitute-actual-base-uri "https://example.org/actions/put-user-identity")
                  (let [user-details (username->user-details username)
                        user-id (format "https://example.org/users/%s" username)]
                    (init/substitute-actual-base-uri

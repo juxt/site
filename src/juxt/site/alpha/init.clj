@@ -314,18 +314,22 @@
        :callback-uri (get-in callback [::pass/puts 0])})))
 
 (defn lookup [g id]
-  (or
-   (when-let [v (get g id)] (assoc v :id id))
-   (some (fn [[k v]]
-;;           (when-not (string? id) (throw (ex-info "DEBUG" {:id id})))
-           (when-let [matches (re-matches (to-regex k) id)]
-             (assoc v
-                    :id id
-                    :params
-                    (zipmap
-                     (map second (re-seq #"\{(\p{Alpha}+)\}" k))
-                     (next matches)))))
-         g)))
+  (try
+    (or
+     (when-let [v (get g id)] (assoc v :id id))
+     (some (fn [[k v]]
+             ;;           (when-not (string? id) (throw (ex-info "DEBUG" {:id id})))
+             (when-let [matches (re-matches (to-regex k) id)]
+               (assoc v
+                      :id id
+                      :params
+                      (zipmap
+                       (map second (re-seq #"\{(\p{Alpha}+)\}" k))
+                       (next matches)))))
+           g))
+    (catch Exception e
+      (throw (ex-info (format "Failed to lookup %s" id) {:id id} e))
+      )))
 
 (def dependency-graph-malli-schema
   [:map-of [:or :string :keyword]

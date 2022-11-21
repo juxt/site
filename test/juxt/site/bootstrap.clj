@@ -362,8 +362,12 @@
 (defn bootstrap* [opts]
   (converge!
    #{:juxt.site.alpha.init/system
-     :juxt.pass.user/all-actions
-     :juxt.pass.user/default-permissions
+
+     "https://example.org/actions/put-user"
+     ;;"https://example.org/actions/put-openid-user-identity"
+     "https://example.org/permissions/system/put-user"
+     ;;"https://example.org/permissions/system/put-openid-user-identity"
+
      :juxt.pass.openid/all-actions
      :juxt.pass.openid/default-permissions
      (substitute-actual-base-uri "https://example.org/permissions/system/put-session-scope")}
@@ -414,7 +418,7 @@
   [& {:keys [name username]
       :juxt.pass.jwt.claims/keys [iss sub nickname]}]
   (user/put-user! :username username :name name)
-  (user/put-openid-user-identity!
+  (openid/put-openid-user-identity!
    (cond-> {:username username
             :juxt.pass.jwt.claims/iss iss}
      sub (assoc :juxt.pass.jwt.claims/sub sub)

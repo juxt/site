@@ -10,6 +10,7 @@
    [juxt.pass.session-scope :as session-scope]
    [juxt.pass.oauth :as oauth]
    [juxt.pass.form-based-auth :as form-based-auth]
+   [juxt.pass.basic-auth :as basic-auth]
    [juxt.pass.alpha :as-alias pass]
    [juxt.flip.alpha.core :as f]
    [juxt.site.alpha.graphql.flip :as graphql-flip]
@@ -17,7 +18,7 @@
    [juxt.site.alpha :as-alias site]
    [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
-   [juxt.test.util :refer [*handler*]]
+   [juxt.test.util :refer [*handler* assoc-body]]
    [malli.core :as malli]
    [clojure.string :as str]))
 
@@ -432,42 +433,6 @@
        })
      ;; end::grant-permission-to-resource-protected-by-basic-auth![]
      ))))
-
-(defn put-basic-protection-space! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::put-basic-protection-space![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/put-protection-space"
-      {:xt/id "https://example.org/protection-spaces/basic/wonderland"
-
-       :juxt.pass.alpha/canonical-root-uri "https://example.org"
-       :juxt.pass.alpha/realm "Wonderland" ; optional
-
-       :juxt.pass.alpha/auth-scheme "Basic"})
-     ;; end::put-basic-protection-space![]
-     ))))
-
-(defn create-basic-user-identity! [& {:juxt.pass.alpha/keys [username password realm]}]
-  (assert username)
-  (assert password)
-  (assert realm)
-  (eval
-   (substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/put-basic-user-identity"
-      {:xt/id ~(format "https://example.org/user-identities/%s/basic" (str/lower-case username))
-       :juxt.pass.alpha/user ~(format "https://example.org/users/%s" (str/lower-case username))
-       ;; Perhaps all user identities need this?
-       :juxt.pass.alpha/canonical-root-uri "https://example.org"
-       :juxt.pass.alpha/realm ~realm
-       ;; Basic auth will only work if these are present
-       :juxt.pass.alpha/username ~username
-       ;; This will be encrypted
-       :juxt.pass.alpha/password ~password}))))
 
 ;; HTTP Bearer Auth
 
@@ -1041,26 +1006,6 @@
 
        :juxt.pass.alpha/auth-scheme "Bearer"}))))
 
-(defn create-basic-protection-space [_]
-  (eval
-   (substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/put-protection-space"
-      {:xt/id "https://example.org/protection-spaces/basic"
-
-       :juxt.pass.alpha/canonical-root-uri "https://example.org"
-       :juxt.pass.alpha/realm "Wonderland"   ; optional
-
-       :juxt.pass.alpha/auth-scheme "Basic"}))))
-
-(defn with-body [req body-bytes]
-  (if body-bytes
-    (-> req
-        (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
-        (assoc :ring.request/body (io/input-stream body-bytes)))
-    req))
-
 (defn login-with-form!
   "Return a session id (or nil) given a map of fields."
   [& {:strs [username password] :as args}]
@@ -1137,10 +1082,11 @@
          {"authorization" (format "Bearer %s" access-token)
           "content-type" "application/edn"}}]
     (*handler*
-     (with-body request
-       (.getBytes
-        (pr-str
-         {:xt/id (format "%s/graphql" (substitute-actual-base-uri "https://example.org"))}))))))
+     (assoc-body
+      request
+      (.getBytes
+       (pr-str
+        {:xt/id (format "%s/graphql" (substitute-actual-base-uri "https://example.org"))}))))))
 
 (defn create-action-create-oauth-scope! [_]
   (eval
@@ -1261,32 +1207,6 @@
    {:create #'grant-permission-to-put-protection-space!
     :deps #{::init/system}}
 
-   "https://example.org/users/{username}"
-   {:create (fn [{:keys [params]}]
-              (let [username (get params "username")]
-                (create-user!
-                 {:username username
-                  :name (str (str/upper-case (first username)) (subs username 1))})))
-    :deps #{::init/system
-            "https://example.org/actions/put-user"
-            "https://example.org/permissions/system/put-user"}}
-
-   "https://example.org/user-identities/{username}/basic"
-   {:create (fn [{:keys [params]}]
-              (let [username (get params "username")]
-                (create-basic-user-identity!
-                 {:juxt.pass.alpha/username username
-                  :juxt.pass.alpha/password (case username
-                                              "alice" "garden"
-                                              "bob" "walrus"
-                                              "carlos" "toothpick")
-                  :juxt.pass.alpha/realm "Wonderland"})))
-    :deps (fn [{:strs [username]} {:juxt.site.alpha/keys [base-uri]}]
-            #{::init/system
-              (format "%s/actions/put-basic-user-identity" base-uri)
-              (format "%s/permissions/system/put-basic-user-identity" base-uri)
-              (format "%s/users/%s" base-uri username)})}
-
    "https://example.org/protected-by-session-scope/document.html"
    {:create #'create-resource-protected-by-session-scope!
     :deps #{::init/system
@@ -1325,14 +1245,6 @@
             "https://example.org/actions/put-protection-space"
             "https://example.org/permissions/system/put-protection-space"}
     :create #'create-bearer-protection-space}
-
-   "https://example.org/protection-spaces/basic"
-   {:deps #{::init/system
-            "https://example.org/_site/do-action"
-            "https://example.org/subjects/system"
-            "https://example.org/actions/put-protection-space"
-            "https://example.org/permissions/system/put-protection-space"}
-    :create #'create-basic-protection-space}
 
    "https://example.org/actions/put-graphql-schema"
    {:deps #{::init/system}

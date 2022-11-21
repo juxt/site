@@ -252,8 +252,7 @@ Password: <input name=password type=password>
 
 (defn login-with-form!
   "Return a session id (or nil) given a map of fields."
-  [handler & {:juxt.site.alpha/keys [uri]
-      :as args}]
+  [handler & {:juxt.site.alpha/keys [uri] :as args}]
   {:pre [(malli/validate
           [:map
            ;;[:juxt.site.alpha/uri [:re "https://.*"]]
