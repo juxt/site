@@ -12,7 +12,7 @@
                         "juxt.site.graphql-compiler-test"
                         "juxt.site.return-test"
                         "juxt.pass.form-based-auth-test"
-                        ;;"juxt.site.eql-datalog-compiler-test"
+                        "juxt.site.eql-datalog-compiler-test"
                         #_"juxt.book-test"
                         #_"juxt.pass.whoami-test"
                         ]}]
