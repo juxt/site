@@ -7,7 +7,6 @@
    [edn-query-language.core :as eql]
    [jsonista.core :as json]
    [juxt.example-users :as example-users]
-   [juxt.flip.alpha.core :as f]
    [juxt.grab.alpha.document :as grab.document]
    [juxt.grab.alpha.parser :as grab.parser]
    [juxt.grab.alpha.schema :as grab.schema]
@@ -23,19 +22,8 @@
    [juxt.site.alpha.graphql-eql-compiler :refer [graphql->eql-ast]]
    [juxt.site.alpha.init :as init]
    [juxt.site.alpha.logging :refer [with-logging]]
-   [juxt.site.alpha.repl :as repl]
    [juxt.test.util :refer [with-system-xt with-resources with-handler *xt-node* *handler*] :as tutil]
    [xtdb.api :as xt]))
-
-;; TODO: Dedupe between this test ns and juxt.book-test
-
-#_(defn with-handler [f]
-    (binding [*handler*
-              (tutil/make-handler
-               {::site/xt-node *xt-node*
-                ::site/base-uri "https://site.test"
-                ::site/uri-prefix "https://site.test"})]
-      (f)))
 
 (use-fixtures :each with-system-xt with-handler)
 
@@ -49,25 +37,39 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/register-doctor"
 
+    :juxt.site.alpha.malli/input-schema
+    [:map
+     [:xt/id [:re "https://site.test/doctors/.*"]]]
+
+    :juxt.site.alpha/prepare
+    {:juxt.site.alpha.sci/program
+
+     (pr-str
+      '(let [content-type (-> *ctx*
+                              :juxt.site.alpha/received-representation
+                              :juxt.http.alpha/content-type)
+             body (-> *ctx*
+                      :juxt.site.alpha/received-representation
+                      :juxt.http.alpha/body)]
+         (case content-type
+           "application/edn"
+           (some->
+            body
+            (String.)
+            clojure.edn/read-string
+            juxt.site.malli/validate-input
+            (assoc
+             :juxt.site.alpha/type "https://site.test/types/doctor"
+             :juxt.pass.alpha/protection-spaces #{"https://site.test/protection-spaces/bearer"}
+             :juxt.site.alpha/methods
+             {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
+              :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
+              :options {}})))))}
+
     :juxt.site.alpha/transact
-    {:juxt.flip.alpha/quotation
-     `(
-       (site/with-fx-acc-with-checks
-         [(site/push-fx
-           (f/dip
-            [site/request-body-as-edn
-             (site/validate
-              [:map
-               [:xt/id [:re "https://site.test/doctors/.*"]]])
-
-             (site/set-type "https://site.test/types/doctor")
-
-             (site/set-methods
-              {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
-               :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
-               :options {}})
-
-             xtdb.api/put]))]))}
+    {:juxt.site.alpha.sci/program
+     (pr-str
+      '[[:xtdb.api/put *prepare*]])}
 
     :juxt.pass.alpha/rules
     '[
@@ -322,21 +324,35 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/register-patient-measurement"
 
+    :juxt.site.alpha.malli/input-schema
+    [:map
+     [:xt/id [:re "https://site.test/measurements/.*"]]
+     [:patient [:re "https://site.test/patients/.*"]]]
+
+    :juxt.site.alpha/prepare
+    {:juxt.site.alpha.sci/program
+     (pr-str
+      '(let [content-type (-> *ctx*
+                              :juxt.site.alpha/received-representation
+                              :juxt.http.alpha/content-type)
+             body (-> *ctx*
+                      :juxt.site.alpha/received-representation
+                      :juxt.http.alpha/body)]
+         (case content-type
+           "application/edn"
+           (some->
+            body
+            (String.)
+            clojure.edn/read-string
+            juxt.site.malli/validate-input
+            (assoc
+             :juxt.site.alpha/type "https://site.test/types/measurement"
+             :juxt.pass.alpha/protection-spaces #{"https://site.test/protection-spaces/bearer"})))))}
+
     :juxt.site.alpha/transact
-    {:juxt.flip.alpha/quotation
-     `(
-       (site/with-fx-acc-with-checks
-         [(site/push-fx
-           (f/dip
-            [site/request-body-as-edn
-             (site/validate
-              [:map
-               [:xt/id [:re "https://site.test/measurements/.*"]]
-               [:patient [:re "https://site.test/patients/.*"]]])
-
-             (site/set-type "https://site.test/types/measurement")
-
-             xtdb.api/put]))]))}
+    {:juxt.site.alpha.sci/program
+     (pr-str
+      '[[:xtdb.api/put *prepare*]])}
 
     :juxt.pass.alpha/rules
     '[

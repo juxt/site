@@ -119,7 +119,7 @@
                           (assoc :ring.response/body content)
                           (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
                           )))}
-                 ;; protection space?
+                 ;; TODO: protection space?
                  })))}
 
    "https://example.org/whoami.html"
