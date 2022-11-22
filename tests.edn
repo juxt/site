@@ -1,19 +1,19 @@
 #kaocha/v1
-{:plugins [;;:kaocha.plugin.alpha/info
+{:plugins [ ;;:kaocha.plugin.alpha/info
            ;;:kaocha.plugin/cloverage
            ]
 
  :tests [{:id :test
           :test-paths ["test"]
-          :ns-patterns ["juxt.book-test"
-                        "juxt.pass.authorization-test"
+          :ns-patterns ["juxt.pass.authorization-test"
                         "juxt.site.cors-test"
                         "juxt.site.graphql-compiler-test"
                         "juxt.site.graphql-auth-integration-test"
-                        "juxt.site.eql-datalog-compiler-test"
                         "juxt.site.graphql-compiler-test"
                         "juxt.site.return-test"
                         "juxt.pass.form-based-auth-test"
+                        "juxt.site.eql-datalog-compiler-test"
+                        "juxt.pass.whoami-test"
                         ]}]
 
  :reporter kaocha.report/documentation}

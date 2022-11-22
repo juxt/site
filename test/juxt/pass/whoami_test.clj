@@ -3,6 +3,8 @@
 (ns juxt.pass.whoami-test
   (:require
    [clojure.edn :as edn]
+   [juxt.site.alpha.logging :refer [with-logging]]
+   [clojure.tools.logging :as log]
    [jsonista.core :as json]
    [edn-query-language.core :as eql]
    [juxt.site.alpha.eql-datalog-compiler :as eqlc]
@@ -11,14 +13,17 @@
    [java-http-clj.core :as hc]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.openid :as openid]
+   [juxt.pass.oauth :as oauth]
    [juxt.pass.session-scope :as session-scope]
    [juxt.pass.user :as user]
    [juxt.pass.form-based-auth :as form-based-auth]
    [juxt.site.alpha :as-alias site]
    [juxt.site.alpha.init :as init]
+   [juxt.example-users :as example-users]
+   [juxt.example-applications :as example-applications]
    [juxt.site.alpha.repl :as repl]
    [juxt.site.bootstrap :as bootstrap]
-   [juxt.test.util :refer [with-system-xt with-resources *handler* *xt-node* with-fixtures with-resources assoc-session-token with-handler]]
+   [juxt.test.util :refer [with-system-xt with-resources *handler* *xt-node* with-fixtures with-resources assoc-session-token with-handler assoc-session-token lookup-session-details]]
    [ring.util.codec :as codec]
    [xtdb.api :as xt]
    [juxt.reap.alpha.regex :as re]))
@@ -26,30 +31,7 @@
 (use-fixtures :each with-system-xt with-handler)
 
 (def dependency-graph
-  {"https://example.org/user-identities/alice"
-   {:deps #{::init/system
-            "https://example.org/~alice"}
-    :create (fn [{:keys [id]}]
-              ;; TODO: Make this data rather than calling a function! (The
-              ;; intention here is to demote this graphs to data;
-              (init/do-action
-               (init/substitute-actual-base-uri "https://example.org/subjects/system")
-               (init/substitute-actual-base-uri "https://example.org/actions/put-basic-user-identity")
-               (init/substitute-actual-base-uri
-                {:xt/id "https://example.org/user-identities/alice"
-                 :juxt.pass.alpha/user "https://example.org/~alice"
-                 :juxt.pass.alpha/username "alice"
-                 :juxt.pass.alpha/password "garden"})))}
-
-   "https://example.org/~alice"
-   {:deps #{::init/system
-            ::user/all-actions
-            ::user/default-permissions}
-    :create (fn [{:keys [id]}]
-              (user/put-user!
-               {:id id :username "alice" :name "Alice"}))}
-
-   "https://example.org/actions/whoami"
+  {"https://example.org/actions/whoami"
    {:deps #{::init/system}
     :create (fn [{:keys [id]}]
               (init/do-action
@@ -81,28 +63,41 @@
                    [id :juxt.pass.alpha/user user]
                    [permission :juxt.pass.alpha/user user]]]}))}
 
-   "https://example.org/permissions/alice/whoami"
+   "https://example.org/permissions/{username}/whoami"
    {:deps #{::init/system
             "https://example.org/actions/whoami"}
+    :create (fn [{:keys [id params]}]
+              (let [username (get params "username")]
+                (juxt.site.alpha.init/do-action
+                 (init/substitute-actual-base-uri "https://example.org/subjects/system")
+                 (init/substitute-actual-base-uri "https://example.org/actions/grant-permission")
+                 (let [user (format "https://example.org/users/%s" username)]
+                   (init/substitute-actual-base-uri
+                    {:xt/id id
+                     :juxt.pass.alpha/action "https://example.org/actions/whoami"
+                     :juxt.pass.alpha/purpose nil
+                     :juxt.pass.alpha/user user})))))}
+
+   ;; TODO: Create an action for establishing a protection space
+   "https://example.org/bearer-protection-space"
+   {:deps #{::init/system}
     :create (fn [{:keys [id]}]
-              (juxt.site.alpha.init/do-action
-               (init/substitute-actual-base-uri "https://example.org/subjects/system")
-               (init/substitute-actual-base-uri "https://example.org/actions/grant-permission")
+              (init/put!
                (init/substitute-actual-base-uri
                 {:xt/id id
-                 :juxt.pass.alpha/action "https://example.org/actions/whoami"
-                 :juxt.pass.alpha/purpose nil
-                 :juxt.pass.alpha/user "https://example.org/~alice"})))}
+                 :juxt.pass.alpha/auth-scheme "Bearer"})))}
 
    "https://example.org/whoami"
    {:deps #{::init/system
-            "https://example.org/actions/whoami"}
+            "https://example.org/actions/whoami"
+            "https://example.org/bearer-protection-space"}
     :create (fn [{:keys [id]}]
               (init/put!
                (init/substitute-actual-base-uri
                 {:xt/id id
                  :juxt.site.alpha/methods
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/whoami"}}}})))}
+                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/whoami"}}}
+                 :juxt.pass.alpha/protection-spaces #{"https://example.org/bearer-protection-space"}})))}
 
    "https://example.org/whoami.json"
    {:deps #{::init/system
@@ -115,6 +110,7 @@
                  {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/whoami"}}}
                  :juxt.site.alpha/variant-of "https://example.org/whoami"
                  :juxt.http.alpha/content-type "application/json"
+                 ;; TODO: Rename to :juxt.site.alpha/respond
                  :juxt.http.alpha/respond
                  {:juxt.site.alpha.sci/program
                   (pr-str
@@ -122,7 +118,9 @@
                       (-> *ctx*
                           (assoc :ring.response/body content)
                           (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
-                          )))}})))}
+                          )))}
+                 ;; TODO: protection space?
+                 })))}
 
    "https://example.org/whoami.html"
    {:deps #{::init/system
@@ -142,16 +140,17 @@
                       (-> *ctx*
                           (assoc :ring.response/body content)
                           (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
-                          )))}}
+                          )))}})))}})
 
-                )))}})
-
-(deftest get-subject
+(deftest get-subject-test
   (with-resources
     ^{:dependency-graphs
       #{session-scope/dependency-graph
         user/dependency-graph
         form-based-auth/dependency-graph
+        oauth/dependency-graph
+        example-users/dependency-graph
+        example-applications/dependency-graph
         dependency-graph}}
     #{"https://site.test/login"
       "https://site.test/user-identities/alice"
@@ -159,34 +158,41 @@
       "https://site.test/whoami.json"
       "https://site.test/whoami.html"
       "https://site.test/permissions/alice/whoami"
-      })
+      "https://site.test/applications/test-app"
+      ::oauth/authorization-server
+      "https://site.test/permissions/alice-can-authorize"}
 
-  (let [result
-        (form-based-auth/login-with-form!
-         *handler*
-         "username" "alice"
-         "password" "garden"
-         :juxt.site.alpha/uri "https://site.test/login")
+    (let [login-result
+          (form-based-auth/login-with-form!
+           *handler*
+           "username" "alice"
+           "password" "garden"
+           :juxt.site.alpha/uri "https://site.test/login")
 
-        session-token (:juxt.pass.alpha/session-token result)
-        _ (assert session-token)
+          session-token (:juxt.pass.alpha/session-token login-result)
+          _ (assert session-token)
 
-        response
-        (*handler*
-         (->
-          {:juxt.site.alpha/uri "https://site.test/whoami"
-           :ring.request/method :get
-           :ring.request/headers {"accept" "application/json"}
-           }
-          (assoc-session-token session-token)))
+          {access-token "access_token"}
+          (oauth/authorize!
+           {:juxt.pass.alpha/session-token session-token
+            "client_id" "test-app"})]
 
-        json (json/read-value (:ring.response/body response))]
-
-    (is (:ring.response/status response))
-    (is (= "Alice"
-           (get-in json ["subject" "juxt.pass.alpha/user-identity" "juxt.pass.alpha/user" "name"])))
-
-    ))
+      (when access-token
+        (let [{:ring.response/keys [status body]}
+              (*handler*
+               {:juxt.site.alpha/uri "https://site.test/whoami"
+                :ring.request/method :get
+                :ring.request/headers
+                {"authorization" (format "Bearer %s" access-token)
+                 "accept" "application/json"}})]
+          (is (= 200 status))
+          (is (= "Alice"
+                 (-> body
+                     json/read-value
+                     (get-in ["subject"
+                              "juxt.pass.alpha/user-identity"
+                              "juxt.pass.alpha/user"
+                              "name"] body)))))))))
 
 ;; Note: If we try to login (with basic), we'll won't need to user 'put' (which will
 ;; lead to dangerously brittle tests if/when we change the structure of internal

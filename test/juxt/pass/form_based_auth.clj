@@ -5,7 +5,6 @@
    [juxt.pass.session-scope :as session-scope]
    [clojure.java.io :as io]
    [clojure.edn :as edn]
-   juxt.book.login
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
    [malli.core :as malli]
    [ring.util.codec :as codec]))
@@ -252,8 +251,7 @@ Password: <input name=password type=password>
 
 (defn login-with-form!
   "Return a session id (or nil) given a map of fields."
-  [handler & {:juxt.site.alpha/keys [uri]
-      :as args}]
+  [handler & {:juxt.site.alpha/keys [uri] :as args}]
   {:pre [(malli/validate
           [:map
            ;;[:juxt.site.alpha/uri [:re "https://.*"]]

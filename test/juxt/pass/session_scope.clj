@@ -3,7 +3,6 @@
 (ns juxt.pass.session-scope
   (:require
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
-   [juxt.flip.alpha.core :as f]
    [juxt.site.alpha :as-alias site]
    xtdb.api
    ))
@@ -18,21 +17,36 @@
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/put-session-scope"
 
+       :juxt.site.alpha.malli/input-schema
+       [:map
+        [:xt/id [:re "https://example.org/session-scopes/(.+)"]]
+        [:juxt.pass.alpha/cookie-domain [:re "https?://[^/]*"]]
+        [:juxt.pass.alpha/cookie-path [:re "/.*"]]
+        [:juxt.pass.alpha/login-uri [:re "https?://[^/]*"]]]
+
+       :juxt.site.alpha/prepare
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '(let [content-type (-> *ctx*
+                                 :juxt.site.alpha/received-representation
+                                 :juxt.http.alpha/content-type)
+                body (-> *ctx*
+                         :juxt.site.alpha/received-representation
+                         :juxt.http.alpha/body)]
+            (case content-type
+              "application/edn"
+              (some->
+               body
+               (String.)
+               clojure.edn/read-string
+               juxt.site.malli/validate-input
+               (assoc
+                :juxt.site.alpha/type "https://meta.juxt.site/pass/session-scope")))))}
+
        :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [site/request-body-as-edn
-                (site/validate
-                 [:map
-                  [:xt/id [:re "https://example.org/session-scopes/(.+)"]]
-                  [:juxt.pass.alpha/cookie-domain [:re "https?://[^/]*"]]
-                  [:juxt.pass.alpha/cookie-path [:re "/.*"]]
-                  [:juxt.pass.alpha/login-uri [:re "https?://[^/]*"]]])
-                (site/set-type "https://meta.juxt.site/pass/session-scope")
-                xtdb.api/put]))]))}
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '[[:xtdb.api/put *prepare*]])}
 
        :juxt.pass.alpha/rules
        '[

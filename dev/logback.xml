@@ -1,7 +1,7 @@
 <!-- Logback Configuration. See http://logback.qos.ch/ -->
 <!-- Adapted from https://github.com/stuartsierra/log.dev/blob/master/resources/logback.xml -->
 <!-- <configuration scan="true" scanPeriod="1 seconds"> -->
-<configuration scan="true">
+<configuration scan="true" scanPeriod="1 seconds">
 
    <!-- Console (STDOUT) output. -->
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -50,7 +50,16 @@
   </appender>
 
 
-  <!-- The output file configuration for log/app.log -->
+  <!-- This supports the juxt.site.alpha.logging/with-logging macro which allows
+       us to switch on logging programmatically for a given thread and
+       scope. -->
+  <turboFilter class="ch.qos.logback.classic.turbo.MDCFilter">
+    <MDCKey>logging</MDCKey>
+    <Value>on</Value>
+    <OnMatch>ACCEPT</OnMatch>
+  </turboFilter>
+
+    <!-- The output file configuration for log/app.log -->
   <appender name="APP_LOG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
 
     <!-- Default encoder is ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
@@ -89,7 +98,7 @@
     <appender-ref ref="ALL_LOG_FILE" />
   </root>
 
-  <logger name="juxt" level="ALL">
+  <logger name="juxt" level="INFO">
     <appender-ref ref="APP_LOG_FILE" />
   </logger>
   <logger name="xt" level="INFO">

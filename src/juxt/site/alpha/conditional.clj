@@ -22,7 +22,7 @@
   ;; (All quotes in this function's comments are from Section 3.2, RFC 7232,
   ;; unless otherwise stated).
   (when-let [header-field (reap/if-match (get-in req [:ring.request/headers "if-match"]))]
-    (log/tracef "evaluate-if-match! %s" header-field)
+    (log/debugf "evaluate-if-match! %s" header-field)
     (cond
       ;; "If the field-value is '*' …"
       (and (map? header-field)
@@ -37,16 +37,16 @@
 
       (sequential? header-field)
       (do
-        (log/tracef "evaluate-if-match! sequential? true, header-field: %s" header-field)
+        (log/debugf "evaluate-if-match! sequential? true, header-field: %s" header-field)
         (let [matches (for [rep current-representations
                             :let [rep-etag (some-> (get rep ::http/etag) reap/entity-tag)]
                             etag header-field
                             ;; "An origin server MUST use the strong comparison function
                             ;; when comparing entity-tags"
-                            :let [_ (log/tracef "evaluate-if-match! - compare %s with %s" etag rep-etag)]
+                            :let [_ (log/debugf "evaluate-if-match! - compare %s with %s" etag rep-etag)]
                             :when (rfc7232/strong-compare-match? etag rep-etag)]
                         etag)]
-          (log/tracef "matches: %d: %s" (count matches) matches)
+          (log/debugf "matches: %d: %s" (count matches) matches)
           (when-not (seq matches)
             ;; TODO: "unless it can be determined that the state-changing
             ;; request has already succeeded (see Section 3.1)"

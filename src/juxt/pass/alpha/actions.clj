@@ -1,4 +1,4 @@
-;; Copyright © 2022, JUXT LTD.
+; Copyright © 2022, JUXT LTD.
 
 (ns juxt.pass.alpha.actions
   (:require
@@ -16,8 +16,6 @@
    [juxt.site.alpha.util :refer [random-bytes]]
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
-   [juxt.flip.alpha.core :as f :refer [eval-quotation]]
-   [juxt.flip.alpha :as-alias flip]
    [xtdb.api :as xt]
    juxt.site.alpha.schema
    [jsonista.core :as json]))
@@ -41,10 +39,8 @@
 ;; This is broken out into its own function to assist debugging when
 ;; authorization is denied and we don't know why. A better authorization
 ;; debugger is definitely required.
-(defn
-  ^{:private true
-    }
-  query-permissions [{:keys [db rules subject actions resource purpose] :as args}]
+(defn ^{:private true} query-permissions
+  [{:keys [db rules subject actions resource purpose] :as args}]
   (assert (or (nil? subject) (string? subject)))
   (assert (or (nil? resource) (string? resource)))
   (let [query {:find '[(pull permission [*]) (pull action [*])]
@@ -404,7 +400,10 @@
                        '*ctx* ctx}
                       ;; Allowed to access the database
                       'xt
-                      {'entity (fn [id] (xt/entity db id))}
+                      {'entity (fn [id] (xt/entity db id))
+                       ;; Definitely can't do this! But we may be able to give access to an action that can do it.
+                       ;;'q (fn [& args] (apply xt/q db args))
+                       }
 
                       'juxt.pass
                       {'match-identity
@@ -425,7 +424,48 @@
                                              ['(crypto.password.bcrypt/check password password-hash)]
                                              ]
                                             (for [[k v] m] ['id k v]))
-                                    :in ['password]} password)))}}
+                                    :in ['password]} password)))
+
+                       'lookup-application
+                       (fn [client-id]
+                         (let [results (xt/q
+                                        db
+                                        '{:find [(pull e [*])]
+                                          :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/application"]
+                                                  [e :juxt.pass.alpha/client-id client-id]]
+                                          :in [client-id]} client-id)]
+                           (if (= 1 (count results))
+                             (ffirst results)
+                             (if (seq results)
+                               (throw
+                                (ex-info
+                                 (format "Too many applications for client-id: %s" client-id)
+                                 {:client-id client-id
+                                  :applications results}))
+                               (throw
+                                (ex-info
+                                 (format "No application with client-id: %s" client-id)
+                                 {:client-id client-id}))))))
+
+                       'lookup-scope
+                       (fn [scope]
+                         (let [results (xt/q
+                                        db
+                                        '{:find [(pull e [*])]
+                                          :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/oauth-scope"]]})]
+
+                           (if (= 1 (count results))
+                             (ffirst results)
+                             (if (seq results)
+                               (throw
+                                (ex-info
+                                 (format "Multiple documents for scope: %s" scope)
+                                 {:scope scope
+                                  :documents (map :xt/id results)}))
+                               (throw
+                                (ex-info
+                                 (format "No such scope: %s" scope)
+                                 {:error "invalid_scope"}))))))}}
 
                      (common-sci-namespaces action-doc))
 
@@ -450,15 +490,6 @@
                     ;; Possibly, in future, we should get the callstack
                     (throw (ex-info (.getMessage e) (or (ex-data (.getCause e)) {}) (.getCause e)))))
 
-                ;; Deprecated: flip
-                (-> action-doc ::site/transact ::flip/quotation)
-                (let [[{::site/keys [fx]}]
-                      (eval-quotation
-                       (reverse args)   ; push the args to the stack
-                       (-> action-doc ::site/transact ::flip/quotation)
-                       env)]
-                  fx)
-
                 ;; There might be other strategies in the future (although the
                 ;; fewer the better really)
                 :else
@@ -467,7 +498,7 @@
                   "Submitted actions should have a valid juxt.site.alpha/transact entry"
                   {:action action-doc})))
 
-              _ (log/infof "FX are %s" (pr-str fx))
+              _ (log/debugf "FX are %s" (pr-str fx))
 
               ;; Validate
               _ (doseq [effect fx]
@@ -479,7 +510,6 @@
                     (throw (ex-info "Invalid effect" {::pass/action action :effect effect}))))
 
               xtdb-ops (filter (fn [[effect]] (= (namespace effect) "xtdb.api")) fx)
-              _ (log/infof "xtdb ops is %s" (pr-str xtdb-ops))
 
               ;; Deprecated
               apply-to-request-context-fx (filter (fn [[effect]] (= effect :juxt.site.alpha/apply-to-request-context)) fx)
@@ -528,7 +558,7 @@
                      ))])]
 
           ;; This isn't the best debugger :( - need a better one!
-          ;;(log/tracef "XXXX Result is: %s" result-ops)
+          ;;(log/debugf "XXXX Result is: %s" result-ops)
 
           result-fx))
 
@@ -572,18 +602,6 @@
 (defn sanitize-ctx [ctx]
   (dissoc ctx ::site/xt-node ::site/db))
 
-(defn apply-request-context-operations [ctx ops]
-  (let [res
-        (reduce
-         (fn [ctx [op & args]]
-           (case op
-             :juxt.site.alpha/apply-to-request-context
-             (let [quotation (first args)]
-               (first (eval-quotation (list ctx) quotation {})))))
-         ctx
-         ops)]
-    res))
-
 (defn apply-response-fx [ctx fx]
   (reduce
    (fn [ctx [op & args]]
@@ -607,8 +625,8 @@
          {'user {'*action* action-doc
                  '*resource* resource
                  '*ctx* (sanitize-ctx ctx)
-                 'logf (fn [& args] (eval `(log/tracef ~@args)))
-                 'log (fn [& args] (eval `(log/trace ~@args)))}
+                 'logf (fn [& args] (eval `(log/debugf ~@args)))
+                 'log (fn [& args] (eval `(log/debug ~@args)))}
 
           'xt
           { ;; Unsafe due to violation of strict serializability, hence marked as
@@ -718,15 +736,6 @@
         (cond-> ctx
           result (assoc ::pass/action-result result)
 
-          ;;:juxt.site.alpha/request-context
-
-          ;; These ops are quotations that can be applied to the request
-          ;; context.  The intention if for these quotations to set the
-          ;; response status and add headers.
-          ;; (deprecated)
-          (seq (:juxt.site.alpha/apply-to-request-context-ops result))
-          (apply-request-context-operations (reverse (:juxt.site.alpha/apply-to-request-context-ops result)))
-
           (seq (:juxt.site.alpha/response-fx result))
           (apply-response-fx (:juxt.site.alpha/response-fx result))
 
@@ -768,6 +777,7 @@
              resource (assoc ::site/resource resource)))]
 
       #_(log/debugf "Permitted actions: %s" (pr-str permitted-actions))
+      (log/tracef "Subject is %s" (pr-str subject))
 
       (if (seq permitted-actions)
         (h (assoc req ::pass/permitted-actions permitted-actions))
@@ -780,7 +790,7 @@
              ::site/request-context req}))
 
           ;; No subject?
-          (if-let [protection-spaces (::pass/protection-spaces req)]
+          (if-let [protection-spaces (::pass/protection-space resource)]
             ;; We are in a protection space, so this is HTTP Authentication (401
             ;; + WWW-Authenticate header)
             (throw
@@ -788,7 +798,7 @@
               (format "No anonymous permission for actions (try authenticating!): %s" (pr-str actions))
               {:ring.response/status 401
                :ring.response/headers
-                {"www-authenticate" (http-authn/www-authenticate-header protection-spaces)}
+               {"www-authenticate" (http-authn/www-authenticate-header db protection-spaces)}
                ::site/request-context req}))
 
             ;; We are outside a protection space, there is nothing we can do
@@ -820,14 +830,6 @@
                 (format "No anonymous permission for actions: %s" (pr-str actions))
                 {:ring.response/status 403
                  ::site/request-context req})))))))))
-
-
-(defmethod f/word 'juxt.pass.alpha/pull-allowed-resources
-  [[{:keys [actions] :as opts} & stack] [_ & queue] env]
-  (assert (::site/db env) "No database in environment")
-  (let [result (pull-allowed-resources (::site/db env) actions env)]
-    [(cons result stack) queue env]))
-
 
 (comment
   (sci/eval-string

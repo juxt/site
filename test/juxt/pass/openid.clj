@@ -2,11 +2,69 @@
 
 (ns juxt.pass.openid
   (:require
+   [clojure.string :as str]
    [clojure.edn :as edn]
    [clojure.java.io :as io]
-   [jsonista.core :as json]
-   [java-http-clj.core :as hc]
-   [juxt.site.alpha.init :refer [substitute-actual-base-uri do-action]]))
+   [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]))
+
+(defn create-action-put-openid-user-identity! [_]
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/create-action"
+      {:xt/id "https://example.org/actions/put-openid-user-identity"
+
+       :juxt.site.alpha.malli/input-schema
+       [:map
+        [:xt/id [:re "https://example.org/.*"]]
+        [:juxt.pass.alpha/user [:re "https://example.org/users/.+"]]
+
+        [:juxt.pass.jwt.claims/iss [:re "https://.+"]]
+        [:juxt.pass.jwt.claims/sub {:optional true} [:string {:min 1}]]
+        [:juxt.pass.jwt.claims/nickname {:optional true} [:string {:min 1}]]]
+
+       :juxt.site.alpha/prepare
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '(do
+            (juxt.site.malli/validate-input)
+            (-> *input*
+                (assoc :juxt.site.alpha/type #{"https://meta.juxt.site/pass/user-identity"
+                                               "https://meta.juxt.site/pass/openid-user-identity"}
+                       :juxt.site.alpha/methods
+                       {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user-identity"}}
+                        :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user-identity"}}
+                        :options {}}))))}
+
+       :juxt.site.alpha/transact
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '[[:xtdb.api/put *prepare*]])}
+
+       :juxt.pass.alpha/rules
+       '[
+         [(allowed? subject resource permission)
+          [permission :juxt.pass.alpha/subject subject]]
+
+         [(allowed? subject resource permission)
+          [subject :juxt.pass.alpha/user-identity id]
+          [id :juxt.pass.alpha/user user]
+          [user :role role]
+          [permission :role role]]]})))))
+
+(defn grant-permission-to-invoke-action-put-openid-user-identity! [_]
+  (eval
+   (substitute-actual-base-uri
+    (quote
+     (juxt.site.alpha.init/do-action
+      "https://example.org/subjects/system"
+      "https://example.org/actions/grant-permission"
+      {:xt/id "https://example.org/permissions/system/put-openid-user-identity"
+       :juxt.pass.alpha/subject "https://example.org/subjects/system"
+       :juxt.pass.alpha/action "https://example.org/actions/put-openid-user-identity"
+       :juxt.pass.alpha/purpose nil})))))
 
 (defn create-action-install-openid-issuer! [_]
   (eval
@@ -820,6 +878,14 @@
 
 (def dependency-graph
   {
+   "https://example.org/actions/put-openid-user-identity"
+   {:create #'create-action-put-openid-user-identity!
+    :deps #{::init/system}}
+
+   "https://example.org/permissions/system/put-openid-user-identity"
+   {:create #'grant-permission-to-invoke-action-put-openid-user-identity!
+    :deps #{::init/system}}
+
    "https://example.org/actions/install-openid-issuer"
    {:deps #{:juxt.site.alpha.init/system}
     :create #'create-action-install-openid-issuer!}
@@ -955,3 +1021,15 @@
                 :juxt.pass.alpha/cookie-domain "https://example.org"
                 :juxt.pass.alpha/cookie-path "/"
                 :juxt.pass.alpha/login-uri "https://example.org/openid/login"}))}})
+
+(defn put-openid-user-identity! [& {:keys [username]
+                                    :juxt.pass.jwt.claims/keys [iss sub nickname]}]
+  (init/do-action
+   (substitute-actual-base-uri "https://example.org/subjects/system")
+   (substitute-actual-base-uri "https://example.org/actions/put-openid-user-identity")
+   (substitute-actual-base-uri
+    (cond-> {:xt/id (format "https://example.org/user-identities/%s/openid" (str/lower-case username))
+             :juxt.pass.alpha/user ~(format "https://example.org/users/%s" (str/lower-case username))
+             :juxt.pass.jwt.claims/iss iss}
+      sub (assoc :juxt.pass.jwt.claims/sub sub)
+      nickname (assoc :juxt.pass.jwt.claims/nickname nickname)))))

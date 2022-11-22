@@ -17,11 +17,8 @@
 (defn xt-template-loader [req db]
   (proxy [java.net.URLStreamHandler] []
     (openConnection [url]
-      ;;      (log/tracef "Open connection: url=%s" url)
       (proxy [java.net.URLConnection] [url]
         (getInputStream []
-          ;;          (log/tracef "Loading template: url=%s" url)
-
           (let [res (xt/entity db (str url))
                 _ (when-not res
                     (throw

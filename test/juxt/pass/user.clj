@@ -3,9 +3,6 @@
 (ns juxt.pass.user
   (:require
    [clojure.string :as str]
-   [clojure.java.io :as io]
-   [malli.core :as malli]
-   [ring.util.codec :as codec]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]))
 
 (defn create-action-put-user! [_]
@@ -74,14 +71,14 @@
      ;; end::grant-permission-to-invoke-action-put-user![]
      ))))
 
-(defn create-action-put-basic-user-identity! [_]
+(defn create-action-put-user-identity! [_]
   (eval
    (substitute-actual-base-uri
     (quote
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/put-basic-user-identity"
+      {:xt/id "https://example.org/actions/put-user-identity"
 
        :juxt.site.alpha.malli/input-schema
        [:map
@@ -147,76 +144,16 @@
           [user :role role]
           [permission :role role]]]})))))
 
-(defn grant-permission-to-invoke-action-put-basic-user-identity! [_]
+(defn grant-permission-to-invoke-action-put-user-identity! [_]
   (eval
    (substitute-actual-base-uri
     (quote
      (juxt.site.alpha.init/do-action
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/system/put-basic-user-identity"
+      {:xt/id "https://example.org/permissions/system/put-user-identity"
        :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/put-basic-user-identity"
-       :juxt.pass.alpha/purpose nil})))))
-
-;; TODO: Move to openid
-(defn create-action-put-openid-user-identity! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/put-openid-user-identity"
-
-       :juxt.site.alpha.malli/input-schema
-       [:map
-        [:xt/id [:re "https://example.org/.*"]]
-        [:juxt.pass.alpha/user [:re "https://example.org/users/.+"]]
-
-        [:juxt.pass.jwt.claims/iss [:re "https://.+"]]
-        [:juxt.pass.jwt.claims/sub {:optional true} [:string {:min 1}]]
-        [:juxt.pass.jwt.claims/nickname {:optional true} [:string {:min 1}]]]
-
-       :juxt.site.alpha/prepare
-       {:juxt.site.alpha.sci/program
-        (pr-str
-         '(do
-            (juxt.site.malli/validate-input)
-            (-> *input*
-                (assoc :juxt.site.alpha/type #{"https://meta.juxt.site/pass/user-identity"
-                                               "https://meta.juxt.site/pass/openid-user-identity"}
-                       :juxt.site.alpha/methods
-                       {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user-identity"}}
-                        :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-user-identity"}}
-                        :options {}}))))}
-
-       :juxt.site.alpha/transact
-       {:juxt.site.alpha.sci/program
-        (pr-str
-         '[[:xtdb.api/put *prepare*]])}
-
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
-
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [user :role role]
-          [permission :role role]]]})))))
-
-(defn grant-permission-to-invoke-action-put-openid-user-identity! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/system/put-openid-user-identity"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/put-openid-user-identity"
+       :juxt.pass.alpha/action "https://example.org/actions/put-user-identity"
        :juxt.pass.alpha/purpose nil})))))
 
 ;; TODO: Make this ns independent of openid. All the openid actions/permissions
@@ -226,57 +163,43 @@
    {:create #'create-action-put-user!
     :deps #{::init/system}}
 
-   "https://example.org/actions/put-basic-user-identity"
-   {:create #'create-action-put-basic-user-identity!
-    :deps #{::init/system}}
-
-   "https://example.org/actions/put-openid-user-identity"
-   {:create #'create-action-put-openid-user-identity!
-    :deps #{::init/system}}
-
    "https://example.org/permissions/system/put-user"
    {:create #'grant-permission-to-invoke-action-put-user!
     :deps #{::init/system}}
 
-   "https://example.org/permissions/system/put-basic-user-identity"
-   {:create #'grant-permission-to-invoke-action-put-basic-user-identity!
+   "https://example.org/actions/put-user-identity"
+   {:create #'create-action-put-user-identity!
     :deps #{::init/system}}
 
-   "https://example.org/permissions/system/put-openid-user-identity"
-   {:create #'grant-permission-to-invoke-action-put-openid-user-identity!
-    :deps #{::init/system}}
-
-   ::all-actions
-   {:deps #{"https://example.org/actions/put-user"
-            "https://example.org/actions/put-basic-user-identity"
-            "https://example.org/actions/put-openid-user-identity"}}
-
-   ::default-permissions
-   {:deps #{"https://example.org/permissions/system/put-user"
-            "https://example.org/permissions/system/put-basic-user-identity"
-            "https://example.org/permissions/system/put-openid-user-identity"}}})
+   "https://example.org/permissions/system/put-user-identity"
+   {:create #'grant-permission-to-invoke-action-put-user-identity!
+    :deps #{::init/system}}})
 
 (defn put-user! [& {:keys [id username name]}]
-  (eval
+  (init/do-action
+   (substitute-actual-base-uri "https://example.org/subjects/system")
+   (substitute-actual-base-uri "https://example.org/actions/put-user")
    (substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/put-user"
-      {:xt/id ~(or id (format "https://example.org/users/%s" username))
-       :name ~name}))))
+    {:xt/id (or id (format "https://example.org/users/%s" username))
+     :name name})))
 
-(defn put-openid-user-identity! [& {:keys [username]
-                                    :juxt.pass.jwt.claims/keys [iss sub nickname]}]
-  (eval
+(defn put-user-identity! [& {:juxt.pass.alpha/keys [username password realm]}]
+  (assert username)
+  (assert password)
+  (assert realm)
+  (init/do-action
+   (substitute-actual-base-uri "https://example.org/subjects/system")
+   (substitute-actual-base-uri "https://example.org/actions/put-user-identity")
    (substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/put-openid-user-identity"
-      (cond-> {:xt/id ~(format "https://example.org/user-identities/%s/openid" (str/lower-case username))
-               :juxt.pass.alpha/user ~(format "https://example.org/users/%s" (str/lower-case username))
-               :juxt.pass.jwt.claims/iss ~iss}
-        ~sub (assoc :juxt.pass.jwt.claims/sub ~sub)
-        ~nickname (assoc :juxt.pass.jwt.claims/nickname ~nickname))))))
+    {:xt/id (format "https://example.org/user-identities/%s/basic" (str/lower-case username))
+     :juxt.pass.alpha/user (format "https://example.org/users/%s" (str/lower-case username))
+     ;; Perhaps all user identities need this?
+     :juxt.pass.alpha/canonical-root-uri "https://example.org"
+     :juxt.pass.alpha/realm realm
+     ;; Basic auth will only work if these are present
+     :juxt.pass.alpha/username username
+     ;; This will be encrypted
+     :juxt.pass.alpha/password password})))
 
 ;; TODO: Could hashes be used to indicate which resources need to be installed
 ;; versus which ones are already up-to-date.  This would help performance but

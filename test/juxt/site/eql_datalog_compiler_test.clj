@@ -3,39 +3,27 @@
 (ns juxt.site.eql-datalog-compiler-test
   (:require
    [clojure.java.io :as io]
-   [juxt.site.alpha.graphql-eql-compiler :refer [graphql->eql-ast]]
-   [juxt.grab.alpha.parser :as grab.parser]
-   [juxt.grab.alpha.document :as grab.document]
-   [juxt.grab.alpha.schema :as grab.schema]
+   [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [edn-query-language.core :as eql]
    [jsonista.core :as json]
-   [clojure.test :refer [deftest is testing use-fixtures] :as t]
-   [juxt.book :as book]
+   [juxt.example-users :as example-users]
+   [juxt.grab.alpha.document :as grab.document]
+   [juxt.grab.alpha.parser :as grab.parser]
+   [juxt.grab.alpha.schema :as grab.schema]
+   [juxt.http.alpha :as-alias http]
+   [juxt.pass.alpha :as-alias pass]
+   [juxt.pass.form-based-auth :as form-based-auth]
+   [juxt.pass.oauth :as oauth]
+   [juxt.pass.protection-space :as protection-space]
    [juxt.pass.session-scope :as session-scope]
    [juxt.pass.user :as user]
-   [juxt.pass.form-based-auth :as form-based-auth]
-   [juxt.flip.alpha.core :as f]
-   [juxt.site.alpha.eql-datalog-compiler :as eqlc]
    [juxt.site.alpha :as-alias site]
-   [juxt.pass.alpha :as-alias pass]
-   [juxt.http.alpha :as-alias http]
+   [juxt.site.alpha.eql-datalog-compiler :as eqlc]
+   [juxt.site.alpha.graphql-eql-compiler :refer [graphql->eql-ast]]
    [juxt.site.alpha.init :as init]
-   [juxt.site.alpha.repl :as repl]
-   [juxt.test.util :refer [with-system-xt with-resources *xt-node* *handler*] :as tutil]
+   [juxt.site.alpha.logging :refer [with-logging]]
+   [juxt.test.util :refer [with-system-xt with-resources with-handler *xt-node* *handler*] :as tutil]
    [xtdb.api :as xt]))
-
-;; TODO: Dedupe between this test ns and juxt.book-test
-
-(defn with-handler [f]
-  (binding [*handler*
-            (tutil/make-handler
-             {::site/xt-node *xt-node*
-              ::site/base-uri "https://site.test"
-              ::site/uri-prefix "https://site.test"})]
-    (f)))
-
-(defn call-handler [request]
-  (*handler* (book/with-body request (::body-bytes request))))
 
 (use-fixtures :each with-system-xt with-handler)
 
@@ -49,25 +37,39 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/register-doctor"
 
+    :juxt.site.alpha.malli/input-schema
+    [:map
+     [:xt/id [:re "https://site.test/doctors/.*"]]]
+
+    :juxt.site.alpha/prepare
+    {:juxt.site.alpha.sci/program
+
+     (pr-str
+      '(let [content-type (-> *ctx*
+                              :juxt.site.alpha/received-representation
+                              :juxt.http.alpha/content-type)
+             body (-> *ctx*
+                      :juxt.site.alpha/received-representation
+                      :juxt.http.alpha/body)]
+         (case content-type
+           "application/edn"
+           (some->
+            body
+            (String.)
+            clojure.edn/read-string
+            juxt.site.malli/validate-input
+            (assoc
+             :juxt.site.alpha/type "https://site.test/types/doctor"
+             :juxt.pass.alpha/protection-spaces #{"https://site.test/protection-spaces/bearer"}
+             :juxt.site.alpha/methods
+             {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
+              :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
+              :options {}})))))}
+
     :juxt.site.alpha/transact
-    {:juxt.flip.alpha/quotation
-     `(
-       (site/with-fx-acc-with-checks
-         [(site/push-fx
-           (f/dip
-            [site/request-body-as-edn
-             (site/validate
-              [:map
-               [:xt/id [:re "https://site.test/doctors/.*"]]])
-
-             (site/set-type "https://site.test/types/doctor")
-
-             (site/set-methods
-              {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
-               :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
-               :options {}})
-
-             xtdb.api/put]))]))}
+    {:juxt.site.alpha.sci/program
+     (pr-str
+      '[[:xtdb.api/put *prepare*]])}
 
     :juxt.pass.alpha/rules
     '[
@@ -89,25 +91,38 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/register-patient"
 
+    :juxt.site.alpha.malli/input-schema
+    [:map
+     [:xt/id [:re "https://site.test/patients/.*"]]]
+
+    :juxt.site.alpha/prepare
+    {:juxt.site.alpha.sci/program
+     (pr-str
+      '(let [content-type (-> *ctx*
+                              :juxt.site.alpha/received-representation
+                              :juxt.http.alpha/content-type)
+             body (-> *ctx*
+                      :juxt.site.alpha/received-representation
+                      :juxt.http.alpha/body)]
+         (case content-type
+           "application/edn"
+           (some->
+            body
+            (String.)
+            clojure.edn/read-string
+            juxt.site.malli/validate-input
+            (assoc
+             :juxt.site.alpha/type "https://site.test/types/patient"
+             :juxt.pass.alpha/protection-spaces #{"https://site.test/protection-spaces/bearer"}
+             :juxt.site.alpha/methods
+             {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
+              :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
+              :options {}})))))}
+
     :juxt.site.alpha/transact
-    {:juxt.flip.alpha/quotation
-     `(
-       (site/with-fx-acc-with-checks
-         [(site/push-fx
-           (f/dip
-            [site/request-body-as-edn
-             (site/validate
-              [:map
-               [:xt/id [:re "https://site.test/patients/.*"]]])
-
-             (site/set-type "https://site.test/types/patient")
-
-             (site/set-methods
-              {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
-               :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
-               :options {}})
-
-             xtdb.api/put]))]))}
+    {:juxt.site.alpha.sci/program
+     (pr-str
+      '[[:xtdb.api/put *prepare*]])}
 
     :juxt.pass.alpha/rules
     '[
@@ -270,45 +285,29 @@
     ;; POST /actions/install-graphql-endpoint
     ;; (book_test line ~500, book line ~1197)
 
-    ;; An action is capable of deriving a view of state across a set of
-    ;; resources.
-    :juxt.site.alpha/methods
-    {:get
-     {:juxt.pass.alpha/actions #{"https://site.test/actions/list-patients"}}}
+    :juxt.site.alpha/state
+    {:juxt.site.alpha.sci/program
+     (pr-str
+      ;; Perform a query, using the rules in get-patient. It would be a good
+      ;; idea to restrict the ability for actions to make general queries
+      ;; against the database. By only exposing API functions such as
+      ;; pull-allowed-resources to Flip, we can limit the power of actions
+      ;; thereby securing them. This is preferable to limiting the ability
+      ;; to deploy actions to a select group of highly authorized
+      ;; individuals.
+      ;;
+      ;; TODO: Go through the use-cases which already make general lookups
+      ;; and queries to XT and see if we can rewrite them to use a more
+      ;; restricted API.
+      '(juxt.pass/pull-allowed-resources
+        #{"https://site.test/actions/get-patient"}))}
 
     :juxt.pass.alpha/rules
     '[
       [(allowed? subject resource permission)
        [subject :juxt.pass.alpha/user-identity id]
        [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]]]
-
-    ;; While many actions perform mutations on the database, some actions
-    ;; only query the database.
-    :juxt.site.alpha/query
-    {:juxt.flip.alpha/quotation
-     `(
-       ;; Perform a query, using the rules in get-patient. It would be a good
-       ;; idea to restrict the ability for actions to make general queries
-       ;; against the database. By only exposing API functions such as
-       ;; pull-allowed-resources to Flip, we can limit the power of actions
-       ;; thereby securing them. This is preferable to limiting the ability
-       ;; to deploy actions to a select group of highly authorized
-       ;; individuals.
-       ;;
-       ;; TODO: Go through the use-cases which already make general lookups
-       ;; and queries to XT and see if we can rewrite them to use a more
-       ;; restricted API.
-       (pass/pull-allowed-resources
-        {:actions #{"https://site.test/actions/get-patient"}})
-
-       ;; TODO: This needs to be aware of the content-type of the selected
-       ;; representation
-       ;;(f/env :juxt.site.alpha/selected-representation)
-       ;;(f/of ::http/content-type)
-       ;;       jsonista.core/write-value-as-string
-       ;;f/break
-       )}}))
+       [permission :juxt.pass.alpha/user user]]]}))
 
 (defn grant-permission-to-list-patients! [username]
   (init/do-action
@@ -325,21 +324,35 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/register-patient-measurement"
 
+    :juxt.site.alpha.malli/input-schema
+    [:map
+     [:xt/id [:re "https://site.test/measurements/.*"]]
+     [:patient [:re "https://site.test/patients/.*"]]]
+
+    :juxt.site.alpha/prepare
+    {:juxt.site.alpha.sci/program
+     (pr-str
+      '(let [content-type (-> *ctx*
+                              :juxt.site.alpha/received-representation
+                              :juxt.http.alpha/content-type)
+             body (-> *ctx*
+                      :juxt.site.alpha/received-representation
+                      :juxt.http.alpha/body)]
+         (case content-type
+           "application/edn"
+           (some->
+            body
+            (String.)
+            clojure.edn/read-string
+            juxt.site.malli/validate-input
+            (assoc
+             :juxt.site.alpha/type "https://site.test/types/measurement"
+             :juxt.pass.alpha/protection-spaces #{"https://site.test/protection-spaces/bearer"})))))}
+
     :juxt.site.alpha/transact
-    {:juxt.flip.alpha/quotation
-     `(
-       (site/with-fx-acc-with-checks
-         [(site/push-fx
-           (f/dip
-            [site/request-body-as-edn
-             (site/validate
-              [:map
-               [:xt/id [:re "https://site.test/measurements/.*"]]
-               [:patient [:re "https://site.test/patients/.*"]]])
-
-             (site/set-type "https://site.test/types/measurement")
-
-             xtdb.api/put]))]))}
+    {:juxt.site.alpha.sci/program
+     (pr-str
+      '[[:xtdb.api/put *prepare*]])}
 
     :juxt.pass.alpha/rules
     '[
@@ -475,8 +488,7 @@
      {:xt/id id
       :name name
       ::http/content-type "application/json"
-      ::http/content (json/write-value-as-string {"name" name})
-      })))
+      ::http/content (json/write-value-as-string {"name" name})})))
 
 (def dependency-graph
   {"https://site.test/actions/register-doctor"
@@ -556,55 +568,17 @@
        {:xt/id "https://site.test/patients"
         :juxt.site.alpha/methods
         {:get
-         {:juxt.pass.alpha/actions #{"https://site.test/actions/list-patients"}
-          :juxt.flip.alpha/quotation
-          ;; This should be a pattern of cond'ing on the content-type of the
-          ;; selected representation.  TODO: get the action, call the query,
-          ;; format the result according to the content-type, return the site
-          ;; request context on the stack.
-
-          ;; (We could use a quasiquote but that then makes this less portable
-          ;; across namespaces, due to a coupling between the quotation and any
-          ;; namespaces aliases declared in the ns.)
-          '(
-            ;; Get all the patients we can access.
-
-            ;; This is done by getting the first permitted action entity.
-
-            ;; TODO: This block should be factored into a common convenience
-            ;; since most GET implementations will do something similar.
-            (juxt.flip.alpha.core/env :juxt.pass.alpha/permitted-actions)
-            juxt.flip.alpha.core/first
-            (juxt.flip.alpha.core/of :juxt.pass.alpha/action)
-            (juxt.flip.alpha.core/of :juxt.site.alpha/query)
-            (juxt.flip.alpha.core/of :juxt.flip.alpha/quotation)
-            juxt.flip.alpha.core/call
-
-            ;; Now style according to the content-type
-            ;; First we need the content-type of the selected representation
-            ;;(juxt.flip.alpha.core/env :juxt.site.alpha/selected-representation)
-            ;;(juxt.flip.alpha.core/of :juxt.http.alpha/content-type)
-
-            ;; Always going to be application/json!
-            jsonista.core/write-value-as-bytes
-
-            #_(juxt.flip.alpha.core/case
-                  ["application/json"
-
-                   ({:message "TODO: Style the stack in json format"})
-
-                   ;; TODO: This is the 'default' branch, but very ugly and needs
-                   ;; improving
-                   (:content-type {} juxt.flip.alpha.core/set-at
-                                  "Unsupported content-type"
-                                  juxt.flip.alpha.core/swap
-                                  juxt.flip.alpha.core/ex-info
-                                  juxt.flip.alpha.core/throw-exception)])
-
-
-            )
-          }}
-        ::http/content-type "application/json"}))
+         {:juxt.pass.alpha/actions #{"https://site.test/actions/list-patients"}}}
+        :juxt.pass.alpha/protection-spaces #{"https://site.test/protection-spaces/bearer"}
+        ::http/content-type "application/json"
+        :juxt.http.alpha/respond
+        {:juxt.site.alpha.sci/program
+         (pr-str
+          '(let [content (jsonista.core/write-value-as-string *state*)]
+             (-> *ctx*
+                 (assoc :ring.response/body content)
+                 (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
+                 )))}}))
     :deps #{::init/system}}
 
    "https://site.test/actions/read-any-measurement"
@@ -646,9 +620,9 @@
          #{::init/system
 
            "https://site.test/login"
-           "https://site.test/user-identities/alice/basic"
-           "https://site.test/user-identities/bob/basic"
-           "https://site.test/user-identities/carlos/basic"
+           "https://site.test/user-identities/alice"
+           "https://site.test/user-identities/bob"
+           "https://site.test/user-identities/carlos"
 
            "https://site.test/oauth/authorize"
            "https://site.test/session-scopes/default"
@@ -656,6 +630,8 @@
            "https://site.test/permissions/bob-can-authorize"
            "https://site.test/permissions/carlos-can-authorize"
            "https://site.test/applications/local-terminal"
+
+           "https://site.test/protection-spaces/bearer"
 
            "https://site.test/actions/get-patient"
            "https://site.test/permissions/alice/get-any-patient"
@@ -702,10 +678,12 @@
     (with-resources
       (with-meta resources
         {:dependency-graphs
-         #{book/dependency-graph
-           session-scope/dependency-graph
+         #{session-scope/dependency-graph
            user/dependency-graph
+           protection-space/dependency-graph
            form-based-auth/dependency-graph
+           example-users/dependency-graph
+           oauth/dependency-graph
            dependency-graph}})
 
       ;; Create some measurements
@@ -741,32 +719,53 @@
         :reading {"heartRate" "87"
                   "bloodPressure" "127/80"}})
 
-      (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+      (let [alice-session-token
+            (form-based-auth/login-with-form!
+             *handler*
+             :juxt.site.alpha/uri "https://site.test/login"
+             "username" "alice"
+             "password" "garden")
+
             {alice-access-token "access_token" error "error"}
-            (book/authorize!
-             :session-id alice-session-id
-             "client_id" "local-terminal"
-             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
-             )
+            (oauth/authorize!
+             (merge
+              alice-session-token
+              {"client_id" "local-terminal"
+               ;; "scope" ["https://site.test/oauth/scope/read-personal-data"]
+               }))
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
-            bob-session-id (book/login-with-form! {"username" "bob" "password" "walrus"})
+            bob-session-token
+            (form-based-auth/login-with-form!
+             *handler*
+             :juxt.site.alpha/uri "https://site.test/login"
+             "username" "bob"
+             "password" "walrus")
             {bob-access-token "access_token"
              error "error"}
-            (book/authorize!
-             :session-id bob-session-id
-             "client_id" "local-terminal"
-             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+            (oauth/authorize!
+             (merge
+              bob-session-token
+              {"client_id" "local-terminal"
+               ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+               })
              )
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
-            carlos-session-id (book/login-with-form! {"username" "carlos" "password" "toothpick"})
+            carlos-session-token
+            (form-based-auth/login-with-form!
+             *handler*
+             :juxt.site.alpha/uri "https://site.test/login"
+             "username" "carlos"
+             "password" "jackal")
             {carlos-access-token "access_token"
              error "error"}
-            (book/authorize!
-             :session-id carlos-session-id
-             "client_id" "local-terminal"
-             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+            (oauth/authorize!
+             (merge
+              carlos-session-token
+              {"client_id" "local-terminal"
+               ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+               })
              )
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
@@ -798,16 +797,20 @@
 
         ;; Alice can access a particular patient because she has a particularly
         ;; broad permission on the get-patient action
+
         (testing "Access to /patient/005"
-          (let [response (*handler*
-                          {:ring.request/method :get
-                           :ring.request/path "/patients/005"
-                           :ring.request/headers
-                           {"authorization" (format "Bearer %s" alice-access-token)
-                            "accept" "application/json"}})]
-            (is (= (json/write-value-as-string {"name" "Angie Solis"})
-                   (String. (:ring.response/body response))))
-            (is (= 200 (:ring.response/status response))))
+          (with-logging
+            (let [response
+                  (*handler*
+                   {:ring.request/method :get
+                    :ring.request/path "/patients/005"
+                    :ring.request/headers
+                    {"authorization" (format "Bearer %s" alice-access-token)
+                     "accept" "application/json"}})]
+
+              (is (= (json/write-value-as-string {"name" "Angie Solis"})
+                     (String. (:ring.response/body response))))
+              (is (= 200 (:ring.response/status response)))))
 
           ;; Bob can't see the patient details of Angie Solis
           (let [response (*handler*
@@ -829,8 +832,11 @@
                   {"authorization" (format "Bearer %s" alice-access-token)
                    "accept" "application/json"}})
                 body (:ring.response/body response)
-                result (json/read-value body)]
+                result (some-> body json/read-value)
+                ]
             (is (= "application/json" (get-in response [:ring.response/headers "content-type"])))
+            (is body)
+            (is result)
             (is (vector? result))
             (is (= 20 (count result))))
 
@@ -1290,9 +1296,9 @@
          #{::init/system
 
            "https://site.test/login"
-           "https://site.test/user-identities/alice/basic"
-           "https://site.test/user-identities/bob/basic"
-           "https://site.test/user-identities/carlos/basic"
+           "https://site.test/user-identities/alice"
+           "https://site.test/user-identities/bob"
+           "https://site.test/user-identities/carlos"
 
            "https://site.test/oauth/authorize"
            "https://site.test/session-scopes/default"
@@ -1346,28 +1352,40 @@
     (with-resources
       (with-meta resources
         {:dependency-graphs
-         #{book/dependency-graph
-           session-scope/dependency-graph
+         #{session-scope/dependency-graph
            user/dependency-graph
            form-based-auth/dependency-graph
+           example-users/dependency-graph
+           oauth/dependency-graph
            dependency-graph}})
 
-      (let [alice-session-id (book/login-with-form! {"username" "alice" "password" "garden"})
+      (let [alice-session-token
+            (form-based-auth/login-with-form!
+             *handler*
+             :juxt.site.alpha/uri "https://site.test/login"
+             "username" "alice"
+             "password" "garden")
             {alice-access-token "access_token" error "error"}
-            (book/authorize!
-             :session-id alice-session-id
-             "client_id" "local-terminal"
-             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
-             )
-            _ (is (nil? error) (format "OAuth2 grant error: %s" error))
+            (oauth/authorize!
+             (merge
+              alice-session-token
+              {"client_id" "local-terminal"
+               ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+               }))
 
-            bob-session-id (book/login-with-form! {"username" "bob" "password" "walrus"})
+            bob-session-token
+            (form-based-auth/login-with-form!
+             *handler*
+             :juxt.site.alpha/uri "https://site.test/login"
+             "username" "bob"
+             "password" "walrus")
             {bob-access-token "access_token"}
-            (book/authorize!
-             :session-id bob-session-id
-             "client_id" "local-terminal"
-             ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
-             )
+            (oauth/authorize!
+             (merge
+              bob-session-token
+              {"client_id" "local-terminal"
+               ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
+               }))
 
             db (xt/db *xt-node*)
 
@@ -1399,55 +1417,58 @@
                  (grab.document/compile-document schema)
                  (grab.document/get-operation "GetDoctors")))
 
-            q (first (eqlc/compile-ast db eql-ast))]
+            q (first (eqlc/compile-ast db eql-ast))
+
+            ]
+
 
         (testing "From GraphQL to database results"
-          (testing "Alice's view"
+              (testing "Alice's view"
+                (is (= #{{:name "Dr. Jack Conway",
+                          :juxt.site.alpha/type "https://site.test/types/doctor",
+                          :xt/id "https://site.test/doctors/001",
+                          :patients
+                          [{:name "Terry Levine",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/001",
+                            :readings nil}
+                           {:name "Jeannie Finley",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/002",
+                            :readings nil}
+                           {:name "Jewel Blackburn",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/003",
+                            :readings nil}
+                           {:name "Angie Solis",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/005",
+                            :readings nil}]}
+                         {:name "Dr. Jackson",
+                          :juxt.site.alpha/type "https://site.test/types/doctor",
+                          :xt/id "https://site.test/doctors/003",
+                          :patients
+                          [{:name "Floyd Castro",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/006",
+                            :readings nil}
+                           {:name "Sondra Richardson",
+                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :xt/id "https://site.test/patients/010",
+                            :readings nil}]}}
+                       (eqlc/prune-result (xt/q db q alice nil))))))
+
+          (testing "Bob's view"
             (is (= #{{:name "Dr. Jack Conway",
                       :juxt.site.alpha/type "https://site.test/types/doctor",
                       :xt/id "https://site.test/doctors/001",
-                      :patients
-                      [{:name "Terry Levine",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/001",
-                        :readings nil}
-                       {:name "Jeannie Finley",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/002",
-                        :readings nil}
-                       {:name "Jewel Blackburn",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/003",
-                        :readings nil}
-                       {:name "Angie Solis",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/005",
-                        :readings nil}]}
+                      :patients nil}
                      {:name "Dr. Jackson",
                       :juxt.site.alpha/type "https://site.test/types/doctor",
                       :xt/id "https://site.test/doctors/003",
                       :patients
-                      [{:name "Floyd Castro",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
-                        :xt/id "https://site.test/patients/006",
-                        :readings nil}
-                       {:name "Sondra Richardson",
+                      [{:name "Sondra Richardson",
                         :juxt.site.alpha/type "https://site.test/types/patient",
                         :xt/id "https://site.test/patients/010",
                         :readings nil}]}}
-                   (eqlc/prune-result (xt/q db q alice nil))))))
-
-        (testing "Bob's view"
-          (is (= #{{:name "Dr. Jack Conway",
-                    :juxt.site.alpha/type "https://site.test/types/doctor",
-                    :xt/id "https://site.test/doctors/001",
-                    :patients nil}
-                   {:name "Dr. Jackson",
-                    :juxt.site.alpha/type "https://site.test/types/doctor",
-                    :xt/id "https://site.test/doctors/003",
-                    :patients
-                    [{:name "Sondra Richardson",
-                      :juxt.site.alpha/type "https://site.test/types/patient",
-                      :xt/id "https://site.test/patients/010",
-                      :readings nil}]}}
-                 (eqlc/prune-result (xt/q db q bob nil)))))))))
+                   (eqlc/prune-result (xt/q db q bob nil)))))))))

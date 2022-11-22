@@ -12,8 +12,6 @@
    [juxt.apex.alpha.openapi :as openapi]
    [juxt.dave.alpha :as dave]
    [juxt.dave.alpha.methods :as dave.methods]
-   [juxt.flip.alpha :as-alias flip]
-   [juxt.flip.alpha.core :as f]
    [juxt.http.alpha :as-alias http]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha :as-alias pass]
@@ -56,7 +54,7 @@
   "Check and load the representation enclosed in the request message payload."
   [{::site/keys [resource start-date] :ring.request/keys [method] :as req}]
 
-  (log/tracef "Receiving representation, for resource %s" (:xt/id resource))
+  (log/debugf "Receiving representation, for resource %s" (:xt/id resource))
 
   (let [content-length
         (try
@@ -70,8 +68,6 @@
               {:ring.response/status 400
                ::site/request-context req}
               e))))]
-
-    (log/tracef "Content length is %s" content-length)
 
     (when (nil? content-length)
       (throw
@@ -199,8 +195,6 @@
         (let [body (.readNBytes in content-length)
               content-type (:juxt.reap.alpha.rfc7231/content-type decoded-representation)]
 
-          (log/tracef "body is %s" (String. body))
-
           (assoc
            req
            ::site/received-representation
@@ -234,27 +228,6 @@
 
     (cond
 
-      ;; DEPRECATED: Flip is legacy and being replaced with SCI
-      (get-in selected-representation [::site/methods method ::flip/quotation])
-      (let [env (-> req
-                    ;; Security hack: We want to guarantee that 'safe' methods are
-                    ;; safe. They can be made safe if we ensure they cannot write
-                    ;; to the database. Therefore, we remove the ::site/xt-node.
-
-                    ;; TODO: We should audit the code-base to ensure that actions
-                    ;; do not have overly powerful environments passed to them.
-                    (dissoc ::site/xt-node))
-            stack
-            ;; The quotation must return a map with :ring.response/headers and
-            ;; :ring.response/body (bytes) or ::site/content (content)
-            (f/eval-quotation
-             []
-             (get-in selected-representation [::site/methods method ::flip/quotation])
-             env
-             )]
-
-        (assoc req :ring.response/body (first stack)))
-
       ;; It's rare but sometimes a GET will involve a transaction. For example,
       ;; the Authorization Request (RFC 6749 Section 4.2.1).
       (and permitted-action (-> permitted-action ::site/transact))
@@ -276,22 +249,33 @@
                  {'user {'*action* permitted-action
                          '*resource* (:juxt.site.alpha/resource req)
                          '*ctx* (dissoc req ::site/xt-node)
-                         'logf (fn [& args] (eval `(log/tracef ~@args)))
-                         'log (fn [& args] (eval `(log/trace ~@args)))}
+                         'logf (fn [& args] (eval `(log/debugf ~@args)))
+                         'log (fn [& args] (eval `(log/debug ~@args)))}
                   'xt
                   {'entity
                    (fn [id] (xt/entity (:juxt.site.alpha/db req) id))
                    'pull
                    (fn [query eid]
                      (xt/pull (:juxt.site.alpha/db req) query eid))
-                   }})
+                   }
+
+                  'juxt.pass
+                  {'pull-allowed-resources
+                   (fn [m]
+                     (actions/pull-allowed-resources
+                      (:juxt.site.alpha/db req)
+                      m
+                      {:juxt.pass.alpha/subject subject
+                       ;; TODO: Don't forget purpose
+                       }))}})
 
                 :classes
                 {'java.util.Date java.util.Date
                  'java.time.Instant java.time.Instant
                  'java.time.Duration java.time.Duration}}))
 
-            respond-program (-> selected-representation :juxt.http.alpha/respond :juxt.site.alpha.sci/program)
+            respond-program
+            (-> selected-representation :juxt.http.alpha/respond :juxt.site.alpha.sci/program)
 
             response
             (sci/eval-string
@@ -302,8 +286,8 @@
                           {'*action* permitted-action
                            '*resource* (:juxt.site.alpha/resource req)
                            '*ctx* (dissoc req ::site/xt-node)
-                           'logf (fn [& args] (eval `(log/tracef ~@args)))
-                           'log (fn [& args] (eval `(log/trace ~@args)))}
+                           'logf (fn [& args] (eval `(log/debugf ~@args)))
+                           'log (fn [& args] (eval `(log/debug ~@args)))}
                           state (assoc '*state* state))
 
                 'jsonista.core
@@ -412,7 +396,7 @@
         access-control-allow-credentials
         (get resource-origin ::site/access-control-allow-credentials)]
 
-    (log/trace "In OPTIONS")
+    (log/debug "In OPTIONS")
 
     (cond-> (into req {:ring.response/status 200})
 
@@ -531,7 +515,7 @@
 #_(defn wrap-authorize-with-acls [h]
     (fn [{::pass/keys [session] ::site/keys [resource] :as req}]
       (when (::pass/authorization resource)
-        (log/trace "Already authorized")
+        (log/debug "Already authorized")
         )
       (h (cond-> req
            ;; Only authorize if not already authorized
@@ -548,7 +532,7 @@
     (if (::pass/authorization resource)
       ;; If authorization already established, this is sufficient
       (do
-        (log/tracef "pre-authorized: %s" (::pass/authorization resource))
+        (log/debugf "pre-authorized: %s" (::pass/authorization resource))
         (h req))
       ;; Otherwise, authorize with PDP
       (let [request-context
@@ -660,9 +644,9 @@
         ;; TODO: Can we use the new refreshed db here to save another call to xt/db?
         (let [actions (rules/eval-triggers (xt/db xt-node) triggers request-context)]
           (when (seq actions)
-            (log/tracef "Triggered actions are %s" (pr-str actions)))
+            (log/debugf "Triggered actions are %s" (pr-str actions)))
           (doseq [action actions]
-            (log/tracef "Running action: %s" (get-in action [:trigger ::site/action]))
+            (log/debugf "Running action: %s" (get-in action [:trigger ::site/action]))
             (triggers/run-action! req action)))
         (catch clojure.lang.ExceptionInfo e
           (log/error e (format "Failed to run trigger/action: %s" (pr-str (ex-data e)))))
@@ -737,13 +721,14 @@
            (and (list? form) (>= (count form) 64))
            (#(take 64 %)))))))
 
-(defn log-request! [{:ring.request/keys [method] :as req}]
+(defn log-request! [{:ring.request/keys [method]
+                     :juxt.site.alpha/keys [base-uri uri]
+                     :as req}]
   (assert method)
   (log/infof
-   "%-7s %s %s %d"
+   "%-7s %s %d"
    (str/upper-case (name method))
-   (:ring.request/path req)
-   (:ring.request/protocol req)
+   uri
    (:ring.response/status req)))
 
 (defn respond
@@ -908,7 +893,7 @@
                       :where [[er ::site/type "ErrorResource"]
                               [er :ring.response/status status]]
                       :in [status]} status))]
-    (log/tracef "ErrorResource found for status %d: %s" status res)
+    (log/debugf "ErrorResource found for status %d: %s" status res)
     res))
 
 (defn error-resource-representation
@@ -1059,8 +1044,6 @@
               status (or
                       (:ring.response/status ex-data) ; explicit error status
                       500)
-              _ (log/debugf "ERROR STATUS: %s %s (%s) %s" status (:ring.response/status ex-data) (.getMessage e)
-                            (pr-str (dissoc ex-data ::site/request-context)))
               headers (merge
                        (:ring.response/headers ctx)
                        (:ring.response/headers ex-data))
@@ -1276,6 +1259,13 @@
          ::site/request-context req})))
     (h req)))
 
+(defn wrap-bind-uri-to-mdc [h]
+  (fn [{:juxt.site.alpha/keys [uri] :as req}]
+    (org.slf4j.MDC/put "uri" uri)
+    (try
+      (h req)
+      (finally (org.slf4j.MDC/remove "uri")))))
+
 (defn make-pipeline
   "Make a pipeline of Ring middleware. Note, that each Ring middleware designates
   a processing stage. An interceptor chain (perhaps using Pedestal (pedestal.io)
@@ -1291,6 +1281,8 @@
 
    ;; Initialize the request by merging in some extra data
    #(wrap-initialize-request % opts)
+
+   wrap-bind-uri-to-mdc
 
    wrap-service-unavailable?
 
@@ -1310,16 +1302,13 @@
    ;; 501
    wrap-method-not-implemented?
 
-   ;; Authenticate
-
-   ;; Rewrite to work against a cookie-scope, which may use JWTs or sessions.
-   ;; wrap-process-cookies
-   session-scope/wrap-session-scope
-
-   wrap-http-authenticate
-
    ;; Locate resources
    wrap-locate-resource
+
+   ;; Authenticate, some clues will be on the resource
+   session-scope/wrap-session-scope
+   wrap-http-authenticate
+
    wrap-redirect
 
    ;; 405

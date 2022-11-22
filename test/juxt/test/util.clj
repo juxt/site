@@ -2,8 +2,8 @@
 
 (ns juxt.test.util
   (:require
+   [clojure.java.io :as io]
    [juxt.site.alpha.handler :as h]
-   [xtdb.api :as xt]
    [juxt.site.alpha.main :as main]
    [juxt.pass.alpha.actions :as authz]
    [juxt.apex.alpha :as-alias apex]
@@ -12,7 +12,8 @@
    [juxt.http.alpha :as-alias http]
    [juxt.mail.alpha :as-alias mail]
    [juxt.pass.alpha :as-alias pass]
-   [juxt.site.alpha :as-alias site])
+   [juxt.site.alpha :as-alias site]
+   [xtdb.api :as xt])
   (:import
    (xtdb.api IXtdb)))
 
@@ -130,18 +131,28 @@
     [::xt/put (authz/install-do-action-fn)]]))
 
 
+(defn lookup-session-details [session-token]
+  (let [db (xt/db *xt-node*)]
+    (first
+     (xt/q db '{:find [(pull session [*]) (pull scope [*])]
+                :keys [session scope]
+                :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/session-token"]
+                        [e :juxt.pass.alpha/session-token session-token]
+                        [e :juxt.pass.alpha/session session]
+                        [session :juxt.pass.alpha/session-scope scope]]
+                :in [session-token]}
+           session-token))))
+
 (defn assoc-session-token [req session-token]
-  (let [db (xt/db *xt-node*)
-        {:keys [session scope]}
-        (first
-         (xt/q db '{:find [(pull session [*]) (pull scope [*])]
-                    :keys [session scope]
-                    :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/session-token"]
-                            [e :juxt.pass.alpha/session-token session-token]
-                            [e :juxt.pass.alpha/session session]
-                            [session :juxt.pass.alpha/session-scope scope]]
-                    :in [session-token]}
-               session-token))
+  (let [{:keys [session scope]}
+        (lookup-session-details session-token)
 
         {:juxt.pass.alpha/keys [cookie-name]} scope]
     (assoc-in req [:ring.request/headers "cookie"] (format "%s=%s" cookie-name session-token))))
+
+(defn assoc-body [req body-bytes]
+  (-> req
+      body-bytes
+      (->
+       (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
+       (assoc :ring.request/body (io/input-stream body-bytes)))))
