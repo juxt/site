@@ -8,12 +8,7 @@
    [clojure.tools.logging :as log]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
-   [juxt.apex.alpha :as-alias apex]
-   [juxt.apex.alpha.openapi :as openapi]
-   [juxt.dave.alpha :as dave]
-   [juxt.dave.alpha.methods :as dave.methods]
    [juxt.http.alpha :as-alias http]
-   [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha :as-alias pass]
    [juxt.pass.alpha.actions :as actions]
    [juxt.pass.alpha.http-authentication :as http-authn]
@@ -307,37 +302,6 @@
       :else
       (response/add-payload req))))
 
-(defn post-variant [{::site/keys [xt-node db uri]
-                     ::apex/keys [request-payload]
-                     :as req}]
-  (let [location
-        (str uri (hash (select-keys request-payload [::site/resource ::site/variant])))
-        existing (xt/entity db location)]
-
-    (->> (xt/submit-tx
-          xt-node
-          [[:xtdb.api/put (merge {:xt/id location} request-payload)]])
-         (xt/await-tx xt-node))
-
-    (into req {:ring.response/status (if existing 204 201)
-               :ring.response/headers {"location" location}})))
-
-(defn post-redirect [{::site/keys [xt-node db]
-                      :as req}]
-  (let [resource-state (::apex/request-payload (openapi/validate-request-payload req))
-        {::site/keys [resource]} resource-state
-        existing (xt/entity db resource)]
-    (->> (xt/submit-tx
-          xt-node
-          [[:xtdb.api/put
-            (merge
-             {:xt/id resource}
-             ;; ::site/resource = :xt/id, no need to duplicate
-             (dissoc resource-state ::site/resource))]])
-         (xt/await-tx xt-node))
-
-    (into req {:ring.response/status (if existing 204 201)})))
-
 (defn perform-unsafe-method [req]
   (let [req (receive-representation req)
         ;; TODO: Should we fail if more than one permitted action available?
@@ -418,29 +382,6 @@
            access-control-allow-methods (assoc "access-control-allow-methods" (join-keywords access-control-allow-methods true))
            access-control-allow-headers (assoc "access-control-allow-headers" (join-keywords access-control-allow-headers false))
            access-control-allow-credentials (assoc "access-control-allow-credentials" access-control-allow-credentials)))))))
-
-(defn PROPFIND [req]
-  (dave.methods/propfind req))
-
-(defn MKCOL [{::site/keys [xt-node uri]}]
-  (let [tx (xt/submit-tx
-            xt-node
-            [[:xtdb.api/put
-              {:xt/id uri
-               ::dave/resource-type :collection
-               ::site/methods {:get {} :head {} :options {} :propfind {}}
-               ::http/content-type "text/html;charset=utf-8"
-               ::http/content "<h1>Index</h1>\r\n"
-               ::http/options {"DAV" "1"}}]])]
-    (xt/await-tx xt-node tx))
-  {:ring.response/status 201
-   :ring.response/headers {}})
-
-(defmethod transform-value "password" [_ instance]
-  (password/encrypt instance 11))
-
-(defmethod transform-value "inst" [_ instance]
-  (read-instant-date instance))
 
 (defn wrap-method-not-implemented? [h]
   (fn [{:ring.request/keys [method] :as req}]
@@ -611,9 +552,7 @@
          :put (PUT req)
          :patch (PATCH req)
          :delete (DELETE req)
-         :options (OPTIONS req)
-         :propfind (PROPFIND req)
-         :mkcol (MKCOL req)))))
+         :options (OPTIONS req)))))
 
 (defn wrap-triggers [h]
   ;; Site-specific step: Check for any observers and 'run' them TODO:
