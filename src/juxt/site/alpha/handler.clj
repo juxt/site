@@ -2,11 +2,9 @@
 
 (ns juxt.site.alpha.handler
   (:require
-   [clojure.instant :refer [read-instant-date]]
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
    [juxt.http.alpha :as-alias http]
    [juxt.pass.alpha :as-alias pass]
@@ -30,8 +28,7 @@
    [juxt.site.alpha.triggers :as triggers]
    [juxt.site.alpha.util :as util]
    [sci.core :as sci]
-   [xtdb.api :as xt]
-   )
+   [xtdb.api :as xt])
   (:import (java.net URI)))
 
 (defn join-keywords
