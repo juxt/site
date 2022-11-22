@@ -176,13 +176,12 @@
     :deps #{::init/system}}})
 
 (defn put-user! [& {:keys [id username name]}]
-  (eval
+  (init/do-action
+   (substitute-actual-base-uri "https://example.org/subjects/system")
+   (substitute-actual-base-uri "https://example.org/actions/put-user")
    (substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/put-user"
-      {:xt/id ~(or id (format "https://example.org/users/%s" username))
-       :name ~name}))))
+    {:xt/id (or id (format "https://example.org/users/%s" username))
+     :name name})))
 
 (defn put-user-identity! [& {:juxt.pass.alpha/keys [username password realm]}]
   (assert username)

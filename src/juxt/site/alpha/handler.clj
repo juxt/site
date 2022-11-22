@@ -280,14 +280,25 @@
                    'pull
                    (fn [query eid]
                      (xt/pull (:juxt.site.alpha/db req) query eid))
-                   }})
+                   }
+
+                  'juxt.pass
+                  {'pull-allowed-resources
+                   (fn [m]
+                     (actions/pull-allowed-resources
+                      (:juxt.site.alpha/db req)
+                      m
+                      {:juxt.pass.alpha/subject subject
+                       ;; TODO: Don't forget purpose
+                       }))}})
 
                 :classes
                 {'java.util.Date java.util.Date
                  'java.time.Instant java.time.Instant
                  'java.time.Duration java.time.Duration}}))
 
-            respond-program (-> selected-representation :juxt.http.alpha/respond :juxt.site.alpha.sci/program)
+            respond-program
+            (-> selected-representation :juxt.http.alpha/respond :juxt.site.alpha.sci/program)
 
             response
             (sci/eval-string

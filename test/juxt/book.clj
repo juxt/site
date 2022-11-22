@@ -36,65 +36,6 @@
   ;; end::example-action[]
   )
 
-(defn create-action-put-subject! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-put-subject![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/put-subject"
-
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [site/request-body-as-edn
-                (site/validate
-                 [:map
-                  [:xt/id [:re "https://example.org/subjects/.*"]]
-                  [:juxt.pass.alpha/user-identity [:re "https://example.org/user-identities/.+"]]])
-                (site/set-type "https://meta.juxt.site/pass/subject")
-                xtdb.api/put]))]))}
-
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
-
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [user :role role]
-          [permission :role role]]]})
-     ;; end::create-action-put-subject![]
-     ))))
-
-(defn grant-permission-to-invoke-action-put-subject! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/system/put-subject"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/put-subject"
-       :juxt.pass.alpha/purpose nil})))))
-
-(defn create-user! [& {:keys [username name role]}]
-  (eval
-   (substitute-actual-base-uri
-    `(init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/put-user"
-      {:xt/id ~(format "https://example.org/users/%s" username)
-       :name ~name
-       :role ~(or role "User")}))))
-
 ;; Hello World!
 
 (defn create-action-put-immutable-public-resource! [_]
@@ -340,62 +281,6 @@
           [permission :juxt.site.alpha/uri resource] ; <2>
           ]]})
      ;; end::create-action-get-protected-resource![]
-     ))))
-
-;; Protection Spaces
-
-(defn create-action-put-protection-space! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::create-action-put-protection-space![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/create-action"
-      {:xt/id "https://example.org/actions/put-protection-space"
-
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [site/request-body-as-edn
-                (site/validate
-                 [:map
-                  [:xt/id [:re "https://example.org/protection-spaces/(.+)"]]
-                  [:juxt.pass.alpha/canonical-root-uri [:re "https?://[^/]*"]]
-                  [:juxt.pass.alpha/realm {:optional true} [:string {:min 1}]]
-                  [:juxt.pass.alpha/auth-scheme [:enum "Basic" "Bearer"]]])
-                (site/set-type "https://meta.juxt.site/pass/protection-space")
-                xtdb.api/put]))]))}
-
-       :juxt.pass.alpha/rules
-       '[
-         [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
-
-         [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :role role]
-          [user :role role]]]})
-     ;; end::create-action-put-protection-space![]
-     ))))
-
-(defn grant-permission-to-put-protection-space! [_]
-  (eval
-   (substitute-actual-base-uri
-    (quote
-     ;; tag::grant-permission-to-put-protection-space![]
-     (juxt.site.alpha.init/do-action
-      "https://example.org/subjects/system"
-      "https://example.org/actions/grant-permission"
-      {:xt/id "https://example.org/permissions/system/put-protection-space"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/put-protection-space"
-       :juxt.pass.alpha/purpose nil})
-     ;; end::grant-permission-to-put-protection-space![]
      ))))
 
 ;; HTTP Basic Auth
@@ -1197,14 +1082,6 @@
 
    "https://example.org/actions/get-protected-resource"
    {:create #'create-action-get-protected-resource!
-    :deps #{::init/system}}
-
-   "https://example.org/actions/put-protection-space"
-   {:create #'create-action-put-protection-space!
-    :deps #{::init/system}}
-
-   "https://example.org/permissions/system/put-protection-space"
-   {:create #'grant-permission-to-put-protection-space!
     :deps #{::init/system}}
 
    "https://example.org/protected-by-session-scope/document.html"

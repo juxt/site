@@ -809,6 +809,7 @@
              resource (assoc ::site/resource resource)))]
 
       #_(log/debugf "Permitted actions: %s" (pr-str permitted-actions))
+      (log/tracef "Subject is %s" (pr-str subject))
 
       (if (seq permitted-actions)
         (h (assoc req ::pass/permitted-actions permitted-actions))

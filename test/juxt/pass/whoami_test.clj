@@ -110,6 +110,7 @@
                  {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/whoami"}}}
                  :juxt.site.alpha/variant-of "https://example.org/whoami"
                  :juxt.http.alpha/content-type "application/json"
+                 ;; TODO: Rename to :juxt.site.alpha/respond
                  :juxt.http.alpha/respond
                  {:juxt.site.alpha.sci/program
                   (pr-str
@@ -117,7 +118,9 @@
                       (-> *ctx*
                           (assoc :ring.response/body content)
                           (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
-                          )))}})))}
+                          )))}
+                 ;; protection space?
+                 })))}
 
    "https://example.org/whoami.html"
    {:deps #{::init/system
