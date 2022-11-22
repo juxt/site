@@ -10,7 +10,6 @@
    [juxt.pass.alpha.actions :as actions]
    [juxt.pass.session-scope :as session-scope]
    [juxt.pass.user :as user]
-   [juxt.flip.alpha.core :as f]
    [juxt.site.alpha :as-alias site]
    [juxt.pass.alpha :as-alias pass]))
 
@@ -62,7 +61,6 @@
    (substitute-actual-base-uri
     (quote
      (juxt.site.alpha.init/put!
-      ;; tag::install-create-action![]
       {:xt/id "https://example.org/actions/create-action"
        :juxt.site.alpha/description "The action to create all other actions"
        :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
@@ -71,27 +69,36 @@
        '[
          ;; Creating actions should only be available to the most trusted
          ;; subjects. Actions can write directly to the database, if they wish.
-         [(allowed? subject resource permission) ; <1>
+         [(allowed? subject resource permission)
           [permission :juxt.pass.alpha/subject subject]]]
 
+       :juxt.site.alpha.malli/input-schema
+       [:map
+        [:xt/id [:re "https://example.org/actions/(.+)"]]
+        [:juxt.pass.alpha/rules [:vector [:vector :any]]]]
+
+       :juxt.site.alpha/prepare
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '(let [content-type (-> *ctx*
+                                 :juxt.site.alpha/received-representation
+                                 :juxt.http.alpha/content-type)
+                body (-> *ctx*
+                         :juxt.site.alpha/received-representation
+                         :juxt.http.alpha/body)]
+            (case content-type
+              "application/edn"
+              (some->
+               body
+               (String.)
+               clojure.edn/read-string
+               juxt.site.malli/validate-input
+               (assoc :juxt.site.alpha/type "https://meta.juxt.site/pass/action")))))}
+
        :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [juxt.site.alpha/request-body-as-edn
-
-                (site/validate
-                 [:map                  ; <2>
-                  [:xt/id [:re "https://example.org/actions/(.+)"]]
-                  [:juxt.pass.alpha/rules [:vector [:vector :any]]]])
-
-                (site/set-type "https://meta.juxt.site/pass/action") ; <3>
-
-                xtdb.api/put]))]))}}
-      ;; end::install-create-action![]
-      )))))
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '[[:xtdb.api/put *prepare*]])}})))))
 
 (defn create-grant-permission-action! [_]
   (eval
@@ -104,6 +111,36 @@
       {:xt/id "https://example.org/actions/grant-permission"
        :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
 
+       :juxt.site.alpha.malli/input-schema
+       [:map
+        [:xt/id [:re "https://example.org/permissions/(.+)"]]
+        [:juxt.pass.alpha/action [:re "https://example.org/actions/(.+)"]]
+        [:juxt.pass.alpha/purpose [:maybe :string]]]
+
+       :juxt.site.alpha/prepare
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '(let [content-type (-> *ctx*
+                                 :juxt.site.alpha/received-representation
+                                 :juxt.http.alpha/content-type)
+                body (-> *ctx*
+                         :juxt.site.alpha/received-representation
+                         :juxt.http.alpha/body)]
+            (case content-type
+              "application/edn"
+              (some->
+               body
+               (String.)
+               clojure.edn/read-string
+               juxt.site.malli/validate-input
+               (assoc
+                :juxt.site.alpha/type "https://meta.juxt.site/pass/permission")))))}
+
+       :juxt.site.alpha/transact
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '[[:xtdb.api/put *prepare*]])}
+
        :juxt.pass.alpha/rules
        '[
          [(allowed? subject resource permission)
@@ -112,25 +149,10 @@
          ;; This might be overly powerful, as a general way of granting anyone a
          ;; permission on any action! Let's comment for now
          #_[(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [user :role role]
-          [permission :role role]]]
-
-       :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [juxt.site.alpha/request-body-as-edn
-                (juxt.site.alpha/validate
-                 [:map
-                  [:xt/id [:re "https://example.org/permissions/(.+)"]]
-                  [:juxt.pass.alpha/action [:re "https://example.org/actions/(.+)"]]
-                  [:juxt.pass.alpha/purpose [:maybe :string]]])
-                (f/set-at (f/dip ["https://meta.juxt.site/pass/permission" :juxt.site.alpha/type]))
-                xtdb.api/put]))]))}})
+            [subject :juxt.pass.alpha/user-identity id]
+            [id :juxt.pass.alpha/user user]
+            [user :role role]
+            [permission :role role]]]})
      ;; end::create-grant-permission-action![]
      ))))
 
@@ -160,21 +182,38 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/install-not-found"
+
+       :juxt.site.alpha.malli/input-schema
+       [:map
+        [:xt/id [:re "https://example.org/.*"]]]
+
+       :juxt.site.alpha/prepare
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '(let [content-type (-> *ctx*
+                                 :juxt.site.alpha/received-representation
+                                 :juxt.http.alpha/content-type)
+                body (-> *ctx*
+                         :juxt.site.alpha/received-representation
+                         :juxt.http.alpha/body)]
+            (case content-type
+              "application/edn"
+              (some->
+               body
+               (String.)
+               clojure.edn/read-string
+               juxt.site.malli/validate-input
+               (assoc
+                :juxt.site.alpha/type "https://meta.juxt.site/not-found"
+                :juxt.site.alpha/methods
+                {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}
+                 :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}})))))}
+
        :juxt.site.alpha/transact
-       {:juxt.flip.alpha/quotation
-        `(
-          (site/with-fx-acc
-            [(site/push-fx
-              (f/dip
-               [site/request-body-as-edn
-                (site/validate
-                 [:map
-                  [:xt/id [:re "https://example.org/.*"]]])
-                (site/set-type "https://meta.juxt.site/not-found")
-                (site/set-methods
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}
-                  :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-not-found"}}})
-                xtdb.api/put]))]))}
+       {:juxt.site.alpha.sci/program
+        (pr-str
+         '[[:xtdb.api/put *prepare*]])}
+
        :juxt.pass.alpha/rules
        [
         ['(allowed? subject resource permission)
@@ -245,27 +284,6 @@
        {:juxt.site.alpha.sci/program
         (pr-str
          '[[:xtdb.api/put *prepare*]])}
-
-       #_{:juxt.flip.alpha/quotation
-          `(
-            (site/with-fx-acc
-              [(site/push-fx
-                (f/dip
-                 [site/request-body-as-edn
-                  (site/validate
-                   [:map
-                    [:juxt.pass.alpha/client-id [:re "[a-z-]{3,}"]]
-                    [:juxt.pass.alpha/redirect-uri [:re "https://"]]])
-
-                  (site/set-type "https://meta.juxt.site/pass/application")
-                  (f/set-at (f/dip [(pass/as-hex-str (pass/random-bytes 20)) :juxt.pass.alpha/client-secret]))
-
-                  (f/set-at
-                   (f/keep
-                    [(f/of :juxt.pass.alpha/client-id) "/applications/" f/str (f/env :juxt.site.alpha/base-uri) f/str
-                     :xt/id]))
-
-                  xtdb.api/put]))]))}
 
        :juxt.pass.alpha/rules
        '[[(allowed? subject resource permission)

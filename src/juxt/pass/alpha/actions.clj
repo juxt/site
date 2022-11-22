@@ -1,4 +1,4 @@
-;; Copyright © 2022, JUXT LTD.
+; Copyright © 2022, JUXT LTD.
 
 (ns juxt.pass.alpha.actions
   (:require
@@ -16,8 +16,6 @@
    [juxt.site.alpha.util :refer [random-bytes]]
    [juxt.pass.alpha.http-authentication :as http-authn]
    [juxt.site.alpha :as-alias site]
-   [juxt.flip.alpha.core :as f :refer [eval-quotation]]
-   [juxt.flip.alpha :as-alias flip]
    [xtdb.api :as xt]
    juxt.site.alpha.schema
    [jsonista.core :as json]))
@@ -492,15 +490,6 @@
                     ;; Possibly, in future, we should get the callstack
                     (throw (ex-info (.getMessage e) (or (ex-data (.getCause e)) {}) (.getCause e)))))
 
-                ;; Deprecated: flip
-                (-> action-doc ::site/transact ::flip/quotation)
-                (let [[{::site/keys [fx]}]
-                      (eval-quotation
-                       (reverse args)   ; push the args to the stack
-                       (-> action-doc ::site/transact ::flip/quotation)
-                       env)]
-                  fx)
-
                 ;; There might be other strategies in the future (although the
                 ;; fewer the better really)
                 :else
@@ -612,18 +601,6 @@
 
 (defn sanitize-ctx [ctx]
   (dissoc ctx ::site/xt-node ::site/db))
-
-(defn apply-request-context-operations [ctx ops]
-  (let [res
-        (reduce
-         (fn [ctx [op & args]]
-           (case op
-             :juxt.site.alpha/apply-to-request-context
-             (let [quotation (first args)]
-               (first (eval-quotation (list ctx) quotation {})))))
-         ctx
-         ops)]
-    res))
 
 (defn apply-response-fx [ctx fx]
   (reduce
@@ -759,15 +736,6 @@
         (cond-> ctx
           result (assoc ::pass/action-result result)
 
-          ;;:juxt.site.alpha/request-context
-
-          ;; These ops are quotations that can be applied to the request
-          ;; context.  The intention if for these quotations to set the
-          ;; response status and add headers.
-          ;; (deprecated)
-          (seq (:juxt.site.alpha/apply-to-request-context-ops result))
-          (apply-request-context-operations (reverse (:juxt.site.alpha/apply-to-request-context-ops result)))
-
           (seq (:juxt.site.alpha/response-fx result))
           (apply-response-fx (:juxt.site.alpha/response-fx result))
 
@@ -862,14 +830,6 @@
                 (format "No anonymous permission for actions: %s" (pr-str actions))
                 {:ring.response/status 403
                  ::site/request-context req})))))))))
-
-
-(defmethod f/word 'juxt.pass.alpha/pull-allowed-resources
-  [[{:keys [actions] :as opts} & stack] [_ & queue] env]
-  (assert (::site/db env) "No database in environment")
-  (let [result (pull-allowed-resources (::site/db env) actions env)]
-    [(cons result stack) queue env]))
-
 
 (comment
   (sci/eval-string

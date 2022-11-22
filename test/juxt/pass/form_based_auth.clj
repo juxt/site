@@ -5,7 +5,6 @@
    [juxt.pass.session-scope :as session-scope]
    [clojure.java.io :as io]
    [clojure.edn :as edn]
-   juxt.book.login
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
    [malli.core :as malli]
    [ring.util.codec :as codec]))

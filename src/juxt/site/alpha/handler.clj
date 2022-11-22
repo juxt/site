@@ -12,8 +12,6 @@
    [juxt.apex.alpha.openapi :as openapi]
    [juxt.dave.alpha :as dave]
    [juxt.dave.alpha.methods :as dave.methods]
-   [juxt.flip.alpha :as-alias flip]
-   [juxt.flip.alpha.core :as f]
    [juxt.http.alpha :as-alias http]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha :as-alias pass]
@@ -229,27 +227,6 @@
         permitted-action (::pass/action (first (::pass/permitted-actions req)))]
 
     (cond
-
-      ;; DEPRECATED: Flip is legacy and being replaced with SCI
-      (get-in selected-representation [::site/methods method ::flip/quotation])
-      (let [env (-> req
-                    ;; Security hack: We want to guarantee that 'safe' methods are
-                    ;; safe. They can be made safe if we ensure they cannot write
-                    ;; to the database. Therefore, we remove the ::site/xt-node.
-
-                    ;; TODO: We should audit the code-base to ensure that actions
-                    ;; do not have overly powerful environments passed to them.
-                    (dissoc ::site/xt-node))
-            stack
-            ;; The quotation must return a map with :ring.response/headers and
-            ;; :ring.response/body (bytes) or ::site/content (content)
-            (f/eval-quotation
-             []
-             (get-in selected-representation [::site/methods method ::flip/quotation])
-             env
-             )]
-
-        (assoc req :ring.response/body (first stack)))
 
       ;; It's rare but sometimes a GET will involve a transaction. For example,
       ;; the Authorization Request (RFC 6749 Section 4.2.1).

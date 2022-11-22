@@ -14,7 +14,6 @@
                         "juxt.pass.form-based-auth-test"
                         "juxt.site.eql-datalog-compiler-test"
                         "juxt.pass.whoami-test"
-                        #_"juxt.book-test"
                         ]}]
 
  :reporter kaocha.report/documentation}
