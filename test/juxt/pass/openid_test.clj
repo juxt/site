@@ -6,12 +6,12 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is are testing]]
    [java-http-clj.core :as hc]
-   [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.openid :as openid]
-   [juxt.pass.session-scope :as session-scope]
-   [juxt.site.alpha :as-alias site]
-   [juxt.site.alpha.init :as init]
-   [juxt.site.alpha.repl :as repl]
+   [juxt.pass :as-alias pass]
+   [juxt.pass.resources.openid :as openid]
+   [juxt.pass.resources.session-scope :as session-scope]
+   [juxt.site :as-alias site]
+   [juxt.site.init :as init]
+   [juxt.site.repl :as repl]
    [juxt.site.bootstrap :as bootstrap]
    [juxt.test.util :refer [*handler* *xt-node* with-fixtures with-resources]]
    [ring.util.codec :as codec]
@@ -57,10 +57,10 @@
                   "https://example.org/subjects/system"
                   "https://example.org/actions/put-session-scope"
                   {:xt/id ~id
-                   :juxt.pass.alpha/cookie-name "sid"
-                   :juxt.pass.alpha/cookie-domain "https://example.org"
-                   :juxt.pass.alpha/cookie-path "/"
-                   :juxt.pass.alpha/login-uri "https://example.org/openid/login"}))))}
+                   :juxt.pass/cookie-name "sid"
+                   :juxt.pass/cookie-domain "https://example.org"
+                   :juxt.pass/cookie-path "/"
+                   :juxt.pass/login-uri "https://example.org/openid/login"}))))}
 
    "https://example.org/openid/login"
    ;;(load-resource-installer "resources/openid/login.edn") TODO
@@ -74,8 +74,8 @@
               (openid/install-openid-login-endpoint!
                (init/substitute-actual-base-uri
                 {:xt/id id
-                 :juxt.pass.alpha/session-scope "https://example.org/session-scopes/openid"
-                 :juxt.pass.alpha/openid-client "https://example.org/openid/auth0/client"})))}
+                 :juxt.pass/session-scope "https://example.org/session-scopes/openid"
+                 :juxt.pass/openid-client "https://example.org/openid/auth0/client"})))}
 
    "https://example.org/openid/callback"
    {:deps #{::init/system
@@ -87,7 +87,7 @@
               (openid/install-openid-callback-endpoint!
                (init/substitute-actual-base-uri
                 {:xt/id id
-                 :juxt.pass.alpha/openid-client "https://example.org/openid/auth0/client"})))}})
+                 :juxt.pass/openid-client "https://example.org/openid/auth0/client"})))}})
 
 #_(with-fixtures
   (with-resources
@@ -120,7 +120,7 @@
                          (for [id (repl/ls-type "https://meta.juxt.site/pass/session-token")]
                            (xt/entity db id)))
 
-          state (:juxt.pass.alpha/state session)
+          state (:juxt.pass/state session)
 
           _ (assert (= 303 (:ring.response/status login-response)))
 
@@ -129,7 +129,7 @@
                                  {:method :get
                                   :uri location})
 
-          cookie-header-value (format "sid=%s" (:juxt.pass.alpha/session-token session-token))
+          cookie-header-value (format "sid=%s" (:juxt.pass/session-token session-token))
 
           callback-request
           {:ring.request/method :get

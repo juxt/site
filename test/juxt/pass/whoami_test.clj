@@ -3,25 +3,25 @@
 (ns juxt.pass.whoami-test
   (:require
    [clojure.edn :as edn]
-   [juxt.site.alpha.logging :refer [with-logging]]
+   [juxt.site.logging :refer [with-logging]]
    [clojure.tools.logging :as log]
    [jsonista.core :as json]
    [edn-query-language.core :as eql]
-   [juxt.site.alpha.eql-datalog-compiler :as eqlc]
+   [juxt.site.eql-datalog-compiler :as eqlc]
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is are testing use-fixtures]]
    [java-http-clj.core :as hc]
-   [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.openid :as openid]
-   [juxt.pass.oauth :as oauth]
-   [juxt.pass.session-scope :as session-scope]
-   [juxt.pass.user :as user]
-   [juxt.pass.form-based-auth :as form-based-auth]
-   [juxt.site.alpha :as-alias site]
-   [juxt.site.alpha.init :as init]
-   [juxt.example-users :as example-users]
-   [juxt.example-applications :as example-applications]
-   [juxt.site.alpha.repl :as repl]
+   [juxt.pass :as-alias pass]
+   [juxt.pass.resources.openid :as openid]
+   [juxt.pass.resources.oauth :as oauth]
+   [juxt.pass.resources.session-scope :as session-scope]
+   [juxt.pass.resources.user :as user]
+   [juxt.pass.resources.form-based-auth :as form-based-auth]
+   [juxt.pass.resources.example-users :as example-users]
+   [juxt.pass.resources.example-applications :as example-applications]
+   [juxt.site :as-alias site]
+   [juxt.site.init :as init]
+   [juxt.site.repl :as repl]
    [juxt.site.bootstrap :as bootstrap]
    [juxt.test.util :refer [with-system-xt with-resources *handler* *xt-node* with-fixtures with-resources assoc-session-token with-handler assoc-session-token lookup-session-details]]
    [ring.util.codec :as codec]
@@ -48,35 +48,35 @@
                 ;; an action is protecting and managing, not a particular
                 ;; view of it.
 
-                :juxt.site.alpha/state
-                {:juxt.site.alpha.sci/program
+                :juxt.site/state
+                {:juxt.site.sci/program
                  (pr-str
                   '{:subject
                     (xt/pull
-                     '[* {:juxt.pass.alpha/user-identity [* {:juxt.pass.alpha/user [*]}]}]
-                     (:xt/id (:juxt.pass.alpha/subject *ctx*)))})}
+                     '[* {:juxt.pass/user-identity [* {:juxt.pass/user [*]}]}]
+                     (:xt/id (:juxt.pass/subject *ctx*)))})}
 
-                :juxt.pass.alpha/rules
+                :juxt.pass/rules
                 '[
                   [(allowed? subject resource permission)
-                   [subject :juxt.pass.alpha/user-identity id]
-                   [id :juxt.pass.alpha/user user]
-                   [permission :juxt.pass.alpha/user user]]]}))}
+                   [subject :juxt.pass/user-identity id]
+                   [id :juxt.pass/user user]
+                   [permission :juxt.pass/user user]]]}))}
 
    "https://example.org/permissions/{username}/whoami"
    {:deps #{::init/system
             "https://example.org/actions/whoami"}
     :create (fn [{:keys [id params]}]
               (let [username (get params "username")]
-                (juxt.site.alpha.init/do-action
+                (juxt.site.init/do-action
                  (init/substitute-actual-base-uri "https://example.org/subjects/system")
                  (init/substitute-actual-base-uri "https://example.org/actions/grant-permission")
                  (let [user (format "https://example.org/users/%s" username)]
                    (init/substitute-actual-base-uri
                     {:xt/id id
-                     :juxt.pass.alpha/action "https://example.org/actions/whoami"
-                     :juxt.pass.alpha/purpose nil
-                     :juxt.pass.alpha/user user})))))}
+                     :juxt.pass/action "https://example.org/actions/whoami"
+                     :juxt.pass/purpose nil
+                     :juxt.pass/user user})))))}
 
    ;; TODO: Create an action for establishing a protection space
    "https://example.org/bearer-protection-space"
@@ -85,7 +85,7 @@
               (init/put!
                (init/substitute-actual-base-uri
                 {:xt/id id
-                 :juxt.pass.alpha/auth-scheme "Bearer"})))}
+                 :juxt.pass/auth-scheme "Bearer"})))}
 
    "https://example.org/whoami"
    {:deps #{::init/system
@@ -95,9 +95,9 @@
               (init/put!
                (init/substitute-actual-base-uri
                 {:xt/id id
-                 :juxt.site.alpha/methods
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/whoami"}}}
-                 :juxt.pass.alpha/protection-spaces #{"https://example.org/bearer-protection-space"}})))}
+                 :juxt.site/methods
+                 {:get {:juxt.pass/actions #{"https://example.org/actions/whoami"}}}
+                 :juxt.pass/protection-spaces #{"https://example.org/bearer-protection-space"}})))}
 
    "https://example.org/whoami.json"
    {:deps #{::init/system
@@ -106,13 +106,13 @@
               (init/put!
                (init/substitute-actual-base-uri
                 {:xt/id id
-                 :juxt.site.alpha/methods
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/whoami"}}}
-                 :juxt.site.alpha/variant-of "https://example.org/whoami"
-                 :juxt.http.alpha/content-type "application/json"
-                 ;; TODO: Rename to :juxt.site.alpha/respond
-                 :juxt.http.alpha/respond
-                 {:juxt.site.alpha.sci/program
+                 :juxt.site/methods
+                 {:get {:juxt.pass/actions #{"https://example.org/actions/whoami"}}}
+                 :juxt.site/variant-of "https://example.org/whoami"
+                 :juxt.http/content-type "application/json"
+                 ;; TODO: Rename to :juxt.site/respond
+                 :juxt.http/respond
+                 {:juxt.site.sci/program
                   (pr-str
                    '(let [content (jsonista.core/write-value-as-string *state*)]
                       (-> *ctx*
@@ -129,12 +129,12 @@
               (init/put!
                (init/substitute-actual-base-uri
                 {:xt/id id
-                 :juxt.site.alpha/methods
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/whoami"}}}
-                 :juxt.site.alpha/variant-of "https://example.org/whoami"
-                 :juxt.http.alpha/content-type "text/html;charset=utf-8"
-                 :juxt.http.alpha/respond
-                 {:juxt.site.alpha.sci/program
+                 :juxt.site/methods
+                 {:get {:juxt.pass/actions #{"https://example.org/actions/whoami"}}}
+                 :juxt.site/variant-of "https://example.org/whoami"
+                 :juxt.http/content-type "text/html;charset=utf-8"
+                 :juxt.http/respond
+                 {:juxt.site.sci/program
                   (pr-str
                    '(let [content (format "<h1>Hello World! state is %s</h1>\n" (pr-str *state*))]
                       (-> *ctx*
@@ -167,20 +167,20 @@
            *handler*
            "username" "alice"
            "password" "garden"
-           :juxt.site.alpha/uri "https://site.test/login")
+           :juxt.site/uri "https://site.test/login")
 
-          session-token (:juxt.pass.alpha/session-token login-result)
+          session-token (:juxt.pass/session-token login-result)
           _ (assert session-token)
 
           {access-token "access_token"}
           (oauth/authorize!
-           {:juxt.pass.alpha/session-token session-token
+           {:juxt.pass/session-token session-token
             "client_id" "test-app"})]
 
       (when access-token
         (let [{:ring.response/keys [status body]}
               (*handler*
-               {:juxt.site.alpha/uri "https://site.test/whoami"
+               {:juxt.site/uri "https://site.test/whoami"
                 :ring.request/method :get
                 :ring.request/headers
                 {"authorization" (format "Bearer %s" access-token)
@@ -190,8 +190,8 @@
                  (-> body
                      json/read-value
                      (get-in ["subject"
-                              "juxt.pass.alpha/user-identity"
-                              "juxt.pass.alpha/user"
+                              "juxt.pass/user-identity"
+                              "juxt.pass/user"
                               "name"] body)))))))))
 
 ;; Note: If we try to login (with basic), we'll won't need to user 'put' (which will

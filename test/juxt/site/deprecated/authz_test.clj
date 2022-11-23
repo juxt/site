@@ -8,10 +8,10 @@
                            *xt-node* *handler*
                            access-all-areas access-all-apis]]))
 
-(alias 'apex (create-ns 'juxt.apex.alpha))
-(alias 'http (create-ns 'juxt.http.alpha))
-(alias 'pass (create-ns 'juxt.pass.alpha))
-(alias 'site (create-ns 'juxt.site.alpha))
+(alias 'apex (create-ns 'juxt.apex))
+(alias 'http (create-ns 'juxt.http))
+(alias 'pass (create-ns 'juxt.pass))
+(alias 'site (create-ns 'juxt.site))
 
 (t/use-fixtures :each with-xt)
 

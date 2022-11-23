@@ -1,50 +1,44 @@
 ;; Copyright © 2021, JUXT LTD.
 
-;;(juxt.pass.alpha.actions/allowed-resources (db) #{} {::pass/subject :foo})
-
 (ns user
   (:require
    clojure.main
    [io.aviso.ansi :as ansi]
-   [juxt.site.alpha.main :as main]
+   [juxt.site.main :as main]
    [clojure.tools.logging :as log]
    [clojure.java.io :as io]
-   [juxt.site.alpha.repl :refer :all]
-   [juxt.site.alpha.init :as init :refer [config base-uri xt-node system put! do-action]]
+   [juxt.site.repl :refer :all]
+   [juxt.site.init :as init :refer [config base-uri xt-node system put! do-action]]
    [integrant.core :as ig]
    [xtdb.api :as xt]
    malli.dev.pretty
    [malli.dev :as md]
-   [malli.instrument :as mi]
-   juxt.site.alpha.schema
-   juxt.pass.alpha.schema
-   juxt.pass.alpha.actions
-   [juxt.book :as book]
-   [juxt.site.bootstrap :as bootstrap :refer [bootstrap bootstrap! bootstrap!!]]
-   [juxt.pass.openid :as openid]
-   [juxt.http.alpha :as-alias http]
-   [juxt.pass.alpha :as-alias pass]
-   [juxt.site.alpha :as-alias site]
+   juxt.site.schema
+   juxt.pass.schema
+   juxt.pass.actions
+   [juxt.http :as-alias http]
+   [juxt.pass :as-alias pass]
+   [juxt.site :as-alias site]
    xtdb.query
    fipp.ednize
    [juxt.clojars-mirrors.nippy.v3v1v1.taoensso.nippy :as nippy]
    ))
 
 (nippy/extend-freeze
- clojure.lang.Atom :juxt.site.alpha.nippy/atom [x data-output]
+ clojure.lang.Atom :juxt.site.nippy/atom [x data-output]
  (.writeUTF data-output "<atom>"))
 
 (nippy/extend-thaw
- :juxt.site.alpha.nippy/atom [data-input]
+ :juxt.site.nippy/atom [data-input]
  (.readUTF data-input)
  nil)
 
 (nippy/extend-freeze
- xtdb.query.QueryDatasource :juxt.site.alpha.nippy/db [x data-output]
+ xtdb.query.QueryDatasource :juxt.site.nippy/db [x data-output]
  (.writeUTF data-output "<db>"))
 
 (nippy/extend-thaw
- :juxt.site.alpha.nippy/db [data-input]
+ :juxt.site.nippy/db [data-input]
  (.readUTF data-input)
  nil)
 

@@ -3,9 +3,8 @@
 (ns juxt.site.return-test
   (:require
    [clojure.test :refer [deftest is are testing]]
-   [juxt.site.alpha.return :refer [return]]))
-
-(alias 'site (create-ns 'juxt.site.alpha))
+   [juxt.site.return :refer [return]]
+   [juxt.site :as-alias site]))
 
 (deftest ok-return
   (let [ex-data

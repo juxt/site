@@ -3,16 +3,14 @@
 (ns juxt.test.util
   (:require
    [clojure.java.io :as io]
-   [juxt.site.alpha.handler :as h]
-   [juxt.site.alpha.main :as main]
-   [juxt.pass.alpha.actions :as authz]
-   [juxt.apex.alpha :as-alias apex]
-   [juxt.site.alpha.init :as init]
+   [juxt.site.handler :as h]
+   [juxt.site.main :as main]
+   [juxt.pass.actions :as authz]
+   [juxt.site.init :as init]
    [juxt.site.bootstrap :as bootstrap]
-   [juxt.http.alpha :as-alias http]
-   [juxt.mail.alpha :as-alias mail]
-   [juxt.pass.alpha :as-alias pass]
-   [juxt.site.alpha :as-alias site]
+   [juxt.http :as-alias http]
+   [juxt.pass :as-alias pass]
+   [juxt.site :as-alias site]
    [xtdb.api :as xt])
   (:import
    (xtdb.api IXtdb)))
@@ -30,7 +28,7 @@
 (defn with-system-xt [f]
   (with-open [node (xt/start-node *opts*)]
     (binding [*xt-node* node
-              main/*system* {:juxt.site.alpha.db/xt-node node}]
+              main/*system* {:juxt.site.db/xt-node node}]
       (f))))
 
 (defn submit-and-await! [transactions]
@@ -93,53 +91,15 @@
         {:dry-run? false :recreate? false}))
      ~@body))
 
-;; Deprecated
-(def access-all-apis
-  {:xt/id "https://example.org/access-rule"
-   ::site/description "A rule allowing access to all APIs"
-   ::site/type "Rule"
-   ::pass/target '[[resource ::site/resource-provider ::apex/openapi-path]]
-   ::pass/effect ::pass/allow})
-
-(defn ^:deprecated install-test-resources! []
-  (submit-and-await!
-   [
-    ;; A tester
-    [::xt/put {:xt/id :tester}]
-
-    ;; A test action
-    [::xt/put
-     {:xt/id :test
-      ::site/type "Action"
-      ::pass/rules
-      '[
-        [(allowed? subject resource permission)
-         [permission ::pass/subject subject]
-         [(nil? resource)]]
-        [(allowed? subject resource permission)
-         [permission ::pass/subject subject]
-         [resource :xt/id]]]}]
-
-    ;; A permission between them
-    [::xt/put
-     {:xt/id :permission
-      ::site/type "Permission"
-      ::pass/subject :tester
-      ::pass/action :test
-      ::pass/purpose nil}]
-
-    [::xt/put (authz/install-do-action-fn)]]))
-
-
 (defn lookup-session-details [session-token]
   (let [db (xt/db *xt-node*)]
     (first
      (xt/q db '{:find [(pull session [*]) (pull scope [*])]
                 :keys [session scope]
-                :where [[e :juxt.site.alpha/type "https://meta.juxt.site/pass/session-token"]
-                        [e :juxt.pass.alpha/session-token session-token]
-                        [e :juxt.pass.alpha/session session]
-                        [session :juxt.pass.alpha/session-scope scope]]
+                :where [[e :juxt.site/type "https://meta.juxt.site/pass/session-token"]
+                        [e :juxt.pass/session-token session-token]
+                        [e :juxt.pass/session session]
+                        [session :juxt.pass/session-scope scope]]
                 :in [session-token]}
            session-token))))
 
@@ -147,7 +107,7 @@
   (let [{:keys [session scope]}
         (lookup-session-details session-token)
 
-        {:juxt.pass.alpha/keys [cookie-name]} scope]
+        {:juxt.pass/keys [cookie-name]} scope]
     (assoc-in req [:ring.request/headers "cookie"] (format "%s=%s" cookie-name session-token))))
 
 (defn assoc-body [req body-bytes]

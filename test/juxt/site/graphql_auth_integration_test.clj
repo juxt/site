@@ -4,13 +4,13 @@
   (:require
    [clojure.test :refer [deftest testing is] :as t]
    [juxt.test.util :refer [*xt-node* *handler*] :as tutil]
-   [juxt.site.alpha.init :as init :refer [put!]]
-   [juxt.site.alpha.repl :as repl]
-   [juxt.site.alpha :as-alias site]
+   [juxt.site.init :as init :refer [put!]]
+   [juxt.site.repl :as repl]
+   [juxt.site :as-alias site]
    [xtdb.api :as xt]
    [clojure.java.io :as io]
-   [juxt.site.alpha.graphql.graphql-query-processor :as graphql-proc]
-   [juxt.site.alpha.graphql.graphql-compiler :as gcompiler]))
+   [juxt.site.graphql.graphql-query-processor :as graphql-proc]
+   [juxt.site.graphql.graphql-compiler :as gcompiler]))
 
 (def site-prefix "https://test.example.com")
 
@@ -25,33 +25,33 @@
 (defn make-user
   [user-id]
   {:xt/id (str site-prefix "/users/" user-id)
-   :juxt.site.alpha/type "https://meta.juxt.site/pass/user"})
+   :juxt.site/type "https://meta.juxt.site/pass/user"})
 
 (defn make-identity
   [user-id]
   {:xt/id (str site-prefix "/identities/" user-id)
-   :juxt.site.alpha/type "https://meta.juxt.site/pass/identity"
-   :juxt.pass.alpha/user (str site-prefix "/users/" user-id)})
+   :juxt.site/type "https://meta.juxt.site/pass/identity"
+   :juxt.pass/user (str site-prefix "/users/" user-id)})
 
 (defn make-subject
   [user-id subject-id]
   {:xt/id (str site-prefix "/subjects/" subject-id)
-   :juxt.site.alpha/type "https://meta.juxt.site/pass/subject"
-   :juxt.pass.alpha/identity (str site-prefix "/identities/" user-id)})
+   :juxt.site/type "https://meta.juxt.site/pass/subject"
+   :juxt.pass/identity (str site-prefix "/identities/" user-id)})
 
 (defn make-permission
   [action-id]
   {:xt/id (str site-prefix "/permissions/" action-id)
-   :juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
-   :juxt.pass.alpha/action (str site-prefix "/actions/" action-id)
-   :juxt.pass.alpha/purpose nil})
+   :juxt.site/type "https://meta.juxt.site/pass/permission"
+   :juxt.pass/action (str site-prefix "/actions/" action-id)
+   :juxt.pass/purpose nil})
 
 (defn with-site-helpers
   [f]
   (init/put! (merge (make-user "host") {:name "Test Host User"}))
   (init/put! (make-identity "host"))
   (init/put! (make-subject "host" "host-test"))
-  (init/put! (merge (make-permission "create-action") { :juxt.pass.alpha/user (str site-prefix "/users/host") }))
+  (init/put! (merge (make-permission "create-action") { :juxt.pass/user (str site-prefix "/users/host") }))
   (f))
 
 (def fixtures [tutil/with-system-xt with-handler with-site-helpers])
@@ -59,13 +59,13 @@
 (defn make-employee
   [juxtcode]
   {:xt/id (str site-prefix "/employee/" juxtcode)
-   :juxt.site.alpha/type (str site-prefix "/employee")
+   :juxt.site/type (str site-prefix "/employee")
    :juxtcode juxtcode})
 
 (defn make-repository
   [repository-name]
   {:xt/id (str site-prefix "/repository/" repository-name)
-   :juxt.site.alpha/type (str site-prefix "/repository")
+   :juxt.site/type (str site-prefix "/repository")
    :name repository-name
    :url (str site-prefix "/git/" repository-name)
    :type :git})
@@ -73,29 +73,29 @@
 (defn make-project
   [prj-code]
   {:xt/id (str site-prefix "/project/" prj-code)
-   :juxt.site.alpha/type (str site-prefix "/project")
+   :juxt.site/type (str site-prefix "/project")
    :name prj-code})
 
 (defn make-client
   [client-name]
   {:xt/id (str site-prefix "/client/" client-name)
-   :juxt.site.alpha/type (str site-prefix "/client")
+   :juxt.site/type (str site-prefix "/client")
    :name client-name})
 
 (defn make-action
   [action-id]
   {:xt/id (str site-prefix "/actions/" action-id)
-   :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
-   :juxt.pass.alpha/scope "read:resource"
-   :juxt.pass.alpha/rules
+   :juxt.site/type "https://meta.juxt.site/pass/action"
+   :juxt.pass/scope "read:resource"
+   :juxt.pass/rules
    [['(allowed? permission subject action resource)
      ['permission :xt/id]]]})
 
 (defn make-lookup-action
   [action-id lookup-type]
   (update (make-action action-id)
-          :juxt.pass.alpha/rules conj ['(include? action e)
-                                       ['e :juxt.site.alpha/type (str site-prefix "/" lookup-type)]]))
+          :juxt.pass/rules conj ['(include? action e)
+                                       ['e :juxt.site/type (str site-prefix "/" lookup-type)]]))
 
 (def example-compiled-schema (-> "juxt/site/example.graphql"
                                  io/resource
@@ -117,7 +117,7 @@
                            :projects #{(:xt/id prj-alpha)
                                        (:xt/id prj-bravo)})
         employee (assoc (make-employee "bob") :phonenumber "5678" :manager (:xt/id manager))
-        contractor (assoc (make-employee "ali") :phonenumber "91011" :juxt.site.alpha/type "https://test.example.com/contractor")
+        contractor (assoc (make-employee "ali") :phonenumber "91011" :juxt.site/type "https://test.example.com/contractor")
         client (assoc (make-client "acme-corp") :projects #{(:xt/id prj-alpha)
                                                             (:xt/id prj-bravo)})]
     (put! repository-a)
@@ -140,20 +140,20 @@
     (put! (make-lookup-action "getClient" "client"))
     (put! (make-permission "getClient"))
     (put! (update (make-action "getProject")
-                       :juxt.pass.alpha/rules conj ['(include? action e)
-                                                    ['e :juxt.site.alpha/type "https://test.example.com/project"]]))
+                       :juxt.pass/rules conj ['(include? action e)
+                                                    ['e :juxt.site/type "https://test.example.com/project"]]))
     (put! (update (make-action "getRepository")
-                       :juxt.pass.alpha/rules #(conj %
+                       :juxt.pass/rules #(conj %
                                                 ['(include? action e)
-                                                 ['e :juxt.site.alpha/type "https://test.example.com/repository"]]
+                                                 ['e :juxt.site/type "https://test.example.com/repository"]]
                                                 ['(arguments-match? e action arguments)
                                                  '[(get arguments :type) type-arg]
                                                  '[(keyword type-arg) type-arg-k]
                                                  '(or [e :type type-arg-k]
                                                       [(nil? type-arg)])])))
     (put! (update (make-action "getClient")
-                       :juxt.pass.alpha/rules conj ['(include? action e)
-                                                    ['e :juxt.site.alpha/type "https://test.example.com/client"]]))
+                       :juxt.pass/rules conj ['(include? action e)
+                                                    ['e :juxt.site/type "https://test.example.com/client"]]))
     ))
 
 (deftest graphql->xtdb-test

@@ -6,22 +6,22 @@
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [edn-query-language.core :as eql]
    [jsonista.core :as json]
-   [juxt.example-users :as example-users]
+   [juxt.pass.resources.example-users :as example-users]
    [juxt.grab.alpha.document :as grab.document]
    [juxt.grab.alpha.parser :as grab.parser]
    [juxt.grab.alpha.schema :as grab.schema]
-   [juxt.http.alpha :as-alias http]
-   [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.form-based-auth :as form-based-auth]
-   [juxt.pass.oauth :as oauth]
-   [juxt.pass.protection-space :as protection-space]
-   [juxt.pass.session-scope :as session-scope]
-   [juxt.pass.user :as user]
-   [juxt.site.alpha :as-alias site]
-   [juxt.site.alpha.eql-datalog-compiler :as eqlc]
-   [juxt.site.alpha.graphql-eql-compiler :refer [graphql->eql-ast]]
-   [juxt.site.alpha.init :as init]
-   [juxt.site.alpha.logging :refer [with-logging]]
+   [juxt.http :as-alias http]
+   [juxt.pass :as-alias pass]
+   [juxt.pass.resources.form-based-auth :as form-based-auth]
+   [juxt.pass.resources.oauth :as oauth]
+   [juxt.pass.resources.protection-space :as protection-space]
+   [juxt.pass.resources.session-scope :as session-scope]
+   [juxt.pass.resources.user :as user]
+   [juxt.site :as-alias site]
+   [juxt.site.eql-datalog-compiler :as eqlc]
+   [juxt.site.graphql-eql-compiler :refer [graphql->eql-ast]]
+   [juxt.site.init :as init]
+   [juxt.site.logging :refer [with-logging]]
    [juxt.test.util :refer [with-system-xt with-resources with-handler *xt-node* *handler*] :as tutil]
    [xtdb.api :as xt]))
 
@@ -37,20 +37,20 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/register-doctor"
 
-    :juxt.site.alpha.malli/input-schema
+    :juxt.site.malli/input-schema
     [:map
      [:xt/id [:re "https://site.test/doctors/.*"]]]
 
-    :juxt.site.alpha/prepare
-    {:juxt.site.alpha.sci/program
+    :juxt.site/prepare
+    {:juxt.site.sci/program
 
      (pr-str
       '(let [content-type (-> *ctx*
-                              :juxt.site.alpha/received-representation
-                              :juxt.http.alpha/content-type)
+                              :juxt.site/received-representation
+                              :juxt.http/content-type)
              body (-> *ctx*
-                      :juxt.site.alpha/received-representation
-                      :juxt.http.alpha/body)]
+                      :juxt.site/received-representation
+                      :juxt.http/body)]
          (case content-type
            "application/edn"
            (some->
@@ -59,31 +59,31 @@
             clojure.edn/read-string
             juxt.site.malli/validate-input
             (assoc
-             :juxt.site.alpha/type "https://site.test/types/doctor"
-             :juxt.pass.alpha/protection-spaces #{"https://site.test/protection-spaces/bearer"}
-             :juxt.site.alpha/methods
-             {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
-              :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-doctor"}}
+             :juxt.site/type "https://site.test/types/doctor"
+             :juxt.pass/protection-spaces #{"https://site.test/protection-spaces/bearer"}
+             :juxt.site/methods
+             {:get {:juxt.pass/actions #{"https://site.test/actions/get-doctor"}}
+              :head {:juxt.pass/actions #{"https://site.test/actions/get-doctor"}}
               :options {}})))))}
 
-    :juxt.site.alpha/transact
-    {:juxt.site.alpha.sci/program
+    :juxt.site/transact
+    {:juxt.site.sci/program
      (pr-str
       '[[:xtdb.api/put *prepare*]])}
 
-    :juxt.pass.alpha/rules
+    :juxt.pass/rules
     '[
       [(allowed? subject resource permission)
-       [permission :juxt.pass.alpha/subject subject]]]}))
+       [permission :juxt.pass/subject subject]]]}))
 
 (defn grant-permission-to-invoke-action-register-doctor! [_]
   (init/do-action
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/system/register-doctor"
-    :juxt.pass.alpha/subject "https://site.test/subjects/system"
-    :juxt.pass.alpha/action "https://site.test/actions/register-doctor"
-    :juxt.pass.alpha/purpose nil}))
+    :juxt.pass/subject "https://site.test/subjects/system"
+    :juxt.pass/action "https://site.test/actions/register-doctor"
+    :juxt.pass/purpose nil}))
 
 (defn create-action-register-patient! [_]
   (init/do-action
@@ -91,19 +91,19 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/register-patient"
 
-    :juxt.site.alpha.malli/input-schema
+    :juxt.site.malli/input-schema
     [:map
      [:xt/id [:re "https://site.test/patients/.*"]]]
 
-    :juxt.site.alpha/prepare
-    {:juxt.site.alpha.sci/program
+    :juxt.site/prepare
+    {:juxt.site.sci/program
      (pr-str
       '(let [content-type (-> *ctx*
-                              :juxt.site.alpha/received-representation
-                              :juxt.http.alpha/content-type)
+                              :juxt.site/received-representation
+                              :juxt.http/content-type)
              body (-> *ctx*
-                      :juxt.site.alpha/received-representation
-                      :juxt.http.alpha/body)]
+                      :juxt.site/received-representation
+                      :juxt.http/body)]
          (case content-type
            "application/edn"
            (some->
@@ -112,31 +112,31 @@
             clojure.edn/read-string
             juxt.site.malli/validate-input
             (assoc
-             :juxt.site.alpha/type "https://site.test/types/patient"
-             :juxt.pass.alpha/protection-spaces #{"https://site.test/protection-spaces/bearer"}
-             :juxt.site.alpha/methods
-             {:get {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
-              :head {:juxt.pass.alpha/actions #{"https://site.test/actions/get-patient"}}
+             :juxt.site/type "https://site.test/types/patient"
+             :juxt.pass/protection-spaces #{"https://site.test/protection-spaces/bearer"}
+             :juxt.site/methods
+             {:get {:juxt.pass/actions #{"https://site.test/actions/get-patient"}}
+              :head {:juxt.pass/actions #{"https://site.test/actions/get-patient"}}
               :options {}})))))}
 
-    :juxt.site.alpha/transact
-    {:juxt.site.alpha.sci/program
+    :juxt.site/transact
+    {:juxt.site.sci/program
      (pr-str
       '[[:xtdb.api/put *prepare*]])}
 
-    :juxt.pass.alpha/rules
+    :juxt.pass/rules
     '[
       [(allowed? subject resource permission)
-       [permission :juxt.pass.alpha/subject subject]]]}))
+       [permission :juxt.pass/subject subject]]]}))
 
 (defn grant-permission-to-invoke-action-register-patient! [_]
   (init/do-action
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/system/register-patient"
-    :juxt.pass.alpha/subject "https://site.test/subjects/system"
-    :juxt.pass.alpha/action "https://site.test/actions/register-patient"
-    :juxt.pass.alpha/purpose nil}))
+    :juxt.pass/subject "https://site.test/subjects/system"
+    :juxt.pass/action "https://site.test/actions/register-patient"
+    :juxt.pass/purpose nil}))
 
 ;; A patient's record contains an attribute that indicates the set of assigned doctors.
 (defn create-action-assign-doctor-to-patient! [_]
@@ -149,20 +149,20 @@
     ;; What if there are a number of actions one can perform on a patient?
     ;; A PATCH to a patient????
 
-    :juxt.site.alpha.malli/input-schema
+    :juxt.site.malli/input-schema
     [:map
      [:patient [:re "https://site.test/patients/.*"]]
      [:doctor [:re "https://site.test/doctors/.*"]]]
 
-    :juxt.site.alpha/prepare
-    {:juxt.site.alpha.sci/program
+    :juxt.site/prepare
+    {:juxt.site.sci/program
      (pr-str
       '(let [content-type (-> *ctx*
-                              :juxt.site.alpha/received-representation
-                              :juxt.http.alpha/content-type)
+                              :juxt.site/received-representation
+                              :juxt.http/content-type)
              body (-> *ctx*
-                      :juxt.site.alpha/received-representation
-                      :juxt.http.alpha/body)]
+                      :juxt.site/received-representation
+                      :juxt.http/body)]
          (let [input
                (case content-type
                  "application/edn"
@@ -183,9 +183,9 @@
               :doctor-id (:doctor input)
               :id id}))))}
 
-    :juxt.site.alpha/transact
+    :juxt.site/transact
     {
-     :juxt.site.alpha.sci/program
+     :juxt.site.sci/program
      (pr-str
       '(let [{:keys [id patient-id doctor-id]} *prepare*]
          [[:xtdb.api/put
@@ -194,19 +194,19 @@
             :doctor doctor-id
             ::site/type "https://site.test/types/doctor-patient-assignment"}]]))}
 
-    :juxt.pass.alpha/rules
+    :juxt.pass/rules
     '[
       [(allowed? subject resource permission)
-       [permission :juxt.pass.alpha/subject subject]]]}))
+       [permission :juxt.pass/subject subject]]]}))
 
 (defn grant-permission-to-invoke-action-assign-doctor-to-patient! [_]
   (init/do-action
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/system/assign-doctor-to-patient"
-    :juxt.pass.alpha/subject "https://site.test/subjects/system"
-    :juxt.pass.alpha/action "https://site.test/actions/assign-doctor-to-patient"
-    :juxt.pass.alpha/purpose nil}))
+    :juxt.pass/subject "https://site.test/subjects/system"
+    :juxt.pass/action "https://site.test/actions/assign-doctor-to-patient"
+    :juxt.pass/purpose nil}))
 
 (defn assign-doctor-to-patient! [{:keys [patient doctor]}]
   (init/do-action
@@ -221,29 +221,29 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/get-patient"
 
-    :juxt.pass.alpha/action-contexts
+    :juxt.pass/action-contexts
     {"https://site.test/actions/get-doctor"
-     {:juxt.pass.alpha/additional-where-clauses
+     {:juxt.pass/additional-where-clauses
       '[[ass ::site/type "https://site.test/types/doctor-patient-assignment"]
         [ass :patient e]
         [ass :doctor parent]]}}
 
-    :juxt.pass.alpha/rules
+    :juxt.pass/rules
     '[
       ;; TODO: Performance tweak: put [subject] to hint that subject is always
       ;; bound - see @jdt for details
       [(allowed? subject resource permission)
-       [subject :juxt.pass.alpha/user-identity id]
-       [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]
-       [resource :juxt.site.alpha/type "https://site.test/types/patient"]
+       [subject :juxt.pass/user-identity id]
+       [id :juxt.pass/user user]
+       [permission :juxt.pass/user user]
+       [resource :juxt.site/type "https://site.test/types/patient"]
        [permission :patient :all]]
 
       [(allowed? subject resource permission)
-       [subject :juxt.pass.alpha/user-identity id]
-       [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]
-       [resource :juxt.site.alpha/type "https://site.test/types/patient"]
+       [subject :juxt.pass/user-identity id]
+       [id :juxt.pass/user user]
+       [permission :juxt.pass/user user]
+       [resource :juxt.site/type "https://site.test/types/patient"]
        [permission :patient resource]]]}))
 
 (defn grant-permission-to-get-any-patient! [username]
@@ -251,10 +251,10 @@
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id (format "https://site.test/permissions/%s/get-any-patient" username)
-    :juxt.pass.alpha/action "https://site.test/actions/get-patient"
-    :juxt.pass.alpha/user (format "https://site.test/users/%s" username)
+    :juxt.pass/action "https://site.test/actions/get-patient"
+    :juxt.pass/user (format "https://site.test/users/%s" username)
     :patient :all
-    :juxt.pass.alpha/purpose nil
+    :juxt.pass/purpose nil
     }))
 
 (defn grant-permission-to-get-patient! [username pid]
@@ -262,10 +262,10 @@
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id (format "https://site.test/permissions/%s/get-patient/%s" username pid)
-    :juxt.pass.alpha/action "https://site.test/actions/get-patient"
-    :juxt.pass.alpha/user (format "https://site.test/users/%s" username)
+    :juxt.pass/action "https://site.test/actions/get-patient"
+    :juxt.pass/user (format "https://site.test/users/%s" username)
     :patient (format "https://site.test/patients/%s" pid)
-    :juxt.pass.alpha/purpose nil
+    :juxt.pass/purpose nil
     }))
 
 (defn create-action-list-patients! [_]
@@ -285,8 +285,8 @@
     ;; POST /actions/install-graphql-endpoint
     ;; (book_test line ~500, book line ~1197)
 
-    :juxt.site.alpha/state
-    {:juxt.site.alpha.sci/program
+    :juxt.site/state
+    {:juxt.site.sci/program
      (pr-str
       ;; Perform a query, using the rules in get-patient. It would be a good
       ;; idea to restrict the ability for actions to make general queries
@@ -302,21 +302,21 @@
       '(juxt.pass/pull-allowed-resources
         #{"https://site.test/actions/get-patient"}))}
 
-    :juxt.pass.alpha/rules
+    :juxt.pass/rules
     '[
       [(allowed? subject resource permission)
-       [subject :juxt.pass.alpha/user-identity id]
-       [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]]]}))
+       [subject :juxt.pass/user-identity id]
+       [id :juxt.pass/user user]
+       [permission :juxt.pass/user user]]]}))
 
 (defn grant-permission-to-list-patients! [username]
   (init/do-action
     "https://site.test/subjects/system"
     "https://site.test/actions/grant-permission"
     {:xt/id (format "https://site.test/permissions/%s/list-patients" username)
-     :juxt.pass.alpha/action "https://site.test/actions/list-patients"
-     :juxt.pass.alpha/user (format "https://site.test/users/%s" username)
-     :juxt.pass.alpha/purpose nil}))
+     :juxt.pass/action "https://site.test/actions/list-patients"
+     :juxt.pass/user (format "https://site.test/users/%s" username)
+     :juxt.pass/purpose nil}))
 
 (defn create-action-register-patient-measurement! [_]
   (init/do-action
@@ -324,20 +324,20 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/register-patient-measurement"
 
-    :juxt.site.alpha.malli/input-schema
+    :juxt.site.malli/input-schema
     [:map
      [:xt/id [:re "https://site.test/measurements/.*"]]
      [:patient [:re "https://site.test/patients/.*"]]]
 
-    :juxt.site.alpha/prepare
-    {:juxt.site.alpha.sci/program
+    :juxt.site/prepare
+    {:juxt.site.sci/program
      (pr-str
       '(let [content-type (-> *ctx*
-                              :juxt.site.alpha/received-representation
-                              :juxt.http.alpha/content-type)
+                              :juxt.site/received-representation
+                              :juxt.http/content-type)
              body (-> *ctx*
-                      :juxt.site.alpha/received-representation
-                      :juxt.http.alpha/body)]
+                      :juxt.site/received-representation
+                      :juxt.http/body)]
          (case content-type
            "application/edn"
            (some->
@@ -346,27 +346,27 @@
             clojure.edn/read-string
             juxt.site.malli/validate-input
             (assoc
-             :juxt.site.alpha/type "https://site.test/types/measurement"
-             :juxt.pass.alpha/protection-spaces #{"https://site.test/protection-spaces/bearer"})))))}
+             :juxt.site/type "https://site.test/types/measurement"
+             :juxt.pass/protection-spaces #{"https://site.test/protection-spaces/bearer"})))))}
 
-    :juxt.site.alpha/transact
-    {:juxt.site.alpha.sci/program
+    :juxt.site/transact
+    {:juxt.site.sci/program
      (pr-str
       '[[:xtdb.api/put *prepare*]])}
 
-    :juxt.pass.alpha/rules
+    :juxt.pass/rules
     '[
       [(allowed? subject resource permission)
-       [permission :juxt.pass.alpha/subject subject]]]}))
+       [permission :juxt.pass/subject subject]]]}))
 
 (defn grant-permission-to-invoke-action-register-patient-measurement! [_]
   (init/do-action
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/system/register-patient-measurement"
-    :juxt.pass.alpha/subject "https://site.test/subjects/system"
-    :juxt.pass.alpha/action "https://site.test/actions/register-patient-measurement"
-    :juxt.pass.alpha/purpose nil}))
+    :juxt.pass/subject "https://site.test/subjects/system"
+    :juxt.pass/action "https://site.test/actions/register-patient-measurement"
+    :juxt.pass/purpose nil}))
 
 ;; Warning, this is an overly broad action! TODO: Narrow this action.
 ;; It permits grantees access to ALL measurements!!
@@ -376,19 +376,19 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/read-any-measurement"
 
-    :juxt.pass.alpha/action-contexts
+    :juxt.pass/action-contexts
     {"https://site.test/actions/get-patient"
-     {:juxt.pass.alpha/additional-where-clauses
+     {:juxt.pass/additional-where-clauses
       '[[e :patient parent]
         [e ::site/type "https://site.test/types/measurement"]]}}
 
-    :juxt.pass.alpha/rules
+    :juxt.pass/rules
     '[
       [(allowed? subject resource permission)
-       [subject :juxt.pass.alpha/user-identity id]
-       [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]
-       ;;[resource :juxt.site.alpha/type "https://site.test/types/measurement"]
+       [subject :juxt.pass/user-identity id]
+       [id :juxt.pass/user user]
+       [permission :juxt.pass/user user]
+       ;;[resource :juxt.site/type "https://site.test/types/measurement"]
        ]]}))
 
 (defn grant-permission-to-read-any-measurement! [username]
@@ -396,9 +396,9 @@
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id (format "https://site.test/permissions/%s/read-any-measurement" username)
-    :juxt.pass.alpha/action "https://site.test/actions/read-any-measurement"
-    :juxt.pass.alpha/user (format "https://site.test/users/%s" username)
-    :juxt.pass.alpha/purpose nil
+    :juxt.pass/action "https://site.test/actions/read-any-measurement"
+    :juxt.pass/user (format "https://site.test/users/%s" username)
+    :juxt.pass/purpose nil
     }))
 
 (defn create-action-get-doctor! [_]
@@ -407,9 +407,9 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/get-doctor"
 
-    :juxt.pass.alpha/params
+    :juxt.pass/params
     {:search
-     {:juxt.pass.alpha/additional-where-clauses
+     {:juxt.pass/additional-where-clauses
       '[[e :name doctor-name]
         [(re-seq pat doctor-name)]
         ;; Case-insensitive search
@@ -417,13 +417,13 @@
         [(re-pattern regex) pat]
         ]}}
 
-    :juxt.pass.alpha/rules
+    :juxt.pass/rules
     '[
       [(allowed? subject resource permission)
-       [subject :juxt.pass.alpha/user-identity id]
-       [id :juxt.pass.alpha/user user]
-       [permission :juxt.pass.alpha/user user]
-       [resource :juxt.site.alpha/type "https://site.test/types/doctor"]]
+       [subject :juxt.pass/user-identity id]
+       [id :juxt.pass/user user]
+       [permission :juxt.pass/user user]
+       [resource :juxt.site/type "https://site.test/types/doctor"]]
       ]}))
 
 (defn grant-permission-to-get-doctor! [username]
@@ -431,9 +431,9 @@
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id (format "https://site.test/permissions/%s/get-doctor" username)
-    :juxt.pass.alpha/action "https://site.test/actions/get-doctor"
-    :juxt.pass.alpha/user (format "https://site.test/users/%s" username)
-    :juxt.pass.alpha/purpose nil}))
+    :juxt.pass/action "https://site.test/actions/get-doctor"
+    :juxt.pass/user (format "https://site.test/users/%s" username)
+    :juxt.pass/purpose nil}))
 
 (def DOCTOR_NAMES
   {"001" "Dr. Jack Conway"
@@ -566,13 +566,13 @@
     (fn [_]
       (init/put!
        {:xt/id "https://site.test/patients"
-        :juxt.site.alpha/methods
+        :juxt.site/methods
         {:get
-         {:juxt.pass.alpha/actions #{"https://site.test/actions/list-patients"}}}
-        :juxt.pass.alpha/protection-spaces #{"https://site.test/protection-spaces/bearer"}
+         {:juxt.pass/actions #{"https://site.test/actions/list-patients"}}}
+        :juxt.pass/protection-spaces #{"https://site.test/protection-spaces/bearer"}
         ::http/content-type "application/json"
-        :juxt.http.alpha/respond
-        {:juxt.site.alpha.sci/program
+        :juxt.http/respond
+        {:juxt.site.sci/program
          (pr-str
           '(let [content (jsonista.core/write-value-as-string *state*)]
              (-> *ctx*
@@ -722,7 +722,7 @@
       (let [alice-session-token
             (form-based-auth/login-with-form!
              *handler*
-             :juxt.site.alpha/uri "https://site.test/login"
+             :juxt.site/uri "https://site.test/login"
              "username" "alice"
              "password" "garden")
 
@@ -738,7 +738,7 @@
             bob-session-token
             (form-based-auth/login-with-form!
              *handler*
-             :juxt.site.alpha/uri "https://site.test/login"
+             :juxt.site/uri "https://site.test/login"
              "username" "bob"
              "password" "walrus")
             {bob-access-token "access_token"
@@ -755,7 +755,7 @@
             carlos-session-token
             (form-based-auth/login-with-form!
              *handler*
-             :juxt.site.alpha/uri "https://site.test/login"
+             :juxt.site/uri "https://site.test/login"
              "username" "carlos"
              "password" "jackal")
             {carlos-access-token "access_token"
@@ -789,7 +789,7 @@
 
         ;; Here we have the conundrum: when the
         ;; https://site.test/actions/get-patient action rule has the clause
-        ;; '[resource :juxt.site.alpha/type
+        ;; '[resource :juxt.site/type
         ;; "https://site.test/types/patient"]' then it is not a permitted
         ;; action. We must separate the actions that allow access to a
         ;; uri-template'd resource and the actions that create the body
@@ -799,18 +799,17 @@
         ;; broad permission on the get-patient action
 
         (testing "Access to /patient/005"
-          (with-logging
-            (let [response
-                  (*handler*
-                   {:ring.request/method :get
-                    :ring.request/path "/patients/005"
-                    :ring.request/headers
-                    {"authorization" (format "Bearer %s" alice-access-token)
-                     "accept" "application/json"}})]
+          (let [response
+                (*handler*
+                 {:ring.request/method :get
+                  :ring.request/path "/patients/005"
+                  :ring.request/headers
+                  {"authorization" (format "Bearer %s" alice-access-token)
+                   "accept" "application/json"}})]
 
-              (is (= (json/write-value-as-string {"name" "Angie Solis"})
-                     (String. (:ring.response/body response))))
-              (is (= 200 (:ring.response/status response)))))
+            (is (= (json/write-value-as-string {"name" "Angie Solis"})
+                   (String. (:ring.response/body response))))
+            (is (= 200 (:ring.response/status response))))
 
           ;; Bob can't see the patient details of Angie Solis
           (let [response (*handler*
@@ -854,7 +853,7 @@
             (is (vector? result))
             (is (= 3 (count result)))))
 
-        ;; We are calling juxt.pass.alpha.actions/pull-allowed-resources which
+        ;; We are calling juxt.pass.actions/pull-allowed-resources which
         ;; provides our query, but we want to experiment with creating our own
         ;; query with sub-queries, which we can compile to with GraphQL.
 
@@ -913,103 +912,103 @@
 
               (testing "Alice's view"
                 (is (= #{{:name "Terry Levine"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/001"
                           :measurements nil}
                          {:name "Moshe Lynch"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/015"
                           :measurements nil}
                          {:name "Hazel Huynh"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/013"
                           :measurements nil}
                          {:name "Valarie Campos"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/019"
                           :measurements nil}
                          {:name "Lila Dickson"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/004"
                           :measurements nil}
                          {:name "Floyd Castro"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/006"
                           :measurements
                           [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
                          {:name "Jeannie Finley"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/002"
                           :measurements nil}
                          {:name "Beulah Leonard"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/008"
                           :measurements nil}
                          {:name "Francesco Casey"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/014"
                           :measurements nil}
                          {:name "Angie Solis"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/005"
                           :measurements nil}
                          {:name "Jewel Blackburn"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/003"
                           :measurements nil}
                          {:name "Sondra Richardson"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/010"
                           :measurements
                           [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
                            {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}
                          {:name "Monica Russell"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/009"
                           :measurements nil}
                          {:name "Rudy King"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/018"
                           :measurements nil}
                          {:name "Mark Richard"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/012"
                           :measurements nil}
                          {:name "Blanca Lindsey"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/017"
                           :measurements nil}
                          {:name "Elisabeth Riddle"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/020"
                           :measurements nil}
                          {:name "Melanie Black"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/007"
                           :measurements nil}
                          {:name "Kim Robles"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/011"
                           :measurements nil}
                          {:name "Darrel Schwartz"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/016"
                           :measurements nil}}
                        (eqlc/prune-result (xt/q db q1 alice nil)))))
 
               (testing "Bob's view"
                 (is (= #{{:name "Lila Dickson"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/004"
                           :measurements nil}
                          {:name "Sondra Richardson"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/010"
                           :measurements
                           [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
                            {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}
                          {:name "Monica Russell"
-                          :juxt.site.alpha/type "https://site.test/types/patient"
+                          :juxt.site/type "https://site.test/types/patient"
                           :xt/id "https://site.test/patients/009"
                           :measurements nil}}
                        (eqlc/prune-result (xt/q db q1 bob nil)))))))
@@ -1032,83 +1031,83 @@
 
               (testing "Alice's view"
                 (is (= #{{:name "Dr. Jack Conway"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/001"
                           :patients
                           [{:name "Terry Levine"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/001"
                             :readings nil}
                            {:name "Jeannie Finley"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/002"
                             :readings nil}
                            {:name "Jewel Blackburn"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/003"
                             :readings nil}
                            {:name "Angie Solis"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/005"
                             :readings nil}]}
                          {:name "Dr. Murillo"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/002"
                           :patients
                           [{:name "Lila Dickson"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/004"
                             :readings nil}
                            {:name "Angie Solis"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/005"
                             :readings nil}]}
                          {:name "Dr. Jackson"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/003"
                           :patients
                           [{:name "Floyd Castro"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/006"
                             :readings
                             [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
                            {:name "Sondra Richardson"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/010"
                             :readings
                             [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
                              {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}
                          {:name "Dr. Kim"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/004"
                           :patients nil}}
                        (eqlc/prune-result (xt/q db q1 alice nil)))))
 
               (testing "Bob's view"
                 (is (= #{{:name "Dr. Jack Conway"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/001"
                           :patients nil}
                          {:name "Dr. Murillo"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/002"
                           :patients
                           [{:name "Lila Dickson"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/004"
                             :readings nil}]}
                          {:name "Dr. Jackson"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/003"
                           :patients
                           [{:name "Sondra Richardson"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/010"
                             :readings
                             [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
                              {:reading {"bloodPressure" "120/80" "heartRate" "85"}}]}]}
                          {:name "Dr. Kim"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/004"
                           :patients nil}}
                        (eqlc/prune-result (xt/q db q1 bob nil)))))))
@@ -1134,36 +1133,36 @@
 
               (testing "Alice's view"
                 (is (= #{{:name "Dr. Jack Conway"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/001"
                           :patients
                           [{:name "Terry Levine"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/001"
                             :readings nil}
                            {:name "Jeannie Finley"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/002"
                             :readings nil}
                            {:name "Jewel Blackburn"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/003"
                             :readings nil}
                            {:name "Angie Solis"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/005"
                             :readings nil}]}
                          {:name "Dr. Jackson"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/003"
                           :patients
                           [{:name "Floyd Castro"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/006"
                             :readings
                             [{:reading {"bloodPressure" "198/160" "heartRate" "82"}}]}
                            {:name "Sondra Richardson"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/010"
                             :readings
                             [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
@@ -1172,15 +1171,15 @@
 
               (testing "Bob's view"
                 (is (= #{{:name "Dr. Jack Conway"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/001"
                           :patients nil}
                          {:name "Dr. Jackson"
-                          :juxt.site.alpha/type "https://site.test/types/doctor"
+                          :juxt.site/type "https://site.test/types/doctor"
                           :xt/id "https://site.test/doctors/003"
                           :patients
                           [{:name "Sondra Richardson"
-                            :juxt.site.alpha/type "https://site.test/types/patient"
+                            :juxt.site/type "https://site.test/types/patient"
                             :xt/id "https://site.test/patients/010"
                             :readings
                             [{:reading {"bloodPressure" "127/80" "heartRate" "87"}}
@@ -1362,7 +1361,7 @@
       (let [alice-session-token
             (form-based-auth/login-with-form!
              *handler*
-             :juxt.site.alpha/uri "https://site.test/login"
+             :juxt.site/uri "https://site.test/login"
              "username" "alice"
              "password" "garden")
             {alice-access-token "access_token" error "error"}
@@ -1376,7 +1375,7 @@
             bob-session-token
             (form-based-auth/login-with-form!
              *handler*
-             :juxt.site.alpha/uri "https://site.test/login"
+             :juxt.site/uri "https://site.test/login"
              "username" "bob"
              "password" "walrus")
             {bob-access-token "access_token"}
@@ -1425,50 +1424,50 @@
         (testing "From GraphQL to database results"
               (testing "Alice's view"
                 (is (= #{{:name "Dr. Jack Conway",
-                          :juxt.site.alpha/type "https://site.test/types/doctor",
+                          :juxt.site/type "https://site.test/types/doctor",
                           :xt/id "https://site.test/doctors/001",
                           :patients
                           [{:name "Terry Levine",
-                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :juxt.site/type "https://site.test/types/patient",
                             :xt/id "https://site.test/patients/001",
                             :readings nil}
                            {:name "Jeannie Finley",
-                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :juxt.site/type "https://site.test/types/patient",
                             :xt/id "https://site.test/patients/002",
                             :readings nil}
                            {:name "Jewel Blackburn",
-                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :juxt.site/type "https://site.test/types/patient",
                             :xt/id "https://site.test/patients/003",
                             :readings nil}
                            {:name "Angie Solis",
-                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :juxt.site/type "https://site.test/types/patient",
                             :xt/id "https://site.test/patients/005",
                             :readings nil}]}
                          {:name "Dr. Jackson",
-                          :juxt.site.alpha/type "https://site.test/types/doctor",
+                          :juxt.site/type "https://site.test/types/doctor",
                           :xt/id "https://site.test/doctors/003",
                           :patients
                           [{:name "Floyd Castro",
-                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :juxt.site/type "https://site.test/types/patient",
                             :xt/id "https://site.test/patients/006",
                             :readings nil}
                            {:name "Sondra Richardson",
-                            :juxt.site.alpha/type "https://site.test/types/patient",
+                            :juxt.site/type "https://site.test/types/patient",
                             :xt/id "https://site.test/patients/010",
                             :readings nil}]}}
                        (eqlc/prune-result (xt/q db q alice nil))))))
 
           (testing "Bob's view"
             (is (= #{{:name "Dr. Jack Conway",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
+                      :juxt.site/type "https://site.test/types/doctor",
                       :xt/id "https://site.test/doctors/001",
                       :patients nil}
                      {:name "Dr. Jackson",
-                      :juxt.site.alpha/type "https://site.test/types/doctor",
+                      :juxt.site/type "https://site.test/types/doctor",
                       :xt/id "https://site.test/doctors/003",
                       :patients
                       [{:name "Sondra Richardson",
-                        :juxt.site.alpha/type "https://site.test/types/patient",
+                        :juxt.site/type "https://site.test/types/patient",
                         :xt/id "https://site.test/patients/010",
                         :readings nil}]}}
                    (eqlc/prune-result (xt/q db q bob nil)))))))))

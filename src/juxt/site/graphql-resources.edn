@@ -1,0 +1,40 @@
+;; Set up a resource which is configured to accept a PUT of a GraphQL schema (in
+;; GraphQL SDL format)
+{:xt/id "{{base-uri}}/_site/graphql"
+ :juxt.http/content-type "text/plain;charset=utf-8"
+ :juxt.site/methods
+ {:get {}
+  :head {}
+  :post {:juxt.site/acceptable {"accept" "application/json"}}
+  :put {:juxt.site/acceptable {"accept" "application/graphql"}}
+  :options {}}
+
+ :juxt.site/access-control-allow-origins
+ {"http://localhost:\\p{Digit}+"
+  {:juxt.site/access-control-allow-methods #{:post}
+   :juxt.site/access-control-allow-headers #{"authorization" "content-type"}
+   :juxt.site/access-control-allow-credentials true}}
+
+ ;; For handling the upsert the schema
+ :juxt.site/put-fn juxt.site.graphql/put-handler
+ :juxt.http/put-error-representations
+ [{:ring.response/status 400
+   :juxt.http/content-type "application/json"
+   :juxt.site/body-fn juxt.site.graphql/put-error-json-body}
+  {:ring.response/status 400
+   :juxt.http/content-type "text/plain"
+   :juxt.site/body-fn juxt.site.graphql/put-error-text-body}
+  {:ring.response/status 400
+   :juxt.http/content-type "text/html;charset=utf-8"
+   ;; TODO: Point to an HTML template that can render the errors nicely
+   :juxt.http/content "<h1>Error compiling schema</h1>"}]
+
+ ;; For POSTing GraphQL queries
+ :juxt.site/post-fn juxt.site.graphql/post-handler
+ :juxt.http/post-error-representations
+ [{:ring.response/status 400
+   :juxt.http/content-type "text/plain"
+   :juxt.site/body-fn juxt.site.graphql/post-error-text-body}
+  {:ring.response/status 400
+   :juxt.http/content-type "application/json"
+   :juxt.site/body-fn juxt.site.graphql/post-error-json-body}]}

@@ -3,10 +3,8 @@
 (ns juxt.site.cors-test
   (:require
    [clojure.test :refer [deftest is are testing]]
-   [juxt.site.alpha.handler :refer [access-control-match-origin]]))
-
-
-(alias 'site (create-ns 'juxt.site.alpha))
+   [juxt.site.handler :refer [access-control-match-origin]]
+   [juxt.site :as-alias site]))
 
 (deftest access-control-origin-match-test
   (let [allow-origins

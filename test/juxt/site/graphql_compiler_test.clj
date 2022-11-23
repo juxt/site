@@ -4,7 +4,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [juxt.site.alpha.graphql-eql-compiler :refer [graphql->eql-ast]]
+   [juxt.site.graphql-eql-compiler :refer [graphql->eql-ast]]
    [juxt.grab.alpha.parser :as parser]
    [juxt.grab.alpha.document :as document]
    [juxt.grab.alpha.schema :as schema]))
@@ -24,7 +24,7 @@
                 :key :doctors
                 :params
                 {:search "jack"
-                 :juxt.pass.alpha/action "https://site.test/actions/get-doctor"}
+                 :juxt.pass/action "https://site.test/actions/get-doctor"}
                 :children [{:type :prop
                             :dispatch-key :xt/id
                             :key :xt/id}]}]}
@@ -44,7 +44,7 @@
                 :key :doctors
                 :params
                 {:search "jack"
-                 :juxt.pass.alpha/action "https://site.test/actions/get-doctor"}
+                 :juxt.pass/action "https://site.test/actions/get-doctor"}
                 :children
                 [{:type :prop :dispatch-key :xt/id :key :xt/id}
                  {:type :prop :dispatch-key :name :key :name}
@@ -52,7 +52,7 @@
                   :dispatch-key :patients
                   :key :patients
                   :params
-                  {:juxt.pass.alpha/action "https://site.test/actions/get-patient"}
+                  {:juxt.pass/action "https://site.test/actions/get-patient"}
                   :children
                   [{:type :prop :dispatch-key :xt/id :key :xt/id}
                    {:type :prop :dispatch-key :name :key :name}]}]}]}

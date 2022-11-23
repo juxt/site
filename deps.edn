@@ -27,9 +27,9 @@
 
         ;; Content negotiation
         juxt/pick
-        {:git/url "https://github.com/juxt/pick.git"
+        #_{:git/url "https://github.com/juxt/pick.git"
          :sha "e4b314cb9e94121fe8005c5628f7f33d28cdefd4"}
-        #_{:local/root "../pick"}
+        {:local/root "/home/mal/src/github.com/juxt/pick"}
 
         juxt/grab
         {:git/url "https://github.com/juxt/grab.git"
@@ -96,7 +96,7 @@
                 djblue/portal {:mvn/version "0.29.1"}
                 }
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
-              "-Dclojure.server.site={:port,50505,:accept,juxt.site.alpha.repl-server/repl}"
+              "-Dclojure.server.site={:port,50505,:accept,juxt.site.repl-server/repl}"
               "-Dclojure.spec.check-asserts=true"
               "--add-opens" "java.base/java.util.concurrent=ALL-UNNAMED"]}
 

@@ -6,11 +6,11 @@
   (:require
    [clojure.set :as set]
    [clojure.test :refer [deftest is are use-fixtures testing] :as t]
-   [juxt.pass.alpha :as-alias pass]
-   [juxt.pass.alpha.malli :as-alias pass.malli]
-   [juxt.pass.alpha.process :as-alias pass.process]
-   [juxt.pass.alpha.actions :as authz]
-   [juxt.site.alpha :as-alias site]
+   [juxt.pass :as-alias pass]
+   [juxt.pass.malli :as-alias pass.malli]
+   [juxt.pass.process :as-alias pass.process]
+   [juxt.pass.actions :as authz]
+   [juxt.site :as-alias site]
    [juxt.test.util :refer [with-xt submit-and-await! *xt-node*]]
    [xtdb.api :as xt]))
 
@@ -1034,7 +1034,7 @@
 
   (is (thrown? clojure.lang.ExceptionInfo
                (authz/do-action
-                {:juxt.site.alpha/xt-node *xt-node*}
+                {:juxt.site/xt-node *xt-node*}
                 {::pass/subject (:xt/id ALICE_SUBJECT)}
                 (:xt/id CREATE_PERSON_ACTION)
                 BOB)))
@@ -1378,8 +1378,8 @@
      x
      (let [[k & args] x]
        (case k
-         :random-bytes (apply juxt.site.alpha.util/random-bytes args)
-         :gen-hex-string (apply juxt.site.alpha.util/as-hex-str args)
+         :random-bytes (apply juxt.site.util/random-bytes args)
+         :gen-hex-string (apply juxt.site.util/as-hex-str args)
          x))))
  [:let :token-id [:gen-hex-string [:random-bytes 20]]])
 
@@ -1464,9 +1464,9 @@
 (defn make-action
   [action-id]
   {:xt/id (str site-prefix "/actions/" action-id)
-   :juxt.site.alpha/type "https://meta.juxt.site/pass/action"
-   :juxt.pass.alpha/scope "read:resource"
-   :juxt.pass.alpha/rules
+   :juxt.site/type "https://meta.juxt.site/pass/action"
+   :juxt.pass/scope "read:resource"
+   :juxt.pass/rules
    [['(allowed? subject resource permission)
      ['permission :xt/id]]]})
 
@@ -1475,7 +1475,7 @@
     (is (empty? (authz/actions->rules (xt/db *xt-node*) #{"https://test.example.com/actions/employee"}))))
 
   (submit-and-await! [[::xt/put (make-action "employee")]])
-  (submit-and-await! [[::xt/put (update (make-action "contractor") :juxt.pass.alpha/rules conj '[(include? e action)
+  (submit-and-await! [[::xt/put (update (make-action "contractor") :juxt.pass/rules conj '[(include? e action)
                                                                                                  [e :type :contractor]])]])
 
   (testing "When there are no actions specified for lookup, returns empty result"
