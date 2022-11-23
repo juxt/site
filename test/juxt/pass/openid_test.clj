@@ -89,6 +89,10 @@
                 {:xt/id id
                  :juxt.pass/openid-client "https://example.org/openid/auth0/client"})))}})
 
+;; The below tests the live openid endpoint (Auth0). TODO: Instead we should
+;; mock out the http-client aspects and return contrived respones - we can do
+;; this via SCI bindings.
+
 #_(with-fixtures
   (with-resources
     ^{:dependency-graphs

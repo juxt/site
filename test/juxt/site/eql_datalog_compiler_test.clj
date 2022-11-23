@@ -291,9 +291,9 @@
       ;; Perform a query, using the rules in get-patient. It would be a good
       ;; idea to restrict the ability for actions to make general queries
       ;; against the database. By only exposing API functions such as
-      ;; pull-allowed-resources to Flip, we can limit the power of actions
-      ;; thereby securing them. This is preferable to limiting the ability
-      ;; to deploy actions to a select group of highly authorized
+      ;; pull-allowed-resources to this SCI script, we can limit the power of
+      ;; actions thereby securing them. This is preferable to limiting the
+      ;; ability to deploy actions to a select group of highly authorized
       ;; individuals.
       ;;
       ;; TODO: Go through the use-cases which already make general lookups
