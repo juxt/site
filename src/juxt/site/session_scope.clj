@@ -1,8 +1,7 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.session-scope
+(ns juxt.site.session-scope
   (:require
-   [juxt.pass :as-alias pass]
    [juxt.site :as-alias site]
    [ring.middleware.cookies :refer [cookies-request]]
    [xtdb.api :as xt]
@@ -18,9 +17,9 @@
                db
                '{:find [(pull cs [*])]
                  :keys [session-scope]
-                 :where [[cs ::site/type "https://meta.juxt.site/pass/session-scope"]
-                         [cs ::pass/cookie-path path]
-                         [cs ::pass/cookie-domain domain]
+                 :where [[cs ::site/type "https://meta.juxt.site/site/session-scope"]
+                         [cs ::site/cookie-path path]
+                         [cs ::site/cookie-domain domain]
                          [(format "%s%s" domain path) uri-prefix]
                          [(clojure.string/starts-with? uri uri-prefix)]]
                  :in [uri]}
@@ -40,32 +39,32 @@
         (first
          (xt/q db '{:find [(pull session-token [*])
                            (pull session [*])]
-                    :keys [juxt.pass/session-token
-                           juxt.pass/session]
+                    :keys [juxt.site/session-token
+                           juxt.site/session]
                     :where
-                    [[session-token ::site/type "https://meta.juxt.site/pass/session-token"]
-                     [session-token ::pass/session-token token-id]
-                     [session-token ::pass/session session]]
+                    [[session-token ::site/type "https://meta.juxt.site/site/session-token"]
+                     [session-token ::site/session-token token-id]
+                     [session-token ::site/session session]]
                     :in [token-id]}
                session-token-id!))
-        subject (some-> session-details ::pass/session ::pass/subject)]
+        subject (some-> session-details ::site/session ::site/subject)]
     (cond-> session-details
       ;; Since subject is common and special, we promote it to the top-level
       ;; context. However, it is possible to have a session without having
       ;; established a subject (for example, while authenticating).
-      subject (assoc ::pass/subject (xt/entity db subject)))))
+      subject (assoc ::site/subject (xt/entity db subject)))))
 
 (defn wrap-session-scope [h]
   (fn [{::site/keys [db uri resource] :as req}]
 
-    (let [scope-id (::pass/session-scope resource)
+    (let [scope-id (::site/session-scope resource)
 
           _ (log/debugf "session-scope for %s is %s" uri scope-id)
           _ (log/debugf "resources is %s" (pr-str resource))
 
           scope (when scope-id (xt/entity db scope-id))
 
-          cookie-name (when scope (:juxt.pass/cookie-name scope))
+          cookie-name (when scope (:juxt.site/cookie-name scope))
 
           session-token-id!
           (when cookie-name
@@ -83,5 +82,5 @@
           ]
 
       (h (cond-> req
-           scope (assoc ::pass/session-scope scope)
+           scope (assoc ::site/session-scope scope)
            session-details (into session-details))))))

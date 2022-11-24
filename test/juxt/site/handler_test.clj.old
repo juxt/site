@@ -10,10 +10,9 @@
    [juxt.test.util :refer [with-xt with-handler submit-and-await!
                            *xt-node* *handler*
                            install-test-resources!]]
-   [juxt.pass.actions :as authz]
+   [juxt.site.actions :as authz]
    [juxt.site.locator :as locator]
    [juxt.http :as-alias http]
-   [juxt.pass :as-alias pass]
    [juxt.site :as-alias site]
    [xtdb.api :as xt])
   (:import
@@ -28,14 +27,14 @@
     [::xt/put
      {:xt/id "https://example.org/_site/actions/put-things"
       ::site/type "Action"
-      :juxt.pass.malli/args-schema
+      :juxt.site.malli/args-schema
       [:tuple
        [:map
         [:a/name :string]]]
 
-      :juxt.pass/process
+      :juxt.site/process
       [
-       [:juxt.pass.malli/validate]
+       [:juxt.site.malli/validate]
        [:xtdb.api/put]]
 
       ::pass/rules
@@ -97,14 +96,14 @@
      [::xt/put
       {:xt/id "https://example.org/_site/actions/put-things"
        ::site/type "Action"
-       :juxt.pass.malli/args-schema
+       :juxt.site.malli/args-schema
        [:tuple
         [:map
          [:a/name :string]]]
 
-       :juxt.pass/process
+       :juxt.site/process
        [
-        [:juxt.pass.malli/validate]
+        [:juxt.site.malli/validate]
         [:xtdb.api/put]]
 
        ::pass/rules
@@ -209,12 +208,12 @@
     [::xt/put
      {:xt/id "https://example.org/_site/actions/put-things"
       ::site/type "Action"
-      :juxt.pass.malli/args-schema
+      :juxt.site.malli/args-schema
       [:tuple [:map]]
 
-      :juxt.pass/process
+      :juxt.site/process
       [
-       [:juxt.pass.malli/validate]
+       [:juxt.site.malli/validate]
        [:xtdb.api/put]]
 
       ::pass/rules
@@ -289,12 +288,12 @@
     [::xt/put
      {:xt/id "https://example.org/_site/actions/put-things"
       ::site/type "Action"
-      :juxt.pass.alpha.malli/args-schema
+      :juxt.site.alpha.malli/args-schema
       [:tuple [:map]]
 
-      :juxt.pass.alpha/process
+      :juxt.site.alpha/process
       [
-       [:juxt.pass.alpha.malli/validate]
+       [:juxt.site.alpha.malli/validate]
        [:xtdb.api/put]]
 
       ::pass/rules

@@ -3,11 +3,9 @@
 (ns juxt.site.response
   (:require
    [juxt.http :as-alias http]
-   [juxt.pass :as-alias pass]
    [juxt.site :as-alias site]))
 
-(defn add-payload [{::site/keys [selected-representation db]
-                    ::pass/keys [subject]
+(defn add-payload [{::site/keys [selected-representation db subject]
                     :ring.request/keys [method]
                     :as req}]
   ;; Should not be called if method is HEAD
@@ -31,8 +29,7 @@
       body (assoc req :ring.response/body body)
       :else req)))
 
-(defn add-error-payload [{::site/keys [selected-representation db]
-                          ::pass/keys [subject]
+(defn add-error-payload [{::site/keys [selected-representation db subject]
                           :ring.request/keys [method]
                           :as req}]
   ;; Should not be called if method is HEAD

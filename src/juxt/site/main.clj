@@ -2,7 +2,6 @@
 
 (ns juxt.site.main
   (:require
-   juxt.pass.schema
    juxt.site.schema
    [aero.core :as aero]
    [clojure.java.io :as io]

@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.resources.session-scope
+(ns juxt.site.resources.session-scope
   (:require
    [juxt.site.init :as init :refer [substitute-actual-base-uri]]
    [juxt.site :as-alias site]
@@ -20,9 +20,9 @@
        :juxt.site.malli/input-schema
        [:map
         [:xt/id [:re "https://example.org/session-scopes/(.+)"]]
-        [:juxt.pass/cookie-domain [:re "https?://[^/]*"]]
-        [:juxt.pass/cookie-path [:re "/.*"]]
-        [:juxt.pass/login-uri [:re "https?://[^/]*"]]]
+        [:juxt.site/cookie-domain [:re "https?://[^/]*"]]
+        [:juxt.site/cookie-path [:re "/.*"]]
+        [:juxt.site/login-uri [:re "https?://[^/]*"]]]
 
        :juxt.site/prepare
        {:juxt.site.sci/program
@@ -41,21 +41,21 @@
                clojure.edn/read-string
                juxt.site.malli/validate-input
                (assoc
-                :juxt.site/type "https://meta.juxt.site/pass/session-scope")))))}
+                :juxt.site/type "https://meta.juxt.site/site/session-scope")))))}
 
        :juxt.site/transact
        {:juxt.site.sci/program
         (pr-str
          '[[:xtdb.api/put *prepare*]])}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass/subject subject]]
+          [permission :juxt.site/subject subject]]
 
          [(allowed? subject resource permission)
-          [subject :juxt.pass/user-identity id]
-          [id :juxt.pass/user user]
+          [subject :juxt.site/user-identity id]
+          [id :juxt.site/user user]
           [permission :role role]
           [user :role role]]]})
      ;; end::create-action-put-session-scope![]
@@ -70,9 +70,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/put-session-scope"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/put-session-scope"
-       :juxt.pass/purpose nil})
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/put-session-scope"
+       :juxt.site/purpose nil})
      ;; end::grant-permission-to-put-session-scope![]
      ))))
 
@@ -84,10 +84,10 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/put-session-scope"
       {:xt/id "https://example.org/session-scopes/default"
-       :juxt.pass/cookie-name "id"
-       :juxt.pass/cookie-domain "https://example.org"
-       :juxt.pass/cookie-path "/"
-       :juxt.pass/login-uri "https://example.org/login"})))))
+       :juxt.site/cookie-name "id"
+       :juxt.site/cookie-domain "https://example.org"
+       :juxt.site/cookie-path "/"
+       :juxt.site/login-uri "https://example.org/login"})))))
 
 (def dependency-graph
   {"https://example.org/actions/put-session-scope"

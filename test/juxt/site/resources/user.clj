@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.resources.user
+(ns juxt.site.resources.user
   (:require
    [clojure.string :as str]
    [juxt.site.init :as init :refer [substitute-actual-base-uri]]))
@@ -36,8 +36,8 @@
                juxt.site.malli/validate-input
                (assoc
                 :juxt.site/methods
-                {:get {:juxt.pass/actions #{"https://example.org/actions/get-user"}}
-                 :head {:juxt.pass/actions #{"https://example.org/actions/get-user"}}
+                {:get {:juxt.site/actions #{"https://example.org/actions/get-user"}}
+                 :head {:juxt.site/actions #{"https://example.org/actions/get-user"}}
                  :options {}})))))}
 
        :juxt.site/transact
@@ -45,14 +45,14 @@
         (pr-str
          '[[:xtdb.api/put *prepare*]])}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass/subject subject]]
+          [permission :juxt.site/subject subject]]
 
          [(allowed? subject resource permission) ; <5>
-          [subject :juxt.pass/user-identity id]
-          [id :juxt.pass/user user]
+          [subject :juxt.site/user-identity id]
+          [id :juxt.site/user user]
           [user :role role]
           [permission :role role]]]})))))
 
@@ -65,9 +65,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/put-user"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/put-user"
-       :juxt.pass/purpose nil})
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/put-user"
+       :juxt.site/purpose nil})
      ;; end::grant-permission-to-invoke-action-put-user![]
      ))))
 
@@ -83,14 +83,14 @@
        :juxt.site.malli/input-schema
        [:map
         [:xt/id [:re "https://example.org/.*"]]
-        [:juxt.pass/user [:re "https://example.org/.+"]]
+        [:juxt.site/user [:re "https://example.org/.+"]]
 
         ;; Required by basic-user-identity
-        [:juxt.pass/username [:re "[A-Za-z0-9]{2,}"]]
+        [:juxt.site/username [:re "[A-Za-z0-9]{2,}"]]
         ;; NOTE: Can put in some password rules here
-        [:juxt.pass/password [:string {:min 6}]]
-        ;;[:juxt.pass.jwt.claims/iss {:optional true} [:re "https://.+"]]
-        ;;[:juxt.pass.jwt.claims/sub {:optional true} [:string {:min 1}]]
+        [:juxt.site/password [:string {:min 6}]]
+        ;;[:juxt.site.jwt.claims/iss {:optional true} [:re "https://.+"]]
+        ;;[:juxt.site.jwt.claims/sub {:optional true} [:string {:min 1}]]
         ]
 
        :juxt.site/prepare
@@ -112,35 +112,35 @@
                      clojure.edn/read-string
                      juxt.site.malli/validate-input
                      (assoc
-                      :juxt.site/type #{"https://meta.juxt.site/pass/user-identity"
-                                              "https://meta.juxt.site/pass/basic-user-identity"}
+                      :juxt.site/type #{"https://meta.juxt.site/site/user-identity"
+                                              "https://meta.juxt.site/site/basic-user-identity"}
                       :juxt.site/methods
-                      {:get {:juxt.pass/actions #{"https://example.org/actions/get-user-identity"}}
-                       :head {:juxt.pass/actions #{"https://example.org/actions/get-user-identity"}}
+                      {:get {:juxt.site/actions #{"https://example.org/actions/get-user-identity"}}
+                       :head {:juxt.site/actions #{"https://example.org/actions/get-user-identity"}}
                        :options {}}))]
                 (-> input
                     ;; We want usernames to be case-insensitive, as per OWASP
                     ;; guidelines.
-                    (update :juxt.pass/username clojure.string/lower-case)
+                    (update :juxt.site/username clojure.string/lower-case)
                     ;; Hash the password
-                    (assoc :juxt.pass/password-hash (crypto.password.bcrypt/encrypt (:juxt.pass/password input)))
+                    (assoc :juxt.site/password-hash (crypto.password.bcrypt/encrypt (:juxt.site/password input)))
                     ;; Remove clear-text password from input, so it doesn't go into
                     ;; the database.
-                    (dissoc :juxt.pass/password))))))}
+                    (dissoc :juxt.site/password))))))}
 
        :juxt.site/transact
        {:juxt.site.sci/program
         (pr-str
          '[[:xtdb.api/put *prepare*]])}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass/subject subject]]
+          [permission :juxt.site/subject subject]]
 
          [(allowed? subject resource permission)
-          [subject :juxt.pass/user-identity id]
-          [id :juxt.pass/user user]
+          [subject :juxt.site/user-identity id]
+          [id :juxt.site/user user]
           [user :role role]
           [permission :role role]]]})))))
 
@@ -152,9 +152,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/put-user-identity"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/put-user-identity"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/put-user-identity"
+       :juxt.site/purpose nil})))))
 
 ;; TODO: Make this ns independent of openid. All the openid actions/permissions
 ;; should be demoted to the openid ns.
@@ -183,7 +183,7 @@
     {:xt/id (or id (format "https://example.org/users/%s" username))
      :name name})))
 
-(defn put-user-identity! [& {:juxt.pass/keys [username password realm]}]
+(defn put-user-identity! [& {:juxt.site/keys [username password realm]}]
   (assert username)
   (assert password)
   (assert realm)
@@ -192,14 +192,14 @@
    (substitute-actual-base-uri "https://example.org/actions/put-user-identity")
    (substitute-actual-base-uri
     {:xt/id (format "https://example.org/user-identities/%s/basic" (str/lower-case username))
-     :juxt.pass/user (format "https://example.org/users/%s" (str/lower-case username))
+     :juxt.site/user (format "https://example.org/users/%s" (str/lower-case username))
      ;; Perhaps all user identities need this?
-     :juxt.pass/canonical-root-uri "https://example.org"
-     :juxt.pass/realm realm
+     :juxt.site/canonical-root-uri "https://example.org"
+     :juxt.site/realm realm
      ;; Basic auth will only work if these are present
-     :juxt.pass/username username
+     :juxt.site/username username
      ;; This will be encrypted
-     :juxt.pass/password password})))
+     :juxt.site/password password})))
 
 ;; TODO: Could hashes be used to indicate which resources need to be installed
 ;; versus which ones are already up-to-date.  This would help performance but

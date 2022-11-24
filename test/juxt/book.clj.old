@@ -7,14 +7,13 @@
    [ring.util.codec :as codec]
    [jsonista.core :as json]
    juxt.book.login
-   [juxt.pass.session-scope :as session-scope]
-   [juxt.pass.oauth :as oauth]
-   [juxt.pass.form-based-auth :as form-based-auth]
-   [juxt.pass.basic-auth :as basic-auth]
-   [juxt.pass.alpha :as-alias pass]
+   [juxt.site.session-scope :as session-scope]
+   [juxt.site.oauth :as oauth]
+   [juxt.site.form-based-auth :as form-based-auth]
+   [juxt.site.basic-auth :as basic-auth]
    [juxt.flip.alpha.core :as f]
    [juxt.site.alpha.graphql.flip :as graphql-flip]
-   [juxt.pass.alpha.util :refer [make-nonce]]
+   [juxt.site.alpha.util :refer [make-nonce]]
    [juxt.site.alpha :as-alias site]
    [juxt.http.alpha :as-alias http]
    [juxt.site.alpha.init :as init :refer [substitute-actual-base-uri]]
@@ -26,7 +25,7 @@
   ;; tag::example-action[]
   {:xt/id "https://example.org/example/feed-cat"
    :juxt.site.alpha/type "https://meta.juxt.site/pass/action" ; <1>
-   :juxt.pass.alpha/rules                                     ; <2>
+   :juxt.site.alpha/rules                                     ; <2>
    [
     '[(allowed? subject resource permission) …]
     ]
@@ -61,20 +60,20 @@
                   [:xt/id [:re "https://example.org/(.+)"]]])
 
                 (site/set-methods ; <2>
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-public-resource"}}
-                  :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-public-resource"}}
-                  :options {:juxt.pass.alpha/actions #{"https://example.org/actions/get-options"}}})
+                 {:get {:juxt.site.alpha/actions #{"https://example.org/actions/get-public-resource"}}
+                  :head {:juxt.site.alpha/actions #{"https://example.org/actions/get-public-resource"}}
+                  :options {:juxt.site.alpha/actions #{"https://example.org/actions/get-options"}}})
 
                 xtdb.api/put]))]))}
 
-       :juxt.pass.alpha/rules
+       :juxt.site.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
+          [permission :juxt.site.alpha/subject subject]]
 
          [(allowed? subject resource permission) ; <3>
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
+          [subject :juxt.site.alpha/user-identity id]
+          [id :juxt.site.alpha/user user]
           [user :role role]
           [permission :role role]]]})
      ;; end::create-action-put-immutable-public-resource![]
@@ -89,9 +88,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/put-immutable-public-resource"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/put-immutable-public-resource"
-       :juxt.pass.alpha/purpose nil})
+       :juxt.site.alpha/subject "https://example.org/subjects/system"
+       :juxt.site.alpha/action "https://example.org/actions/put-immutable-public-resource"
+       :juxt.site.alpha/purpose nil})
      ;; end::grant-permission-to-invoke-action-put-immutable-public-resource![]
      ))))
 
@@ -105,7 +104,7 @@
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/get-public-resource"
 
-       :juxt.pass.alpha/rules
+       :juxt.site.alpha/rules
        '[
          [(allowed? subject resource permission)
           [permission :xt/id "https://example.org/permissions/public-resources-to-all"] ; <2>
@@ -122,8 +121,8 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/public-resources-to-all"
-       :juxt.pass.alpha/action "https://example.org/actions/get-public-resource"
-       :juxt.pass.alpha/purpose nil})
+       :juxt.site.alpha/action "https://example.org/actions/get-public-resource"
+       :juxt.site.alpha/purpose nil})
      ;; end::grant-permission-to-invoke-get-public-resource![]
      ))))
 
@@ -168,9 +167,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/alice/put-template"
-       :juxt.pass.alpha/user "https://example.org/users/alice"
-       :juxt.pass.alpha/action #{"https://example.org/actions/put-template"}
-       :juxt.pass.alpha/purpose nil})
+       :juxt.site.alpha/user "https://example.org/users/alice"
+       :juxt.site.alpha/action #{"https://example.org/actions/put-template"}
+       :juxt.site.alpha/purpose nil})
      ;; end::grant-permission-to-invoke-action-put-template![]
      ))))
 
@@ -227,21 +226,21 @@
                   [:xt/id [:re "https://example.org/(.+)"]]])
 
                 (site/set-methods ; <2>
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-protected-resource"}}
-                  :head {:juxt.pass.alpha/actions #{"https://example.org/actions/get-protected-resource"}}
-                  :options {:juxt.pass.alpha/actions #{"https://example.org/actions/get-options"}}})
+                 {:get {:juxt.site.alpha/actions #{"https://example.org/actions/get-protected-resource"}}
+                  :head {:juxt.site.alpha/actions #{"https://example.org/actions/get-protected-resource"}}
+                  :options {:juxt.site.alpha/actions #{"https://example.org/actions/get-options"}}})
 
                 xtdb.api/put
                 ]))]))}
 
-       :juxt.pass.alpha/rules
+       :juxt.site.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]
+          [permission :juxt.site.alpha/subject subject]]
 
          [(allowed? subject resource permission) ; <3>
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
+          [subject :juxt.site.alpha/user-identity id]
+          [id :juxt.site.alpha/user user]
           [permission :role role]
           [user :role role]]]})
      ;; end::create-action-put-immutable-protected-resource![]
@@ -256,9 +255,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/put-immutable-protected-resource"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/put-immutable-protected-resource"
-       :juxt.pass.alpha/purpose nil})
+       :juxt.site.alpha/subject "https://example.org/subjects/system"
+       :juxt.site.alpha/action "https://example.org/actions/put-immutable-protected-resource"
+       :juxt.site.alpha/purpose nil})
      ;; end::grant-permission-to-put-immutable-protected-resource![]
      ))))
 
@@ -272,12 +271,12 @@
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/get-protected-resource"
 
-       :juxt.pass.alpha/rules
+       :juxt.site.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]    ; <1>
+          [subject :juxt.site.alpha/user-identity id]
+          [id :juxt.site.alpha/user user]
+          [permission :juxt.site.alpha/user user]    ; <1>
           [permission :juxt.site.alpha/uri resource] ; <2>
           ]]})
      ;; end::create-action-get-protected-resource![]
@@ -311,10 +310,10 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/alice/protected-by-basic-auth/document.html"
-       :juxt.pass.alpha/action "https://example.org/actions/get-protected-resource"
-       :juxt.pass.alpha/user "https://example.org/users/alice"
+       :juxt.site.alpha/action "https://example.org/actions/get-protected-resource"
+       :juxt.site.alpha/user "https://example.org/users/alice"
        :juxt.site.alpha/uri "https://example.org/protected-by-basic-auth/document.html"
-       :juxt.pass.alpha/purpose nil
+       :juxt.site.alpha/purpose nil
        })
      ;; end::grant-permission-to-resource-protected-by-basic-auth![]
      ))))
@@ -345,10 +344,10 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/alice/protected-by-bearer-auth/document.html"
-       :juxt.pass.alpha/action "https://example.org/actions/get-protected-resource"
-       :juxt.pass.alpha/user "https://example.org/users/alice"
+       :juxt.site.alpha/action "https://example.org/actions/get-protected-resource"
+       :juxt.site.alpha/user "https://example.org/users/alice"
        :juxt.site.alpha/uri "https://example.org/protected-by-bearer-auth/document.html"
-       :juxt.pass.alpha/purpose nil
+       :juxt.site.alpha/purpose nil
        })
      ;; end::grant-permission-to-resource-protected-by-bearer-auth![]
      ))))
@@ -362,10 +361,10 @@
       "https://example.org/actions/put-protection-space"
       {:xt/id "https://example.org/protection-spaces/bearer/wonderland"
 
-       :juxt.pass.alpha/canonical-root-uri "https://example.org"
-       :juxt.pass.alpha/realm "Wonderland" ; optional
+       :juxt.site.alpha/canonical-root-uri "https://example.org"
+       :juxt.site.alpha/realm "Wonderland" ; optional
 
-       :juxt.pass.alpha/auth-scheme "Bearer"})))))
+       :juxt.site.alpha/auth-scheme "Bearer"})))))
 
 ;; Session Scope Example
 
@@ -393,10 +392,10 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/alice/protected-by-session-scope/document.html"
-       :juxt.pass.alpha/action "https://example.org/actions/get-protected-resource"
-       :juxt.pass.alpha/user "https://example.org/users/alice"
+       :juxt.site.alpha/action "https://example.org/actions/get-protected-resource"
+       :juxt.site.alpha/user "https://example.org/users/alice"
        :juxt.site.alpha/uri "https://example.org/protected-by-session-scope/document.html"
-       :juxt.pass.alpha/purpose nil
+       :juxt.site.alpha/purpose nil
        })
      ;; end::grant-permission-to-resource-protected-by-session-scope![]
      ))))
@@ -420,10 +419,10 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/alice/private/internal.html"
-       :juxt.pass.alpha/action "https://example.org/actions/get-protected-resource"
-       :juxt.pass.alpha/user "https://example.org/users/alice"
+       :juxt.site.alpha/action "https://example.org/actions/get-protected-resource"
+       :juxt.site.alpha/user "https://example.org/users/alice"
        :juxt.site.alpha/uri "https://example.org/private/internal.html"
-       :juxt.pass.alpha/purpose nil})))))
+       :juxt.site.alpha/purpose nil})))))
 
 ;; GraphQL
 
@@ -438,12 +437,12 @@
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/install-graphql-endpoint"
 
-       :juxt.pass.alpha/scope "https://example.org/oauth/scope/graphql/administer"
+       :juxt.site.alpha/scope "https://example.org/oauth/scope/graphql/administer"
 
        :juxt.site.alpha/methods
        {
         ;; As this is an 'installer' actions, we expose this action.
-        :post {:juxt.pass.alpha/actions #{"https://example.org/actions/install-graphql-endpoint"}}
+        :post {:juxt.site.alpha/actions #{"https://example.org/actions/install-graphql-endpoint"}}
         ;; (the default action of an action resource is itself.)
         }
 
@@ -459,7 +458,7 @@
                 :input]))])
 
           (f/define extract-permissions
-            [(f/set-at (f/dip [(f/env :juxt.pass.alpha/permissions) :permissions]))])
+            [(f/set-at (f/dip [(f/env :juxt.site.alpha/permissions) :permissions]))])
 
           (f/define determine-if-match-resource-pattern
             ;; We check that the permission resource matches the xt/id
@@ -485,10 +484,10 @@
               (f/keep
                [(f/of :input)
                 (site/set-methods
-                 {:get {:juxt.pass.alpha/actions #{"https://example.org/actions/get-graphql-schema"}}
-                  :put {:juxt.pass.alpha/actions #{"https://example.org/actions/put-graphql-schema"}
+                 {:get {:juxt.site.alpha/actions #{"https://example.org/actions/get-graphql-schema"}}
+                  :put {:juxt.site.alpha/actions #{"https://example.org/actions/put-graphql-schema"}
                         :juxt.site.alpha/acceptable {"accept" "application/graphql"}}
-                  :post {:juxt.pass.alpha/actions #{"https://example.org/actions/graphql-request"}}})
+                  :post {:juxt.site.alpha/actions #{"https://example.org/actions/graphql-request"}}})
                 (f/set-at (f/dip ["https://meta.juxt.site/site/graphql-endpoint" :juxt.site.alpha/type]))
                 (f/set-at (f/dip ["GraphQL endpoint" :juxt.site.alpha/description]))
                 :new-resource]))])
@@ -496,15 +495,15 @@
           (f/define extract-owner
             [(f/set-at
               (f/dip
-               [(f/env :juxt.pass.alpha/subject) (f/of :juxt.pass.alpha/user-identity) site/entity
-                (f/of :juxt.pass.alpha/user)
+               [(f/env :juxt.site.alpha/subject) (f/of :juxt.site.alpha/user-identity) site/entity
+                (f/of :juxt.site.alpha/user)
                 :owner]))])
 
           (f/define add-owner
             [(f/set-at
               (f/keep
                [f/dup (f/of :new-resource)
-                f/swap (f/of :owner) :juxt.pass.alpha/owner f/rot f/set-at
+                f/swap (f/of :owner) :juxt.site.alpha/owner f/rot f/set-at
                 :new-resource]))])
 
           (f/define push-resource
@@ -528,8 +527,8 @@
               (f/dip
                [{:juxt.site.alpha/type "https://meta.juxt.site/pass/permission"
                  :juxt.site.alpha/description "Permission for endpoint owner to put GraphQL schema"
-                 :juxt.pass.alpha/action "https://example.org/actions/put-graphql-schema"
-                 :juxt.pass.alpha/purpose nil}
+                 :juxt.site.alpha/action "https://example.org/actions/put-graphql-schema"
+                 :juxt.site.alpha/purpose nil}
                 :new-permission]))])
 
           (site/with-fx-acc
@@ -551,7 +550,7 @@
              (f/set-at
               (f/keep
                [f/dup (f/of :new-permission) f/swap
-                (f/of :owner) :juxt.pass.alpha/user f/rot f/set-at :new-permission]))
+                (f/of :owner) :juxt.site.alpha/user f/rot f/set-at :new-permission]))
 
              ;; Set xt/id
              (f/set-at
@@ -567,12 +566,12 @@
 
              configure-response]))}
 
-       :juxt.pass.alpha/rules
+       :juxt.site.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})))))
+          [subject :juxt.site.alpha/user-identity id]
+          [id :juxt.site.alpha/user user]
+          [permission :juxt.site.alpha/user user]]]})))))
 
 (defn grant-permission-install-graphql-endpoint-to-alice! [_]
   (eval
@@ -583,12 +582,12 @@
       "https://example.org/actions/grant-permission"
       ;; TODO: We need a specialist grant-permission for this because we want to documnent/validate the :juxt.site.alpha/resource-pattern
       {:xt/id "https://example.org/permissions/alice/install-graphql-endpoint"
-       :juxt.pass.alpha/user "https://example.org/users/alice"
-       :juxt.pass.alpha/action "https://example.org/actions/install-graphql-endpoint"
+       :juxt.site.alpha/user "https://example.org/users/alice"
+       :juxt.site.alpha/action "https://example.org/actions/install-graphql-endpoint"
        ;; This permission can restrict exactly where a GraphQL endpoint can be
        ;; installed.
        :juxt.site.alpha/resource-pattern "\\Qhttps://example.org/graphql\\E"
-       :juxt.pass.alpha/purpose nil})))))
+       :juxt.site.alpha/purpose nil})))))
 
 (defn create-action-put-graphql-schema [_]
   (eval
@@ -599,7 +598,7 @@
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/put-graphql-schema"
 
-       :juxt.pass.alpha/scope "https://example.org/oauth/scope/graphql/develop"
+       :juxt.site.alpha/scope "https://example.org/oauth/scope/graphql/develop"
 
        ;; TODO: This is required to compile the GraphQL schema and communicate
        ;; any schema validation or compilation errors. Perhaps this can be done
@@ -677,12 +676,12 @@
              site/push-fx
              ]))}
 
-       :juxt.pass.alpha/rules
+       :juxt.site.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})))))
+          [subject :juxt.site.alpha/user-identity id]
+          [id :juxt.site.alpha/user user]
+          [permission :juxt.site.alpha/user user]]]})))))
 
 (defn grant-permission-put-graphql-schema-to-alice! [_]
   (eval
@@ -694,9 +693,9 @@
       ;; TODO: We need a specialist grant-permission for this because we want to
       ;; documnent/validate the :juxt.site.alpha/resource
       {:xt/id "https://example.org/permissions/alice/put-graphql-schema"
-       :juxt.pass.alpha/user "https://example.org/users/alice"
-       :juxt.pass.alpha/action "https://example.org/actions/put-graphql-schema"
-       :juxt.pass.alpha/purpose nil
+       :juxt.site.alpha/user "https://example.org/users/alice"
+       :juxt.site.alpha/action "https://example.org/actions/put-graphql-schema"
+       :juxt.site.alpha/purpose nil
        :juxt.site.alpha/resource "https://example.org/graphql"})))))
 
 (defn grant-permission-get-graphql-schema-to-alice! [_]
@@ -709,9 +708,9 @@
       ;; TODO: We need a specialist grant-permission for this because we want to
       ;; documnent/validate the :juxt.site.alpha/resource
       {:xt/id "https://example.org/permissions/alice/get-graphql-schema"
-       :juxt.pass.alpha/user "https://example.org/users/alice"
-       :juxt.pass.alpha/action "https://example.org/actions/get-graphql-schema"
-       :juxt.pass.alpha/purpose nil
+       :juxt.site.alpha/user "https://example.org/users/alice"
+       :juxt.site.alpha/action "https://example.org/actions/get-graphql-schema"
+       :juxt.site.alpha/purpose nil
        :juxt.site.alpha/resource "https://example.org/graphql"})))))
 
 (defn create-action-get-graphql-schema [_]
@@ -722,7 +721,7 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/get-graphql-schema"
-       :juxt.pass.alpha/scope "https://example.org/oauth/scope/graphql/develop"
+       :juxt.site.alpha/scope "https://example.org/oauth/scope/graphql/develop"
        #_:juxt.site.alpha/transact
        #_{:juxt.site.alpha.sci/program
           (pr-str
@@ -732,12 +731,12 @@
               (if-let [selected-representation (:juxt.site.alpha/selected-representation *ctx*)]
                 [[:continue]]
                 [[:ring.response/status 404]])))}
-       :juxt.pass.alpha/rules
+       :juxt.site.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
-          [permission :juxt.pass.alpha/user user]]]})))))
+          [subject :juxt.site.alpha/user-identity id]
+          [id :juxt.site.alpha/user user]
+          [permission :juxt.site.alpha/user user]]]})))))
 
 (defn create-action-graphql-request [_]
   (eval
@@ -749,7 +748,7 @@
       {:xt/id "https://example.org/actions/graphql-request"
        :juxt.site.alpha/transact
        {:juxt.flip.alpha/quotation `()}
-       :juxt.pass.alpha/rules
+       :juxt.site.alpha/rules
        '[
          [(allowed? subject resource permission)
           [permission :xt/id "https://example.org/permissions/graphql-access-to-known-subjects"]
@@ -763,8 +762,8 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/graphql-access-to-known-subjects"
-       :juxt.pass.alpha/action "https://example.org/actions/graphql-request"
-       :juxt.pass.alpha/purpose nil})))))
+       :juxt.site.alpha/action "https://example.org/actions/graphql-request"
+       :juxt.site.alpha/purpose nil})))))
 
 ;; Other stuff
 
@@ -777,9 +776,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/alice/put-error-resource"
-       :juxt.pass.alpha/user "https://example.org/users/alice"
-       :juxt.pass.alpha/action #{"https://example.org/actions/put-error-resource"}
-       :juxt.pass.alpha/purpose nil})
+       :juxt.site.alpha/user "https://example.org/users/alice"
+       :juxt.site.alpha/action #{"https://example.org/actions/put-error-resource"}
+       :juxt.site.alpha/purpose nil})
      ;; end::grant-permission-to-put-error-resource![]
      ))))
 
@@ -835,10 +834,10 @@
       "https://example.org/actions/put-protection-space"
       {:xt/id "https://example.org/protection-spaces/bearer"
 
-       :juxt.pass.alpha/canonical-root-uri "https://example.org"
-       ;;:juxt.pass.alpha/realm "Wonderland" ; optional
+       :juxt.site.alpha/canonical-root-uri "https://example.org"
+       ;;:juxt.site.alpha/realm "Wonderland" ; optional
 
-       :juxt.pass.alpha/auth-scheme "Bearer"}))))
+       :juxt.site.alpha/auth-scheme "Bearer"}))))
 
 (defn login-with-form!
   "Return a session id (or nil) given a map of fields."
@@ -848,7 +847,7 @@
          :juxt.site.alpha/uri (substitute-actual-base-uri "https://example.org/login")
          "username" username
          "password" password)]
-    (:juxt.pass.alpha/session-token result)))
+    (:juxt.site.alpha/session-token result)))
 
 ;; TODO: Moved to oauth - use that instead
 #_(defn authorize-response!
@@ -905,7 +904,7 @@
         {access-token "access_token"
          error "error"}
         (oauth/authorize!
-         {:juxt.pass.alpha/session-token session-token
+         {:juxt.site.alpha/session-token session-token
           "client_id" "local-terminal"
           "scope" [(format "%s/oauth/scope/graphql/administer" (substitute-actual-base-uri "https://example.org"))]})
         _ (assert (nil? error) (format "OAuth2 grant error: %s" error))
@@ -944,10 +943,10 @@
                 (site/set-type "https://meta.juxt.site/pass/oauth-scope")
                 xtdb.api/put]))]))}
 
-       :juxt.pass.alpha/rules
+       :juxt.site.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/subject subject]]]})))))
+          [permission :juxt.site.alpha/subject subject]]]})))))
 
 (defn grant-permission-to-invoke-action-create-oauth-scope! [_]
   (eval
@@ -957,9 +956,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/create-oauth-scope"
-       :juxt.pass.alpha/subject "https://example.org/subjects/system"
-       :juxt.pass.alpha/action "https://example.org/actions/create-oauth-scope"
-       :juxt.pass.alpha/purpose nil})))))
+       :juxt.site.alpha/subject "https://example.org/subjects/system"
+       :juxt.site.alpha/action "https://example.org/actions/create-oauth-scope"
+       :juxt.site.alpha/purpose nil})))))
 
 (defn create-oauth-scope! [scope]
   (eval
@@ -977,12 +976,12 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/put-user-owned-content"
-       :juxt.pass.alpha/rules
+       :juxt.site.alpha/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass.alpha/user user]
-          [subject :juxt.pass.alpha/user-identity id]
-          [id :juxt.pass.alpha/user user]
+          [permission :juxt.site.alpha/user user]
+          [subject :juxt.site.alpha/user-identity id]
+          [id :juxt.site.alpha/user user]
           [resource :owner user]]]})))))
 
 (defn grant-permission-to-put-user-owned-content! [username]
@@ -992,9 +991,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id ~(format "https://example.org/permissions/%s/put-user-owned-content" username)
-       :juxt.pass.alpha/action "https://example.org/actions/put-user-owned-content"
-       :juxt.pass.alpha/user ~(format "https://example.org/users/%s" username)
-       :juxt.pass.alpha/purpose nil}))))
+       :juxt.site.alpha/action "https://example.org/actions/put-user-owned-content"
+       :juxt.site.alpha/user ~(format "https://example.org/users/%s" username)
+       :juxt.site.alpha/purpose nil}))))
 
 (def dependency-graph
   {"https://example.org/hello"

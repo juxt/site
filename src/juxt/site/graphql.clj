@@ -17,7 +17,6 @@
    [clojure.edn :as edn]
    [tick.core :as t]
    [juxt.grab.graphql :as-alias g]
-   [juxt.pass :as-alias pass]
    [juxt.site :as-alias site]
    [juxt.http :as-alias http]))
 
@@ -147,7 +146,7 @@
   (= (get-in types-by-name [arg-name ::g/kind]) 'ENUM))
 
 (defn prepare-mutation-entity
-  [{:keys [field juxt.pass/subject type-k argument-values site-args] :as opts}
+  [{:keys [field juxt.site/subject type-k argument-values site-args] :as opts}
    entity transform]
   (let [type (or (get site-args "objectType") (-> field ::g/type-ref ::g/name))
         _validate-type (and (nil? type)
@@ -164,7 +163,7 @@
       ;; this should use a clock component that keeps the same time for
       ;; everything in a single graphql transcation
       (nil? (:_siteCreatedAt entity)) (assoc :_siteCreatedAt (str (t/now)))
-      subject (assoc :_siteSubject (::pass/username subject))
+      subject (assoc :_siteSubject (::site/username subject))
       (nil? (type-k entity)) (assoc type-k type)
       (:id entity) (dissoc :id)
       transform (transform argument-values)
@@ -365,13 +364,13 @@
         ent (some-> (lookup e)
                     (assoc-valid-time db)
                     (assoc-creation-time db xt-node))]
-    (if-let [ent-ns (::pass/namespace ent)]
-      (let [rules (some-> ent-ns lookup ::pass/rules)
+    (if-let [ent-ns (::site/namespace ent)]
+      (let [rules (some-> ent-ns lookup ::site/rules)
             acls (->>
                   (xt/q
                    db
                    {:find ['(pull ?acl [*])]
-                    :where '[[?acl ::pass/type "ACL"]
+                    :where '[[?acl ::site/type "ACL"]
                              (check ?acl ?subject ?e)]
                     :rules rules
                     :in '[?subject ?e]}
@@ -435,7 +434,7 @@
         nil))))
 
 (defn perform-mutation!
-  [{:keys [argument-values site-args xt-node lookup-entity field-kind pass/subject] :as opts}]
+  [{:keys [argument-values site-args xt-node lookup-entity field-kind site/subject] :as opts}]
   (let [action (or (get site-args "mutation") "put")
         validate-id! (fn [args]
                        (let [id (get args "id")]
@@ -486,8 +485,7 @@
 ;;(-> object-value :stack-trace seqable?)
 
 (defn query [schema document operation-name variable-values
-             {::pass/keys [subject]
-              ::site/keys [db xt-node base-uri resource]
+             {::site/keys [subject db xt-node base-uri resource]
               :as req}]
   (let [type-k
         (or
@@ -554,7 +552,7 @@
                       :base-uri base-uri
                       :type-k type-k
                       :lookup-entity lookup-entity
-                      ::pass/subject subject
+                      ::site/subject subject
                       :db db})]
 
           (cond
@@ -782,16 +780,15 @@
 
 (defn common-variables
   "Return the common 'built-in' variables that are bound always bound."
-  [{::site/keys [uri] ::pass/keys [subject] ::apex/keys [new-uri] :as req}]
+  [{::site/keys [uri subject] ::apex/keys [new-uri] :as req}]
   (log/tracef "new-uri is %s, keys are %s" new-uri (pr-str (keys req)))
-  (let [username (::pass/username subject)]
+  (let [username (::site/username subject)]
     (cond-> {}
       uri (assoc "siteUri" uri)
       new-uri (assoc "siteNewUri" new-uri)
       username (assoc "siteUsername" username))))
 
-(defn post-handler [{::site/keys [uri db]
-                     ::pass/keys [subject]
+(defn post-handler [{::site/keys [uri db subject]
                      :as req}]
   (let [schema (some-> (xt/entity db uri) ::site/graphql-compiled-schema)
         _validate-schema (and (nil? schema)
@@ -1076,8 +1073,7 @@
     (query schema document operation-name variables req)))
 
 (defn stored-document-post-handler
-  [{::site/keys [xt-node db resource received-representation base-uri]
-    ::pass/keys [subject]
+  [{::site/keys [xt-node db resource received-representation base-uri subject]
     :as req}]
 
   (assert (.startsWith (::http/content-type received-representation)

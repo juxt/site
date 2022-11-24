@@ -9,8 +9,7 @@
    [crypto.password.bcrypt :as password]
    [io.aviso.ansi :as ansi]
    [juxt.http :as-alias http]
-   [juxt.pass :as-alias pass]
-   [juxt.pass.actions :as actions]
+   [juxt.site.actions :as actions]
    [juxt.site :as-alias site]
    [juxt.site.cache :as cache]
    [juxt.site.init :as init :refer [config base-uri xt-node system put! do-action]]
@@ -287,8 +286,8 @@
         (xt/q (db) '{:find [user]
                      :where [[user ::site/type "User"]
                              [mapping ::site/type "UserRoleMapping"]
-                             [mapping ::pass/assignee user]
-                             [mapping ::pass/role superuser]]
+                             [mapping ::site/assignee user]
+                             [mapping ::site/role superuser]]
                      :in [superuser]}
               (str base-uri "/_site/roles/superuser")))))
 
@@ -298,7 +297,7 @@
    (map
     first
     (xt/q db {:find '[e]
-              :where [['e ::pass/client (str base-uri "/_site/apps/admin")]
+              :where [['e ::site/client (str base-uri "/_site/apps/admin")]
                       ['e ::site/type "AccessToken"]]}))))
 
 (defn steps
@@ -380,13 +379,13 @@
   (let [db (db)]
     (for [tok (->> (q '{:find [e]
                         :where [[e :xt/id]
-                                [e ::site/type "https://meta.juxt.site/pass/session"]]
+                                [e ::site/type "https://meta.juxt.site/site/session"]]
                         :in [t]} t)
                    (map first)
                    )
-          :let [session-id (::pass/session (xt/entity db tok))
+          :let [session-id (::site/session (xt/entity db tok))
                 session (xt/entity db session-id)
-                subject-id (::pass/subject session)
+                subject-id (::site/subject session)
                 subject (xt/entity db subject-id)]]
       {:session-token tok
        :session session
@@ -400,14 +399,14 @@
     (->>
      (for [tok (->> (q '{:find [e]
                          :where [[e :xt/id]
-                                 [e ::site/type #{"https://meta.juxt.site/pass/session"
-                                                  "https://meta.juxt.site/pass/session-token"}]]
+                                 [e ::site/type #{"https://meta.juxt.site/site/session"
+                                                  "https://meta.juxt.site/site/session-token"}]]
                          :in [t]} t)
                     (map first)
                     )
-           :let [session-id (::pass/session (xt/entity db tok))
+           :let [session-id (::site/session (xt/entity db tok))
                  session (xt/entity db session-id)
-                 subject (::pass/subject session)]]
+                 subject (::site/subject session)]]
        (remove nil? [tok session-id subject]))
      (mapcat seq)
      (apply evict!))))

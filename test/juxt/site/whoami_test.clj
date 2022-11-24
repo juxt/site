@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.whoami-test
+(ns juxt.site.whoami-test
   (:require
    [clojure.edn :as edn]
    [juxt.site.logging :refer [with-logging]]
@@ -11,14 +11,13 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is are testing use-fixtures]]
    [java-http-clj.core :as hc]
-   [juxt.pass :as-alias pass]
-   [juxt.pass.resources.openid :as openid]
-   [juxt.pass.resources.oauth :as oauth]
-   [juxt.pass.resources.session-scope :as session-scope]
-   [juxt.pass.resources.user :as user]
-   [juxt.pass.resources.form-based-auth :as form-based-auth]
-   [juxt.pass.resources.example-users :as example-users]
-   [juxt.pass.resources.example-applications :as example-applications]
+   [juxt.site.resources.openid :as openid]
+   [juxt.site.resources.oauth :as oauth]
+   [juxt.site.resources.session-scope :as session-scope]
+   [juxt.site.resources.user :as user]
+   [juxt.site.resources.form-based-auth :as form-based-auth]
+   [juxt.site.resources.example-users :as example-users]
+   [juxt.site.resources.example-applications :as example-applications]
    [juxt.site :as-alias site]
    [juxt.site.init :as init]
    [juxt.site.repl :as repl]
@@ -53,15 +52,15 @@
                  (pr-str
                   '{:subject
                     (xt/pull
-                     '[* {:juxt.pass/user-identity [* {:juxt.pass/user [*]}]}]
-                     (:xt/id (:juxt.pass/subject *ctx*)))})}
+                     '[* {:juxt.site/user-identity [* {:juxt.site/user [*]}]}]
+                     (:xt/id (:juxt.site/subject *ctx*)))})}
 
-                :juxt.pass/rules
+                :juxt.site/rules
                 '[
                   [(allowed? subject resource permission)
-                   [subject :juxt.pass/user-identity id]
-                   [id :juxt.pass/user user]
-                   [permission :juxt.pass/user user]]]}))}
+                   [subject :juxt.site/user-identity id]
+                   [id :juxt.site/user user]
+                   [permission :juxt.site/user user]]]}))}
 
    "https://example.org/permissions/{username}/whoami"
    {:deps #{::init/system
@@ -74,9 +73,9 @@
                  (let [user (format "https://example.org/users/%s" username)]
                    (init/substitute-actual-base-uri
                     {:xt/id id
-                     :juxt.pass/action "https://example.org/actions/whoami"
-                     :juxt.pass/purpose nil
-                     :juxt.pass/user user})))))}
+                     :juxt.site/action "https://example.org/actions/whoami"
+                     :juxt.site/purpose nil
+                     :juxt.site/user user})))))}
 
    ;; TODO: Create an action for establishing a protection space
    "https://example.org/bearer-protection-space"
@@ -85,7 +84,7 @@
               (init/put!
                (init/substitute-actual-base-uri
                 {:xt/id id
-                 :juxt.pass/auth-scheme "Bearer"})))}
+                 :juxt.site/auth-scheme "Bearer"})))}
 
    "https://example.org/whoami"
    {:deps #{::init/system
@@ -96,8 +95,8 @@
                (init/substitute-actual-base-uri
                 {:xt/id id
                  :juxt.site/methods
-                 {:get {:juxt.pass/actions #{"https://example.org/actions/whoami"}}}
-                 :juxt.pass/protection-spaces #{"https://example.org/bearer-protection-space"}})))}
+                 {:get {:juxt.site/actions #{"https://example.org/actions/whoami"}}}
+                 :juxt.site/protection-spaces #{"https://example.org/bearer-protection-space"}})))}
 
    "https://example.org/whoami.json"
    {:deps #{::init/system
@@ -107,7 +106,7 @@
                (init/substitute-actual-base-uri
                 {:xt/id id
                  :juxt.site/methods
-                 {:get {:juxt.pass/actions #{"https://example.org/actions/whoami"}}}
+                 {:get {:juxt.site/actions #{"https://example.org/actions/whoami"}}}
                  :juxt.site/variant-of "https://example.org/whoami"
                  :juxt.http/content-type "application/json"
                  ;; TODO: Rename to :juxt.site/respond
@@ -130,7 +129,7 @@
                (init/substitute-actual-base-uri
                 {:xt/id id
                  :juxt.site/methods
-                 {:get {:juxt.pass/actions #{"https://example.org/actions/whoami"}}}
+                 {:get {:juxt.site/actions #{"https://example.org/actions/whoami"}}}
                  :juxt.site/variant-of "https://example.org/whoami"
                  :juxt.http/content-type "text/html;charset=utf-8"
                  :juxt.http/respond
@@ -169,12 +168,12 @@
            "password" "garden"
            :juxt.site/uri "https://site.test/login")
 
-          session-token (:juxt.pass/session-token login-result)
+          session-token (:juxt.site/session-token login-result)
           _ (assert session-token)
 
           {access-token "access_token"}
           (oauth/authorize!
-           {:juxt.pass/session-token session-token
+           {:juxt.site/session-token session-token
             "client_id" "test-app"})]
 
       (when access-token
@@ -190,8 +189,8 @@
                  (-> body
                      json/read-value
                      (get-in ["subject"
-                              "juxt.pass/user-identity"
-                              "juxt.pass/user"
+                              "juxt.site/user-identity"
+                              "juxt.site/user"
                               "name"] body)))))))))
 
 ;; Note: If we try to login (with basic), we'll won't need to user 'put' (which will

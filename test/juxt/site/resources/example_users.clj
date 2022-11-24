@@ -1,10 +1,10 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.resources.example-users
+(ns juxt.site.resources.example-users
   (:require
    [clojure.string :as str]
    [juxt.site.init :as init :refer [substitute-actual-base-uri]]
-   [juxt.pass.resources.user :as user]
+   [juxt.site.resources.user :as user]
    [malli.core :as malli]))
 
 ;; These are example users that are useful for testing
@@ -19,9 +19,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id (format "https://example.org/permissions/%s-can-authorize" ~(str/lower-case username))
-       :juxt.pass/action "https://example.org/actions/oauth/authorize"
-       :juxt.pass/user (format "https://example.org/users/%s" ~(str/lower-case username))
-       :juxt.pass/purpose nil}))))
+       :juxt.site/action "https://example.org/actions/oauth/authorize"
+       :juxt.site/user (format "https://example.org/users/%s" ~(str/lower-case username))
+       :juxt.site/purpose nil}))))
 
 (malli/=>
  grant-permission-to-authorize!
@@ -79,6 +79,6 @@
                        user-id (format "https://example.org/users/%s" username)]
                    (init/substitute-actual-base-uri
                     {:xt/id id
-                     :juxt.pass/user user-id
-                     :juxt.pass/username username
-                     :juxt.pass/password (:password user-details)})))))}})
+                     :juxt.site/user user-id
+                     :juxt.site/username username
+                     :juxt.site/password (:password user-details)})))))}})

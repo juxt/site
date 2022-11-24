@@ -6,12 +6,11 @@
    [clojure.java.io :as io]
    [clojure.set :as set]
    [juxt.site.init :refer [put! base-uri substitute-actual-base-uri converge! do-action]]
-   [juxt.pass.actions :as actions]
-   [juxt.pass.resources.openid :as openid]
-   [juxt.pass.resources.session-scope :as session-scope]
-   [juxt.pass.resources.user :as user]
-   [juxt.site :as-alias site]
-   [juxt.pass :as-alias pass]))
+   [juxt.site.actions :as actions]
+   [juxt.site.resources.openid :as openid]
+   [juxt.site.resources.session-scope :as session-scope]
+   [juxt.site.resources.user :as user]
+   [juxt.site :as-alias site]))
 
 (defn install-system-subject! [_]
   (eval
@@ -21,7 +20,7 @@
       ;; tag::install-system-subject![]
       {:xt/id "https://example.org/subjects/system"
        :juxt.site/description "The system subject"
-       :juxt.site/type "https://meta.juxt.site/pass/subject"}
+       :juxt.site/type "https://meta.juxt.site/site/subject"}
       ;; end::install-system-subject![]
       )))))
 
@@ -32,11 +31,11 @@
      (juxt.site.init/put!
       ;; tag::install-system-permissions![]
       {:xt/id "https://example.org/permissions/system/bootstrap"
-       :juxt.site/type "https://meta.juxt.site/pass/permission" ; <1>
-       :juxt.pass/action #{"https://example.org/actions/create-action"
+       :juxt.site/type "https://meta.juxt.site/site/permission" ; <1>
+       :juxt.site/action #{"https://example.org/actions/create-action"
                                  "https://example.org/actions/grant-permission"} ; <2>
-       :juxt.pass/purpose nil      ; <3>
-       :juxt.pass/subject "https://example.org/subjects/system" ; <4>
+       :juxt.site/purpose nil      ; <3>
+       :juxt.site/subject "https://example.org/subjects/system" ; <4>
        }
       ;; end::install-system-permissions![]
       )))))
@@ -53,8 +52,8 @@
         "https://example.org/subjects/system"
         "https://example.org/actions/grant-permission"
         {:xt/id "https://example.org/permissions/get-not-found"
-         :juxt.pass/action "https://example.org/actions/get-not-found"
-         :juxt.pass/purpose nil}))))))
+         :juxt.site/action "https://example.org/actions/get-not-found"
+         :juxt.site/purpose nil}))))))
 
 (defn install-create-action! [_]
   (eval
@@ -63,19 +62,19 @@
      (juxt.site.init/put!
       {:xt/id "https://example.org/actions/create-action"
        :juxt.site/description "The action to create all other actions"
-       :juxt.site/type "https://meta.juxt.site/pass/action"
+       :juxt.site/type "https://meta.juxt.site/site/action"
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          ;; Creating actions should only be available to the most trusted
          ;; subjects. Actions can write directly to the database, if they wish.
          [(allowed? subject resource permission)
-          [permission :juxt.pass/subject subject]]]
+          [permission :juxt.site/subject subject]]]
 
        :juxt.site.malli/input-schema
        [:map
         [:xt/id [:re "https://example.org/actions/(.+)"]]
-        [:juxt.pass/rules [:vector [:vector :any]]]]
+        [:juxt.site/rules [:vector [:vector :any]]]]
 
        :juxt.site/prepare
        {:juxt.site.sci/program
@@ -93,7 +92,7 @@
                (String.)
                clojure.edn/read-string
                juxt.site.malli/validate-input
-               (assoc :juxt.site/type "https://meta.juxt.site/pass/action")))))}
+               (assoc :juxt.site/type "https://meta.juxt.site/site/action")))))}
 
        :juxt.site/transact
        {:juxt.site.sci/program
@@ -109,13 +108,13 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/grant-permission"
-       :juxt.site/type "https://meta.juxt.site/pass/action"
+       :juxt.site/type "https://meta.juxt.site/site/action"
 
        :juxt.site.malli/input-schema
        [:map
         [:xt/id [:re "https://example.org/permissions/(.+)"]]
-        [:juxt.pass/action [:re "https://example.org/actions/(.+)"]]
-        [:juxt.pass/purpose [:maybe :string]]]
+        [:juxt.site/action [:re "https://example.org/actions/(.+)"]]
+        [:juxt.site/purpose [:maybe :string]]]
 
        :juxt.site/prepare
        {:juxt.site.sci/program
@@ -134,23 +133,23 @@
                clojure.edn/read-string
                juxt.site.malli/validate-input
                (assoc
-                :juxt.site/type "https://meta.juxt.site/pass/permission")))))}
+                :juxt.site/type "https://meta.juxt.site/site/permission")))))}
 
        :juxt.site/transact
        {:juxt.site.sci/program
         (pr-str
          '[[:xtdb.api/put *prepare*]])}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass/subject subject]]
+          [permission :juxt.site/subject subject]]
 
          ;; This might be overly powerful, as a general way of granting anyone a
          ;; permission on any action! Let's comment for now
          #_[(allowed? subject resource permission)
-            [subject :juxt.pass/user-identity id]
-            [id :juxt.pass/user user]
+            [subject :juxt.site/user-identity id]
+            [id :juxt.site/user user]
             [user :role role]
             [permission :role role]]]})
      ;; end::create-grant-permission-action![]
@@ -169,7 +168,7 @@
         (pr-str
          '(do
             [[:ring.response/status 404]]))}
-       :juxt.pass/rules
+       :juxt.site/rules
        [
         ['(allowed? subject resource permission)
          ['permission :xt/id]]]})))))
@@ -206,18 +205,18 @@
                (assoc
                 :juxt.site/type "https://meta.juxt.site/not-found"
                 :juxt.site/methods
-                {:get {:juxt.pass/actions #{"https://example.org/actions/get-not-found"}}
-                 :head {:juxt.pass/actions #{"https://example.org/actions/get-not-found"}}})))))}
+                {:get {:juxt.site/actions #{"https://example.org/actions/get-not-found"}}
+                 :head {:juxt.site/actions #{"https://example.org/actions/get-not-found"}}})))))}
 
        :juxt.site/transact
        {:juxt.site.sci/program
         (pr-str
          '[[:xtdb.api/put *prepare*]])}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        [
         ['(allowed? subject resource permission)
-         '[permission :juxt.pass/subject subject]]]})))))
+         '[permission :juxt.site/subject subject]]]})))))
 
 (defn grant-permission-install-not-found! [_]
   (eval
@@ -227,9 +226,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/install-not-found"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/install-not-found"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/install-not-found"
+       :juxt.site/purpose nil})))))
 
 (defn install-not-found-resource! [_]
   (eval
@@ -255,8 +254,8 @@
 
        :juxt.site.malli/input-schema
        [:map
-        [:juxt.pass/client-id [:re "[a-z-]{3,}"]]
-        [:juxt.pass/redirect-uri [:re "https://"]]]
+        [:juxt.site/client-id [:re "[a-z-]{3,}"]]
+        [:juxt.site/redirect-uri [:re "https://"]]]
 
        :juxt.site/prepare
        {:juxt.site.sci/program
@@ -274,10 +273,10 @@
                            (String.)
                            clojure.edn/read-string
                            juxt.site.malli/validate-input)
-                    client-id (:juxt.pass/client-id input)]
+                    client-id (:juxt.site/client-id input)]
                 (into
                  {:xt/id (format "%s/applications/%s" (:juxt.site/base-uri *ctx*) client-id)
-                  :juxt.site/type "https://meta.juxt.site/pass/application"}
+                  :juxt.site/type "https://meta.juxt.site/site/application"}
                  input)))))}
 
        :juxt.site/transact
@@ -285,13 +284,13 @@
         (pr-str
          '[[:xtdb.api/put *prepare*]])}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[[(allowed? subject resource permission)
-          [permission :juxt.pass/subject "https://example.org/subjects/system"]]
+          [permission :juxt.site/subject "https://example.org/subjects/system"]]
 
          [(allowed? subject resource permission)
-          [id :juxt.pass/user user]
-          [subject :juxt.pass/user-identity id]
+          [id :juxt.site/user user]
+          [subject :juxt.site/user-identity id]
           [user :role role]
           [permission :role role]]]})))))
 
@@ -303,9 +302,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/register-application"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/register-application"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/register-application"
+       :juxt.site/purpose nil})))))
 
 (def dependency-graph
   {"https://example.org/_site/do-action"
@@ -386,8 +385,8 @@
      "https://example.org/permissions/system/put-user"
      ;;"https://example.org/permissions/system/put-openid-user-identity"
 
-     :juxt.pass.openid/all-actions
-     :juxt.pass.openid/default-permissions
+     :juxt.site.openid/all-actions
+     :juxt.site.openid/default-permissions
      (substitute-actual-base-uri "https://example.org/permissions/system/put-session-scope")}
    (substitute-actual-base-uri
     (merge
@@ -415,8 +414,8 @@
 (defn install-openid! []
   (converge!
    #{:juxt.site.init/system
-     :juxt.pass.openid/all-actions
-     :juxt.pass.openid/default-permissions
+     :juxt.site.openid/all-actions
+     :juxt.site.openid/default-permissions
      (substitute-actual-base-uri "https://example.org/openid/auth0/issuer")
      (substitute-actual-base-uri "https://example.org/openid/auth0/client-configuration")
      (substitute-actual-base-uri "https://example.org/openid/login")
@@ -434,47 +433,47 @@
 
 (defn install-openid-user!
   [& {:keys [name username]
-      :juxt.pass.jwt.claims/keys [iss sub nickname]}]
+      :juxt.site.jwt.claims/keys [iss sub nickname]}]
   (user/put-user! :username username :name name)
   (openid/put-openid-user-identity!
    (cond-> {:username username
-            :juxt.pass.jwt.claims/iss iss}
-     sub (assoc :juxt.pass.jwt.claims/sub sub)
-     nickname (assoc :juxt.pass.jwt.claims/nickname nickname))))
+            :juxt.site.jwt.claims/iss iss}
+     sub (assoc :juxt.site.jwt.claims/sub sub)
+     nickname (assoc :juxt.site.jwt.claims/nickname nickname))))
 
 (comment
   (install-openid-user!
    :username "mal"
    :name "Malcolm Sparks"
-   :juxt.pass.jwt.claims/iss "https://juxt.eu.auth0.com/"
-   :juxt.pass.jwt.claims/nickname "malcolmsparks"))
+   :juxt.site.jwt.claims/iss "https://juxt.eu.auth0.com/"
+   :juxt.site.jwt.claims/nickname "malcolmsparks"))
 
 (comment
   (put!
    {:xt/id "https://site.test/actions/whoami"
-    :juxt.site/type "https://meta.juxt.site/pass/action"
-    :juxt.pass/rules
+    :juxt.site/type "https://meta.juxt.site/site/action"
+    :juxt.site/rules
     '[
       [(allowed? subject resource permission)
-       [permission :juxt.pass/subject subject]]
+       [permission :juxt.site/subject subject]]
 
       [(allowed? subject resource permission)
-       [subject :juxt.pass/user-identity id]
-       [id :juxt.pass/user user]
-       [permission :juxt.pass/user user]]]}))
+       [subject :juxt.site/user-identity id]
+       [id :juxt.site/user user]
+       [permission :juxt.site/user user]]]}))
 
 (comment
   (put!
    {:xt/id "https://site.test/whoami"
     :juxt.site/methods
-    {:get {:juxt.pass/actions #{"https://site.test/actions/whoami"}}}
+    {:get {:juxt.site/actions #{"https://site.test/actions/whoami"}}}
     :juxt.http/content-type "text/plain"
     :juxt.http/content "Hello - who are you?"}))
 
 (comment
   (put!
    {:xt/id "https://site.test/permissions/malcolm/whoami"
-    :juxt.site/type "https://meta.juxt.site/pass/permission"
-    :juxt.pass/user "https://site.test/users/mal"
-    :juxt.pass/action "https://site.test/actions/whoami"
-    :juxt.pass/purpose nil}))
+    :juxt.site/type "https://meta.juxt.site/site/permission"
+    :juxt.site/user "https://site.test/users/mal"
+    :juxt.site/action "https://site.test/actions/whoami"
+    :juxt.site/purpose nil}))

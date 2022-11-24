@@ -1,20 +1,19 @@
 ; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.actions
+(ns juxt.site.actions
   (:require
    [clojure.tools.logging :as log]
    [crypto.password.bcrypt :as bcrypt]
-   [juxt.pass.openid-connect :as openid-connect]
+   [juxt.site.openid-connect :as openid-connect]
    [java-http-clj.core :as hc]
    [sci.core :as sci]
    [malli.core :as malli]
    [malli.error :a me]
    [ring.util.codec :as codec]
    [crypto.password.bcrypt :as bcrypt]
-   [juxt.pass :as-alias pass]
-   [juxt.pass.util :refer [make-nonce]]
+   [juxt.site.util :refer [make-nonce]]
    [juxt.site.util :refer [random-bytes]]
-   [juxt.pass.http-authentication :as http-authn]
+   [juxt.site.http-authentication :as http-authn]
    [juxt.site :as-alias site]
    [xtdb.api :as xt]
    juxt.site.schema
@@ -28,13 +27,13 @@
   (comment
     (vec (for [action actions
                :let [e (xt/entity db action)]
-               rule (::pass/rules e)]
+               rule (::site/rules e)]
            (conj rule ['action :xt/id action]))))
   (mapv
    #(conj (second %) ['action :xt/id (first %)])
    (xt/q db {:find ['e 'rules]
              :where [['e :xt/id (set actions)]
-                     ['e ::pass/rules 'rules]]})))
+                     ['e ::site/rules 'rules]]})))
 
 ;; This is broken out into its own function to assist debugging when
 ;; authorization is denied and we don't know why. A better authorization
@@ -44,21 +43,21 @@
   (assert (or (nil? subject) (string? subject)))
   (assert (or (nil? resource) (string? resource)))
   (let [query {:find '[(pull permission [*]) (pull action [*])]
-               :keys '[juxt.pass/permission juxt.pass/action]
+               :keys '[juxt.site/permission juxt.site/action]
                :where
                '[
-                 [action ::site/type "https://meta.juxt.site/pass/action"]
+                 [action ::site/type "https://meta.juxt.site/site/action"]
 
                  ;; Only consider given actions
                  [(contains? actions action)]
 
                  ;; Only consider a permitted action
-                 [permission ::site/type "https://meta.juxt.site/pass/permission"]
-                 [permission ::pass/action action]
+                 [permission ::site/type "https://meta.juxt.site/site/permission"]
+                 [permission ::site/action action]
                  (allowed? subject resource permission)
 
                  ;; Only permissions that match our purpose
-                 [permission ::pass/purpose purpose]]
+                 [permission ::site/purpose purpose]]
 
                :rules rules
 
@@ -73,9 +72,9 @@
 
 (defn check-permissions
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
-  [db actions {subject ::pass/subject resource ::site/resource purpose ::pass/purpose :as options}]
+  [db actions {subject ::site/subject resource ::site/resource purpose ::site/purpose :as options}]
 
-  (when (= (find options ::pass/subject) [::pass/subject nil])
+  (when (= (find options ::site/subject) [::site/subject nil])
     (throw (ex-info "Nil subject passed!" {})))
 
   ;; TODO: These asserts have been replaced by Malli schema instrumentation
@@ -101,31 +100,31 @@
        :any
        [:set :string]
        [:map
-        [::pass/subject {:optional true}]
+        [::site/subject {:optional true}]
         [::site/resource {:optional true}]
-        [::pass/purpose {:optional true}]]]
+        [::site/purpose {:optional true}]]]
   :any])
 
 (defn allowed-resources
   "Given a set of possible actions, and possibly a subject and purpose, which
   resources are allowed?"
-  [db actions {::pass/keys [subject purpose]}]
+  [db actions {::site/keys [subject purpose]}]
   (let [rules (actions->rules db actions)
         query {:find '[resource]
                :where
                '[
-                 [action ::site/type "https://meta.juxt.site/pass/action"]
+                 [action ::site/type "https://meta.juxt.site/site/action"]
 
                  ;; Only consider given actions
                  [(contains? actions action)]
 
                  ;; Only consider a permitted action
-                 [permission ::site/type "https://meta.juxt.site/pass/permission"]
-                 [permission ::pass/action action]
+                 [permission ::site/type "https://meta.juxt.site/site/permission"]
+                 [permission ::site/action action]
                  (allowed? subject resource permission)
 
                  ;; Only permissions that match our purpose
-                 [permission ::pass/purpose purpose]]
+                 [permission ::site/purpose purpose]]
 
                :rules rules
 
@@ -152,8 +151,8 @@
        [:set {:min 0} :string]
        ;;[:set :string]
        [:map
-        [::pass/subject {:optional true}]
-        [::pass/purpose {:optional true}]]]
+        [::site/subject {:optional true}]
+        [::site/purpose {:optional true}]]]
   :any])
 
 ;; TODO: How is this call protected from unauthorized use? Must call this with
@@ -169,20 +168,20 @@
            :keys '[subject action]
            :where
            '[
-             [action ::site/type "https://meta.juxt.site/pass/action"]
+             [action ::site/type "https://meta.juxt.site/site/action"]
 
              ;; Only consider given actions
              [(contains? actions action)]
 
              ;; Only consider a permitted action
-             [permission ::site/type "https://meta.juxt.site/pass/permission"]
-             [permission ::pass/action action]
+             [permission ::site/type "https://meta.juxt.site/site/permission"]
+             [permission ::site/action action]
              (allowed? subject resource permission)
 
              ;; Only permissions that match our purpose
-             [permission ::pass/purpose purpose]
+             [permission ::site/purpose purpose]
 
-             #_[access-token ::pass/subject subject]]
+             #_[access-token ::site/subject subject]]
 
            :rules rules
 
@@ -193,16 +192,16 @@
 (defn pull-allowed-resource
   "Given a subject, a set of possible actions and a resource, pull the allowed
   attributes."
-  [db actions resource {::pass/keys [subject purpose] :as pass-ctx}]
+  [db actions resource {::site/keys [subject purpose] :as ctx}]
   (let [check-result
         (check-permissions
          db
          actions
-         (assoc pass-ctx ::site/resource resource))
+         (assoc ctx ::site/resource resource))
 
         pull-expr (vec (mapcat
-                        (fn [{::pass/keys [action]}]
-                          (::pass/pull action))
+                        (fn [{::site/keys [action]}]
+                          (::site/pull action))
                         check-result))]
     (xt/pull db pull-expr (:xt/id resource))))
 
@@ -213,36 +212,36 @@
        [:set :string]
        ::site/resource
        [:map
-        [::pass/subject {:optional true}]
-        [::pass/purpose {:optional true}]]]
+        [::site/subject {:optional true}]
+        [::site/purpose {:optional true}]]]
   :any])
 
 (defn pull-allowed-resources
   "Given a subject and a set of possible actions, which resources are allowed, and
   get me the documents. If resources-in-scope is given, only consider resources
   in that set."
-  [db actions {::pass/keys [subject purpose include-rules resources-in-scope]}]
+  [db actions {::site/keys [subject purpose include-rules resources-in-scope]}]
   (let [rules (actions->rules db actions)
         _ (when-not (seq rules)
             (throw (ex-info "No rules found for actions" {:actions actions})))
         results
         (xt/q
          db
-         {:find '[resource (pull action [:xt/id ::pass/pull]) purpose permission]
+         {:find '[resource (pull action [:xt/id ::site/pull]) purpose permission]
           :keys '[resource action purpose permission]
           :where
           (cond-> '[
                     ;; Only consider given actions
-                    [action ::site/type "https://meta.juxt.site/pass/action"]
+                    [action ::site/type "https://meta.juxt.site/site/action"]
                     [(contains? actions action)]
 
                     ;; Only consider allowed permssions
-                    [permission ::site/type "https://meta.juxt.site/pass/permission"]
-                    [permission ::pass/action action]
+                    [permission ::site/type "https://meta.juxt.site/site/permission"]
+                    [permission ::site/action action]
                     (allowed? subject resource permission)
 
                     ;; Only permissions that match our purpose
-                    [permission ::pass/purpose purpose]]
+                    [permission ::site/purpose purpose]]
 
             include-rules
             (conj '(include? subject action resource))
@@ -270,7 +269,7 @@
                     ;; TODO: Purpose and permission are useful metadata, how do
                     ;; we retain in the result? with-meta?
                     resource-group]
-                (xt/pull db (::pass/pull action '[*]) resource)))))))
+                (xt/pull db (::site/pull action '[*]) resource)))))))
 
 (malli/=>
  pull-allowed-resources
@@ -278,8 +277,8 @@
         :any
         [:set :string]
         [:map
-         [::pass/subject {:optional true}]
-         [::pass/purpose {:optional true}]]]
+         [::site/subject {:optional true}]
+         [::site/purpose {:optional true}]]]
    :any])
 
 (defn join-with-pull-allowed-resources
@@ -287,7 +286,7 @@
   given actions and options."
   [db coll join-key actions options]
   (let [idx (->>
-             (assoc options ::pass/resources-in-scope (set (map join-key coll)))
+             (assoc options ::site/resources-in-scope (set (map join-key coll)))
              (pull-allowed-resources db actions)
              (group-by :xt/id))]
     (map #(update % join-key (comp first idx)) coll)))
@@ -306,8 +305,8 @@
    {'write-value-as-string json/write-value-as-string
     'read-value json/read-value}
 
-   'juxt.pass
-   {'decode-id-token juxt.pass.openid-connect/decode-id-token}
+   'juxt.site
+   {'decode-id-token juxt.site.openid-connect/decode-id-token}
 
    'juxt.site.malli
    {'validate (fn [schema value] (malli/validate schema value))
@@ -332,13 +331,13 @@
   "This function is applied within a transaction function. It should be fast, but
   at least doesn't have to worry about the database being stale!"
   [xt-ctx
-   {subject ::pass/subject
-    action ::pass/action
-    access-token ::pass/access-token
+   {subject ::site/subject
+    action ::site/action
+    access-token ::site/access-token
     resource ::site/resource
-    purpose ::pass/purpose
+    purpose ::site/purpose
     base-uri ::site/base-uri
-    prepare ::pass/prepare
+    prepare ::site/prepare
     :as ctx} args]
   (let [db (xt/db xt-ctx)
         tx (xt/indexing-tx xt-ctx)]
@@ -351,7 +350,7 @@
       (let [check-permissions-result
             (check-permissions db #{action} ctx)
 
-            {::pass/keys [scope] :as action-doc} (xt/entity db action)
+            {::site/keys [scope] :as action-doc} (xt/entity db action)
             _ (when-not action-doc
                 (throw
                  (ex-info
@@ -366,14 +365,14 @@
                     {:ring.response/status 403
                      :action action
                      :scope scope})))
-                (when-not (contains? (set (::pass/scope access-token)) scope)
+                (when-not (contains? (set (::site/scope access-token)) scope)
                   (throw
                    (ex-info
                     (format "Access token does not have sufficient scope (%s)" scope)
                     {:ring.response/status 403
                      :access-token access-token
                      :action action
-                     :scope-granted (::pass/scope access-token)
+                     :scope-granted (::site/scope access-token)
                      :scope-required scope}))))]
 
         (when-not (seq check-permissions-result)
@@ -382,7 +381,7 @@
         (let [env (assoc
                    ctx
                    ::site/db db
-                   ::pass/permissions (map ::pass/permission check-permissions-result))
+                   ::site/permissions (map ::site/permission check-permissions-result))
               fx
               (cond
                 ;; Official: sci
@@ -405,13 +404,13 @@
                        ;;'q (fn [& args] (apply xt/q db args))
                        }
 
-                      'juxt.pass
+                      'juxt.site
                       {'match-identity
                        (fn [m]
                          (ffirst
                           (xt/q db {:find ['id]
                                     :where (into
-                                            [['id :juxt.site/type "https://meta.juxt.site/pass/user-identity"]]
+                                            [['id :juxt.site/type "https://meta.juxt.site/site/user-identity"]]
                                             (for [[k v] m] ['id k v] ))})))
 
                        'match-identity-with-password
@@ -419,7 +418,7 @@
                          (ffirst
                           (xt/q db {:find ['id]
                                     :where (into
-                                            [['id :juxt.site/type "https://meta.juxt.site/pass/user-identity"]
+                                            [['id :juxt.site/type "https://meta.juxt.site/site/user-identity"]
                                              ['id password-hash-key 'password-hash]
                                              ['(crypto.password.bcrypt/check password password-hash)]
                                              ]
@@ -431,8 +430,8 @@
                          (let [results (xt/q
                                         db
                                         '{:find [(pull e [*])]
-                                          :where [[e :juxt.site/type "https://meta.juxt.site/pass/application"]
-                                                  [e :juxt.pass/client-id client-id]]
+                                          :where [[e :juxt.site/type "https://meta.juxt.site/site/application"]
+                                                  [e :juxt.site/client-id client-id]]
                                           :in [client-id]} client-id)]
                            (if (= 1 (count results))
                              (ffirst results)
@@ -452,7 +451,7 @@
                          (let [results (xt/q
                                         db
                                         '{:find [(pull e [*])]
-                                          :where [[e :juxt.site/type "https://meta.juxt.site/pass/oauth-scope"]]})]
+                                          :where [[e :juxt.site/type "https://meta.juxt.site/site/oauth-scope"]]})]
 
                            (if (= 1 (count results))
                              (ffirst results)
@@ -507,7 +506,7 @@
                                  (if (= :xtdb.api/put (first effect))
                                    (map? (second effect))
                                    true))
-                    (throw (ex-info "Invalid effect" {::pass/action action :effect effect}))))
+                    (throw (ex-info "Invalid effect" {::site/action action :effect effect}))))
 
               xtdb-ops (filter (fn [[effect]] (= (namespace effect) "xtdb.api")) fx)
 
@@ -532,15 +531,15 @@
                  (cond->
                      {:xt/id (format "%s/_site/events/%s" base-uri (::xt/tx-id tx))
                       ::site/type "https://meta.juxt.site/site/event"
-                      ::pass/subject-uri (:xt/id subject)
-                      ::pass/action action
-                      ::pass/purpose purpose
-                      ::pass/puts (vec
+                      ::site/subject-uri (:xt/id subject)
+                      ::site/action action
+                      ::site/purpose purpose
+                      ::site/puts (vec
                                    (keep
                                     (fn [[tx-op {id :xt/id}]]
                                       (when (= tx-op ::xt/put) id))
                                     xtdb-ops))
-                      ::pass/deletes (vec
+                      ::site/deletes (vec
                                       (keep
                                        (fn [[tx-op {id :xt/id}]]
                                          (when (= tx-op ::xt/delete) id))
@@ -569,10 +568,10 @@
           [[::xt/put
             {:xt/id event-id
              ::site/type "https://meta.juxt.site/site/event"
-             ::pass/subject subject
-             ::pass/action action
+             ::site/subject subject
+             ::site/action action
              ::site/resource resource
-             ::pass/purpose purpose
+             ::site/purpose purpose
              ::site/error {:message (.getMessage e)
                            ;; ex-data is just too problematic to put into the
                            ;; database as-is without some sanitization ensuring
@@ -592,7 +591,7 @@
 (defn install-do-action-fn [uri]
   {:xt/id (str uri "/_site/do-action")
    :xt/fn '(fn [xt-ctx ctx & args]
-             (juxt.pass.actions/do-action-in-tx-fn xt-ctx ctx args))})
+             (juxt.site.actions/do-action-in-tx-fn xt-ctx ctx args))})
 
 ;; Remove anything in the ctx that will upset nippy. However, in the future
 ;; we'll definitely want to record all inputs to actions, so this is an
@@ -634,7 +633,7 @@
            'entity*
            (fn [id] (xt/entity db id))}
 
-          'juxt.pass.util {'make-nonce make-nonce}}
+          'juxt.site.util {'make-nonce make-nonce}}
          (common-sci-namespaces action-doc))
         :classes
         {'java.util.Date java.util.Date
@@ -644,10 +643,8 @@
         (throw (ex-info "Failure during prepare" {:cause-ex-info (ex-data e)} e))))))
 
 (defn do-action
-  [{::site/keys [xt-node db base-uri resource]
-    ;; TODO: Arguably action should passed as a map
-    ::pass/keys [subject action]
-    :as ctx}]
+  [;; TODO: Arguably action should passed as a map
+   {::site/keys [xt-node db base-uri resource subject action] :as ctx}]
   (assert (::site/xt-node ctx) "xt-node must be present")
   (assert (::site/db ctx) "db must be present")
 
@@ -690,7 +687,7 @@
   ;; fails. However, it is a good place to compute any secure random numbers
   ;; which can't be done in the transaction.
 
-  ;; The :juxt.pass/subject can be nil, if this action is being performed
+  ;; The :juxt.site/subject can be nil, if this action is being performed
   ;; by an anonymous user.
   (let [action-doc (xt/entity db action)
         _ (when-not action-doc
@@ -698,7 +695,7 @@
         prepare (do-prepare ctx action-doc)
         tx-fn (str base-uri "/_site/do-action")
         _ (assert (xt/entity db tx-fn) (format "do-action must exist in database: %s" tx-fn))
-        tx-ctx (cond-> (sanitize-ctx ctx) prepare (assoc ::pass/prepare prepare))
+        tx-ctx (cond-> (sanitize-ctx ctx) prepare (assoc ::site/prepare prepare))
         tx (xt/submit-tx xt-node [[::xt/fn tx-fn tx-ctx]])
         {::xt/keys [tx-id] :as tx} (xt/await-tx xt-node tx)
         ctx (assoc ctx ::site/db (xt/db xt-node tx))]
@@ -708,7 +705,7 @@
        (ex-info
         (format "Transaction failed to be committed for action %s" action)
         {::xt/tx-id tx-id
-         ::pass/action action
+         ::site/action action
          ::site/request-context ctx})))
 
     (let [result
@@ -734,7 +731,7 @@
                 (:ex-data error)))))))
 
         (cond-> ctx
-          result (assoc ::pass/action-result result)
+          result (assoc ::site/action-result result)
 
           (seq (:juxt.site/response-fx result))
           (apply-response-fx (:juxt.site/response-fx result))
@@ -749,15 +746,14 @@
 ;; For a fuller discussion on determinism and its benefits, see
 ;; https://www.cs.umd.edu/~abadi/papers/abadi-cacm2018.pdf
 (defn wrap-authorize-with-actions [h]
-  (fn [{::pass/keys [subject]
-        ::site/keys [db resource uri]
+  (fn [{::site/keys [db resource uri subject]
         :ring.request/keys [method]
         :as req}]
 
     (assert (or (nil? subject) (map? subject)))
     (assert (or (nil? resource) (map? resource)))
 
-    (let [actions (get-in resource [::site/methods method ::pass/actions])
+    (let [actions (get-in resource [::site/methods method ::site/actions])
 
           _ (doseq [action actions]
               (when-not (xt/entity db action)
@@ -773,14 +769,14 @@
              ;; When the resource is in the database, we can add it to the
              ;; permission checking in case there's a specific permission for
              ;; this resource.
-             subject (assoc ::pass/subject subject)
+             subject (assoc ::site/subject subject)
              resource (assoc ::site/resource resource)))]
 
       #_(log/debugf "Permitted actions: %s" (pr-str permitted-actions))
       (log/tracef "Subject is %s" (pr-str subject))
 
       (if (seq permitted-actions)
-        (h (assoc req ::pass/permitted-actions permitted-actions))
+        (h (assoc req ::site/permitted-actions permitted-actions))
 
         (if subject
           (throw
@@ -790,7 +786,7 @@
              ::site/request-context req}))
 
           ;; No subject?
-          (if-let [protection-spaces (::pass/protection-space resource)]
+          (if-let [protection-spaces (::site/protection-space resource)]
             ;; We are in a protection space, so this is HTTP Authentication (401
             ;; + WWW-Authenticate header)
             (throw
@@ -815,8 +811,8 @@
             ;; respond with a redirect to a page that will establish (immediately
             ;; or eventually), the cookie.
 
-            (if-let [session-scope (::pass/session-scope req)]
-              (let [login-uri (:juxt.pass/login-uri session-scope)
+            (if-let [session-scope (::site/session-scope req)]
+              (let [login-uri (:juxt.site/login-uri session-scope)
                     redirect (str login-uri "?return-to=" (codec/url-encode uri))]
                 ;; If we are in a session-scope that contains a login-uri, let's redirect to that
                 (throw

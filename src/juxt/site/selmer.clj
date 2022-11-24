@@ -8,8 +8,7 @@
    selmer.filters
    selmer.tags
    [juxt.site :as-alias site]
-   [juxt.http :as-alias http]
-   [juxt.pass :as-alias pass]))
+   [juxt.http :as-alias http]))
 
 (selmer/cache-off!)
 

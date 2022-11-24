@@ -7,7 +7,6 @@
    [juxt.site.util :as util]
    [xtdb.api :as xt]
    [juxt.http :as-alias http]
-   [juxt.pass :as-alias pass]
    [juxt.site :as-alias site]))
 
 (defn put-static-resource
@@ -33,7 +32,7 @@
                    pattern (assoc ::site/pattern pattern)
                    type (assoc ::site/type type)
                    variant-of (assoc ::site/variant-of variant-of)
-                   classification (assoc ::pass/classification classification)
+                   classification (assoc ::site/classification classification)
                    template-dialect (assoc ::site/template-dialect (str/lower-case template-dialect)))
                  received-representation)]
 

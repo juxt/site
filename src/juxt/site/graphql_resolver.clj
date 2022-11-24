@@ -11,7 +11,6 @@
    [juxt.site.repl :as repl]
    [ring.util.codec :refer [form-decode]]
    [xtdb.api :as xt]
-   [juxt.pass :as-alias pass]
    [juxt.site :as-alias site]
    [juxt.grab :as-alias grab]
    ))
@@ -19,10 +18,10 @@
 (defn config []
   (main/config))
 
-(defn subject [{::pass/keys [subject] :keys [db]}]
-  (let [user (xt/entity db (::pass/user subject))]
+(defn subject [{::site/keys [subject] :keys [db]}]
+  (let [user (xt/entity db (::site/user subject))]
     {"user" user
-     "authScheme" (::pass/auth-scheme subject)}))
+     "authScheme" (::site/auth-scheme subject)}))
 
 (defn query-string [args]
   (some-> args :juxt.site/request-context :ring.request/query))

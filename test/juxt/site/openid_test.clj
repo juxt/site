@@ -1,14 +1,13 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.openid-test
+(ns juxt.site.openid-test
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is are testing]]
    [java-http-clj.core :as hc]
-   [juxt.pass :as-alias pass]
-   [juxt.pass.resources.openid :as openid]
-   [juxt.pass.resources.session-scope :as session-scope]
+   [juxt.site.resources.openid :as openid]
+   [juxt.site.resources.session-scope :as session-scope]
    [juxt.site :as-alias site]
    [juxt.site.init :as init]
    [juxt.site.repl :as repl]
@@ -57,10 +56,10 @@
                   "https://example.org/subjects/system"
                   "https://example.org/actions/put-session-scope"
                   {:xt/id ~id
-                   :juxt.pass/cookie-name "sid"
-                   :juxt.pass/cookie-domain "https://example.org"
-                   :juxt.pass/cookie-path "/"
-                   :juxt.pass/login-uri "https://example.org/openid/login"}))))}
+                   :juxt.site/cookie-name "sid"
+                   :juxt.site/cookie-domain "https://example.org"
+                   :juxt.site/cookie-path "/"
+                   :juxt.site/login-uri "https://example.org/openid/login"}))))}
 
    "https://example.org/openid/login"
    ;;(load-resource-installer "resources/openid/login.edn") TODO
@@ -74,8 +73,8 @@
               (openid/install-openid-login-endpoint!
                (init/substitute-actual-base-uri
                 {:xt/id id
-                 :juxt.pass/session-scope "https://example.org/session-scopes/openid"
-                 :juxt.pass/openid-client "https://example.org/openid/auth0/client"})))}
+                 :juxt.site/session-scope "https://example.org/session-scopes/openid"
+                 :juxt.site/openid-client "https://example.org/openid/auth0/client"})))}
 
    "https://example.org/openid/callback"
    {:deps #{::init/system
@@ -87,7 +86,7 @@
               (openid/install-openid-callback-endpoint!
                (init/substitute-actual-base-uri
                 {:xt/id id
-                 :juxt.pass/openid-client "https://example.org/openid/auth0/client"})))}})
+                 :juxt.site/openid-client "https://example.org/openid/auth0/client"})))}})
 
 ;; The below tests the live openid endpoint (Auth0). TODO: Instead we should
 ;; mock out the http-client aspects and return contrived respones - we can do
@@ -117,14 +116,14 @@
           db (xt/db *xt-node*)
 
           session (first
-                   (for [id (repl/ls-type "https://meta.juxt.site/pass/session")]
+                   (for [id (repl/ls-type "https://meta.juxt.site/site/session")]
                      (xt/entity db id)))
 
           session-token (first
-                         (for [id (repl/ls-type "https://meta.juxt.site/pass/session-token")]
+                         (for [id (repl/ls-type "https://meta.juxt.site/site/session-token")]
                            (xt/entity db id)))
 
-          state (:juxt.pass/state session)
+          state (:juxt.site/state session)
 
           _ (assert (= 303 (:ring.response/status login-response)))
 
@@ -133,7 +132,7 @@
                                  {:method :get
                                   :uri location})
 
-          cookie-header-value (format "sid=%s" (:juxt.pass/session-token session-token))
+          cookie-header-value (format "sid=%s" (:juxt.site/session-token session-token))
 
           callback-request
           {:ring.request/method :get
@@ -183,11 +182,11 @@
            :resources (repl/ls)
            :session-tokens
            (vec
-            (for [id (repl/ls-type "https://meta.juxt.site/pass/session-token")]
+            (for [id (repl/ls-type "https://meta.juxt.site/site/session-token")]
               (xt/entity db id)))
            :sessions
            (vec
-            (for [id (repl/ls-type "https://meta.juxt.site/pass/session")]
+            (for [id (repl/ls-type "https://meta.juxt.site/site/session")]
               (xt/entity db id)))})
 
 
@@ -207,8 +206,8 @@
         (do-prepare
          {::site/xt-node xt-node
           ::site/db db
-          ::pass/subject (xt/entity db "https://site.test/subjects/system")
-          ::pass/action "https://site.test/actions/openid/exchange-code-for-id-token"
+          ::site/subject (xt/entity db "https://site.test/subjects/system")
+          ::site/action "https://site.test/actions/openid/exchange-code-for-id-token"
           ::site/base-uri (init/base-uri)
           :ring.request/query "code=RyMRjiijG_zjlhKdFiLOHNkcsn1i1gDMRPQNGtteQ5Fx9&state=9e7d5227c7c818bc"}
          action-doc

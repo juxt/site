@@ -1,8 +1,8 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.resources.form-based-auth
+(ns juxt.site.resources.form-based-auth
   (:require
-   [juxt.pass.session-scope :as session-scope]
+   [juxt.site.session-scope :as session-scope]
    [clojure.java.io :as io]
    [clojure.edn :as edn]
    [juxt.site.init :as init :refer [substitute-actual-base-uri]]
@@ -26,7 +26,7 @@
        :juxt.site.malli/input-schema
        [:map
         [:xt/id [:re "https://example.org/.*"]]
-        [:juxt.pass/session-scope [:re "https://example.org/.*"]]]
+        [:juxt.site/session-scope [:re "https://example.org/.*"]]]
 
        :juxt.site/prepare
        {:juxt.site.sci/program
@@ -46,10 +46,10 @@
                juxt.site.malli/validate-input
                (assoc
                 :juxt.site/methods
-                {:get {:juxt.pass/actions #{"https://example.org/actions/get-public-resource"}}
-                 :head {:juxt.pass/actions #{"https://example.org/actions/get-public-resource"}}
-                 :post {:juxt.pass/actions #{"https://example.org/actions/login"}}
-                 :options {:juxt.pass/actions #{"https://example.org/actions/get-options"}}}
+                {:get {:juxt.site/actions #{"https://example.org/actions/get-public-resource"}}
+                 :head {:juxt.site/actions #{"https://example.org/actions/get-public-resource"}}
+                 :post {:juxt.site/actions #{"https://example.org/actions/login"}}
+                 :options {:juxt.site/actions #{"https://example.org/actions/get-options"}}}
 
                 :juxt.http/content-type "text/html;charset=utf-8"
                 :juxt.http/content "
@@ -78,7 +78,7 @@ Password: <input name=password type=password>
         (pr-str
          '[[:xtdb.api/put *prepare*]])}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
           [permission :xt/id]]]})))))
@@ -92,9 +92,9 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/create-login-resource"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/create-login-resource"
-       :juxt.pass/purpose nil
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/create-login-resource"
+       :juxt.site/purpose nil
        })
      ;; end::grant-permission-to-create-login-resource![]
      ))))
@@ -107,7 +107,7 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/create-login-resource"
       {:xt/id "https://example.org/login"
-       :juxt.pass/session-scope "https://example.org/session-scopes/default"})))))
+       :juxt.site/session-scope "https://example.org/session-scopes/default"})))))
 
 (defn create-action-login! [_]
   (eval
@@ -117,7 +117,7 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/create-action"
       {:xt/id "https://example.org/actions/login"
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
           [permission :xt/id]]]
@@ -139,9 +139,9 @@ Password: <input name=password type=password>
             (case content-type
               "application/x-www-form-urlencoded"
               {:form (-> body (String.) ring.util.codec/form-decode juxt.site.malli/validate-input)
-               :subject-id (juxt.pass.util/make-nonce 10)
-               :session-id (juxt.pass.util/make-nonce 16)
-               :session-token (juxt.pass.util/make-nonce 16)})))}
+               :subject-id (juxt.site.util/make-nonce 10)
+               :session-id (juxt.site.util/make-nonce 16)
+               :session-token (juxt.site.util/make-nonce 16)})))}
 
        ;;:juxt.site/transact juxt.book.login/login-quotation
        :juxt.site/transact
@@ -149,24 +149,24 @@ Password: <input name=password type=password>
         :juxt.site.sci/program
         (pr-str
          '(let [user-identity
-                (juxt.pass/match-identity-with-password
-                 {:juxt.site/type "https://meta.juxt.site/pass/basic-user-identity"
-                  :juxt.pass/username (clojure.string/lower-case (get-in *prepare* [:form "username"]))}
+                (juxt.site/match-identity-with-password
+                 {:juxt.site/type "https://meta.juxt.site/site/basic-user-identity"
+                  :juxt.site/username (clojure.string/lower-case (get-in *prepare* [:form "username"]))}
                  (get-in *prepare* [:form "password"])
-                 :juxt.pass/password-hash)
+                 :juxt.site/password-hash)
 
                 subject
                 (when user-identity
                   {:xt/id (str "https://example.org/subjects/" (get *prepare* :subject-id))
-                   :juxt.site/type "https://meta.juxt.site/pass/subject"
-                   :juxt.pass/user-identity user-identity})
+                   :juxt.site/type "https://meta.juxt.site/site/subject"
+                   :juxt.site/user-identity user-identity})
 
                 _ (assert subject)
 
                 session-id (:session-id *prepare*)
                 _ (assert session-id)
 
-                session-scope-id (:juxt.pass/session-scope *resource*)
+                session-scope-id (:juxt.site/session-scope *resource*)
 
                 session-scope (xt/entity session-scope-id)
 
@@ -176,9 +176,9 @@ Password: <input name=password type=password>
                 session
                 (when subject
                   {:xt/id (str "https://example.org/sessions/" session-id)
-                   :juxt.site/type "https://meta.juxt.site/pass/session"
-                   :juxt.pass/subject (:xt/id subject)
-                   :juxt.pass/session-scope session-scope-id})
+                   :juxt.site/type "https://meta.juxt.site/site/session"
+                   :juxt.site/subject (:xt/id subject)
+                   :juxt.site/session-scope session-scope-id})
 
                 session-token (:session-token *prepare*)
                 _ (assert session-token)
@@ -186,12 +186,12 @@ Password: <input name=password type=password>
                 session-token-doc
                 (when session
                   {:xt/id (str "https://example.org/session-tokens/" session-token)
-                   :juxt.site/type "https://meta.juxt.site/pass/session-token"
-                   :juxt.pass/session-token session-token
-                   :juxt.pass/session (:xt/id session)})
+                   :juxt.site/type "https://meta.juxt.site/site/session-token"
+                   :juxt.site/session-token session-token
+                   :juxt.site/session (:xt/id session)})
 
-                cookie-name (:juxt.pass/cookie-name session-scope)
-                cookie-path (or (:juxt.pass/cookie-path session-scope) "/")]
+                cookie-name (:juxt.site/cookie-name session-scope)
+                cookie-path (or (:juxt.site/cookie-path session-scope) "/")]
 
             (cond-> []
               subject (conj [:xtdb.api/put subject])
@@ -220,8 +220,8 @@ Password: <input name=password type=password>
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/login"
-       :juxt.pass/action "https://example.org/actions/login"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/action "https://example.org/actions/login"
+       :juxt.site/purpose nil})))))
 
 (def dependency-graph
   {"https://example.org/actions/login"
@@ -276,4 +276,4 @@ Password: <input name=password type=password>
         "Login failed"
         {:args args
          :response response})))
-    {:juxt.pass/session-token id}))
+    {:juxt.site/session-token id}))

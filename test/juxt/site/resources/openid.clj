@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.resources.openid
+(ns juxt.site.resources.openid
   (:require
    [clojure.string :as str]
    [clojure.edn :as edn]
@@ -19,11 +19,11 @@
        :juxt.site.malli/input-schema
        [:map
         [:xt/id [:re "https://example.org/.*"]]
-        [:juxt.pass/user [:re "https://example.org/users/.+"]]
+        [:juxt.site/user [:re "https://example.org/users/.+"]]
 
-        [:juxt.pass.jwt.claims/iss [:re "https://.+"]]
-        [:juxt.pass.jwt.claims/sub {:optional true} [:string {:min 1}]]
-        [:juxt.pass.jwt.claims/nickname {:optional true} [:string {:min 1}]]]
+        [:juxt.site.jwt.claims/iss [:re "https://.+"]]
+        [:juxt.site.jwt.claims/sub {:optional true} [:string {:min 1}]]
+        [:juxt.site.jwt.claims/nickname {:optional true} [:string {:min 1}]]]
 
        :juxt.site/prepare
        {:juxt.site.sci/program
@@ -31,11 +31,11 @@
          '(do
             (juxt.site.malli/validate-input)
             (-> *input*
-                (assoc :juxt.site/type #{"https://meta.juxt.site/pass/user-identity"
-                                               "https://meta.juxt.site/pass/openid-user-identity"}
+                (assoc :juxt.site/type #{"https://meta.juxt.site/site/user-identity"
+                                               "https://meta.juxt.site/site/openid-user-identity"}
                        :juxt.site/methods
-                       {:get {:juxt.pass/actions #{"https://example.org/actions/get-user-identity"}}
-                        :head {:juxt.pass/actions #{"https://example.org/actions/get-user-identity"}}
+                       {:get {:juxt.site/actions #{"https://example.org/actions/get-user-identity"}}
+                        :head {:juxt.site/actions #{"https://example.org/actions/get-user-identity"}}
                         :options {}}))))}
 
        :juxt.site/transact
@@ -43,14 +43,14 @@
         (pr-str
          '[[:xtdb.api/put *prepare*]])}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass/subject subject]]
+          [permission :juxt.site/subject subject]]
 
          [(allowed? subject resource permission)
-          [subject :juxt.pass/user-identity id]
-          [id :juxt.pass/user user]
+          [subject :juxt.site/user-identity id]
+          [id :juxt.site/user user]
           [user :role role]
           [permission :role role]]]})))))
 
@@ -62,9 +62,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/put-openid-user-identity"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/put-openid-user-identity"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/put-openid-user-identity"
+       :juxt.site/purpose nil})))))
 
 (defn create-action-install-openid-issuer! [_]
   (eval
@@ -78,7 +78,7 @@
        :juxt.site.malli/input-schema
        [:map
         [:xt/id [:re "https://example.org/.*"]]
-        [:juxt.pass/issuer [:re "https://.*"]]]
+        [:juxt.site/issuer [:re "https://.*"]]]
 
        :juxt.site/prepare
        {:juxt.site.sci/program
@@ -92,7 +92,7 @@
                   ;; removed before appending /.well-known/openid-configuration."
                   ;;
                   ;; This uses a reluctant regex qualifier.
-                  (str (second (re-matches #"(.*?)/?" (:juxt.pass/issuer *input*))) "/.well-known/openid-configuration")
+                  (str (second (re-matches #"(.*?)/?" (:juxt.site/issuer *input*))) "/.well-known/openid-configuration")
 
                   _ (logf "Config uri %s" config-uri)
 
@@ -108,23 +108,23 @@
 
                   config (jsonista.core/read-value (:body config-response))]
               {:xt/id (:xt/id *input*)
-               :juxt.pass/issuer (:juxt.pass/issuer *input*)
-               :juxt.pass/openid-configuration config})))}
+               :juxt.site/issuer (:juxt.site/issuer *input*)
+               :juxt.site/openid-configuration config})))}
 
        :juxt.site/transact
        {:juxt.site.sci/program
         (pr-str
          '[[:xtdb.api/put *prepare*]])}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass/subject subject]]
+          [permission :juxt.site/subject subject]]
 
          [(allowed? subject resource permission)
-          [subject :juxt.pass/user-identity id]
-          [id :juxt.pass/user user]
-          [permission :juxt.pass/user user]]]})))))
+          [subject :juxt.site/user-identity id]
+          [id :juxt.site/user user]
+          [permission :juxt.site/user user]]]})))))
 
 (defn create-action-install-openid-client! [_]
   (eval
@@ -138,10 +138,10 @@
        :juxt.site.malli/input-schema
         [:map
          [:xt/id [:re "https://example.org/.*"]]
-         [:juxt.pass/issuer-configuration [:re "https://example.org/.*"]]
-         [:juxt.pass/client-id [:string {:min 12}]]
-         [:juxt.pass/client-secret [:string {:min 20}]]
-         [:juxt.pass/redirect-uri [:re "https://example.org/.*"]]]
+         [:juxt.site/issuer-configuration [:re "https://example.org/.*"]]
+         [:juxt.site/client-id [:string {:min 12}]]
+         [:juxt.site/client-secret [:string {:min 20}]]
+         [:juxt.site/redirect-uri [:re "https://example.org/.*"]]]
 
        :juxt.site/prepare
        {:juxt.site.sci/program
@@ -155,15 +155,15 @@
         :juxt.site.sci/program
         (pr-str '[[:xtdb.api/put *prepare*]])}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass/subject subject]]
+          [permission :juxt.site/subject subject]]
 
          [(allowed? subject resource permission)
-          [subject :juxt.pass/user-identity id]
-          [id :juxt.pass/user user]
-          [permission :juxt.pass/user user]]]})))))
+          [subject :juxt.site/user-identity id]
+          [id :juxt.site/user user]
+          [permission :juxt.site/user user]]]})))))
 
 (defn create-action-install-openid-login-endpoint! [_]
   (eval
@@ -177,8 +177,8 @@
        :juxt.site.malli/input-schema
         [:map
          [:xt/id [:re "https://example.org/.*"]]
-         [:juxt.pass/session-scope [:re "https://example.org/.*"]]
-         [:juxt.pass/openid-client-configuration [:re "https://example.org/.*"]]]
+         [:juxt.site/session-scope [:re "https://example.org/.*"]]
+         [:juxt.site/openid-client-configuration [:re "https://example.org/.*"]]]
 
        :juxt.site/transact
        {
@@ -191,19 +191,19 @@
                *input*
                :juxt.site/methods
                {:get
-                {:juxt.pass/actions #{"https://example.org/actions/login-with-openid"}}}
+                {:juxt.site/actions #{"https://example.org/actions/login-with-openid"}}}
                :juxt.http/content-type "text/html;charset=utf-8"
                :juxt.http/content "<p>This should redirect</p>")]]))}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass/subject subject]]
+          [permission :juxt.site/subject subject]]
 
          [(allowed? subject resource permission)
-          [subject :juxt.pass/user-identity id]
-          [id :juxt.pass/user user]
-          [permission :juxt.pass/user user]]]})))))
+          [subject :juxt.site/user-identity id]
+          [id :juxt.site/user user]
+          [permission :juxt.site/user user]]]})))))
 
 (defn create-action-install-openid-callback-endpoint! [_]
   (eval
@@ -217,7 +217,7 @@
        :juxt.site.malli/input-schema
         [:map
          [:xt/id [:re "https://example.org/.*"]]
-         [:juxt.pass/openid-client-configuration [:re "https://example.org/.*"]]]
+         [:juxt.site/openid-client-configuration [:re "https://example.org/.*"]]]
 
        :juxt.site/transact
        {
@@ -230,19 +230,19 @@
                *input*
                :juxt.site/methods
                {:get
-                {:juxt.pass/actions #{"https://example.org/actions/openid/exchange-code-for-id-token"}}}
+                {:juxt.site/actions #{"https://example.org/actions/openid/exchange-code-for-id-token"}}}
                :juxt.http/content-type "text/html;charset=utf-8"
                :juxt.http/content "<p>This should redirect</p>")]]))}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass/subject subject]]
+          [permission :juxt.site/subject subject]]
 
          [(allowed? subject resource permission)
-          [subject :juxt.pass/user-identity id]
-          [id :juxt.pass/user user]
-          [permission :juxt.pass/user user]]]})))))
+          [subject :juxt.site/user-identity id]
+          [id :juxt.site/user user]
+          [permission :juxt.site/user user]]]})))))
 
 (defn create-action-login-with-openid! [_]
   (eval
@@ -256,19 +256,19 @@
        :juxt.site/prepare
        {:juxt.site.sci/program
         (pr-str
-         '{:state (juxt.pass.util/make-nonce 8)
-           :nonce (juxt.pass.util/make-nonce 12)
-           :session-id (str "https://example.org/sessions/" (juxt.pass.util/make-nonce 16))
-           :session-token (juxt.pass.util/make-nonce 16)})}
+         '{:state (juxt.site.util/make-nonce 8)
+           :nonce (juxt.site.util/make-nonce 12)
+           :session-id (str "https://example.org/sessions/" (juxt.site.util/make-nonce 16))
+           :session-token (juxt.site.util/make-nonce 16)})}
 
        :juxt.site/transact
        {:juxt.site.sci/program
         (pr-str
-         '(let [openid-client-configuration-id (:juxt.pass/openid-client-configuration *resource*)
+         '(let [openid-client-configuration-id (:juxt.site/openid-client-configuration *resource*)
                 _ (when-not openid-client-configuration-id
                     (throw
                      (ex-info
-                      "No :juxt.pass/openid-client-configuration on resource"
+                      "No :juxt.site/openid-client-configuration on resource"
                       {:resource *resource*})))
 
                 openid-client-configuration (xt/entity openid-client-configuration-id)
@@ -278,11 +278,11 @@
                       "No openid-client-configuration doc in database"
                       {:openid-client-configuration openid-client-configuration-id})))
 
-                issuer-config (:juxt.pass/issuer-configuration openid-client-configuration)
+                issuer-config (:juxt.site/issuer-configuration openid-client-configuration)
                 _ (when-not issuer-config
                     (throw
                      (ex-info
-                      "No :juxt.pass/issuer-configuration on client doc"
+                      "No :juxt.site/issuer-configuration on client doc"
                       {:openid-client-configuration openid-client-configuration})))
 
                 issuer-config-doc (xt/entity issuer-config)
@@ -292,11 +292,11 @@
                       (format "OpenID configuration document could not be found in database for issuer: %s" issuer-config)
                       {:issuer-config issuer-config})))
 
-                configuration (:juxt.pass/openid-configuration issuer-config-doc)
+                configuration (:juxt.site/openid-configuration issuer-config-doc)
                 _ (when-not configuration
                     (throw
                      (ex-info
-                      "OpenID configuration document does not have a :juxt.pass/openid-configuration entry"
+                      "OpenID configuration document does not have a :juxt.site/openid-configuration entry"
                       {:issuer-config-document issuer-config-doc})))
 
                 authorization-endpoint (get configuration "authorization_endpoint")
@@ -323,10 +323,10 @@
 
                 session
                 (cond-> {:xt/id session-id
-                         :juxt.site/type "https://meta.juxt.site/pass/session"
-                         :juxt.pass/state state
-                         :juxt.pass/nonce nonce}
-                  return-to (assoc :juxt.pass/return-to return-to))
+                         :juxt.site/type "https://meta.juxt.site/site/session"
+                         :juxt.site/state state
+                         :juxt.site/nonce nonce}
+                  return-to (assoc :juxt.site/return-to return-to))
 
                 session-token (:session-token *prepare*)
                 _ (when-not session-token
@@ -336,17 +336,17 @@
 
                 session-token-doc
                 {:xt/id session-token-id
-                 :juxt.site/type "https://meta.juxt.site/pass/session-token"
-                 :juxt.pass/session-token session-token
-                 :juxt.pass/session (:xt/id session)}
+                 :juxt.site/type "https://meta.juxt.site/site/session-token"
+                 :juxt.site/session-token session-token
+                 :juxt.site/session (:xt/id session)}
 
-                client-id (:juxt.pass/client-id openid-client-configuration)
+                client-id (:juxt.site/client-id openid-client-configuration)
 
-                redirect-uri (:juxt.pass/redirect-uri openid-client-configuration)
+                redirect-uri (:juxt.site/redirect-uri openid-client-configuration)
                 _ (when-not redirect-uri
                     (throw
                      (ex-info
-                      "Login resource should be configured with a :juxt.pass/redirect-uri entry containing the URI of the callback resource."
+                      "Login resource should be configured with a :juxt.site/redirect-uri entry containing the URI of the callback resource."
                       {:resource *resource*})))
 
                 query-string
@@ -361,10 +361,10 @@
 
                 location (str authorization-endpoint "?" query-string)
 
-                session-scope (:juxt.pass/session-scope *resource*)
+                session-scope (:juxt.site/session-scope *resource*)
                 _ (when-not session-scope
                     (throw
-                     (ex-info "No :juxt.pass/session-scope on resource"
+                     (ex-info "No :juxt.site/session-scope on resource"
                               {:resource *resource*})))
 
                 session-scope-doc (xt/entity session-scope)
@@ -372,16 +372,16 @@
                     (throw
                      (ex-info
                       "No session-scope entity in database"
-                      {:juxt.pass/session-scope session-scope})))
+                      {:juxt.site/session-scope session-scope})))
 
-                cookie-name (:juxt.pass/cookie-name session-scope-doc)
+                cookie-name (:juxt.site/cookie-name session-scope-doc)
                 _ (when-not cookie-name
                     (throw
                      (ex-info
-                      "No :juxt.pass/cookie-name found in session-scope"
-                      {:juxt.pass/session-scope session-scope-doc})))
+                      "No :juxt.site/cookie-name found in session-scope"
+                      {:juxt.site/session-scope session-scope-doc})))
 
-                cookie-path (or (:juxt.pass/cookie-path session-scope-doc) "/")]
+                cookie-path (or (:juxt.site/cookie-path session-scope-doc) "/")]
 
             ;; Pretty much all of this can be computed in the prepare phase,
             ;; unless we decide to honor an existing session.
@@ -397,7 +397,7 @@
                        session-token
                        cookie-path)}]]))}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
           [permission :xt/id]]]
@@ -434,11 +434,11 @@
                     (throw
                      (ex-info "No code in query params" {})))
 
-                openid-client-configuration-id (:juxt.pass/openid-client-configuration *resource*)
+                openid-client-configuration-id (:juxt.site/openid-client-configuration *resource*)
                 _ (when-not openid-client-configuration-id
                     (throw
                      (ex-info
-                      "Resource does not have a non-nil :juxt.pass/openid-client entry"
+                      "Resource does not have a non-nil :juxt.site/openid-client entry"
                       {:resource *resource*})))
 
                 ;; The use of the asterisk as a suffix is meant to indicate that
@@ -447,7 +447,7 @@
                 ;; request and this cannot be done in a transaction
                 ;; function. The returned ID_TOKEN will be checked and verified
                 ;; in the transaction function.
-                {:juxt.pass/keys [client-id client-secret redirect-uri]
+                {:juxt.site/keys [client-id client-secret redirect-uri]
                  :as openid-client-configuration*}
                 (xt/entity* openid-client-configuration-id)
                 _ (when-not openid-client-configuration*
@@ -456,7 +456,7 @@
                       "OpenID client document not found in database"
                       {:openid-client-configuration-id openid-client-configuration-id})))
 
-                issuer-config-id* (:juxt.pass/issuer-configuration openid-client-configuration*)
+                issuer-config-id* (:juxt.site/issuer-configuration openid-client-configuration*)
                 _ (when-not issuer-config-id*
                     (throw (ex-info "No issuer config in client" {})))
 
@@ -465,7 +465,7 @@
                     (throw (ex-info "Issuer configuation document not found in database"
                                     {:issuer-config-id issuer-config-id*})))
 
-                openid-configuration* (:juxt.pass/openid-configuration issuer-configuration*)
+                openid-configuration* (:juxt.site/openid-configuration issuer-configuration*)
                 _ (when-not openid-configuration*
                     (throw
                      (ex-info
@@ -476,7 +476,7 @@
                 _ (when-not token-endpoint*
                     (throw (ex-info "No token_endpoint found in configuration" {})))
 
-                ;; TODO: Promote this, e.g. (juxt.pass/get-token {:uri token-endpoint :grant-type "authorization_code" ...}) => id-token
+                ;; TODO: Promote this, e.g. (juxt.site/get-token {:uri token-endpoint :grant-type "authorization_code" ...}) => id-token
                 token-response
                 (java-http-clj.core/send
                  {:method :post
@@ -502,7 +502,7 @@
                 ;; The subject-id will be randomized, so we can't generate this
                 ;; in the transaction function (since different nodes would
                 ;; almost certainly generate different values!)
-                subject-id (juxt.pass.util/make-nonce 10)]
+                subject-id (juxt.site.util/make-nonce 10)]
 
             ;; We send the issuer and the encoded-id-token. Although the client
             ;; configuration may still change prior to this transaction reaching
@@ -512,11 +512,11 @@
             ;; reacquired from the new issuer). Note that while this might
             ;; appear to be an unreasonable about of caution to preserve strict
             ;; serializability of data.
-            {:issuer (:juxt.pass/issuer issuer-configuration*)
+            {:issuer (:juxt.site/issuer issuer-configuration*)
              :encoded-id-token encoded-id-token
              :received-state received-state
              :subject-id subject-id
-             :new-session-token (juxt.pass.util/make-nonce 16)}))}
+             :new-session-token (juxt.site.util/make-nonce 16)}))}
 
        :juxt.site/transact
        {:juxt.site.sci/program
@@ -529,28 +529,28 @@
                  new-session-token :new-session-token}
                 *prepare*
 
-                openid-client-configuration-id (:juxt.pass/openid-client-configuration *resource*)
+                openid-client-configuration-id (:juxt.site/openid-client-configuration *resource*)
                 openid-client-configuration (xt/entity openid-client-configuration-id)
-                client-id (:juxt.pass/client-id openid-client-configuration)
-                issuer-config-id (:juxt.pass/issuer-configuration openid-client-configuration)
+                client-id (:juxt.site/client-id openid-client-configuration)
+                issuer-config-id (:juxt.site/issuer-configuration openid-client-configuration)
                 issuer-configuration (xt/entity issuer-config-id)
-                openid-configuration (:juxt.pass/openid-configuration issuer-configuration)
+                openid-configuration (:juxt.site/openid-configuration issuer-configuration)
 
                 id-token
-                (juxt.pass/decode-id-token
+                (juxt.site/decode-id-token
                  {:id-token encoded-id-token
-                  :jwks (:juxt.pass/jwks issuer-configuration)
+                  :jwks (:juxt.site/jwks issuer-configuration)
                   :openid-configuration openid-configuration
                   :client-id client-id})
 
                 ;; Arguably do the nonce check below in the validation of the
                 ;; ID_TOKEN.  Pass in the session if necessary.
 
-                session (:juxt.pass/session *ctx*)
+                session (:juxt.site/session *ctx*)
                 _ (when-not session
                     (throw (ex-info "No session in request context" {})))
 
-                expected-state (:juxt.pass/state session)
+                expected-state (:juxt.site/state session)
                 _ (when-not expected-state
                     (throw (ex-info "No state stored in session" {})))
 
@@ -563,7 +563,7 @@
                       {:received-state received-state
                        :expected-state expected-state})))
 
-                session-nonce (:juxt.pass/nonce session)
+                session-nonce (:juxt.site/nonce session)
                 _ (when-not session-nonce
                     (throw (ex-info "Expected to find nonce in session" {:session session})))
 
@@ -592,15 +592,15 @@
                            :let [v (get claims c)]
                            :when v]
                        ;; See https://www.rfc-editor.org/rfc/rfc7519#section-4
-                       [(keyword "juxt.pass.jwt.claims" (clojure.string/replace c "_" "-")) v])
+                       [(keyword "juxt.site.jwt.claims" (clojure.string/replace c "_" "-")) v])
                      (into {}))))
 
                 claims (extract-standard-claims (:claims id-token))
 
                 user-identity
-                (juxt.pass/match-identity
-                 {:juxt.pass.jwt.claims/iss (get claims :juxt.pass.jwt.claims/iss)
-                  :juxt.pass.jwt.claims/nickname (get claims :juxt.pass.jwt.claims/nickname)})
+                (juxt.site/match-identity
+                 {:juxt.site.jwt.claims/iss (get claims :juxt.site.jwt.claims/iss)
+                  :juxt.site.jwt.claims/nickname (get claims :juxt.site.jwt.claims/nickname)})
 
                 issued-date (get-in id-token [:claims "iat"])
                 expiry-date (get-in id-token [:claims "exp"]) ;;(java.util.Date/from (.plusSeconds (java.time.Instant/now) 30)) ;;
@@ -609,32 +609,32 @@
                 (when user-identity
                   (into
                    {:xt/id (str "https://example.org/subjects/" subject-id)
-                    :juxt.site/type "https://meta.juxt.site/pass/subject"
-                    :juxt.pass/id-token-claims (:claims id-token)
-                    :juxt.pass/user-identity user-identity
-                    :juxt.pass/issued-date issued-date
-                    :juxt.pass/expiry-date expiry-date}
+                    :juxt.site/type "https://meta.juxt.site/site/subject"
+                    :juxt.site/id-token-claims (:claims id-token)
+                    :juxt.site/user-identity user-identity
+                    :juxt.site/issued-date issued-date
+                    :juxt.site/expiry-date expiry-date}
                    claims))
 
                 new-session-token-doc
                 (when subject
                   {:xt/id (str "https://example.org/session-tokens/" new-session-token)
-                   :juxt.site/type "https://meta.juxt.site/pass/session-token"
-                   :juxt.pass/session-token new-session-token
-                   :juxt.pass/session (:xt/id session)})]
+                   :juxt.site/type "https://meta.juxt.site/site/session-token"
+                   :juxt.site/session-token new-session-token
+                   :juxt.site/session (:xt/id session)})]
 
             (cond-> []
               subject
               (conj
                [:xtdb.api/put subject
-                (get-in subject [:juxt.pass/id-token-claims "iat"])
+                (get-in subject [:juxt.site/id-token-claims "iat"])
                 ;; TODO: Expire the subject in the bitemporal timeline according
                 ;; to the 'exp' (expiry) in the claims. This has the added
                 ;; desirable effect of keeping the database free from clutter.
-                (get-in subject [:juxt.pass/id-token-claims "exp"])]
+                (get-in subject [:juxt.site/id-token-claims "exp"])]
 
                ;; Update session with subject
-               [:xtdb.api/put (assoc session :juxt.pass/subject (:xt/id subject))]
+               [:xtdb.api/put (assoc session :juxt.site/subject (:xt/id subject))]
 
                ;; Escalate session (as recommended by OWASP as this session has
                ;; been promoted)
@@ -645,21 +645,21 @@
                ;; [:ring.response/status 303]
 
                [:ring.response/headers
-                (let [session-scope (:juxt.pass/session-scope *ctx*)
+                (let [session-scope (:juxt.site/session-scope *ctx*)
                       _ (when-not session-scope
                           (throw
                            (ex-info
-                            "No :juxt.pass/session-scope attached to context"
+                            "No :juxt.site/session-scope attached to context"
                             {})))
 
-                      cookie-name (:juxt.pass/cookie-name session-scope)
+                      cookie-name (:juxt.site/cookie-name session-scope)
                       _ (when-not cookie-name
                           (throw
                            (ex-info
-                            "No :juxt.pass/cookie-name found in session-scope"
-                            {:juxt.pass/session-scope session-scope})))
+                            "No :juxt.site/cookie-name found in session-scope"
+                            {:juxt.site/session-scope session-scope})))
 
-                      cookie-path (or (:juxt.pass/cookie-path session-scope) "/")]
+                      cookie-path (or (:juxt.site/cookie-path session-scope) "/")]
                   { ;;"location" return-to
                    "set-cookie"
                    (format "%s=%s; Path=%s; Secure; HttpOnly; SameSite=Lax"
@@ -667,7 +667,7 @@
                            new-session-token
                            cookie-path)})]))))}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
           [permission :xt/id]]]})))))
@@ -694,19 +694,19 @@
             (let [issuer (:xt/id *input*)
                   issuer-doc (xt/entity* issuer)
                   _ (when-not issuer-doc
-                      (throw (ex-info "Issuer not installed in database" {:issuer (:juxt.pass/issuer *input*)})))
-                  jwks-uri (get-in issuer-doc [:juxt.pass/openid-configuration "jwks_uri"])
+                      (throw (ex-info "Issuer not installed in database" {:issuer (:juxt.site/issuer *input*)})))
+                  jwks-uri (get-in issuer-doc [:juxt.site/openid-configuration "jwks_uri"])
                   _ (when-not jwks-uri
-                      (if (nil? (:juxt.pass/openid-configuration issuer-doc))
+                      (if (nil? (:juxt.site/openid-configuration issuer-doc))
                         (throw
                          (ex-info
-                          "The entry :juxt.pass/openid-configuration is missing from the issuer entity"
+                          "The entry :juxt.site/openid-configuration is missing from the issuer entity"
                           {:issuer issuer-doc}))
                         (throw
                          (ex-info
-                          "jwks_uri not found in :juxt.pass/openid-configuration entry of issuer entity"
+                          "jwks_uri not found in :juxt.site/openid-configuration entry of issuer entity"
                           {:issuer issuer-doc
-                           :openid-configuration (:juxt.pass/openid-configuration issuer-doc)}))))
+                           :openid-configuration (:juxt.site/openid-configuration issuer-doc)}))))
 
                   get-jwks-response
                   (java-http-clj.core/send
@@ -720,18 +720,18 @@
 
                   jwks (jsonista.core/read-value (:body get-jwks-response))]
               {:jwks-uri jwks-uri
-               :juxt.pass/jwks jwks})))}
+               :juxt.site/jwks jwks})))}
 
        :juxt.site/transact
        {:juxt.site.sci/program
         (pr-str
          '(let [issuer-doc (xt/entity (:xt/id *input*))
-                jwks-uri (get-in issuer-doc [:juxt.pass/openid-configuration "jwks_uri"])]
+                jwks-uri (get-in issuer-doc [:juxt.site/openid-configuration "jwks_uri"])]
             (cond-> []
               (= jwks-uri (:jwks-uri *prepare*))
-              (conj [:xtdb.api/put (assoc issuer-doc :juxt.pass/jwks (:juxt.pass/jwks *prepare*))]))))}
+              (conj [:xtdb.api/put (assoc issuer-doc :juxt.site/jwks (:juxt.site/jwks *prepare*))]))))}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
           [permission :xt/id]]]})))))
@@ -744,9 +744,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/install-openid-issuer"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/install-openid-issuer"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/install-openid-issuer"
+       :juxt.site/purpose nil})))))
 
 (defn grant-permission-to-install-openid-client! [_]
   (eval
@@ -756,9 +756,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/install-openid-client"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/install-openid-client"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/install-openid-client"
+       :juxt.site/purpose nil})))))
 
 (defn grant-permission-to-install-openid-login-endpoint! [_]
   (eval
@@ -768,9 +768,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/install-openid-login-endpoint"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/install-openid-login-endpoint"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/install-openid-login-endpoint"
+       :juxt.site/purpose nil})))))
 
 (defn grant-permission-to-install-openid-callback-endpoint! [_]
   (eval
@@ -780,9 +780,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/install-openid-callback-endpoint"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/install-openid-callback-endpoint"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/install-openid-callback-endpoint"
+       :juxt.site/purpose nil})))))
 
 (defn grant-permission-to-fetch-jwks! [_]
   (eval
@@ -792,9 +792,9 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/fetch-jwks"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/openid/fetch-jwks"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/openid/fetch-jwks"
+       :juxt.site/purpose nil})))))
 
 (defn grant-permission-to-invoke-action-login-with-openid! [_]
   (eval
@@ -804,8 +804,8 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/login-with-openid"
-       :juxt.pass/action "https://example.org/actions/login-with-openid"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/action "https://example.org/actions/login-with-openid"
+       :juxt.site/purpose nil})))))
 
 (defn grant-permission-to-invoke-action-exchange-code-for-id-token! [{:keys [id]}]
   (eval
@@ -815,8 +815,8 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/openid/exchange-code-for-id-token"
-       :juxt.pass/action "https://example.org/actions/openid/exchange-code-for-id-token"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/action "https://example.org/actions/openid/exchange-code-for-id-token"
+       :juxt.site/purpose nil})))))
 
 (defn install-openid-issuer! [m]
   (eval
@@ -976,10 +976,10 @@
    "https://example.org/openid/auth0/issuer"
    {:deps #{"https://example.org/permissions/system/install-openid-issuer"}
     :create (fn [{:keys [id]}]
-              (let [{issuer :juxt.pass/issuer} (openid-config)]
+              (let [{issuer :juxt.site/issuer} (openid-config)]
                 (install-openid-issuer!
                  {:xt/id id
-                  :juxt.pass/issuer issuer})
+                  :juxt.site/issuer issuer})
                 (fetch-jwks! id)))}
 
    "https://example.org/openid/auth0/client-configuration"
@@ -988,12 +988,12 @@
               (install-openid-client
                (merge
                 {:xt/id id
-                 :juxt.pass/issuer-configuration "https://example.org/openid/auth0/issuer"}
+                 :juxt.site/issuer-configuration "https://example.org/openid/auth0/issuer"}
                 (select-keys
                  (openid-config)
-                 [:juxt.pass/client-id
-                  :juxt.pass/client-secret
-                  :juxt.pass/redirect-uri]))))}
+                 [:juxt.site/client-id
+                  :juxt.site/client-secret
+                  :juxt.site/redirect-uri]))))}
 
    "https://example.org/openid/login"
    {:deps #{"https://example.org/openid/callback"
@@ -1002,34 +1002,34 @@
     :create (fn [{:keys [id]}]
               (install-openid-login-endpoint!
                {:xt/id id
-                :juxt.pass/openid-client-configuration "https://example.org/openid/auth0/client-configuration"
-                :juxt.pass/session-scope "https://example.org/session-scopes/openid"}))}
+                :juxt.site/openid-client-configuration "https://example.org/openid/auth0/client-configuration"
+                :juxt.site/session-scope "https://example.org/session-scopes/openid"}))}
 
    "https://example.org/openid/callback"
    {:deps #{"https://example.org/session-scopes/openid"}
     :create (fn [{:keys [id]}]
               (install-openid-callback-endpoint!
                {:xt/id id
-                :juxt.pass/openid-client-configuration "https://example.org/openid/auth0/client-configuration"}))}
+                :juxt.site/openid-client-configuration "https://example.org/openid/auth0/client-configuration"}))}
 
    "https://example.org/session-scopes/openid"
    {:deps #{"https://example.org/permissions/system/put-session-scope"}
     :create (fn [{:keys [id]}]
               (install-session-scope!
                {:xt/id id
-                :juxt.pass/cookie-name "sid"
-                :juxt.pass/cookie-domain "https://example.org"
-                :juxt.pass/cookie-path "/"
-                :juxt.pass/login-uri "https://example.org/openid/login"}))}})
+                :juxt.site/cookie-name "sid"
+                :juxt.site/cookie-domain "https://example.org"
+                :juxt.site/cookie-path "/"
+                :juxt.site/login-uri "https://example.org/openid/login"}))}})
 
 (defn put-openid-user-identity! [& {:keys [username]
-                                    :juxt.pass.jwt.claims/keys [iss sub nickname]}]
+                                    :juxt.site.jwt.claims/keys [iss sub nickname]}]
   (init/do-action
    (substitute-actual-base-uri "https://example.org/subjects/system")
    (substitute-actual-base-uri "https://example.org/actions/put-openid-user-identity")
    (substitute-actual-base-uri
     (cond-> {:xt/id (format "https://example.org/user-identities/%s/openid" (str/lower-case username))
-             :juxt.pass/user ~(format "https://example.org/users/%s" (str/lower-case username))
-             :juxt.pass.jwt.claims/iss iss}
-      sub (assoc :juxt.pass.jwt.claims/sub sub)
-      nickname (assoc :juxt.pass.jwt.claims/nickname nickname)))))
+             :juxt.site/user ~(format "https://example.org/users/%s" (str/lower-case username))
+             :juxt.site.jwt.claims/iss iss}
+      sub (assoc :juxt.site.jwt.claims/sub sub)
+      nickname (assoc :juxt.site.jwt.claims/nickname nickname)))))

@@ -6,11 +6,10 @@
 ;; https://www.scottbrady91.com/openid-connect/identity-tokens
 ;; https://www.scottbrady91.com/jose/jwts-which-signing-algorithm-should-i-use
 
-(ns juxt.pass.openid-connect
+(ns juxt.site.openid-connect
   (:require
    [clojure.tools.logging :as log]
    [juxt.site :as-alias site]
-   [juxt.pass :as-alias pass]
    [xtdb.api :as-alias xt])
   (:import
    (com.auth0.jwt.exceptions JWTVerificationException)

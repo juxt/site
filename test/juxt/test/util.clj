@@ -5,11 +5,10 @@
    [clojure.java.io :as io]
    [juxt.site.handler :as h]
    [juxt.site.main :as main]
-   [juxt.pass.actions :as authz]
+   [juxt.site.actions :as authz]
    [juxt.site.init :as init]
    [juxt.site.bootstrap :as bootstrap]
    [juxt.http :as-alias http]
-   [juxt.pass :as-alias pass]
    [juxt.site :as-alias site]
    [xtdb.api :as xt])
   (:import
@@ -72,8 +71,8 @@
   {:xt/id "https://example.org/access-rule"
    ::site/description "A rule allowing access everything"
    ::site/type "Rule"
-   ::pass/target '[]
-   ::pass/effect ::pass/allow})
+   ::site/target '[]
+   ::site/effect ::site/allow})
 
 (defmacro with-fixtures [& body]
   `((clojure.test/join-fixtures [with-system-xt with-handler])
@@ -96,10 +95,10 @@
     (first
      (xt/q db '{:find [(pull session [*]) (pull scope [*])]
                 :keys [session scope]
-                :where [[e :juxt.site/type "https://meta.juxt.site/pass/session-token"]
-                        [e :juxt.pass/session-token session-token]
-                        [e :juxt.pass/session session]
-                        [session :juxt.pass/session-scope scope]]
+                :where [[e :juxt.site/type "https://meta.juxt.site/site/session-token"]
+                        [e :juxt.site/session-token session-token]
+                        [e :juxt.site/session session]
+                        [session :juxt.site/session-scope scope]]
                 :in [session-token]}
            session-token))))
 
@@ -107,7 +106,7 @@
   (let [{:keys [session scope]}
         (lookup-session-details session-token)
 
-        {:juxt.pass/keys [cookie-name]} scope]
+        {:juxt.site/keys [cookie-name]} scope]
     (assoc-in req [:ring.request/headers "cookie"] (format "%s=%s" cookie-name session-token))))
 
 (defn assoc-body [req body-bytes]

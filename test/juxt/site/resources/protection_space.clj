@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.resources.protection-space
+(ns juxt.site.resources.protection-space
   (:require
    [juxt.site.init :as init :refer [substitute-actual-base-uri]]))
 
@@ -14,9 +14,9 @@
      :juxt.site.malli/input-schema
      [:map
       [:xt/id [:re "https://example.org/protection-spaces/(.+)"]]
-      [:juxt.pass/auth-scheme [:enum "Basic" "Bearer"]]
-      [:juxt.pass/realm {:optional true} [:string {:min 1}]]
-      [:juxt.pass/canonical-root-uri {:optional true} [:re "https?://[^/]*"]]]
+      [:juxt.site/auth-scheme [:enum "Basic" "Bearer"]]
+      [:juxt.site/realm {:optional true} [:string {:min 1}]]
+      [:juxt.site/canonical-root-uri {:optional true} [:re "https?://[^/]*"]]]
 
      :juxt.site/prepare
      {:juxt.site.sci/program
@@ -34,21 +34,21 @@
              (String.)
              clojure.edn/read-string
              juxt.site.malli/validate-input
-             (assoc :juxt.site/type "https://meta.juxt.site/pass/protection-space")))))}
+             (assoc :juxt.site/type "https://meta.juxt.site/site/protection-space")))))}
 
      :juxt.site/transact
      {:juxt.site.sci/program
       (pr-str
        '[[:xtdb.api/put *prepare*]])}
 
-     :juxt.pass/rules
+     :juxt.site/rules
      '[
        [(allowed? subject resource permission)
-        [permission :juxt.pass/subject subject]]
+        [permission :juxt.site/subject subject]]
 
        [(allowed? subject resource permission)
-        [subject :juxt.pass/user-identity id]
-        [id :juxt.pass/user user]
+        [subject :juxt.site/user-identity id]
+        [id :juxt.site/user user]
         [permission :role role]
         [user :role role]]]})))
 
@@ -58,9 +58,9 @@
    (substitute-actual-base-uri "https://example.org/actions/grant-permission")
    (substitute-actual-base-uri
     {:xt/id "https://example.org/permissions/system/put-protection-space"
-     :juxt.pass/subject "https://example.org/subjects/system"
-     :juxt.pass/action "https://example.org/actions/put-protection-space"
-     :juxt.pass/purpose nil})))
+     :juxt.site/subject "https://example.org/subjects/system"
+     :juxt.site/action "https://example.org/actions/put-protection-space"
+     :juxt.site/purpose nil})))
 
 (defn put-basic-protection-space! [_]
   (init/do-action
@@ -69,10 +69,10 @@
    (substitute-actual-base-uri
     {:xt/id "https://example.org/protection-spaces/basic/wonderland"
 
-     :juxt.pass/canonical-root-uri "https://example.org"
-     :juxt.pass/realm "Wonderland" ; optional
+     :juxt.site/canonical-root-uri "https://example.org"
+     :juxt.site/realm "Wonderland" ; optional
 
-     :juxt.pass/auth-scheme "Basic"})))
+     :juxt.site/auth-scheme "Basic"})))
 
 (defn put-bearer-protection-space! [_]
   (init/do-action
@@ -80,7 +80,7 @@
    (substitute-actual-base-uri "https://example.org/actions/put-protection-space")
    (substitute-actual-base-uri
     {:xt/id "https://example.org/protection-spaces/bearer"
-     :juxt.pass/auth-scheme "Bearer"})))
+     :juxt.site/auth-scheme "Bearer"})))
 
 (def dependency-graph
   {"https://example.org/actions/put-protection-space"

@@ -1,13 +1,13 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.form-based-auth-test
+(ns juxt.site.form-based-auth-test
   (:require
    [clojure.test :refer [deftest is use-fixtures]]
    [malli.core :as malli]
-   [juxt.pass.resources.form-based-auth :as form-based-auth]
-   [juxt.pass.resources.example-users :as example-users]
-   [juxt.pass.resources.session-scope :as session-scope]
-   [juxt.pass.resources.user :as user]
+   [juxt.site.resources.form-based-auth :as form-based-auth]
+   [juxt.site.resources.example-users :as example-users]
+   [juxt.site.resources.session-scope :as session-scope]
+   [juxt.site.resources.user :as user]
    [juxt.test.util :refer [*handler* with-fixtures with-resources with-system-xt with-handler]]))
 
 (use-fixtures :each with-system-xt with-handler)
@@ -33,5 +33,5 @@
                   "username" "ALICE"
                   "password" "garden")]
       result
-      ;;(is (malli/validate [:map [:juxt.pass/session-token :string]] result))
+      ;;(is (malli/validate [:map [:juxt.site/session-token :string]] result))
       )))

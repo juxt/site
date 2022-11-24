@@ -3,8 +3,7 @@
 (ns juxt.site.graphql-eql-compiler
   (:require
    [juxt.grab.alpha.document :as document]
-   [juxt.site :as-alias site]
-   [juxt.pass :as-alias pass]))
+   [juxt.site :as-alias site]))
 
 (defn- graphql->eql-ast*
   [schema field]
@@ -28,7 +27,7 @@
        :dispatch-key k
        :key k
        :params (cond-> args
-                 action (assoc ::pass/action action))
+                 action (assoc ::site/action action))
        :children (mapv #(graphql->eql-ast* schema %)
                        (:juxt.grab.alpha.graphql/selection-set field))}
 

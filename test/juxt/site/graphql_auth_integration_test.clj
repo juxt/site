@@ -25,33 +25,33 @@
 (defn make-user
   [user-id]
   {:xt/id (str site-prefix "/users/" user-id)
-   :juxt.site/type "https://meta.juxt.site/pass/user"})
+   :juxt.site/type "https://meta.juxt.site/site/user"})
 
 (defn make-identity
   [user-id]
   {:xt/id (str site-prefix "/identities/" user-id)
-   :juxt.site/type "https://meta.juxt.site/pass/identity"
-   :juxt.pass/user (str site-prefix "/users/" user-id)})
+   :juxt.site/type "https://meta.juxt.site/site/identity"
+   :juxt.site/user (str site-prefix "/users/" user-id)})
 
 (defn make-subject
   [user-id subject-id]
   {:xt/id (str site-prefix "/subjects/" subject-id)
-   :juxt.site/type "https://meta.juxt.site/pass/subject"
-   :juxt.pass/identity (str site-prefix "/identities/" user-id)})
+   :juxt.site/type "https://meta.juxt.site/site/subject"
+   :juxt.site/identity (str site-prefix "/identities/" user-id)})
 
 (defn make-permission
   [action-id]
   {:xt/id (str site-prefix "/permissions/" action-id)
-   :juxt.site/type "https://meta.juxt.site/pass/permission"
-   :juxt.pass/action (str site-prefix "/actions/" action-id)
-   :juxt.pass/purpose nil})
+   :juxt.site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/action (str site-prefix "/actions/" action-id)
+   :juxt.site/purpose nil})
 
 (defn with-site-helpers
   [f]
   (init/put! (merge (make-user "host") {:name "Test Host User"}))
   (init/put! (make-identity "host"))
   (init/put! (make-subject "host" "host-test"))
-  (init/put! (merge (make-permission "create-action") { :juxt.pass/user (str site-prefix "/users/host") }))
+  (init/put! (merge (make-permission "create-action") { :juxt.site/user (str site-prefix "/users/host") }))
   (f))
 
 (def fixtures [tutil/with-system-xt with-handler with-site-helpers])
@@ -85,16 +85,16 @@
 (defn make-action
   [action-id]
   {:xt/id (str site-prefix "/actions/" action-id)
-   :juxt.site/type "https://meta.juxt.site/pass/action"
-   :juxt.pass/scope "read:resource"
-   :juxt.pass/rules
+   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/scope "read:resource"
+   :juxt.site/rules
    [['(allowed? permission subject action resource)
      ['permission :xt/id]]]})
 
 (defn make-lookup-action
   [action-id lookup-type]
   (update (make-action action-id)
-          :juxt.pass/rules conj ['(include? action e)
+          :juxt.site/rules conj ['(include? action e)
                                        ['e :juxt.site/type (str site-prefix "/" lookup-type)]]))
 
 (def example-compiled-schema (-> "juxt/site/example.graphql"
@@ -140,10 +140,10 @@
     (put! (make-lookup-action "getClient" "client"))
     (put! (make-permission "getClient"))
     (put! (update (make-action "getProject")
-                       :juxt.pass/rules conj ['(include? action e)
+                       :juxt.site/rules conj ['(include? action e)
                                                     ['e :juxt.site/type "https://test.example.com/project"]]))
     (put! (update (make-action "getRepository")
-                       :juxt.pass/rules #(conj %
+                       :juxt.site/rules #(conj %
                                                 ['(include? action e)
                                                  ['e :juxt.site/type "https://test.example.com/repository"]]
                                                 ['(arguments-match? e action arguments)
@@ -152,7 +152,7 @@
                                                  '(or [e :type type-arg-k]
                                                       [(nil? type-arg)])])))
     (put! (update (make-action "getClient")
-                       :juxt.pass/rules conj ['(include? action e)
+                       :juxt.site/rules conj ['(include? action e)
                                                     ['e :juxt.site/type "https://test.example.com/client"]]))
     ))
 

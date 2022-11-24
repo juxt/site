@@ -10,7 +10,6 @@
 
 (alias 'apex (create-ns 'juxt.apex))
 (alias 'http (create-ns 'juxt.http))
-(alias 'pass (create-ns 'juxt.pass))
 (alias 'site (create-ns 'juxt.site))
 
 (t/use-fixtures :each with-xt)
@@ -84,13 +83,13 @@
     ;; rather than define new ones in the ACL.
     [:xtdb.api/put
      {:xt/id "https://example.org/jon-can-see-his-own-report.acl"
-      ::pass/entity "https://example.org/jon/heart-rate"
-      ::pass/owner "https://example.org/users/jon"}]
+      ::site/entity "https://example.org/jon/heart-rate"
+      ::site/owner "https://example.org/users/jon"}]
 
     [:xtdb.api/put
      {:xt/id "https://example.org/mal-can-see-his-own-report.acl"
-      ::pass/entity "https://example.org/mal/heart-rate"
-      ::pass/owner "https://example.org/users/mal"}]
+      ::site/entity "https://example.org/mal/heart-rate"
+      ::site/owner "https://example.org/users/mal"}]
 
     ;; Bob is Jon's doctor
     [:xtdb.api/put
@@ -102,12 +101,12 @@
     [:xtdb.api/put
      {:xt/id "https://example.org/bob-is-jon-doctor.acl"
       ::site/type "Consent"
-      ::pass/granted-by "https://example.org/users/jon"
-      ::pass/entity "https://example.org/jon/heart-rate"
-      ::pass/grantee "https://example.org/users/bob"
-      ::pass/scopes #{:read}
+      ::site/granted-by "https://example.org/users/jon"
+      ::site/entity "https://example.org/jon/heart-rate"
+      ::site/grantee "https://example.org/users/bob"
+      ::site/scopes #{:read}
       ;; But only for the purposes of a medical intervention
-      ::pass/purpose :medical-intervention
+      ::site/purpose :medical-intervention
       :hl7.fhir/category [#:hl7.fhir{:coding #:hl7.fhir{:code "vital-signs"}}]}]
 
     ;; Carl is another doctor, but Jon doesn't want this doctor accessing his
@@ -134,19 +133,19 @@
              ;; part of the document.
 
              :rules [[(check acl user obj purpose)
-                      [acl ::pass/owner user]
-                      [acl ::pass/entity obj]
+                      [acl ::site/owner user]
+                      [acl ::site/entity obj]
                       [(some? purpose) _]]
 
                      [(check acl user obj purpose)
                       [acl ::site/type "Consent"]
-                      [acl ::pass/grantee user]
-                      [acl ::pass/granted-by owner]
+                      [acl ::site/grantee user]
+                      [acl ::site/granted-by owner]
                       [acl :hl7.fhir/category acl-cat]
                       [obj :hl7.fhir/category obj-cat]
                       [(get-in acl-cat [:hl7.fhir/coding :hl7.fhir/code]) code]
                       [(get-in obj-cat [:hl7.fhir/coding :hl7.fhir/code]) code]
-                      [acl ::pass/purpose purpose]
+                      [acl ::site/purpose purpose]
                       ;; We need to check the ACL for the owner to see the doc
                       (check subacl owner obj purpose)
                       ]]

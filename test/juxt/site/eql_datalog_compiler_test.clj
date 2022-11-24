@@ -6,17 +6,16 @@
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [edn-query-language.core :as eql]
    [jsonista.core :as json]
-   [juxt.pass.resources.example-users :as example-users]
+   [juxt.site.resources.example-users :as example-users]
    [juxt.grab.alpha.document :as grab.document]
    [juxt.grab.alpha.parser :as grab.parser]
    [juxt.grab.alpha.schema :as grab.schema]
    [juxt.http :as-alias http]
-   [juxt.pass :as-alias pass]
-   [juxt.pass.resources.form-based-auth :as form-based-auth]
-   [juxt.pass.resources.oauth :as oauth]
-   [juxt.pass.resources.protection-space :as protection-space]
-   [juxt.pass.resources.session-scope :as session-scope]
-   [juxt.pass.resources.user :as user]
+   [juxt.site.resources.form-based-auth :as form-based-auth]
+   [juxt.site.resources.oauth :as oauth]
+   [juxt.site.resources.protection-space :as protection-space]
+   [juxt.site.resources.session-scope :as session-scope]
+   [juxt.site.resources.user :as user]
    [juxt.site :as-alias site]
    [juxt.site.eql-datalog-compiler :as eqlc]
    [juxt.site.graphql-eql-compiler :refer [graphql->eql-ast]]
@@ -60,10 +59,10 @@
             juxt.site.malli/validate-input
             (assoc
              :juxt.site/type "https://site.test/types/doctor"
-             :juxt.pass/protection-spaces #{"https://site.test/protection-spaces/bearer"}
+             :juxt.site/protection-spaces #{"https://site.test/protection-spaces/bearer"}
              :juxt.site/methods
-             {:get {:juxt.pass/actions #{"https://site.test/actions/get-doctor"}}
-              :head {:juxt.pass/actions #{"https://site.test/actions/get-doctor"}}
+             {:get {:juxt.site/actions #{"https://site.test/actions/get-doctor"}}
+              :head {:juxt.site/actions #{"https://site.test/actions/get-doctor"}}
               :options {}})))))}
 
     :juxt.site/transact
@@ -71,19 +70,19 @@
      (pr-str
       '[[:xtdb.api/put *prepare*]])}
 
-    :juxt.pass/rules
+    :juxt.site/rules
     '[
       [(allowed? subject resource permission)
-       [permission :juxt.pass/subject subject]]]}))
+       [permission :juxt.site/subject subject]]]}))
 
 (defn grant-permission-to-invoke-action-register-doctor! [_]
   (init/do-action
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/system/register-doctor"
-    :juxt.pass/subject "https://site.test/subjects/system"
-    :juxt.pass/action "https://site.test/actions/register-doctor"
-    :juxt.pass/purpose nil}))
+    :juxt.site/subject "https://site.test/subjects/system"
+    :juxt.site/action "https://site.test/actions/register-doctor"
+    :juxt.site/purpose nil}))
 
 (defn create-action-register-patient! [_]
   (init/do-action
@@ -113,10 +112,10 @@
             juxt.site.malli/validate-input
             (assoc
              :juxt.site/type "https://site.test/types/patient"
-             :juxt.pass/protection-spaces #{"https://site.test/protection-spaces/bearer"}
+             :juxt.site/protection-spaces #{"https://site.test/protection-spaces/bearer"}
              :juxt.site/methods
-             {:get {:juxt.pass/actions #{"https://site.test/actions/get-patient"}}
-              :head {:juxt.pass/actions #{"https://site.test/actions/get-patient"}}
+             {:get {:juxt.site/actions #{"https://site.test/actions/get-patient"}}
+              :head {:juxt.site/actions #{"https://site.test/actions/get-patient"}}
               :options {}})))))}
 
     :juxt.site/transact
@@ -124,19 +123,19 @@
      (pr-str
       '[[:xtdb.api/put *prepare*]])}
 
-    :juxt.pass/rules
+    :juxt.site/rules
     '[
       [(allowed? subject resource permission)
-       [permission :juxt.pass/subject subject]]]}))
+       [permission :juxt.site/subject subject]]]}))
 
 (defn grant-permission-to-invoke-action-register-patient! [_]
   (init/do-action
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/system/register-patient"
-    :juxt.pass/subject "https://site.test/subjects/system"
-    :juxt.pass/action "https://site.test/actions/register-patient"
-    :juxt.pass/purpose nil}))
+    :juxt.site/subject "https://site.test/subjects/system"
+    :juxt.site/action "https://site.test/actions/register-patient"
+    :juxt.site/purpose nil}))
 
 ;; A patient's record contains an attribute that indicates the set of assigned doctors.
 (defn create-action-assign-doctor-to-patient! [_]
@@ -194,19 +193,19 @@
             :doctor doctor-id
             ::site/type "https://site.test/types/doctor-patient-assignment"}]]))}
 
-    :juxt.pass/rules
+    :juxt.site/rules
     '[
       [(allowed? subject resource permission)
-       [permission :juxt.pass/subject subject]]]}))
+       [permission :juxt.site/subject subject]]]}))
 
 (defn grant-permission-to-invoke-action-assign-doctor-to-patient! [_]
   (init/do-action
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/system/assign-doctor-to-patient"
-    :juxt.pass/subject "https://site.test/subjects/system"
-    :juxt.pass/action "https://site.test/actions/assign-doctor-to-patient"
-    :juxt.pass/purpose nil}))
+    :juxt.site/subject "https://site.test/subjects/system"
+    :juxt.site/action "https://site.test/actions/assign-doctor-to-patient"
+    :juxt.site/purpose nil}))
 
 (defn assign-doctor-to-patient! [{:keys [patient doctor]}]
   (init/do-action
@@ -221,28 +220,28 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/get-patient"
 
-    :juxt.pass/action-contexts
+    :juxt.site/action-contexts
     {"https://site.test/actions/get-doctor"
-     {:juxt.pass/additional-where-clauses
+     {:juxt.site/additional-where-clauses
       '[[ass ::site/type "https://site.test/types/doctor-patient-assignment"]
         [ass :patient e]
         [ass :doctor parent]]}}
 
-    :juxt.pass/rules
+    :juxt.site/rules
     '[
       ;; TODO: Performance tweak: put [subject] to hint that subject is always
       ;; bound - see @jdt for details
       [(allowed? subject resource permission)
-       [subject :juxt.pass/user-identity id]
-       [id :juxt.pass/user user]
-       [permission :juxt.pass/user user]
+       [subject :juxt.site/user-identity id]
+       [id :juxt.site/user user]
+       [permission :juxt.site/user user]
        [resource :juxt.site/type "https://site.test/types/patient"]
        [permission :patient :all]]
 
       [(allowed? subject resource permission)
-       [subject :juxt.pass/user-identity id]
-       [id :juxt.pass/user user]
-       [permission :juxt.pass/user user]
+       [subject :juxt.site/user-identity id]
+       [id :juxt.site/user user]
+       [permission :juxt.site/user user]
        [resource :juxt.site/type "https://site.test/types/patient"]
        [permission :patient resource]]]}))
 
@@ -251,10 +250,10 @@
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id (format "https://site.test/permissions/%s/get-any-patient" username)
-    :juxt.pass/action "https://site.test/actions/get-patient"
-    :juxt.pass/user (format "https://site.test/users/%s" username)
+    :juxt.site/action "https://site.test/actions/get-patient"
+    :juxt.site/user (format "https://site.test/users/%s" username)
     :patient :all
-    :juxt.pass/purpose nil
+    :juxt.site/purpose nil
     }))
 
 (defn grant-permission-to-get-patient! [username pid]
@@ -262,10 +261,10 @@
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id (format "https://site.test/permissions/%s/get-patient/%s" username pid)
-    :juxt.pass/action "https://site.test/actions/get-patient"
-    :juxt.pass/user (format "https://site.test/users/%s" username)
+    :juxt.site/action "https://site.test/actions/get-patient"
+    :juxt.site/user (format "https://site.test/users/%s" username)
     :patient (format "https://site.test/patients/%s" pid)
-    :juxt.pass/purpose nil
+    :juxt.site/purpose nil
     }))
 
 (defn create-action-list-patients! [_]
@@ -299,24 +298,24 @@
       ;; TODO: Go through the use-cases which already make general lookups
       ;; and queries to XT and see if we can rewrite them to use a more
       ;; restricted API.
-      '(juxt.pass/pull-allowed-resources
+      '(juxt.site/pull-allowed-resources
         #{"https://site.test/actions/get-patient"}))}
 
-    :juxt.pass/rules
+    :juxt.site/rules
     '[
       [(allowed? subject resource permission)
-       [subject :juxt.pass/user-identity id]
-       [id :juxt.pass/user user]
-       [permission :juxt.pass/user user]]]}))
+       [subject :juxt.site/user-identity id]
+       [id :juxt.site/user user]
+       [permission :juxt.site/user user]]]}))
 
 (defn grant-permission-to-list-patients! [username]
   (init/do-action
     "https://site.test/subjects/system"
     "https://site.test/actions/grant-permission"
     {:xt/id (format "https://site.test/permissions/%s/list-patients" username)
-     :juxt.pass/action "https://site.test/actions/list-patients"
-     :juxt.pass/user (format "https://site.test/users/%s" username)
-     :juxt.pass/purpose nil}))
+     :juxt.site/action "https://site.test/actions/list-patients"
+     :juxt.site/user (format "https://site.test/users/%s" username)
+     :juxt.site/purpose nil}))
 
 (defn create-action-register-patient-measurement! [_]
   (init/do-action
@@ -347,26 +346,26 @@
             juxt.site.malli/validate-input
             (assoc
              :juxt.site/type "https://site.test/types/measurement"
-             :juxt.pass/protection-spaces #{"https://site.test/protection-spaces/bearer"})))))}
+             :juxt.site/protection-spaces #{"https://site.test/protection-spaces/bearer"})))))}
 
     :juxt.site/transact
     {:juxt.site.sci/program
      (pr-str
       '[[:xtdb.api/put *prepare*]])}
 
-    :juxt.pass/rules
+    :juxt.site/rules
     '[
       [(allowed? subject resource permission)
-       [permission :juxt.pass/subject subject]]]}))
+       [permission :juxt.site/subject subject]]]}))
 
 (defn grant-permission-to-invoke-action-register-patient-measurement! [_]
   (init/do-action
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id "https://site.test/permissions/system/register-patient-measurement"
-    :juxt.pass/subject "https://site.test/subjects/system"
-    :juxt.pass/action "https://site.test/actions/register-patient-measurement"
-    :juxt.pass/purpose nil}))
+    :juxt.site/subject "https://site.test/subjects/system"
+    :juxt.site/action "https://site.test/actions/register-patient-measurement"
+    :juxt.site/purpose nil}))
 
 ;; Warning, this is an overly broad action! TODO: Narrow this action.
 ;; It permits grantees access to ALL measurements!!
@@ -376,18 +375,18 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/read-any-measurement"
 
-    :juxt.pass/action-contexts
+    :juxt.site/action-contexts
     {"https://site.test/actions/get-patient"
-     {:juxt.pass/additional-where-clauses
+     {:juxt.site/additional-where-clauses
       '[[e :patient parent]
         [e ::site/type "https://site.test/types/measurement"]]}}
 
-    :juxt.pass/rules
+    :juxt.site/rules
     '[
       [(allowed? subject resource permission)
-       [subject :juxt.pass/user-identity id]
-       [id :juxt.pass/user user]
-       [permission :juxt.pass/user user]
+       [subject :juxt.site/user-identity id]
+       [id :juxt.site/user user]
+       [permission :juxt.site/user user]
        ;;[resource :juxt.site/type "https://site.test/types/measurement"]
        ]]}))
 
@@ -396,9 +395,9 @@
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id (format "https://site.test/permissions/%s/read-any-measurement" username)
-    :juxt.pass/action "https://site.test/actions/read-any-measurement"
-    :juxt.pass/user (format "https://site.test/users/%s" username)
-    :juxt.pass/purpose nil
+    :juxt.site/action "https://site.test/actions/read-any-measurement"
+    :juxt.site/user (format "https://site.test/users/%s" username)
+    :juxt.site/purpose nil
     }))
 
 (defn create-action-get-doctor! [_]
@@ -407,9 +406,9 @@
    "https://site.test/actions/create-action"
    {:xt/id "https://site.test/actions/get-doctor"
 
-    :juxt.pass/params
+    :juxt.site/params
     {:search
-     {:juxt.pass/additional-where-clauses
+     {:juxt.site/additional-where-clauses
       '[[e :name doctor-name]
         [(re-seq pat doctor-name)]
         ;; Case-insensitive search
@@ -417,12 +416,12 @@
         [(re-pattern regex) pat]
         ]}}
 
-    :juxt.pass/rules
+    :juxt.site/rules
     '[
       [(allowed? subject resource permission)
-       [subject :juxt.pass/user-identity id]
-       [id :juxt.pass/user user]
-       [permission :juxt.pass/user user]
+       [subject :juxt.site/user-identity id]
+       [id :juxt.site/user user]
+       [permission :juxt.site/user user]
        [resource :juxt.site/type "https://site.test/types/doctor"]]
       ]}))
 
@@ -431,9 +430,9 @@
    "https://site.test/subjects/system"
    "https://site.test/actions/grant-permission"
    {:xt/id (format "https://site.test/permissions/%s/get-doctor" username)
-    :juxt.pass/action "https://site.test/actions/get-doctor"
-    :juxt.pass/user (format "https://site.test/users/%s" username)
-    :juxt.pass/purpose nil}))
+    :juxt.site/action "https://site.test/actions/get-doctor"
+    :juxt.site/user (format "https://site.test/users/%s" username)
+    :juxt.site/purpose nil}))
 
 (def DOCTOR_NAMES
   {"001" "Dr. Jack Conway"
@@ -568,8 +567,8 @@
        {:xt/id "https://site.test/patients"
         :juxt.site/methods
         {:get
-         {:juxt.pass/actions #{"https://site.test/actions/list-patients"}}}
-        :juxt.pass/protection-spaces #{"https://site.test/protection-spaces/bearer"}
+         {:juxt.site/actions #{"https://site.test/actions/list-patients"}}}
+        :juxt.site/protection-spaces #{"https://site.test/protection-spaces/bearer"}
         ::http/content-type "application/json"
         :juxt.http/respond
         {:juxt.site.sci/program
@@ -853,7 +852,7 @@
             (is (vector? result))
             (is (= 3 (count result)))))
 
-        ;; We are calling juxt.pass.actions/pull-allowed-resources which
+        ;; We are calling juxt.site.actions/pull-allowed-resources which
         ;; provides our query, but we want to experiment with creating our own
         ;; query with sub-queries, which we can compile to with GraphQL.
 
@@ -866,10 +865,10 @@
         (let [db (xt/db *xt-node*)
               extract-subject-with-token
               (fn [token]
-                (::pass/subject
+                (::site/subject
                  (ffirst
                   (xt/q db '{:find [(pull e [*])]
-                             :where [[e ::pass/token token]]
+                             :where [[e ::site/token token]]
                              :in [token]} token))))
               alice (extract-subject-with-token alice-access-token)
               bob (extract-subject-with-token bob-access-token)]
@@ -903,11 +902,11 @@
                        db
                        (eql/query->ast
                         '[
-                          {(:patients {::pass/action "https://site.test/actions/get-patient"})
+                          {(:patients {::site/action "https://site.test/actions/get-patient"})
                            [:xt/id
                             :name
                             ::site/type
-                            {(:measurements {::pass/action "https://site.test/actions/read-any-measurement"})
+                            {(:measurements {::site/action "https://site.test/actions/read-any-measurement"})
                              [:reading]}]}])))]
 
               (testing "Alice's view"
@@ -1018,15 +1017,15 @@
                       (eqlc/compile-ast
                        db
                        (eql/query->ast
-                        '[{(:doctors {::pass/action "https://site.test/actions/get-doctor"})
+                        '[{(:doctors {::site/action "https://site.test/actions/get-doctor"})
                            [:xt/id
                             :name
                             ::site/type
-                            {(:patients {::pass/action "https://site.test/actions/get-patient"})
+                            {(:patients {::site/action "https://site.test/actions/get-patient"})
                              [:xt/id
                               :name
                               ::site/type
-                              {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
+                              {(:readings {::site/action "https://site.test/actions/read-any-measurement"})
                                [:reading]}]}]}])))]
 
               (testing "Alice's view"
@@ -1119,16 +1118,16 @@
                       (eqlc/compile-ast
                        db
                        (eql/query->ast
-                        '[{(:doctor {::pass/action "https://site.test/actions/get-doctor"
+                        '[{(:doctor {::site/action "https://site.test/actions/get-doctor"
                                      :search "jack"})
                            [:xt/id
                             :name
                             ::site/type
-                            {(:patients {::pass/action "https://site.test/actions/get-patient"})
+                            {(:patients {::site/action "https://site.test/actions/get-patient"})
                              [:xt/id
                               :name
                               ::site/type
-                              {(:readings {::pass/action "https://site.test/actions/read-any-measurement"})
+                              {(:readings {::site/action "https://site.test/actions/read-any-measurement"})
                                [:reading]}]}]}])))]
 
               (testing "Alice's view"
@@ -1279,7 +1278,7 @@
         ;; be deduped via reference to independent documents, or even one to the
         ;; other:
 
-        ;; {:xt/id "list-patients" ::pass/rules "get-patient"}
+        ;; {:xt/id "list-patients" ::site/rules "get-patient"}
 
         ;; Idea: Break GraphQL schemas into constituent types and create
         ;; individual resources, one resource per type. Use 'set' difference to
@@ -1393,10 +1392,10 @@
             ;; against the database, rather than going via Ring .
             extract-subject-with-token
             (fn [token]
-              (::pass/subject
+              (::site/subject
                (ffirst
                 (xt/q db '{:find [(pull e [*])]
-                           :where [[e ::pass/token token]]
+                           :where [[e ::site/token token]]
                            :in [token]} token))))
             alice (extract-subject-with-token alice-access-token)
             bob (extract-subject-with-token bob-access-token)

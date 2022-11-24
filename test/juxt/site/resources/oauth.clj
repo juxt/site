@@ -1,11 +1,11 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.resources.oauth
+(ns juxt.site.resources.oauth
   (:require
    [clojure.pprint :refer [pprint]]
    [clojure.string :as str]
    [clojure.test :refer [deftest is are testing]]
-   [juxt.pass.util :refer [make-nonce]]
+   [juxt.site.util :refer [make-nonce]]
    [juxt.site.init :as init :refer [substitute-actual-base-uri]]
    [juxt.test.util :refer [*handler*]]
    [malli.core :as malli]
@@ -16,9 +16,9 @@
    (substitute-actual-base-uri "https://example.org/subjects/system")
    (substitute-actual-base-uri "https://example.org/actions/register-application")
    (substitute-actual-base-uri
-    {:juxt.pass/client-id (get params "client")
+    {:juxt.site/client-id (get params "client")
      ;; TODO: What is this redirect-uri doing here?
-     :juxt.pass/redirect-uri (format "https://example.org/terminal/%s" (get params "client"))})))
+     :juxt.site/redirect-uri (format "https://example.org/terminal/%s" (get params "client"))})))
 
 (defn create-action-install-authorization-server! [_]
   (eval
@@ -32,7 +32,7 @@
        :juxt.site.malli/input-schema
        [:map
         [:xt/id [:re "https://example.org/.*"]]
-        [:juxt.pass/session-scope {:optional true} [:re "https://example.org/.*"]]]
+        [:juxt.site/session-scope {:optional true} [:re "https://example.org/.*"]]]
 
        :juxt.site/prepare
        {:juxt.site.sci/program
@@ -50,16 +50,16 @@
                  juxt.site.malli/validate-input
                  (assoc
                   :juxt.site/methods
-                  {:get #:juxt.pass{:actions #{"https://example.org/actions/oauth/authorize"}}}))))))}
+                  {:get #:juxt.site{:actions #{"https://example.org/actions/oauth/authorize"}}}))))))}
 
        :juxt.site/transact
        {:juxt.site.sci/program
         (pr-str '[[:xtdb.api/put *prepare*]])}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
-          [permission :juxt.pass/subject subject]]]})))))
+          [permission :juxt.site/subject subject]]]})))))
 
 (defn grant-permission-install-authorization-server! [_]
   (eval
@@ -69,11 +69,11 @@
       "https://example.org/subjects/system"
       "https://example.org/actions/grant-permission"
       {:xt/id "https://example.org/permissions/system/install-authorization-server"
-       :juxt.pass/subject "https://example.org/subjects/system"
-       :juxt.pass/action "https://example.org/actions/install-authorization-server"
-       :juxt.pass/purpose nil})))))
+       :juxt.site/subject "https://example.org/subjects/system"
+       :juxt.site/action "https://example.org/actions/install-authorization-server"
+       :juxt.site/purpose nil})))))
 
-(defn install-authorization-server! [{:juxt.pass/keys [session-scope]}]
+(defn install-authorization-server! [{:juxt.site/keys [session-scope]}]
   (init/do-action
    (substitute-actual-base-uri "https://example.org/subjects/system")
    (substitute-actual-base-uri "https://example.org/actions/install-authorization-server")
@@ -81,7 +81,7 @@
     {:xt/id "https://example.org/oauth/authorize"
      :juxt.http/content-type "text/html;charset=utf-8"
      :juxt.http/content "<p>Welcome to the Site authorization server.</p>"
-     :juxt.pass/session-scope session-scope})))
+     :juxt.site/session-scope session-scope})))
 
 (defn create-action-oauth-authorize! [_]
   (eval
@@ -141,7 +141,7 @@
                   _ (when-not (contains? #{"code" "token"} response-type)
                       (throw (ex-info "Only response types of 'code' and 'token' are currently supported" {})))
 
-                  subject (:juxt.pass/subject *ctx*)
+                  subject (:juxt.site/subject *ctx*)
                   _ (when-not subject
                       (throw (ex-info "Cannot create access-token: no subject" {})))
 
@@ -149,7 +149,7 @@
                   ;; value it issues." -- RFC 6749 Section 4.2.2
                   access-token-length 16
 
-                  access-token (juxt.pass.util/make-nonce access-token-length)
+                  access-token (juxt.site.util/make-nonce access-token-length)
                   ]
 
               {:client-id client-id
@@ -161,7 +161,7 @@
        {:juxt.site.sci/program
         (pr-str
          '(let [{:keys [client-id query access-token subject]} *prepare*
-                application (juxt.pass/lookup-application client-id)
+                application (juxt.site/lookup-application client-id)
                 _ (when-not application
                     (throw
                      (ex-info
@@ -170,16 +170,16 @@
 
                 ;; Leave scope for now for tests to flush out
                 scopes (some-> *prepare* (get-in [:query "scope"]) ring.util.codec/form-decode (clojure.string/split #"\\s") set)
-                _ (doall (map juxt.pass/lookup-scope scopes))
+                _ (doall (map juxt.site/lookup-scope scopes))
 
                 access-token-doc
                 (cond->
                     {:xt/id (format "%s/access-tokens/%s" (:juxt.site/base-uri *ctx*) access-token)
-                     :juxt.site/type "https://meta.juxt.site/pass/access-token"
-                     :juxt.pass/subject subject
-                     :juxt.pass/application (:xt/id application)
-                     :juxt.pass/token access-token}
-                    scopes (assoc :juxt.pass/scope scopes))
+                     :juxt.site/type "https://meta.juxt.site/site/access-token"
+                     :juxt.site/subject subject
+                     :juxt.site/application (:xt/id application)
+                     :juxt.site/token access-token}
+                    scopes (assoc :juxt.site/scope scopes))
 
                 fragment
                 (ring.util.codec/form-encode
@@ -187,18 +187,18 @@
                   "token_type" "bearer"
                   "state" (get query "state")})
 
-                location (format "%s#%s" (:juxt.pass/redirect-uri application) fragment)]
+                location (format "%s#%s" (:juxt.site/redirect-uri application) fragment)]
 
             [[:xtdb.api/put access-token-doc]
              [:ring.response/status 303]
              [:ring.response/headers {"location" location}]]))}
 
-       :juxt.pass/rules
+       :juxt.site/rules
        '[
          [(allowed? subject resource permission)
-          [subject :juxt.pass/user-identity id]
-          [id :juxt.pass/user user]
-          [permission :juxt.pass/user user]]]})))))
+          [subject :juxt.site/user-identity id]
+          [id :juxt.site/user user]
+          [permission :juxt.site/user user]]]})))))
 
 (def dependency-graph
   {"https://example.org/applications/{client}"
@@ -223,7 +223,7 @@
    "https://example.org/oauth/authorize"
    {:create (fn [_]
               (install-authorization-server!
-               {:juxt.pass/session-scope "https://example.org/session-scopes/default"}))
+               {:juxt.site/session-scope "https://example.org/session-scopes/default"}))
     :deps #{::init/system
             "https://example.org/session-scopes/default"
             "https://example.org/actions/install-authorization-server"
@@ -235,7 +235,7 @@
 
 (defn authorize-response!
   "Authorize response"
-  [{:juxt.pass/keys [session-token]
+  [{:juxt.site/keys [session-token]
     client-id "client_id"
     scope "scope"
     :as args}]
@@ -256,7 +256,7 @@
  authorize-response!
  [:=> [:cat
        [:map
-        ^{:doc "to authenticate with authorization server"} [:juxt.pass/session-token :string]
+        ^{:doc "to authenticate with authorization server"} [:juxt.site/session-token :string]
         ["client_id" :string]
         ["scope" {:optional true} [:sequential :string]]]]
   [:map
@@ -284,7 +284,7 @@
  authorize!
  [:=> [:cat
        [:map
-        ^{:doc "to authenticate with authorization server"} [:juxt.pass/session-token :string]
+        ^{:doc "to authenticate with authorization server"} [:juxt.site/session-token :string]
         ["client_id" :string]
         ["scope" {:optional true} [:sequential :string]]]]
   [:map

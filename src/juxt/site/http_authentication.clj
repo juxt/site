@@ -1,6 +1,6 @@
 ;; Copyright © 2021, JUXT LTD.
 
-(ns juxt.pass.http-authentication
+(ns juxt.site.http-authentication
   (:require
    [jsonista.core :as json]
    [juxt.reap.alpha.encoders :refer [www-authenticate]]
@@ -10,7 +10,6 @@
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.rfc7235 :as rfc7235]
    [juxt.http :as-alias http]
-   [juxt.pass :as-alias pass]
    [juxt.site :as-alias site]
    [ring.util.codec :refer [form-decode]]
    [ring.middleware.cookies :refer [cookies-request cookies-response]]
@@ -43,8 +42,8 @@
   (get @sessions-by-access-token k))
 
 #_(defn token-response
-  [{::site/keys [received-representation resource start-date]
-    :juxt.pass/keys [subject] :as req}]
+  [{::site/keys [received-representation resource start-date subject]
+     :as req}]
 
   ;; Check grant_type of posted-representation
   (assert (.startsWith (::http/content-type received-representation)
@@ -73,11 +72,11 @@
 
         access-token (access-token)
 
-        expires-in (get resource :juxt.pass/expires-in (* 24 3600))
+        expires-in (get resource :juxt.site/expires-in (* 24 3600))
 
         session {"access_token" access-token
                  "expires_in" expires-in
-                 "user" (:juxt.pass/user subject)}
+                 "user" (:juxt.site/user subject)}
 
         _ (put-session!
            access-token
@@ -107,10 +106,10 @@
 
   (let [users (x/q db '{:find [r pwhash]
                         :where [[r ::site/type "User"]
-                                [r :juxt.pass/username username]
-                                [pe :juxt.pass/user r]
+                                [r :juxt.site/username username]
+                                [pe :juxt.site/user r]
                                 [pe ::site/type "Password"]
-                                [pe :juxt.pass/password-hash pwhash]]
+                                [pe :juxt.site/password-hash pwhash]]
                         :in [username]}
                    username)]
     (cond
@@ -145,14 +144,14 @@
     (or
      (when (and password pwhash (password/check password pwhash))
        (let [access-token (access-token)
-             expires-in (get resource :juxt.pass/expires-in 3600)
+             expires-in (get resource :juxt.site/expires-in 3600)
              session {"access_token" access-token
                       "token_type" "login"
                       "expires_in" expires-in}]
          (put-session!
           access-token
-          (merge session {:juxt.pass/user user
-                          :juxt.pass/username username})
+          (merge session {:juxt.site/user user
+                          :juxt.site/username username})
           (.plusSeconds (.toInstant start-date) expires-in))
          (-> req
              (assoc :ring.response/status 302
@@ -239,9 +238,9 @@
           db
           '{:find [(pull ps [*])]
             :keys [protection-space]
-            :where [[ps ::site/type "https://meta.juxt.site/pass/protection-space"]
-                    [ps :juxt.pass/authentication-scope auth-scope]
-                    [ps :juxt.pass/canonical-root-uri root]
+            :where [[ps ::site/type "https://meta.juxt.site/site/protection-space"]
+                    [ps :juxt.site/authentication-scope auth-scope]
+                    [ps :juxt.site/canonical-root-uri root]
                     [(format "\\Q%s\\E%s" root auth-scope) regex]
                     [(re-pattern regex) regex-pattern]
                     [(re-matches regex-pattern uri)]
@@ -258,12 +257,12 @@
            (first
             (xt/q db '{:find [(pull sub [*]) (pull at [*])]
                        :keys [subject access-token]
-                       :where [[at :juxt.pass/token tok]
-                               [at ::site/type "https://meta.juxt.site/pass/access-token"]
-                               [at :juxt.pass/subject sub]
-                               [sub ::site/type "https://meta.juxt.site/pass/subject"]]
+                       :where [[at :juxt.site/token tok]
+                               [at ::site/type "https://meta.juxt.site/site/access-token"]
+                               [at :juxt.site/subject sub]
+                               [sub ::site/type "https://meta.juxt.site/site/subject"]]
                        :in [tok]} token68))]
-       (when subject (assoc req :juxt.pass/subject subject :juxt.pass/access-token access-token))))
+       (when subject (assoc req :juxt.site/subject subject :juxt.site/access-token access-token))))
    req))
 
 ;; TODO (idea): Tie bearer token to other security aspects such as remote IP so that
@@ -273,22 +272,22 @@
   (assert (::site/base-uri req))
   (let [xt-node (::site/xt-node req)
         subject {:xt/id (format "%s/_site/subjects/%s" (::site/base-uri req) (random-uuid))
-                 :juxt.site/type "https://meta.juxt.site/pass/subject"
-                 :juxt.pass/user-identity (:xt/id user-identity)
-                 :juxt.pass/protection-space (:xt/id protection-space)}
+                 :juxt.site/type "https://meta.juxt.site/site/subject"
+                 :juxt.site/user-identity (:xt/id user-identity)
+                 :juxt.site/protection-space (:xt/id protection-space)}
         ;; TODO: Replace this with a Flip tx-fn to ensure database consistency
         tx (xt/submit-tx xt-node [[:xtdb.api/put subject]])]
     (xt/await-tx xt-node tx)
     ;; TODO: Find an existing subject we can re-use or we create a subject for
     ;; every basic auth request. All attributes must match the above.
     (cond-> req
-      subject (assoc :juxt.pass/subject subject)
+      subject (assoc :juxt.site/subject subject)
       ;; We need to update the db because we have injected a subject and it will
       ;; need to be in the database for authorization rules to work.
       subject (assoc ::site/db (xt/db xt-node)))))
 
 (defn authenticate-with-basic-auth [req db token68 protection-spaces]
-  (when-let [{:juxt.pass/keys [canonical-root-uri realm] :as protection-space} (first protection-spaces)]
+  (when-let [{:juxt.site/keys [canonical-root-uri realm] :as protection-space} (first protection-spaces)]
     (let [[_ username password]
           (re-matches
            #"([^:]*):([^:]*)"
@@ -296,11 +295,11 @@
 
           query (cond-> '{:find [(pull e [*])]
                           :keys [identity]
-                          :where [[e ::site/type "https://meta.juxt.site/pass/user-identity"]
-                                  [e :juxt.pass/canonical-root-uri canonical-root-uri]
-                                  [e :juxt.pass/username username]]
+                          :where [[e ::site/type "https://meta.juxt.site/site/user-identity"]
+                                  [e :juxt.site/canonical-root-uri canonical-root-uri]
+                                  [e :juxt.site/username username]]
                           :in [username canonical-root-uri realm]}
-                  realm (update :where conj '[e :juxt.pass/realm realm]))
+                  realm (update :where conj '[e :juxt.site/realm realm]))
 
           candidates
           (xt/q db query username canonical-root-uri realm)]
@@ -309,7 +308,7 @@
         (log/warnf "Multiple candidates in basic auth found for username %s, using first found" username))
 
       (when-let [user-identity (:identity (first candidates))]
-        (when-let [password-hash (:juxt.pass/password-hash user-identity)]
+        (when-let [password-hash (:juxt.site/password-hash user-identity)]
           (when (password/check password password-hash)
             (find-or-create-basic-auth-subject req user-identity protection-space)))))))
 
@@ -320,8 +319,8 @@
   (www-authenticate
    (for [ps-id protection-spaces
          :let [ps (xt/entity db ps-id)
-               realm (:juxt.pass/realm ps)]]
-     {:juxt.reap.rfc7235/auth-scheme (:juxt.pass/auth-scheme ps)
+               realm (:juxt.site/realm ps)]]
+     {:juxt.reap.rfc7235/auth-scheme (:juxt.site/auth-scheme ps)
       :juxt.reap.rfc7235/auth-params
       (cond-> []
         realm (conj
@@ -337,13 +336,13 @@
       (or
        (authenticate-with-basic-auth
         req db token68
-        (filter #(= (:juxt.pass/auth-scheme %) "Basic") protection-spaces))
+        (filter #(= (:juxt.site/auth-scheme %) "Basic") protection-spaces))
        req)
 
       "bearer"
       (authenticate-with-bearer-auth
        req db token68
-       (filter #(= (:juxt.pass/auth-scheme %) "Bearer") protection-spaces))
+       (filter #(= (:juxt.site/auth-scheme %) "Bearer") protection-spaces))
 
       (throw
        (ex-info
@@ -363,8 +362,8 @@
 
   ;; TODO: This might be where we also add the 'on-behalf-of' info
 
-  (let [protection-spaces (keep #(xt/entity db %) (:juxt.pass/protection-spaces resource []))
-        ;;req (cond-> req protection-spaces (assoc :juxt.pass/protection-spaces protection-spaces))
+  (let [protection-spaces (keep #(xt/entity db %) (:juxt.site/protection-spaces resource []))
+        ;;req (cond-> req protection-spaces (assoc :juxt.site/protection-spaces protection-spaces))
         authorization-header (get-in req [:ring.request/headers "authorization"])]
 
     (cond-> req

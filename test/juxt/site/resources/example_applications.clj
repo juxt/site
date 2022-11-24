@@ -1,10 +1,10 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.pass.resources.example-applications
+(ns juxt.site.resources.example-applications
   (:require
    [clojure.string :as str]
    [juxt.site.init :as init :refer [substitute-actual-base-uri]]
-   [juxt.pass.resources.oauth :as oauth]
+   [juxt.site.resources.oauth :as oauth]
    [malli.core :as malli]))
 
 ;; These are example applications that are useful for testing

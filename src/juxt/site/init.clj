@@ -5,11 +5,10 @@
    [clojure.string :as str]
    [clojure.walk :refer [postwalk]]
    [malli.core :as malli]
-   [juxt.pass :as-alias pass]
-   [juxt.site.locator :refer [to-regex]]
-   [juxt.pass.actions :as actions]
    [juxt.reap.alpha.combinators :as p]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
+   [juxt.site.locator :refer [to-regex]]
+   [juxt.site.actions :as actions]
    [juxt.site :as-alias site]
    [juxt.site.main :as main]
    [xtdb.api :as xt]
@@ -50,8 +49,8 @@
     (cond->
         {::site/xt-node xt-node
          ::site/db (xt/db xt-node)
-         ::pass/subject subject
-         ::pass/action action
+         ::site/subject subject
+         ::site/action action
          ::site/base-uri (base-uri)}
       edn-arg (merge {::site/received-representation
                       {::http/content-type "application/edn"
@@ -67,7 +66,7 @@
    (let [xt-node (xt-node)
          db (xt/db xt-node)
          subject (when subject-id (xt/entity db subject-id))]
-     (::pass/action-result
+     (::site/action-result
       (actions/do-action
        (make-repl-request-context subject action-id edn-arg))))))
 
@@ -158,7 +157,7 @@
                 (when-not create (throw (ex-info (format "No creator for %s" id) {:id id})))
                 (if-not dry-run?
                   (conj acc (try
-                              (let [{::pass/keys [puts] :as result} (create v)]
+                              (let [{::site/keys [puts] :as result} (create v)]
                                 (when (and puts (not (contains? (set puts) id)))
                                   (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
                                 {:id id :status :created :result result})

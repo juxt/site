@@ -116,3 +116,11 @@
        (::http/content representation)
        (.getBytes (::http/content representation)
                   (get representation ::http/charset "UTF-8")))) 0 32)))
+
+(defn make-nonce
+  "This uses java.util.HexFormat which requires Java 17 and above. If required,
+  this can be re-coded, see
+  https://stackoverflow.com/questions/9655181/how-to-convert-a-byte-array-to-a-hex-string-in-java
+  and similar. For the size parameter, try 12."
+  [size]
+  (as-hex-str (random-bytes size)))

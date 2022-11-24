@@ -7,10 +7,6 @@
    [clojure.tools.logging :as log]
    [jsonista.core :as json]
    [juxt.http :as-alias http]
-   [juxt.pass :as-alias pass]
-   [juxt.pass.actions :as actions]
-   [juxt.pass.http-authentication :as http-authn]
-   [juxt.pass.session-scope :as session-scope]
    [juxt.pick.core :refer [rate-representation]]
    [juxt.pick.ring :refer [decode-maybe]]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
@@ -19,11 +15,14 @@
    [juxt.reap.alpha.rfc7230 :as-alias rfc7230]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
    [juxt.site :as-alias site]
+   [juxt.site.actions :as actions]
    [juxt.site.cache :as cache]
    [juxt.site.conditional :as conditional]
    [juxt.site.content-negotiation :as conneg]
+   [juxt.site.http-authentication :as http-authn]
    [juxt.site.locator :as locator]
    [juxt.site.response :as response]
+   [juxt.site.session-scope :as session-scope]
    [juxt.site.util :as util]
    [sci.core :as sci]
    [xtdb.api :as xt])
@@ -205,8 +204,7 @@
 
               {::http/body body}))))))))
 
-(defn GET [{::pass/keys [subject]
-            ::site/keys [selected-representation]
+(defn GET [{::site/keys [selected-representation subject]
             :ring.request/keys [method]
             :as req}]
 
@@ -214,7 +212,7 @@
   (let [req (assoc req :ring.response/status 200)
         ;; This use of 'first' is worrisome. Perhaps we should be merging the
         ;; results of every permitted action? TODO: resolve this
-        permitted-action (::pass/action (first (::pass/permitted-actions req)))]
+        permitted-action (::site/action (first (::site/permitted-actions req)))]
 
     (cond
 
@@ -223,7 +221,7 @@
       (and permitted-action (-> permitted-action ::site/transact))
       (actions/do-action
        (cond-> req
-         permitted-action (assoc ::pass/action (:xt/id permitted-action))
+         permitted-action (assoc ::site/action (:xt/id permitted-action))
          ;; A java.io.BufferedInputStream in the request can cause this error:
          ;; "invalid tx-op: Unfreezable type: class
          ;; java.io.BufferedInputStream".
@@ -249,13 +247,13 @@
                      (xt/pull (:juxt.site/db req) query eid))
                    }
 
-                  'juxt.pass
+                  'juxt.site
                   {'pull-allowed-resources
                    (fn [m]
                      (actions/pull-allowed-resources
                       (:juxt.site/db req)
                       m
-                      {:juxt.pass/subject subject
+                      {:juxt.site/subject subject
                        ;; TODO: Don't forget purpose
                        }))}})
 
@@ -300,13 +298,13 @@
 (defn perform-unsafe-method [req]
   (let [req (receive-representation req)
         ;; TODO: Should we fail if more than one permitted action available?
-        permitted-action (::pass/action (first (::pass/permitted-actions req)))
+        permitted-action (::site/action (first (::site/permitted-actions req)))
         ;; Default response status
         req (assoc req :ring.response/status 200)]
 
     (actions/do-action
      (-> req
-         (assoc ::pass/action (:xt/id permitted-action))
+         (assoc ::site/action (:xt/id permitted-action))
          ;; A java.io.BufferedInputStream in the request can provke this
          ;; error: "invalid tx-op: Unfreezable type: class
          ;; java.io.BufferedInputStream".
@@ -425,7 +423,7 @@
                 ;; redirections. In this case, we don't throw a 404, but return
                ;; the result of the action.
                ;; New note: let's not do this, but rather ensure that there is content, even if it's null content, on the redirection resource.
-               ;;(empty? (get-in resource [:juxt.site/methods :get :juxt.pass/actions]))
+               ;;(empty? (get-in resource [:juxt.site/methods :get :juxt.site/actions]))
                )
           (throw
            (ex-info
@@ -449,13 +447,13 @@
     (h (http-authn/authenticate req))))
 
 #_(defn wrap-authorize-with-acls [h]
-    (fn [{::pass/keys [session] ::site/keys [resource] :as req}]
-      (when (::pass/authorization resource)
+    (fn [{::site/keys [session resource] :as req}]
+      (when (::site/authorization resource)
         (log/debug "Already authorized")
         )
       (h (cond-> req
            ;; Only authorize if not already authorized
-           (not (::pass/authorization resource))
+           (not (::site/authorization resource))
            actions/authorize-resource))))
 
 #_(defn wrap-authorize-with-pdp
@@ -464,11 +462,11 @@
   ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
   ;; before checking any HTTP conditional header.".
   [h]
-  (fn [{:ring.request/keys [method] ::site/keys [db resource] ::pass/keys [subject session] :as req}]
-    (if (::pass/authorization resource)
+  (fn [{:ring.request/keys [method] ::site/keys [db resource subject session] :as req}]
+    (if (::site/authorization resource)
       ;; If authorization already established, this is sufficient
       (do
-        (log/debugf "pre-authorized: %s" (::pass/authorization resource))
+        (log/debugf "pre-authorized: %s" (::site/authorization resource))
         (h req))
       ;; Otherwise, authorize with PDP
       (let [request-context
@@ -488,8 +486,8 @@
                     (pdp/authorization db request-context))
 
             req (cond-> req
-                  true (assoc ::pass/request-context request-context)
-                  authz (update ::site/resource assoc ::pass/authorization authz)
+                  true (assoc ::site/request-context request-context)
+                  authz (update ::site/resource assoc ::site/authorization authz)
                   ;; If the max-content-length has been modified, update that in the
                   ;; resource
                   (::http/max-content-length authz)
@@ -497,15 +495,15 @@
                           assoc ::http/max-content-length (::http/max-content-length authz)))]
 
         (when (and (not= method :options)
-                   (not= (::pass/access authz) ::pass/approved))
+                   (not= (::site/access authz) ::site/approved))
           (let [status
                 (if (or
-                     (::pass/user subject)
+                     (::site/user subject)
                      ;; This is temporarily coupled to the new authz in order to
                      ;; generate a correct 403 response. We need to rework this
                      ;; to give these two authorization mechanisms independence
                      ;; from each other.
-                     (:juxt.pass.jwt/sub session))
+                     (:juxt.site.jwt/sub session))
                   403
                   401)]
             (throw
@@ -538,8 +536,8 @@
   (fn [{:ring.request/keys [method] :as req}]
 
     ;; Temporary assert while tracking down an issue
-    (assert (or (nil? (::pass/subject req)) (map? (::pass/subject req)))
-            (format "Subject must be a map, or nil: %s" (pr-str (::pass/subject req))))
+    (assert (or (nil? (::site/subject req)) (map? (::site/subject req)))
+            (format "Subject must be a map, or nil: %s" (pr-str (::site/subject req))))
 
     (h (case method
          (:get :head) (GET req)
@@ -553,7 +551,7 @@
   ;; Site-specific step: Check for any observers and 'run' them TODO:
   ;; Perhaps effects need to run against happy and sad paths - i.e. errors
   ;; - this should really be in a 'finally' block.
-  (fn [{::site/keys [xt-node] ::pass/keys [subject] :as req}]
+  (fn [{::site/keys [xt-node subject] :as req}]
 
     (let [db (xt/db xt-node) ; latest post-method db
           result (h req)
@@ -1141,7 +1139,7 @@
             (xt/submit-tx
              xt-node
              [[:xtdb.api/put (-> req ->storable
-                                (select-keys [:juxt.pass/subject
+                                (select-keys [:juxt.site/subject
                                               ::site/date
                                               ::site/uri
                                               :ring.request/method

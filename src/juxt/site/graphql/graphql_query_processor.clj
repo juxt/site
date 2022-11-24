@@ -4,7 +4,7 @@
   (:require
    [xtdb.api :as xt]
    [juxt.site.graphql.graphql-compiler :as gcompiler]
-   [juxt.pass.actions :as actions]))
+   [juxt.site.actions :as actions]))
 
 (defn graphql-query->xtdb-query
   "Transforms a graphql query string into an xtdb query
