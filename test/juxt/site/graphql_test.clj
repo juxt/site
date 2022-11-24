@@ -459,3 +459,117 @@ type Mutation {
 }
 "
       ))
+
+(defn evict-cascade-test-data []
+  "Function puts data into XTDB"
+  (submit-and-await!
+   [[:xtdb.api/put access-all-areas]
+
+    [:xtdb.api/put
+     {:xt/id "https://example.org/graphql"
+      :doc "A GraphQL endpoint"
+      :juxt.http.alpha/methods #{:post :put :options}
+      :juxt.http.alpha/acceptable "application/graphql"
+      :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/put-handler
+      :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/post-handler}]
+    
+
+    [:xtdb.api/put
+     {:xt/id "https://example.org/persons/ts1"
+      :type "Person"
+      :name "Testuser 1"}]
+    
+    [:xtdb.api/put
+     {:xt/id "https://example.org/persons/ts2"
+      :type "Person"
+      :name "Testuser 2"}]
+
+    [:xtdb.api/put
+     {:xt/id "https://example.org/house/hh1"
+      :type "House"
+      :name "House 1"
+      :ownerId "https://example.org/persons/ts2"
+      }]
+
+    [:xtdb.api/put
+     {:xt/id "https://example.org/house/hh2"
+      :type "House"
+      :name "House 2"
+      :ownerId "https://example.org/persons/ts2"
+      }]
+
+    [:xtdb.api/put
+     {:xt/id "https://example.org/house/hh3"
+      :type "House"
+      :name "House 3"
+      :ownerId "https://example.org/persons/ts1"
+      }]
+    ]))
+
+(def straight-evict-cascade-query
+  "
+mutation {
+  evictPerson(id: \"https://example.org/persons/ts2\"
+              cascadeKey: \"https://example.org/persons/ts2\"
+) { id }
+}
+")
+
+(defn testing-evict-cascade []
+  (evict-cascade-test-data)
+  ;; Install a GraphQL schema at /graphql
+  (let [schema
+        "schema {
+             query: Query
+             mutation: Mutation
+           }
+           type Query {
+                 persons: [Person]!
+                 person( id: ID! ): Person
+           }
+           type Mutation {
+                 deletePerson(id: ID!): Person @site(mutation: \"delete\")
+
+                 evictPerson(id: ID!): Person
+                    @site(mutation: \"evict-cascade\"
+                          cascadeKey: \"ownerId\")
+           }
+           type Person {
+                 id: ID!
+                 name: String @site(a: \"name\")
+                 house: [House] @site(ref: \"houseId\")
+           }
+           type House {
+                 id: ID!
+                 name: String @site(a: \"name\")
+                 owner: Person @site(ref: \"ownerId\")
+           }"]
+    
+    (is (= 204 (:ring.response/status (put-schema schema)))))
+
+  ;; POST a query to that schema
+  (comment (let [response (post-mutation "{ persons { id name } }")
+                 body (json/read-value (:ring.response/body response))]
+
+             (is (= 200 (:ring.response/status response)))))
+
+  ;; Testing that db contains all data
+
+  (is (= [(x/q (x/db *xt-node*) '{:find [e] :where [[e :type "Person"]]})
+          (x/q (x/db *xt-node*) '{:find [e]  :where [[e :type "House"]]})]
+         [#{["https://example.org/persons/ts2"] ["https://example.org/persons/ts1"]}
+          #{["https://example.org/house/hh2"] ["https://example.org/house/hh1"] ["https://example.org/house/hh3"]}]))
+
+  ;; Cascade evicting person xt/id: "https://example.org/persons/ts2" and all documents with ownerId: https://example.org/pesons/ts2
+
+  (is (= 200 (:ring.response/status (post-mutation straight-evict-cascade-query))))
+
+  ;; Testing that data has been evicted
+
+  (is (and (nil? ((x/q (x/db *xt-node*) '{:find [e] :where [[e :type "Person"]]}) ["https://example.org/persons/ts2"]))
+           (->> [["https://example.org/house/hh2"] ["https://example.org/house/hh1"]]
+                (map (x/q (x/db *xt-node*) '{:find [e] :where [[e :type "House"]]}))
+                (every? nil?)))))
+
+(deftest evict-cascade-test
+  (testing-evict-cascade))
