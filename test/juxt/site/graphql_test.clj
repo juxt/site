@@ -472,13 +472,13 @@ type Mutation {
       :juxt.http.alpha/acceptable "application/graphql"
       :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/put-handler
       :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/post-handler}]
-    
+
 
     [:xtdb.api/put
      {:xt/id "https://example.org/persons/ts1"
       :type "Person"
       :name "Testuser 1"}]
-    
+
     [:xtdb.api/put
      {:xt/id "https://example.org/persons/ts2"
       :type "Person"
@@ -524,7 +524,7 @@ mutation {
              mutation: Mutation
            }
            type Query {
-                 persons: [Person]!
+                 persons: [Person] @site(q: { find: [e] where: [[e {keyword: \"type\"} \"Person\"]]})
                  person( id: ID! ): Person
            }
            type Mutation {
@@ -544,14 +544,14 @@ mutation {
                  name: String @site(a: \"name\")
                  owner: Person @site(ref: \"ownerId\")
            }"]
-    
+
     (is (= 204 (:ring.response/status (put-schema schema)))))
 
   ;; POST a query to that schema
-  (comment (let [response (post-mutation "{ persons { id name } }")
-                 body (json/read-value (:ring.response/body response))]
-
-             (is (= 200 (:ring.response/status response)))))
+  (let [response (post-mutation "{ persons { id name } }")
+        body (json/read-value (:ring.response/body response))]
+             (is (= 200 (:ring.response/status response)))
+             (is (= 2 (-> body (get-in ["data" "persons"]) count))))
 
   ;; Testing that db contains all data
 
