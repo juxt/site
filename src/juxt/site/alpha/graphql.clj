@@ -494,6 +494,24 @@
         ;; TODO: Allow an argument to correspond to valid-time, via
         ;; @site(a: "xtdb.api/valid-time").
         (lookup-entity id))
+      "delete-cascade"
+      (let [id (validate-id! argument-values)
+            cascade-key (keyword (get site-args "cascadeKey"))
+            _ (when-not cascade-key
+                (throw (ex-info "evict-cascade requires a 'cascadeKey' site directive"
+                                {:site-args site-args})))
+            related-ids (map first
+                             (xt/q db {:find ['e]
+                                       :where [['e cascade-key id]]}))]
+        (log/warn "deleting" (conj (for [id related-ids]
+                                     (xt-delete id))
+                                   (xt-delete id)))
+        (await-tx xt-node (conj (for [id related-ids]
+                                  (xt-delete id))
+                                (xt-delete id)))
+        ;; TODO: Allow an argument to correspond to valid-time, via
+        ;; @site(a: "xtdb.api/valid-time").
+        {:xt/id id})
       "evict-cascade"
       (let [id (validate-id! argument-values)
             cascade-key (keyword (get site-args "cascadeKey"))
