@@ -3,26 +3,15 @@
 (ns juxt.site.whoami-test
   (:require
    [jsonista.core :as json]
-   [edn-query-language.core :as eql]
-   [juxt.site.eql-datalog-compiler :as eqlc]
-   [clojure.java.io :as io]
-   [clojure.test :refer [deftest is are testing use-fixtures]]
-   [java-http-clj.core :as hc]
-   [juxt.site.resources.openid :as openid]
+   [clojure.test :refer [deftest is use-fixtures]]
    [juxt.site.resources.oauth :as oauth]
    [juxt.site.resources.session-scope :as session-scope]
    [juxt.site.resources.user :as user]
    [juxt.site.resources.form-based-auth :as form-based-auth]
    [juxt.site.resources.example-users :as example-users]
    [juxt.site.resources.example-applications :as example-applications]
-   [juxt.site :as-alias site]
    [juxt.site.init :as init]
-   [juxt.site.repl :as repl]
-   [juxt.site.bootstrap :as bootstrap]
-   [juxt.test.util :refer [with-system-xt with-resources *handler* *xt-node* with-fixtures with-resources assoc-session-token with-handler assoc-session-token lookup-session-details]]
-   [ring.util.codec :as codec]
-   [xtdb.api :as xt]
-   [juxt.reap.alpha.regex :as re]))
+   [juxt.test.util :refer [with-system-xt with-resources *handler* with-resources with-handler]]))
 
 (use-fixtures :each with-system-xt with-handler)
 

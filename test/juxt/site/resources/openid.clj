@@ -807,7 +807,7 @@
        :juxt.site/action "https://example.org/actions/login-with-openid"
        :juxt.site/purpose nil})))))
 
-(defn grant-permission-to-invoke-action-exchange-code-for-id-token! [{:keys [id]}]
+(defn grant-permission-to-invoke-action-exchange-code-for-id-token! [_]
   (eval
    (substitute-actual-base-uri
     (quote

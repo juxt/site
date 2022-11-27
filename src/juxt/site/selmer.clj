@@ -2,13 +2,11 @@
 
 (ns juxt.site.selmer
   (:require
-   [clojure.tools.logging :as log]
    [xtdb.api :as xt]
    [selmer.parser :as selmer]
    selmer.filters
    selmer.tags
-   [juxt.site :as-alias site]
-   [juxt.http :as-alias http]))
+   [juxt.site :as-alias site]))
 
 (selmer/cache-off!)
 

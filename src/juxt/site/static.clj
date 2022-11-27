@@ -12,7 +12,7 @@
 (defn put-static-resource
   "PUT a new representation of the target resource. All other representations are
   replaced."
-  [{::site/keys [uri db received-representation start-date xt-node base-uri request-id] :as req}]
+  [{::site/keys [uri db received-representation start-date xt-node request-id] :as req}]
 
   (let [existing (xt/entity db uri)
         classification (get-in req [:ring.request/headers "site-classification"])

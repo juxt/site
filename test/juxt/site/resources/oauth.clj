@@ -2,9 +2,7 @@
 
 (ns juxt.site.resources.oauth
   (:require
-   [clojure.pprint :refer [pprint]]
    [clojure.string :as str]
-   [clojure.test :refer [deftest is are testing]]
    [juxt.site.util :refer [make-nonce]]
    [juxt.site.init :as init :refer [substitute-actual-base-uri]]
    [juxt.test.util :refer [*handler*]]
@@ -237,8 +235,7 @@
   "Authorize response"
   [{:juxt.site/keys [session-token]
     client-id "client_id"
-    scope "scope"
-    :as args}]
+    scope "scope"}]
   (let [state (make-nonce 10)
         request {:ring.request/method :get
                  :juxt.site/uri (substitute-actual-base-uri "https://example.org/oauth/authorize")

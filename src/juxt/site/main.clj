@@ -6,10 +6,7 @@
    [aero.core :as aero]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log]
-   [integrant.core :as ig]
-   [malli.core :as m]
-   [malli.registry :as mr]
-   ))
+   [integrant.core :as ig]))
 
 (def ^:dynamic *system* nil)
 
@@ -60,7 +57,7 @@
     (log/trace "TRACE on")
     (Thread/setDefaultUncaughtExceptionHandler
      (reify Thread$UncaughtExceptionHandler
-       (uncaughtException [_ thread throwable]
+       (uncaughtException [_ _ throwable]
          (throw (ex-info "Default Exception caught:" throwable)))))
 
     (.addShutdownHook

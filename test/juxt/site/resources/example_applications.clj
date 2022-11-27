@@ -2,10 +2,8 @@
 
 (ns juxt.site.resources.example-applications
   (:require
-   [clojure.string :as str]
-   [juxt.site.init :as init :refer [substitute-actual-base-uri]]
-   [juxt.site.resources.oauth :as oauth]
-   [malli.core :as malli]))
+   [juxt.site.init :as-alias init]
+   [juxt.site.resources.oauth :as oauth]))
 
 ;; These are example applications that are useful for testing
 

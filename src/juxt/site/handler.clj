@@ -205,7 +205,6 @@
               {::http/body body}))))))))
 
 (defn GET [{::site/keys [selected-representation subject]
-            :ring.request/keys [method]
             :as req}]
 
   (conditional/evaluate-preconditions! req)
@@ -411,7 +410,6 @@
 (defn wrap-find-current-representations
   [h]
   (fn [{:ring.request/keys [method]
-        ::site/keys [resource]
         :as req}]
     (if (#{:get :head :put} method)
       (let [cur-reps (seq (conneg/current-representations req))]
@@ -445,72 +443,6 @@
 (defn wrap-http-authenticate [h]
   (fn [req]
     (h (http-authn/authenticate req))))
-
-#_(defn wrap-authorize-with-acls [h]
-    (fn [{::site/keys [session resource] :as req}]
-      (when (::site/authorization resource)
-        (log/debug "Already authorized")
-        )
-      (h (cond-> req
-           ;; Only authorize if not already authorized
-           (not (::site/authorization resource))
-           actions/authorize-resource))))
-
-#_(defn wrap-authorize-with-pdp
-  ;; Do authorization as late as possible (in order to have as much data
-  ;; as possible to base the authorization decision on. However, note
-  ;; Section 8.5, RFC 4918 states "the server MUST do authorization checks
-  ;; before checking any HTTP conditional header.".
-  [h]
-  (fn [{:ring.request/keys [method] ::site/keys [db resource subject session] :as req}]
-    (if (::site/authorization resource)
-      ;; If authorization already established, this is sufficient
-      (do
-        (log/debugf "pre-authorized: %s" (::site/authorization resource))
-        (h req))
-      ;; Otherwise, authorize with PDP
-      (let [request-context
-            {'subject subject
-             'resource (dissoc resource ::http/body ::http/content)
-             'request (select-keys
-                       req
-                       [:ring.request/headers :ring.request/method :ring.request/path
-                        :ring.request/query :ring.request/protocol :ring.request/remote-addr
-                        :ring.request/scheme :ring.request/server-name :ring.request/server-post
-                        :ring.request/ssl-client-cert
-                        ::site/uri])
-             'representation (dissoc resource ::http/body ::http/content)
-             'environment {}}
-
-            authz (when (not= method :options)
-                    (pdp/authorization db request-context))
-
-            req (cond-> req
-                  true (assoc ::site/request-context request-context)
-                  authz (update ::site/resource assoc ::site/authorization authz)
-                  ;; If the max-content-length has been modified, update that in the
-                  ;; resource
-                  (::http/max-content-length authz)
-                  (update ::site/resource
-                          assoc ::http/max-content-length (::http/max-content-length authz)))]
-
-        (when (and (not= method :options)
-                   (not= (::site/access authz) ::site/approved))
-          (let [status
-                (if (or
-                     (::site/user subject)
-                     ;; This is temporarily coupled to the new authz in order to
-                     ;; generate a correct 403 response. We need to rework this
-                     ;; to give these two authorization mechanisms independence
-                     ;; from each other.
-                     (:juxt.site.jwt/sub session))
-                  403
-                  401)]
-            (throw
-             (ex-info
-              (case status 401  "Unauthorized" 403 "Forbidden")
-              {::site/request-context (assoc req :ring.response/status status)}))))
-        (h req)))))
 
 (defn wrap-method-not-allowed? [h]
   (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
@@ -546,33 +478,6 @@
          :patch (PATCH req)
          :delete (DELETE req)
          :options (OPTIONS req)))))
-
-(defn wrap-triggers [h]
-  ;; Site-specific step: Check for any observers and 'run' them TODO:
-  ;; Perhaps effects need to run against happy and sad paths - i.e. errors
-  ;; - this should really be in a 'finally' block.
-  (fn [{::site/keys [xt-node subject] :as req}]
-
-    (let [db (xt/db xt-node) ; latest post-method db
-          result (h req)
-
-          triggers
-          (map first
-               (xt/q db '{:find [rule]
-                         :where [[rule ::site/type "Trigger"]]}))
-
-          request-context
-          {'subject subject
-           'request (select-keys
-                     req
-                     [:ring.request/headers :ring.request/method :ring.request/path
-                      :ring.request/query :ring.request/protocol :ring.request/remote-addr
-                      :ring.request/scheme :ring.request/server-name :ring.request/server-post
-                      :ring.request/ssl-client-cert
-                      ::site/uri])
-           'environment {}}]
-
-      result)))
 
 (defn wrap-security-headers [h]
   (fn [req]
@@ -641,7 +546,7 @@
            (#(take 64 %)))))))
 
 (defn log-request! [{:ring.request/keys [method]
-                     :juxt.site/keys [base-uri uri]
+                     :juxt.site/keys [uri]
                      :as req}]
   (assert method)
   (log/infof
@@ -651,7 +556,7 @@
    (:ring.response/status req)))
 
 (defn respond
-  [{::site/keys [selected-representation start-date base-uri request-id]
+  [{::site/keys [selected-representation start-date request-id]
     :ring.request/keys [method]
     :ring.response/keys [body]
     :as req}]
@@ -762,7 +667,7 @@
 
 (defn put-error-representation
   "If method is PUT"
-  [{::site/keys [resource] :ring.response/keys [status] :as req} e]
+  [{::site/keys [resource] :ring.response/keys [status] :as req}]
   (let [{::http/keys [put-error-representations]} resource
         put-error-representations
         (filter
@@ -778,7 +683,7 @@
 
 (defn post-error-representation
   "If method is POST"
-  [{::site/keys [resource] :ring.response/keys [status] :as req} e]
+  [{::site/keys [resource] :ring.response/keys [status] :as req}]
   (let [{::http/keys [post-error-representations]} resource
         post-error-representations
         (filter
@@ -819,7 +724,7 @@
   "Experimental. Not sure this is a good idea to have a 'global' error
   resource. Better to merge error handling into each resource (using the
   resource locator)."
-  [req e]
+  [req]
   (let [{:ring.response/keys [status]} req]
 
     (when-let [er (error-resource req (or status 500))]
@@ -887,9 +792,9 @@
 
         representation
         (or
-         (when (= method :put) (put-error-representation req e))
-         (when (= method :post) (post-error-representation req e))
-         (error-resource-representation req e)
+         (when (= method :put) (put-error-representation req))
+         (when (= method :post) (post-error-representation req))
+         (error-resource-representation req)
 
          ;; Some default representations for errors
          (some->
@@ -1162,11 +1067,11 @@
       {:ring.response/status 200 :ring.response/body "Site OK!\r\n"}
       (h req))))
 
-(defn service-available? [req]
+(defn service-available? [_]
   true)
 
 (defn wrap-service-unavailable?
-  ""
+  "Check whether service is available, return 503 if it isn't."
   [h]
   (fn [req]
     (when-not (service-available? req)
@@ -1239,13 +1144,6 @@
    ;; Find representations and possibly do content negotiation
    wrap-find-current-representations
    wrap-negotiate-representation
-
-   ;; Authorize - deprecated
-   #_wrap-authorize-with-acls
-   #_wrap-authorize-with-pdp
-
-   ;; Custom middleware for Site
-   #_wrap-triggers
 
    ;; Create initial response
    wrap-initialize-response

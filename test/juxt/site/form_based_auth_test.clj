@@ -8,7 +8,7 @@
    [juxt.site.resources.example-users :as example-users]
    [juxt.site.resources.session-scope :as session-scope]
    [juxt.site.resources.user :as user]
-   [juxt.test.util :refer [*handler* with-fixtures with-resources with-system-xt with-handler]]))
+   [juxt.test.util :refer [*handler* with-resources with-system-xt with-handler]]))
 
 (use-fixtures :each with-system-xt with-handler)
 

@@ -8,9 +8,7 @@
 
 (ns juxt.site.openid-connect
   (:require
-   [clojure.tools.logging :as log]
-   [juxt.site :as-alias site]
-   [xtdb.api :as-alias xt])
+   [clojure.tools.logging :as log])
   (:import
    (com.auth0.jwt.exceptions JWTVerificationException)
    (com.auth0.jwt JWT)

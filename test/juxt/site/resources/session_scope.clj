@@ -2,10 +2,7 @@
 
 (ns juxt.site.resources.session-scope
   (:require
-   [juxt.site.init :as init :refer [substitute-actual-base-uri]]
-   [juxt.site :as-alias site]
-   xtdb.api
-   ))
+   [juxt.site.init :as init :refer [substitute-actual-base-uri]]))
 
 (defn create-action-put-session-scope! [_]
   (eval

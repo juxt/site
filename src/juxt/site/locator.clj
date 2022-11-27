@@ -2,77 +2,9 @@
 
 (ns juxt.site.locator
   (:require
-   [clojure.tools.logging :as log]
    [clojure.string :as str]
    [xtdb.api :as xt]
-   [juxt.site :as-alias site]
-   [juxt.http :as-alias http]))
-
-#_(defn locate-with-locators [db req]
-    (let [uri (::site/uri req)]
-      (when-let [locators
-                 (seq (xt/q
-                       db
-                       '{:find [r
-                                grps]
-
-                         :where [(or [r ::site/type "AppRoutes"]
-
-                                     ;; Same as AppRoutes, but a more appropriate
-                                     ;; name in the case of a resource that isn't
-                                     ;; found in the database but does need to
-                                     ;; exist for the purposes of defining PUT
-                                     ;; semantics.
-                                     [r ::site/type "VirtualResource"]
-
-                                     ;; Deprecated because it relies on code
-                                     ;; deployed and we want to avoid this unless
-                                     ;; no alternative is possible.
-                                     [r ::site/type "ResourceLocator"])
-
-                                 [r ::site/pattern p]
-                                 [(first grps) grp0]
-                                 [(some? grp0)]
-                                 [(re-pattern p) pat]
-                                 [(re-matches pat uri) grps]]
-
-                         :in [uri]} uri))]
-
-        (when (> (count locators) 1)
-          (throw
-           (ex-info
-            "Multiple resource locators returned from query that match URI"
-            {::locators (map :xt/id locators)
-             ::site/request-context (assoc req :ring.response/status 500)})))
-
-        (let [[e grps] (first locators)
-              {typ ::site/type :as locator} (xt/entity db e)]
-          (case typ
-            "ResourceLocator"
-            (let [{::site/keys [locator-fn description]} locator]
-              (when-not locator-fn
-                (throw
-                 (ex-info
-                  "Resource locator must have a :juxt.site/locator attribute"
-                  {::locator locator
-                   ::site/request-context (assoc req :ring.response/status 500)})))
-
-              (when-not (symbol? locator-fn)
-                (throw
-                 (ex-info
-                  "Resource locator must be a symbol"
-                  {::locator locator
-                   ::locator-fn locator-fn
-                   ::site/request-context (assoc req :ring.response/status 500)})))
-
-
-              (log/debug "Requiring resolve of" locator-fn)
-              (let [f (requiring-resolve locator-fn)]
-                (log/debugf "Calling locator-fn %s: %s" locator-fn description)
-                (f {:db db :request req :locator locator :grps grps})))
-
-            ("AppRoutes" "VirtualResource") locator)))))
-
+   [juxt.site :as-alias site]))
 
 ;; TODO: Definitely a candidate for clojure.core.cache (or memoize). Always be
 ;; careful using memoize, but in case performance is scarcer than memory.
@@ -81,7 +13,7 @@
    (re-pattern
     (str/replace
      uri-template
-     #"\{([^\}]+)\}"                      ; e.g. {id}
+     #"\{([^\}]+)\}"                    ; e.g. {id}
      (fn replacer [[_ group]]
        ;; Instead of using the regex of path parameter's schema, we use a
        ;; weak regex that includes anything except forward slashes, question
@@ -123,7 +55,7 @@
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
   in :default."
-  [{::site/keys [db uri base-uri] :as req}]
+  [{::site/keys [db uri base-uri]}]
 
   (assert uri)
   (assert base-uri)
@@ -140,21 +72,6 @@
 
    ;; Is it found by any resource locators registered in the database?
    (match-uri-templated-uris db uri)
-
-   ;; Is it a redirect?  Deprecated - not sure we need such a resource - we can
-   ;; always create a normal resource with a GET action now
-   #_(when-let [[r loc] (first
-                         (xt/q db '{:find [r loc]
-                                    :where [[r ::site/resource uri]
-                                            [r ::site/location loc]
-                                            [r ::site/type "Redirect"]]
-                                    :in [uri]}
-                               uri))]
-       {::site/uri uri
-        ::site/methods {:get {} :head {} :options {}}
-        ::site/resource-provider r
-        ::http/redirect (cond-> loc (.startsWith loc base-uri)
-                                (subs (count base-uri)))})
 
    ;; This can be put into the database to override the ::default-empty-resource
    ;; default.

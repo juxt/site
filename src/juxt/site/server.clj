@@ -10,7 +10,7 @@
   (:import (java.lang.management ManagementFactory)
            (org.eclipse.jetty.jmx MBeanContainer)))
 
-(defmethod ig/init-key ::server [_ {::site/keys [xt-node port base-uri dynamic?] :as opts}]
+(defmethod ig/init-key ::server [_ {::site/keys [port dynamic?] :as opts}]
   (log/infof "Starting Jetty server on port %d" port)
   (let [mb-container (MBeanContainer. (ManagementFactory/getPlatformMBeanServer))]
     (doto

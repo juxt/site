@@ -2,15 +2,11 @@
 
 (ns juxt.site.bootstrap
   (:require
-   [clojure.edn :as edn]
-   [clojure.java.io :as io]
-   [clojure.set :as set]
-   [juxt.site.init :refer [put! base-uri substitute-actual-base-uri converge! do-action]]
+   [juxt.site.init :refer [put! base-uri substitute-actual-base-uri converge!]]
    [juxt.site.actions :as actions]
    [juxt.site.resources.openid :as openid]
    [juxt.site.resources.session-scope :as session-scope]
-   [juxt.site.resources.user :as user]
-   [juxt.site :as-alias site]))
+   [juxt.site.resources.user :as user]))
 
 (defn install-system-subject! [_]
   (eval

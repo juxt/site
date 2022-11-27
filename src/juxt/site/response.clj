@@ -5,7 +5,7 @@
    [juxt.http :as-alias http]
    [juxt.site :as-alias site]))
 
-(defn add-payload [{::site/keys [selected-representation db subject]
+(defn add-payload [{::site/keys [selected-representation ]
                     :ring.request/keys [method]
                     :as req}]
   ;; Should not be called if method is HEAD
@@ -29,13 +29,14 @@
       body (assoc req :ring.response/body body)
       :else req)))
 
-(defn add-error-payload [{::site/keys [selected-representation db subject]
-                          :ring.request/keys [method]
-                          :as req}]
+(defn add-error-payload
+  [{::site/keys [selected-representation]
+    :ring.request/keys [method]
+    :as req}]
   ;; Should not be called if method is HEAD
   (assert (not= method :head))
 
-  (let [{::http/keys [body content] ::site/keys [body-fn]} selected-representation]
+  (let [{::http/keys [body content]} selected-representation]
     (cond
       content (assoc req :ring.response/body content)
       body (assoc req :ring.response/body body)

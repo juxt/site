@@ -7,7 +7,7 @@
    [nrepl.server :refer [start-server stop-server]]
    [juxt.site :as-alias site]))
 
-(defmethod ig/init-key ::server [_ {::site/keys [port] :as opts}]
+(defmethod ig/init-key ::server [_ {::site/keys [port]}]
   (log/infof "Starting nREPL server on port %d" port)
   (start-server :port port))
 

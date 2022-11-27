@@ -5,10 +5,8 @@
    [clojure.java.io :as io]
    [juxt.site.handler :as h]
    [juxt.site.main :as main]
-   [juxt.site.actions :as authz]
    [juxt.site.init :as init]
    [juxt.site.bootstrap :as bootstrap]
-   [juxt.http :as-alias http]
    [juxt.site :as-alias site]
    [xtdb.api :as xt])
   (:import
@@ -103,7 +101,7 @@
            session-token))))
 
 (defn assoc-session-token [req session-token]
-  (let [{:keys [session scope]}
+  (let [{:keys [scope]}
         (lookup-session-details session-token)
 
         {:juxt.site/keys [cookie-name]} scope]

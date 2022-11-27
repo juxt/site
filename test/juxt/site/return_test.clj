@@ -2,7 +2,7 @@
 
 (ns juxt.site.return-test
   (:require
-   [clojure.test :refer [deftest is are testing]]
+   [clojure.test :refer [deftest is]]
    [juxt.site.return :refer [return]]
    [juxt.site :as-alias site]))
 

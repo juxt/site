@@ -7,7 +7,6 @@
    [juxt.site.init :as init :refer [put!]]
    [juxt.site.repl :as repl]
    [juxt.site :as-alias site]
-   [xtdb.api :as xt]
    [clojure.java.io :as io]
    [juxt.site.graphql.graphql-query-processor :as graphql-proc]
    [juxt.site.graphql.graphql-compiler :as gcompiler]))

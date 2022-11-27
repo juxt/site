@@ -4,7 +4,6 @@
   (:require
    [clojure.core.server :as s]
    [clojure.main :as m]
-   [clojure.pprint :refer [pprint]]
    [puget.printer :as puget]))
 
 (defn repl-init

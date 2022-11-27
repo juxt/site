@@ -2,9 +2,7 @@
 
 (ns juxt.site.resources.form-based-auth
   (:require
-   [juxt.site.session-scope :as session-scope]
    [clojure.java.io :as io]
-   [clojure.edn :as edn]
    [juxt.site.init :as init :refer [substitute-actual-base-uri]]
    [malli.core :as malli]
    [ring.util.codec :as codec]))
@@ -251,17 +249,15 @@ Password: <input name=password type=password>
 
 (defn login-with-form!
   "Return a session id (or nil) given a map of fields."
-  [handler & {:juxt.site/keys [uri] :as args}]
+  [handler & {:as args}]
   {:pre [(malli/validate
           [:map
-           ;;[:juxt.site/uri [:re "https://.*"]]
            [:juxt.site/uri [:re "https://.*"]]
            ["username" [:string {:min 2}]]
            ["password" [:string {:min 6}]]] args)]}
   (let [form (codec/form-encode (dissoc args :juxt.site/uri))
         body (.getBytes form)
-        req {;;:juxt.site/uri uri
-             :juxt.site/uri (:juxt.site/uri args)
+        req {:juxt.site/uri (:juxt.site/uri args)
              :ring.request/method :post
              :ring.request/headers
              {"content-length" (str (count body))

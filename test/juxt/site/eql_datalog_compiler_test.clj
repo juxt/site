@@ -20,7 +20,6 @@
    [juxt.site.eql-datalog-compiler :as eqlc]
    [juxt.site.graphql-eql-compiler :refer [graphql->eql-ast]]
    [juxt.site.init :as init]
-   [juxt.site.logging :refer [with-logging]]
    [juxt.test.util :refer [with-system-xt with-resources with-handler *xt-node* *handler*] :as tutil]
    [xtdb.api :as xt]))
 
@@ -749,26 +748,7 @@
                ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
                })
              )
-            _ (is (nil? error) (format "OAuth2 grant error: %s" error))
-
-            carlos-session-token
-            (form-based-auth/login-with-form!
-             *handler*
-             :juxt.site/uri "https://site.test/login"
-             "username" "carlos"
-             "password" "jackal")
-            {carlos-access-token "access_token"
-             error "error"}
-            (oauth/authorize!
-             (merge
-              carlos-session-token
-              {"client_id" "local-terminal"
-               ;;"scope" ["https://site.test/oauth/scope/read-personal-data"]
-               })
-             )
-            _ (is (nil? error) (format "OAuth2 grant error: %s" error))
-
-            ]
+            _ (is (nil? error) (format "OAuth2 grant error: %s" error))]
 
         ;; Add a /patient/XXX resource to serve an individual patient.
 
@@ -1363,7 +1343,7 @@
              :juxt.site/uri "https://site.test/login"
              "username" "alice"
              "password" "garden")
-            {alice-access-token "access_token" error "error"}
+            {alice-access-token "access_token"}
             (oauth/authorize!
              (merge
               alice-session-token

@@ -2,7 +2,6 @@
 
 (ns juxt.site.graphql.graphql-compiler
   (:require
-   [clojure.set :as set]
    [juxt.grab.alpha.parser :as parser]
    [juxt.grab.alpha.document :as document]
    [juxt.grab.alpha.graphql :as-alias graphql]
@@ -128,9 +127,8 @@
       (let [inner-results (flatten (map #(selection-set->name-scoped-name-pair
                                           schema %)
                                         inner-type-entries))]
-        (set/union inner-results current-level-entries))
+        (distinct (concat inner-results current-level-entries)))
       current-level-entries)))
-
 
 (defn query-doc->actions
   [query-document schema]
@@ -145,7 +143,7 @@
                           (cond
                             (vector? actions) (into acc actions)
                             (some? actions) (conj acc actions)
-                            :default (throw
+                            :else (throw
                                       (ex-info
                                        "Failed to find linked actions for field. Ensure @site directive is available in the schema for this field."
                                        {:target-pair n :schema schema})))

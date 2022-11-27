@@ -2,7 +2,7 @@
 
 (ns juxt.site.cors-test
   (:require
-   [clojure.test :refer [deftest is are testing]]
+   [clojure.test :refer [deftest is]]
    [juxt.site.handler :refer [access-control-match-origin]]
    [juxt.site :as-alias site]))
 

@@ -12,7 +12,7 @@
    [juxt.site.actions :as actions]
    [juxt.site :as-alias site]
    [juxt.site.cache :as cache]
-   [juxt.site.init :as init :refer [config base-uri xt-node system put! do-action]]
+   [juxt.site.init :as init :refer [config base-uri xt-node]]
    [juxt.site.util :as util]
    [xtdb.api :as xt]
    [juxt.site.repl :as repl])
@@ -141,7 +141,6 @@
                   {:eof :eof :readers edn-readers}
                   in)
                  (catch Exception e
-                   (def in in)
                    (prn (.getMessage e))))]
     (cond
       (nil? record)
@@ -187,13 +186,6 @@
            (string? s)
            (str/replace pat (fn [x] (get mapping x)))))
        ent))))
-
-(comment
-  (export-resources
-   {:pred (fn [x] (or (= (:juxt.home/type x) "Person")))
-    :filename "/home/mal/Sync/persons.edn"
-    :uri-mapping {"http://localhost:2021"
-                  "https://home.juxt.site"}}))
 
 (defn export-resources
   "Export all resources to a file."
