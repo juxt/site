@@ -178,12 +178,3 @@
                               "juxt.site/user-identity"
                               "juxt.site/user"
                               "name"] body)))))))))
-
-;; Note: If we try to login (with basic), we'll won't need to user 'put' (which will
-;; lead to dangerously brittle tests if/when we change the structure of internal
-;; documents like sessions and session-tokens).
-
-;; TODO
-;; Login alice with basic (ensuring session scope exists)
-;; Passing the session-token as a cookie, call the /whoami resource.
-;; Build the functionality of GET /whoami into the action (in the prepare part of the transaction)
