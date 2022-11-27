@@ -12,9 +12,7 @@
 
 (use-fixtures :each with-system-xt with-handler)
 
-;;deftest login-with-form-test
-
-(with-fixtures
+(deftest login-with-form-test
   (with-resources
     ^{:dependency-graphs
       #{session-scope/dependency-graph
@@ -32,6 +30,4 @@
                   :juxt.site/uri "https://site.test/login"
                   "username" "ALICE"
                   "password" "garden")]
-      result
-      ;;(is (malli/validate [:map [:juxt.site/session-token :string]] result))
-      )))
+      (is (malli/validate [:map [:juxt.site/session-token :string]] result)))))
