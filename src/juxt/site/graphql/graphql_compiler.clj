@@ -2,6 +2,7 @@
 
 (ns juxt.site.graphql.graphql-compiler
   (:require
+   [clojure.set :as set]
    [juxt.grab.alpha.parser :as parser]
    [juxt.grab.alpha.document :as document]
    [juxt.grab.alpha.graphql :as-alias graphql]
@@ -127,7 +128,7 @@
       (let [inner-results (flatten (map #(selection-set->name-scoped-name-pair
                                           schema %)
                                         inner-type-entries))]
-        (clojure.set/union inner-results current-level-entries))
+        (set/union inner-results current-level-entries))
       current-level-entries)))
 
 
