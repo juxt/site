@@ -4,20 +4,17 @@
   (:require
    [clojure.tools.logging :as log]
    [crypto.password.bcrypt :as bcrypt]
-   [juxt.site.openid-connect :as openid-connect]
    [java-http-clj.core :as hc]
-   [sci.core :as sci]
-   [malli.core :as malli]
-   [malli.error :a me]
-   [ring.util.codec :as codec]
-   [crypto.password.bcrypt :as bcrypt]
-   [juxt.site.util :refer [make-nonce]]
-   [juxt.site.util :refer [random-bytes]]
-   [juxt.site.http-authentication :as http-authn]
+   [jsonista.core :as json]
    [juxt.site :as-alias site]
+   [juxt.site.http-authentication :as http-authn]
+   [juxt.site.openid-connect :as openid-connect]
+   [juxt.site.util :refer [make-nonce]]
+   [malli.core :as malli]
+   [ring.util.codec :as codec]
+   [sci.core :as sci]
    [xtdb.api :as xt]
-   juxt.site.schema
-   [jsonista.core :as json]))
+   juxt.site.schema))
 
 (defn actions->rules
   "Determine rules for the given action ids. Each rule is bound to the given
@@ -39,7 +36,7 @@
 ;; authorization is denied and we don't know why. A better authorization
 ;; debugger is definitely required.
 (defn ^{:private true} query-permissions
-  [{:keys [db rules subject actions resource purpose] :as args}]
+  [{:keys [db rules subject actions resource purpose]}]
   (assert (or (nil? subject) (string? subject)))
   (assert (or (nil? resource) (string? resource)))
   (let [query {:find '[(pull permission [*]) (pull action [*])]
@@ -192,7 +189,7 @@
 (defn pull-allowed-resource
   "Given a subject, a set of possible actions and a resource, pull the allowed
   attributes."
-  [db actions resource {::site/keys [subject purpose] :as ctx}]
+  [db actions resource ctx]
   (let [check-result
         (check-permissions
          db
@@ -258,14 +255,10 @@
     ;; TODO: Too complex, extract this and unit test. The purpose here it to
     ;; apply the pull of each relevant action to each result, and merge the
     ;; results into a single map.
-
-    #_(throw (ex-info "HERE DEBUG" {:db db
-                                  :resource-groups (group-by :resource results)}))
-
     (doall
      (for [[resource resource-group] (group-by :resource results)]
        (apply merge
-              (for [{:keys [action purpose permission]}
+              (for [{:keys [action]}
                     ;; TODO: Purpose and permission are useful metadata, how do
                     ;; we retain in the result? with-meta?
                     resource-group]
@@ -324,8 +317,9 @@
              :schema schema})))
         input))}
 
-   'ring.util.codec {'form-encode codec/form-encode
-                     'form-decode codec/form-decode}})
+   'ring.util.codec
+   {'form-encode codec/form-encode
+    'form-decode codec/form-decode}})
 
 (defn do-action-in-tx-fn
   "This function is applied within a transaction function. It should be fast, but
@@ -338,7 +332,7 @@
     purpose ::site/purpose
     base-uri ::site/base-uri
     prepare ::site/prepare
-    :as ctx} args]
+    :as ctx}]
   (let [db (xt/db xt-ctx)
         tx (xt/indexing-tx xt-ctx)]
     (try
@@ -378,11 +372,7 @@
         (when-not (seq check-permissions-result)
           (throw (ex-info "Action denied" ctx)))
 
-        (let [env (assoc
-                   ctx
-                   ::site/db db
-                   ::site/permissions (map ::site/permission check-permissions-result))
-              fx
+        (let [fx
               (cond
                 ;; Official: sci
                 (-> action-doc ::site/transact :juxt.site.sci/program)
@@ -591,7 +581,7 @@
 (defn install-do-action-fn [uri]
   {:xt/id (str uri "/_site/do-action")
    :xt/fn '(fn [xt-ctx ctx & args]
-             (juxt.site.actions/do-action-in-tx-fn xt-ctx ctx args))})
+             (juxt.site.actions/do-action-in-tx-fn xt-ctx ctx))})
 
 ;; Remove anything in the ctx that will upset nippy. However, in the future
 ;; we'll definitely want to record all inputs to actions, so this is an

@@ -29,7 +29,7 @@
   (valAt [this k not-found] (or (.valAt this k) not-found))
 
   clojure.lang.Seqable
-  (seq [_] (keep (fn [[k sr]] (when-some [v (.get sr)] v)) @a))
+  (seq [_] (keep (fn [[_ sr]] (when-some [v (.get sr)] v)) @a))
 
   ICache
   (put! [_ k obj]

@@ -14,10 +14,7 @@
    malli.dev.pretty
    [malli.dev :as md]
    juxt.site.schema
-   juxt.pass.schema
-   juxt.pass.actions
    [juxt.http :as-alias http]
-   [juxt.pass :as-alias pass]
    [juxt.site :as-alias site]
    xtdb.query
    fipp.ednize

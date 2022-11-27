@@ -2,9 +2,6 @@
 
 (ns juxt.site.whoami-test
   (:require
-   [clojure.edn :as edn]
-   [juxt.site.logging :refer [with-logging]]
-   [clojure.tools.logging :as log]
    [jsonista.core :as json]
    [edn-query-language.core :as eql]
    [juxt.site.eql-datalog-compiler :as eqlc]

@@ -4,12 +4,10 @@
   (:require
    [clojure.tools.logging :as log]
    [juxt.http :as-alias http]
-   [juxt.site :as-alias site]
    [juxt.reap.alpha.decoders :as reap]
-   [juxt.reap.alpha.rfc7232 :as rfc7232]
-   [juxt.reap.alpha.rfc7230 :as-alias rfc7230]
    [juxt.reap.alpha.rfc7231 :as-alias rfc7231]
-   [juxt.reap.alpha.rfc7232 :as-alias rfc7232]))
+   [juxt.reap.alpha.rfc7232 :as rfc7232]
+   [juxt.site :as-alias site]))
 
 (defn evaluate-if-match!
   "Evaluate an If-None-Match precondition header field in the context of a
