@@ -25,9 +25,6 @@
     <appender-ref ref="CONSOLE" />
   </root>
 
-  <logger name="juxt.apex" level="DEBUG"/>
-  <logger name="juxt.dave" level="DEBUG"/>
-  <logger name="juxt.pass" level="DEBUG"/>
   <logger name="juxt.site" level="DEBUG"/>
 
   <!-- Make java.util.logging more efficient at disabled levels.
