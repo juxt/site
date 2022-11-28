@@ -566,7 +566,7 @@
          {:juxt.site/actions #{"https://site.test/actions/list-patients"}}}
         :juxt.site/protection-spaces #{"https://site.test/protection-spaces/bearer"}
         ::http/content-type "application/json"
-        :juxt.http/respond
+        :juxt.site/respond
         {:juxt.site.sci/program
          (pr-str
           '(let [content (jsonista.core/write-value-as-string *state*)]

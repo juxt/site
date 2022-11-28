@@ -226,7 +226,7 @@
          ;; java.io.BufferedInputStream".
          (:ring.request/body req) (dissoc :ring.request/body)))
 
-      (-> resource :juxt.http/respond :juxt.site.sci/program)
+      (-> resource :juxt.site/respond :juxt.site.sci/program)
       (let [state
             (when-let [program (-> permitted-action :juxt.site/state :juxt.site.sci/program)]
               (sci/eval-string
@@ -262,7 +262,7 @@
                  'java.time.Duration java.time.Duration}}))
 
             respond-program
-            (-> resource :juxt.http/respond :juxt.site.sci/program)
+            (-> resource :juxt.site/respond :juxt.site.sci/program)
 
             response
             (sci/eval-string

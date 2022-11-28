@@ -95,8 +95,7 @@
                  {:get {:juxt.site/actions #{"https://example.org/actions/whoami"}}}
                  :juxt.site/variant-of "https://example.org/whoami"
                  :juxt.http/content-type "application/json"
-                 ;; TODO: Rename to :juxt.site/respond
-                 :juxt.http/respond
+                 :juxt.site/respond
                  {:juxt.site.sci/program
                   (pr-str
                    '(let [content (jsonista.core/write-value-as-string *state*)]
@@ -117,7 +116,7 @@
                  {:get {:juxt.site/actions #{"https://example.org/actions/whoami"}}}
                  :juxt.site/variant-of "https://example.org/whoami"
                  :juxt.http/content-type "text/html;charset=utf-8"
-                 :juxt.http/respond
+                 :juxt.site/respond
                  {:juxt.site.sci/program
                   (pr-str
                    '(let [content (format "<h1>Hello World! state is %s</h1>\n" (pr-str *state*))]
