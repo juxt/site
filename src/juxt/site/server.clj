@@ -5,12 +5,11 @@
    [clojure.tools.logging :as log]
    [integrant.core :as ig]
    [ring.adapter.jetty :refer [run-jetty]]
-   [juxt.site.handler :refer [make-handler]]
-   [juxt.site :as-alias site])
+   [juxt.site.handler :refer [make-handler]])
   (:import (java.lang.management ManagementFactory)
            (org.eclipse.jetty.jmx MBeanContainer)))
 
-(defmethod ig/init-key ::server [_ {::site/keys [port dynamic?] :as opts}]
+(defmethod ig/init-key ::server [_ {:juxt.site/keys [port dynamic?] :as opts}]
   (log/infof "Starting Jetty server on port %d" port)
   (let [mb-container (MBeanContainer. (ManagementFactory/getPlatformMBeanServer))]
     (doto

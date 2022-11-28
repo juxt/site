@@ -4,7 +4,6 @@
   (:require
    [clojure.walk :refer [postwalk]]
    [juxt.site.actions :as actions]
-   [juxt.site :as-alias site]
    [xtdb.api :as xt]))
 
 (defn- compile-ast*
@@ -12,25 +11,25 @@
   (assert (map? ctx))
   (assert (number? (:depth ctx)))
   (let [depth (:depth ctx)
-        action-id (-> ast :params ::site/action)
+        action-id (-> ast :params :juxt.site/action)
         _ (assert action-id "Action must be specified on metadata")
         action (when action-id (xt/entity db action-id))
         _ (when action-id (assert action (format "Action not found: %s" action-id)))
         rules (when action (actions/actions->rules db #{action-id}))
         _ (when action (assert (seq rules) (format "No rules found for action %s" action-id)))
 
-        parent-action (::site/action ctx)
+        parent-action (:juxt.site/action ctx)
 
         additional-where-clauses
         (concat
          ;; Context
          (when-let [parent-action-id (:xt/id parent-action)]
-           (get-in action [::site/action-contexts parent-action-id ::site/additional-where-clauses]))
+           (get-in action [:juxt.site/action-contexts parent-action-id :juxt.site/additional-where-clauses]))
          ;; Parameters
          (mapcat
           (fn [[k v]]
             (when-let [clauses
-                       (get-in action [::site/params k ::site/additional-where-clauses])]
+                       (get-in action [:juxt.site/params k :juxt.site/additional-where-clauses])]
               (postwalk
                (fn [x] (if (= x '$) v x))
                clauses)))
@@ -50,7 +49,7 @@
                                       ~(compile-ast*
                                         db
                                         (-> ctx
-                                            (assoc ::site/action action)
+                                            (assoc :juxt.site/action action)
                                             (update :depth inc))
                                         node)
                                       ~'e ; e becomes the parent
@@ -63,9 +62,9 @@
        :keys [~'root]
        :where
        ~(cond-> `[[~'action :xt/id ~action-id]
-                  ~'[permission ::site/type "https://meta.juxt.site/site/permission"]
-                  ~'[permission ::site/action action]
-                  ~'[permission ::site/purpose purpose]
+                  ~'[permission :juxt.site/type "https://meta.juxt.site/site/permission"]
+                  ~'[permission :juxt.site/action action]
+                  ~'[permission :juxt.site/purpose purpose]
                   ;; We must rename 'allowed?' here because we
                   ;; cannot allow rules from parent queries to
                   ;; affect rules from sub-queries. In other

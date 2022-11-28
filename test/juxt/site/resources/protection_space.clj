@@ -2,7 +2,7 @@
 
 (ns juxt.site.resources.protection-space
   (:require
-   [juxt.site.init :as init :refer [do-action substitute-actual-base-uri]]))
+   [juxt.site.init :as init :refer [do-action]]))
 
 (defn create-action-put-protection-space! [_]
   (do-action

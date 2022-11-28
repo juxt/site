@@ -9,13 +9,8 @@
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.site.locator :refer [to-regex]]
    [juxt.site.actions :as actions]
-   [juxt.site :as-alias site]
    [juxt.site.main :as main]
-   [xtdb.api :as xt]
-
-   ;; These are kept around just for the commented code sections
-   [juxt.http :as-alias http]
-))
+   [xtdb.api :as xt]))
 
 (defn system [] main/*system*)
 
@@ -35,7 +30,7 @@
   (main/config))
 
 (defn base-uri []
-  (::site/base-uri (config)))
+  (:juxt.site/base-uri (config)))
 
 (defn substitute-actual-base-uri [form]
   (postwalk
@@ -47,14 +42,14 @@
 (defn make-repl-request-context [subject action edn-arg]
   (let [xt-node (xt-node)]
     (cond->
-        {::site/xt-node xt-node
-         ::site/db (xt/db xt-node)
-         ::site/subject subject
-         ::site/action action
-         ::site/base-uri (base-uri)}
-      edn-arg (merge {::site/received-representation
-                      {::http/content-type "application/edn"
-                       ::http/body (.getBytes (pr-str edn-arg))}}))))
+        {:juxt.site/xt-node xt-node
+         :juxt.site/db (xt/db xt-node)
+         :juxt.site/subject subject
+         :juxt.site/action action
+         :juxt.site/base-uri (base-uri)}
+      edn-arg (merge {:juxt.site/received-representation
+                      {:juxt.http/content-type "application/edn"
+                       :juxt.http/body (.getBytes (pr-str edn-arg))}}))))
 
 ;; TODO: Rename this to do-action! ?
 (defn do-action
@@ -70,7 +65,7 @@
          xt-node (xt-node)
          db (xt/db xt-node)
          subject (when subject-id (xt/entity db subject-id))]
-     (::site/action-result
+     (:juxt.site/action-result
       (actions/do-action
        (make-repl-request-context
         subject action-id (substitute-actual-base-uri edn-arg)))))))
@@ -112,7 +107,7 @@
       [:set [:or :string :keyword]]
       [:=> [:cat
             [:map-of :string :string]
-            [:map {::site/base-uri :string}]]
+            [:map {:juxt.site/base-uri :string}]]
        [:set [:or :string :keyword]]]]]]])
 
 (defn converge!
@@ -147,7 +142,7 @@
                                     (let [{:keys [deps params]} (lookup graph id)]
                                       (cond
                                         (nil? deps) nil
-                                        (fn? deps) (deps params {::site/base-uri (base-uri)})
+                                        (fn? deps) (deps params {:juxt.site/base-uri (base-uri)})
                                         (set? deps) deps
                                         :else (throw (ex-info "Unexpected deps type" {:deps deps}))))))
                         (keep (fn [id]
@@ -162,7 +157,7 @@
                 (when-not create (throw (ex-info (format "No creator for %s" id) {:id id})))
                 (if-not dry-run?
                   (conj acc (try
-                              (let [{::site/keys [puts] :as result} (create v)]
+                              (let [{:juxt.site/keys [puts] :as result} (create v)]
                                 (when (and puts (not (contains? (set puts) id)))
                                   (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
                                 {:id id :status :created :result result})

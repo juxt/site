@@ -2,7 +2,6 @@
 
 (ns juxt.site.session-scope
   (:require
-   [juxt.site :as-alias site]
    [ring.middleware.cookies :refer [cookies-request]]
    [xtdb.api :as xt]
    [clojure.tools.logging :as log]))
@@ -15,22 +14,22 @@
                     :keys [juxt.site/session-token
                            juxt.site/session]
                     :where
-                    [[session-token ::site/type "https://meta.juxt.site/site/session-token"]
-                     [session-token ::site/session-token token-id]
-                     [session-token ::site/session session]]
+                    [[session-token :juxt.site/type "https://meta.juxt.site/site/session-token"]
+                     [session-token :juxt.site/session-token token-id]
+                     [session-token :juxt.site/session session]]
                     :in [token-id]}
                session-token-id!))
-        subject (some-> session-details ::site/session ::site/subject)]
+        subject (some-> session-details :juxt.site/session :juxt.site/subject)]
     (cond-> session-details
       ;; Since subject is common and special, we promote it to the top-level
       ;; context. However, it is possible to have a session without having
       ;; established a subject (for example, while authenticating).
-      subject (assoc ::site/subject (xt/entity db subject)))))
+      subject (assoc :juxt.site/subject (xt/entity db subject)))))
 
 (defn wrap-session-scope [h]
-  (fn [{::site/keys [db uri resource] :as req}]
+  (fn [{:juxt.site/keys [db uri resource] :as req}]
 
-    (let [scope-id (::site/session-scope resource)
+    (let [scope-id (:juxt.site/session-scope resource)
 
           _ (log/debugf "session-scope for %s is %s" uri scope-id)
           _ (log/debugf "resources is %s" (pr-str resource))
@@ -55,5 +54,5 @@
           ]
 
       (h (cond-> req
-           scope (assoc ::site/session-scope scope)
+           scope (assoc :juxt.site/session-scope scope)
            session-details (into session-details))))))

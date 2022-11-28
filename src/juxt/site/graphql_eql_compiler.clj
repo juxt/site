@@ -2,8 +2,7 @@
 
 (ns juxt.site.graphql-eql-compiler
   (:require
-   [juxt.grab.alpha.document :as document]
-   [juxt.site :as-alias site]))
+   [juxt.grab.alpha.document :as document]))
 
 (defn- graphql->eql-ast*
   [schema field]
@@ -12,7 +11,7 @@
         sel-name (:juxt.grab.alpha.graphql/name field)
         k (case sel-name
             "id" :xt/id
-            "_type" ::site/type
+            "_type" :juxt.site/type
             (keyword sel-name))
         field-def (some-> gtype :juxt.grab.alpha.graphql/field-definitions (->> (some (fn [fdef] (when (= (:juxt.grab.alpha.graphql/name fdef) sel-name) fdef)))))
         site-dir (some-> field-def :juxt.grab.alpha.graphql/directives (->> (some (fn [dir] (when (= (:juxt.grab.alpha.graphql/name dir) "site") dir)))))
@@ -27,7 +26,7 @@
        :dispatch-key k
        :key k
        :params (cond-> args
-                 action (assoc ::site/action action))
+                 action (assoc :juxt.site/action action))
        :children (mapv #(graphql->eql-ast* schema %)
                        (:juxt.grab.alpha.graphql/selection-set field))}
 

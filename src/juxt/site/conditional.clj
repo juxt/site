@@ -3,17 +3,15 @@
 (ns juxt.site.conditional
   (:require
    [clojure.tools.logging :as log]
-   [juxt.http :as-alias http]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.rfc7231 :as-alias rfc7231]
-   [juxt.reap.alpha.rfc7232 :as rfc7232]
-   [juxt.site :as-alias site]))
+   [juxt.reap.alpha.rfc7232 :as rfc7232]))
 
 (defn evaluate-if-match!
   "Evaluate an If-None-Match precondition header field in the context of a
   resource. If the precondition is found to be false, an exception is thrown
   with ex-data containing the proper response."
-  [{::site/keys [current-representations] :as req}]
+  [{:juxt.site/keys [current-representations] :as req}]
   ;; (All quotes in this function's comments are from Section 3.2, RFC 7232,
   ;; unless otherwise stated).
   (when-let [header-field (reap/if-match (get-in req [:ring.request/headers "if-match"]))]
@@ -28,13 +26,13 @@
       (throw
        (ex-info
         "If-Match precondition failed"
-        {::site/request-context (assoc req :ring.response/status 412)}))
+        {:juxt.site/request-context (assoc req :ring.response/status 412)}))
 
       (sequential? header-field)
       (do
         (log/debugf "evaluate-if-match! sequential? true, header-field: %s" header-field)
         (let [matches (for [rep current-representations
-                            :let [rep-etag (some-> (get rep ::http/etag) reap/entity-tag)]
+                            :let [rep-etag (some-> (get rep :juxt.http/etag) reap/entity-tag)]
                             etag header-field
                             ;; "An origin server MUST use the strong comparison function
                             ;; when comparing entity-tags"
@@ -48,7 +46,7 @@
             (throw
              (ex-info
               "No strong matches between if-match and current representations"
-              {::site/request-context (assoc req :ring.response/status 412)}))))))))
+              {:juxt.site/request-context (assoc req :ring.response/status 412)}))))))))
 
 ;; TODO: See Section 4.1, RFC 7232:
 ;;
@@ -57,13 +55,13 @@
   resource and, when applicable, the representation metadata of the selected
   representation. If the precondition is found to be false, an exception is
   thrown with ex-data containing the proper response."
-  [{::site/keys [resource] :as req}]
+  [{:juxt.site/keys [resource] :as req}]
   ;; (All quotes in this function's comments are from Section 3.2, RFC 7232,
   ;; unless otherwise stated).
   (let [header-field (reap/if-none-match (get-in req [:ring.request/headers "if-none-match"]))]
     (cond
       (sequential? header-field)
-      (when-let [rep-etag (some-> (get resource ::http/etag) reap/entity-tag)]
+      (when-let [rep-etag (some-> (get resource :juxt.http/etag) reap/entity-tag)]
         ;; "If the field-value is a list of entity-tags, the condition is false
         ;; if one of the listed tags match the entity-tag of the selected
         ;; representation."
@@ -76,13 +74,13 @@
                (ex-info
                 "Not modified"
                 {::matching-entity-tag etag
-                 ::site/request-context (assoc req :ring.response/status 304)})
+                 :juxt.site/request-context (assoc req :ring.response/status 304)})
                ;; "… or 412 (Precondition Failed) status code for all other
                ;; request methods."
                (ex-info
                 "If-None-Match precondition failed"
                 {::matching-entity-tag etag
-                 ::site/request-context (assoc req :ring.response/status 412)}))))))
+                 :juxt.site/request-context (assoc req :ring.response/status 412)}))))))
 
       ;; "If-None-Match can also be used with a value of '*' …"
       (and (map? header-field) (::rfc7232/wildcard header-field))
@@ -92,7 +90,7 @@
         (throw
          (ex-info
           "At least one representation already exists for this resource"
-          {::site/request-context
+          {:juxt.site/request-context
            (assoc
             req
             :ring.response/status
@@ -105,21 +103,21 @@
               ;; request methods."
               412))}))))))
 
-(defn evaluate-if-unmodified-since! [{::site/keys [resource] :as req}]
+(defn evaluate-if-unmodified-since! [{:juxt.site/keys [resource] :as req}]
   (let [if-unmodified-since-date
         (-> req
             (get-in [:ring.request/headers "if-unmodified-since"])
             reap/http-date
             ::rfc7231/date)]
     (when (.isAfter
-           (.toInstant (get resource ::http/last-modified (java.util.Date.)))
+           (.toInstant (get resource :juxt.http/last-modified (java.util.Date.)))
            (.toInstant if-unmodified-since-date))
       (throw
        (ex-info
         "Precondition failed"
-        {::site/request-context (assoc req :ring.resposne/status 304)})))))
+        {:juxt.site/request-context (assoc req :ring.resposne/status 304)})))))
 
-(defn evaluate-if-modified-since! [{::site/keys [resource] :as req}]
+(defn evaluate-if-modified-since! [{:juxt.site/keys [resource] :as req}]
   (let [if-modified-since-date
         (-> req
             (get-in [:ring.request/headers "if-modified-since"])
@@ -127,12 +125,12 @@
             ::rfc7231/date)]
 
     (when-not (.isAfter
-               (.toInstant (get resource ::http/last-modified (java.util.Date.)))
+               (.toInstant (get resource :juxt.http/last-modified (java.util.Date.)))
                (.toInstant if-modified-since-date))
       (throw
        (ex-info
         "Not modified"
-        {::site/request-context (assoc req :ring.response/status 304)})))))
+        {:juxt.site/request-context (assoc req :ring.response/status 304)})))))
 
 (defn evaluate-preconditions!
   "Implementation of Section 6 of RFC 7232. Arguments are the (Ring) request, a

@@ -3,8 +3,7 @@
 (ns juxt.site.return-test
   (:require
    [clojure.test :refer [deftest is]]
-   [juxt.site.return :refer [return]]
-   [juxt.site :as-alias site]))
+   [juxt.site.return :refer [return]]))
 
 (deftest ok-return
   (let [ex-data
@@ -13,7 +12,7 @@
           {}
           (catch clojure.lang.ExceptionInfo e
             (ex-data e)))]
-    (is (= 200 (get-in ex-data [::site/request-context :ring.response/status])))))
+    (is (= 200 (get-in ex-data [:juxt.site/request-context :ring.response/status])))))
 
 (deftest ok-message-arg-return
   (let [msg
@@ -27,12 +26,12 @@
 (deftest redirect-return
   (let [ex-data
         (try
-          (return {:method :get} 302 "Redirect" {::site/request-context {:ring.response/headers {"Location" "foo"}}})
+          (return {:method :get} 302 "Redirect" {:juxt.site/request-context {:ring.response/headers {"Location" "foo"}}})
           (assert false)
           (catch clojure.lang.ExceptionInfo e
             (ex-data e)))]
-    (is (= 302 (get-in ex-data [::site/request-context :ring.response/status])))
-    (is (= {"Location" "foo"} (get-in ex-data [::site/request-context :ring.response/headers])))))
+    (is (= 302 (get-in ex-data [:juxt.site/request-context :ring.response/status])))
+    (is (= {"Location" "foo"} (get-in ex-data [:juxt.site/request-context :ring.response/headers])))))
 
 (deftest ex-data-return
   (let [ex-data
@@ -47,11 +46,11 @@
 (deftest return-with-merged-request-context-entries
   (let [ex-data
         (try
-          (return {:foo "foo"} 500 "Error" {::site/request-context {:bar "bar"}})
+          (return {:foo "foo"} 500 "Error" {:juxt.site/request-context {:bar "bar"}})
           (assert false)
           (catch clojure.lang.ExceptionInfo e
             (ex-data e)))]
-    (is (= {:foo "foo" :bar "bar" :ring.response/status 500} (get-in ex-data [::site/request-context])))))
+    (is (= {:foo "foo" :bar "bar" :ring.response/status 500} (get-in ex-data [:juxt.site/request-context])))))
 
 (deftest return-with-headers-merged
   (let [ex-data
@@ -60,4 +59,4 @@
           (assert false)
           (catch clojure.lang.ExceptionInfo e
             (ex-data e)))]
-    (is (= {"Foo" "foo" "Bar" "bar"} (get-in ex-data [::site/request-context :ring.response/headers])))))
+    (is (= {"Foo" "foo" "Bar" "bar"} (get-in ex-data [:juxt.site/request-context :ring.response/headers])))))

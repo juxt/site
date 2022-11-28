@@ -2,9 +2,7 @@
 
 (ns juxt.site.util
   (:require
-   [juxt.clojars-mirrors.nippy.v3v1v1.taoensso.nippy.utils :refer [freezable?]]
-   [juxt.site :as-alias site]
-   [juxt.http :as-alias http]))
+   [juxt.clojars-mirrors.nippy.v3v1v1.taoensso.nippy.utils :refer [freezable?]]))
 
 (defn assoc-when-some [m k v]
   (cond-> m v (assoc k v)))
@@ -103,7 +101,7 @@
    (fn [form]
      (cond-> form
        (not (freezable? form))
-       ((fn [_] ::site/unfreezable))))))
+       ((fn [_] :juxt.site/unfreezable))))))
 
 (defn etag [representation]
   (format
@@ -111,11 +109,11 @@
    (subs
     (hexdigest
      (cond
-       (::http/body representation)
-       (::http/body representation)
-       (::http/content representation)
-       (.getBytes (::http/content representation)
-                  (get representation ::http/charset "UTF-8")))) 0 32)))
+       (:juxt.http/body representation)
+       (:juxt.http/body representation)
+       (:juxt.http/content representation)
+       (.getBytes (:juxt.http/content representation)
+                  (get representation :juxt.http/charset "UTF-8")))) 0 32)))
 
 (defn make-nonce
   "This uses java.util.HexFormat which requires Java 17 and above. If required,

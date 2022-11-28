@@ -6,7 +6,6 @@
    [crypto.password.bcrypt :as bcrypt]
    [java-http-clj.core :as hc]
    [jsonista.core :as json]
-   [juxt.site :as-alias site]
    [juxt.site.http-authentication :as http-authn]
    [juxt.site.openid-connect :as openid-connect]
    [juxt.site.util :refer [make-nonce]]
@@ -24,13 +23,13 @@
   (comment
     (vec (for [action actions
                :let [e (xt/entity db action)]
-               rule (::site/rules e)]
+               rule (:juxt.site/rules e)]
            (conj rule ['action :xt/id action]))))
   (mapv
    #(conj (second %) ['action :xt/id (first %)])
    (xt/q db {:find ['e 'rules]
              :where [['e :xt/id (set actions)]
-                     ['e ::site/rules 'rules]]})))
+                     ['e :juxt.site/rules 'rules]]})))
 
 ;; This is broken out into its own function to assist debugging when
 ;; authorization is denied and we don't know why. A better authorization
@@ -43,18 +42,18 @@
                :keys '[juxt.site/permission juxt.site/action]
                :where
                '[
-                 [action ::site/type "https://meta.juxt.site/site/action"]
+                 [action :juxt.site/type "https://meta.juxt.site/site/action"]
 
                  ;; Only consider given actions
                  [(contains? actions action)]
 
                  ;; Only consider a permitted action
-                 [permission ::site/type "https://meta.juxt.site/site/permission"]
-                 [permission ::site/action action]
+                 [permission :juxt.site/type "https://meta.juxt.site/site/permission"]
+                 [permission :juxt.site/action action]
                  (allowed? subject resource permission)
 
                  ;; Only permissions that match our purpose
-                 [permission ::site/purpose purpose]]
+                 [permission :juxt.site/purpose purpose]]
 
                :rules rules
 
@@ -69,9 +68,9 @@
 
 (defn check-permissions
   "Given a subject, possible actions and resource, return all related pairs of permissions and actions."
-  [db actions {subject ::site/subject resource ::site/resource purpose ::site/purpose :as options}]
+  [db actions {subject :juxt.site/subject resource :juxt.site/resource purpose :juxt.site/purpose :as options}]
 
-  (when (= (find options ::site/subject) [::site/subject nil])
+  (when (= (find options :juxt.site/subject) [:juxt.site/subject nil])
     (throw (ex-info "Nil subject passed!" {})))
 
   ;; TODO: These asserts have been replaced by Malli schema instrumentation
@@ -97,31 +96,31 @@
        :any
        [:set :string]
        [:map
-        [::site/subject {:optional true}]
-        [::site/resource {:optional true}]
-        [::site/purpose {:optional true}]]]
+        [:juxt.site/subject {:optional true}]
+        [:juxt.site/resource {:optional true}]
+        [:juxt.site/purpose {:optional true}]]]
   :any])
 
 (defn allowed-resources
   "Given a set of possible actions, and possibly a subject and purpose, which
   resources are allowed?"
-  [db actions {::site/keys [subject purpose]}]
+  [db actions {:juxt.site/keys [subject purpose]}]
   (let [rules (actions->rules db actions)
         query {:find '[resource]
                :where
                '[
-                 [action ::site/type "https://meta.juxt.site/site/action"]
+                 [action :juxt.site/type "https://meta.juxt.site/site/action"]
 
                  ;; Only consider given actions
                  [(contains? actions action)]
 
                  ;; Only consider a permitted action
-                 [permission ::site/type "https://meta.juxt.site/site/permission"]
-                 [permission ::site/action action]
+                 [permission :juxt.site/type "https://meta.juxt.site/site/permission"]
+                 [permission :juxt.site/action action]
                  (allowed? subject resource permission)
 
                  ;; Only permissions that match our purpose
-                 [permission ::site/purpose purpose]]
+                 [permission :juxt.site/purpose purpose]]
 
                :rules rules
 
@@ -148,8 +147,8 @@
        [:set {:min 0} :string]
        ;;[:set :string]
        [:map
-        [::site/subject {:optional true}]
-        [::site/purpose {:optional true}]]]
+        [:juxt.site/subject {:optional true}]
+        [:juxt.site/purpose {:optional true}]]]
   :any])
 
 ;; TODO: How is this call protected from unauthorized use? Must call this with
@@ -165,20 +164,20 @@
            :keys '[subject action]
            :where
            '[
-             [action ::site/type "https://meta.juxt.site/site/action"]
+             [action :juxt.site/type "https://meta.juxt.site/site/action"]
 
              ;; Only consider given actions
              [(contains? actions action)]
 
              ;; Only consider a permitted action
-             [permission ::site/type "https://meta.juxt.site/site/permission"]
-             [permission ::site/action action]
+             [permission :juxt.site/type "https://meta.juxt.site/site/permission"]
+             [permission :juxt.site/action action]
              (allowed? subject resource permission)
 
              ;; Only permissions that match our purpose
-             [permission ::site/purpose purpose]
+             [permission :juxt.site/purpose purpose]
 
-             #_[access-token ::site/subject subject]]
+             #_[access-token :juxt.site/subject subject]]
 
            :rules rules
 
@@ -194,11 +193,11 @@
         (check-permissions
          db
          actions
-         (assoc ctx ::site/resource resource))
+         (assoc ctx :juxt.site/resource resource))
 
         pull-expr (vec (mapcat
-                        (fn [{::site/keys [action]}]
-                          (::site/pull action))
+                        (fn [{:juxt.site/keys [action]}]
+                          (:juxt.site/pull action))
                         check-result))]
     (xt/pull db pull-expr (:xt/id resource))))
 
@@ -207,38 +206,38 @@
  [:=> [:cat
        :any
        [:set :string]
-       ::site/resource
+       :juxt.site/resource
        [:map
-        [::site/subject {:optional true}]
-        [::site/purpose {:optional true}]]]
+        [:juxt.site/subject {:optional true}]
+        [:juxt.site/purpose {:optional true}]]]
   :any])
 
 (defn pull-allowed-resources
   "Given a subject and a set of possible actions, which resources are allowed, and
   get me the documents. If resources-in-scope is given, only consider resources
   in that set."
-  [db actions {::site/keys [subject purpose include-rules resources-in-scope]}]
+  [db actions {:juxt.site/keys [subject purpose include-rules resources-in-scope]}]
   (let [rules (actions->rules db actions)
         _ (when-not (seq rules)
             (throw (ex-info "No rules found for actions" {:actions actions})))
         results
         (xt/q
          db
-         {:find '[resource (pull action [:xt/id ::site/pull]) purpose permission]
+         {:find '[resource (pull action [:xt/id :juxt.site/pull]) purpose permission]
           :keys '[resource action purpose permission]
           :where
           (cond-> '[
                     ;; Only consider given actions
-                    [action ::site/type "https://meta.juxt.site/site/action"]
+                    [action :juxt.site/type "https://meta.juxt.site/site/action"]
                     [(contains? actions action)]
 
                     ;; Only consider allowed permssions
-                    [permission ::site/type "https://meta.juxt.site/site/permission"]
-                    [permission ::site/action action]
+                    [permission :juxt.site/type "https://meta.juxt.site/site/permission"]
+                    [permission :juxt.site/action action]
                     (allowed? subject resource permission)
 
                     ;; Only permissions that match our purpose
-                    [permission ::site/purpose purpose]]
+                    [permission :juxt.site/purpose purpose]]
 
             include-rules
             (conj '(include? subject action resource))
@@ -262,7 +261,7 @@
                     ;; TODO: Purpose and permission are useful metadata, how do
                     ;; we retain in the result? with-meta?
                     resource-group]
-                (xt/pull db (::site/pull action '[*]) resource)))))))
+                (xt/pull db (:juxt.site/pull action '[*]) resource)))))))
 
 (malli/=>
  pull-allowed-resources
@@ -270,8 +269,8 @@
         :any
         [:set :string]
         [:map
-         [::site/subject {:optional true}]
-         [::site/purpose {:optional true}]]]
+         [:juxt.site/subject {:optional true}]
+         [:juxt.site/purpose {:optional true}]]]
    :any])
 
 (defn join-with-pull-allowed-resources
@@ -279,7 +278,7 @@
   given actions and options."
   [db coll join-key actions options]
   (let [idx (->>
-             (assoc options ::site/resources-in-scope (set (map join-key coll)))
+             (assoc options :juxt.site/resources-in-scope (set (map join-key coll)))
              (pull-allowed-resources db actions)
              (group-by :xt/id))]
     (map #(update % join-key (comp first idx)) coll)))
@@ -325,13 +324,13 @@
   "This function is applied within a transaction function. It should be fast, but
   at least doesn't have to worry about the database being stale!"
   [xt-ctx
-   {subject ::site/subject
-    action ::site/action
-    access-token ::site/access-token
-    resource ::site/resource
-    purpose ::site/purpose
-    base-uri ::site/base-uri
-    prepare ::site/prepare
+   {subject :juxt.site/subject
+    action :juxt.site/action
+    access-token :juxt.site/access-token
+    resource :juxt.site/resource
+    purpose :juxt.site/purpose
+    base-uri :juxt.site/base-uri
+    prepare :juxt.site/prepare
     :as ctx}]
   (let [db (xt/db xt-ctx)
         tx (xt/indexing-tx xt-ctx)]
@@ -344,7 +343,7 @@
       (let [check-permissions-result
             (check-permissions db #{action} ctx)
 
-            {::site/keys [scope] :as action-doc} (xt/entity db action)
+            {:juxt.site/keys [scope] :as action-doc} (xt/entity db action)
             _ (when-not action-doc
                 (throw
                  (ex-info
@@ -359,14 +358,14 @@
                     {:ring.response/status 403
                      :action action
                      :scope scope})))
-                (when-not (contains? (set (::site/scope access-token)) scope)
+                (when-not (contains? (set (:juxt.site/scope access-token)) scope)
                   (throw
                    (ex-info
                     (format "Access token does not have sufficient scope (%s)" scope)
                     {:ring.response/status 403
                      :access-token access-token
                      :action action
-                     :scope-granted (::site/scope access-token)
+                     :scope-granted (:juxt.site/scope access-token)
                      :scope-required scope}))))]
 
         (when-not (seq check-permissions-result)
@@ -375,10 +374,10 @@
         (let [fx
               (cond
                 ;; Official: sci
-                (-> action-doc ::site/transact :juxt.site.sci/program)
+                (-> action-doc :juxt.site/transact :juxt.site.sci/program)
                 (try
                   (sci/eval-string
-                   (-> action-doc ::site/transact :juxt.site.sci/program)
+                   (-> action-doc :juxt.site/transact :juxt.site.sci/program)
                    {:namespaces
                     (merge-with
                      merge
@@ -496,7 +495,7 @@
                                  (if (= :xtdb.api/put (first effect))
                                    (map? (second effect))
                                    true))
-                    (throw (ex-info "Invalid effect" {::site/action action :effect effect}))))
+                    (throw (ex-info "Invalid effect" {:juxt.site/action action :effect effect}))))
 
               xtdb-ops (filter (fn [[effect]] (= (namespace effect) "xtdb.api")) fx)
 
@@ -520,16 +519,16 @@
                 (into
                  (cond->
                      {:xt/id (format "%s/_site/events/%s" base-uri (::xt/tx-id tx))
-                      ::site/type "https://meta.juxt.site/site/event"
-                      ::site/subject-uri (:xt/id subject)
-                      ::site/action action
-                      ::site/purpose purpose
-                      ::site/puts (vec
+                      :juxt.site/type "https://meta.juxt.site/site/event"
+                      :juxt.site/subject-uri (:xt/id subject)
+                      :juxt.site/action action
+                      :juxt.site/purpose purpose
+                      :juxt.site/puts (vec
                                    (keep
                                     (fn [[tx-op {id :xt/id}]]
                                       (when (= tx-op ::xt/put) id))
                                     xtdb-ops))
-                      ::site/deletes (vec
+                      :juxt.site/deletes (vec
                                       (keep
                                        (fn [[tx-op {id :xt/id}]]
                                          (when (= tx-op ::xt/delete) id))
@@ -557,12 +556,12 @@
 
           [[::xt/put
             {:xt/id event-id
-             ::site/type "https://meta.juxt.site/site/event"
-             ::site/subject subject
-             ::site/action action
-             ::site/resource resource
-             ::site/purpose purpose
-             ::site/error {:message (.getMessage e)
+             :juxt.site/type "https://meta.juxt.site/site/event"
+             :juxt.site/subject subject
+             :juxt.site/action action
+             :juxt.site/resource resource
+             :juxt.site/purpose purpose
+             :juxt.site/error {:message (.getMessage e)
                            ;; ex-data is just too problematic to put into the
                            ;; database as-is without some sanitization ensuring
                            ;; it's nippyable.
@@ -576,7 +575,7 @@
                            ;; investigated thorougly enough.
                            #_(let [ex-data (ex-data e)]
                                (cond-> ex-data
-                                 (:env ex-data) (dissoc :env)#_(update :env dissoc ::site/db ::site/xt-node)))}}]])))))
+                                 (:env ex-data) (dissoc :env)#_(update :env dissoc :juxt.site/db :juxt.site/xt-node)))}}]])))))
 
 (defn install-do-action-fn [uri]
   {:xt/id (str uri "/_site/do-action")
@@ -589,7 +588,7 @@
 ;; only transitory for the purposes of responnding to the request.
 
 (defn sanitize-ctx [ctx]
-  (dissoc ctx ::site/xt-node ::site/db))
+  (dissoc ctx :juxt.site/xt-node :juxt.site/db))
 
 (defn apply-response-fx [ctx fx]
   (reduce
@@ -604,7 +603,7 @@
          {:op op :args args}))))
    ctx fx))
 
-(defn do-prepare [{::site/keys [db resource] :as ctx} action-doc]
+(defn do-prepare [{:juxt.site/keys [db resource] :as ctx} action-doc]
   (when-let [prepare-program (some-> action-doc :juxt.site/prepare :juxt.site.sci/program)]
     (try
       (sci/eval-string
@@ -634,14 +633,14 @@
 
 (defn do-action
   [;; TODO: Arguably action should passed as a map
-   {::site/keys [xt-node db base-uri resource subject action] :as ctx}]
-  (assert (::site/xt-node ctx) "xt-node must be present")
-  (assert (::site/db ctx) "db must be present")
+   {:juxt.site/keys [xt-node db base-uri resource subject action] :as ctx}]
+  (assert (:juxt.site/xt-node ctx) "xt-node must be present")
+  (assert (:juxt.site/db ctx) "db must be present")
 
   (when-not (xt/entity db action)
     (throw (ex-info "No action found"
                     {:action action
-                     :ls (->> (xt/q db '{:find [(pull e [:xt/id ::site/type])]
+                     :ls (->> (xt/q db '{:find [(pull e [:xt/id :juxt.site/type])]
                                       :where [[e :xt/id]]})
                               (map first)
                               (filter (fn [e]
@@ -650,7 +649,7 @@
                                                 "Session"
                                                 "SessionToken"
                                                 }
-                                              (::site/type e)))))
+                                              (:juxt.site/type e)))))
                               (map :xt/id)
                               (sort-by str))}))
     )
@@ -664,13 +663,13 @@
     (throw
      (ex-info
       "Subject to do-action expected to be a map, or null"
-      {::site/request-context ctx :subject subject})))
+      {:juxt.site/request-context ctx :subject subject})))
 
   (when-not (or (nil? resource) (map? resource))
     (throw
      (ex-info
       "Resource to do-action expected to be a map, or null"
-      {::site/request-context ctx :resource resource})))
+      {:juxt.site/request-context ctx :resource resource})))
 
   ;; Prepare the transaction - this work happens prior to the transaction, one a
   ;; single node, and may be wasted work if the transaction ultimately
@@ -685,24 +684,24 @@
         prepare (do-prepare ctx action-doc)
         tx-fn (str base-uri "/_site/do-action")
         _ (assert (xt/entity db tx-fn) (format "do-action must exist in database: %s" tx-fn))
-        tx-ctx (cond-> (sanitize-ctx ctx) prepare (assoc ::site/prepare prepare))
+        tx-ctx (cond-> (sanitize-ctx ctx) prepare (assoc :juxt.site/prepare prepare))
         tx (xt/submit-tx xt-node [[::xt/fn tx-fn tx-ctx]])
         {::xt/keys [tx-id] :as tx} (xt/await-tx xt-node tx)
-        ctx (assoc ctx ::site/db (xt/db xt-node tx))]
+        ctx (assoc ctx :juxt.site/db (xt/db xt-node tx))]
 
     (when-not (xt/tx-committed? xt-node tx)
       (throw
        (ex-info
         (format "Transaction failed to be committed for action %s" action)
         {::xt/tx-id tx-id
-         ::site/action action
-         ::site/request-context ctx})))
+         :juxt.site/action action
+         :juxt.site/request-context ctx})))
 
     (let [result
           (xt/entity
            (xt/db xt-node)
            (format "%s/_site/events/%d" base-uri tx-id))]
-      (if-let [error (::site/error result)]
+      (if-let [error (:juxt.site/error result)]
         (do
           (log/errorf "Transaction error: %s" error)
           (let [status (:ring.response/status (:ex-data error))]
@@ -714,14 +713,14 @@
                (:message error)
                (if status (format "(status: %s)" status) ""))
               (into
-               (cond-> {::site/request-context ctx}
+               (cond-> {:juxt.site/request-context ctx}
                  status (assoc :ring.response/status status))
                (merge
-                (dissoc result ::site/type :xt/id ::site/error)
+                (dissoc result :juxt.site/type :xt/id :juxt.site/error)
                 (:ex-data error)))))))
 
         (cond-> ctx
-          result (assoc ::site/action-result result)
+          result (assoc :juxt.site/action-result result)
 
           (seq (:juxt.site/response-fx result))
           (apply-response-fx (:juxt.site/response-fx result))
@@ -736,18 +735,18 @@
 ;; For a fuller discussion on determinism and its benefits, see
 ;; https://www.cs.umd.edu/~abadi/papers/abadi-cacm2018.pdf
 (defn wrap-authorize-with-actions [h]
-  (fn [{::site/keys [db resource uri subject]
+  (fn [{:juxt.site/keys [db resource uri subject]
         :ring.request/keys [method]
         :as req}]
 
     (assert (or (nil? subject) (map? subject)))
     (assert (or (nil? resource) (map? resource)))
 
-    (let [actions (get-in resource [::site/methods method ::site/actions])
+    (let [actions (get-in resource [:juxt.site/methods method :juxt.site/actions])
 
           _ (doseq [action actions]
               (when-not (xt/entity db action)
-                (throw (ex-info (format "No such action: %s" action) {::site/request-context req
+                (throw (ex-info (format "No such action: %s" action) {:juxt.site/request-context req
                                                                       :missing-action action}))))
 
           permitted-actions
@@ -759,24 +758,24 @@
              ;; When the resource is in the database, we can add it to the
              ;; permission checking in case there's a specific permission for
              ;; this resource.
-             subject (assoc ::site/subject subject)
-             resource (assoc ::site/resource resource)))]
+             subject (assoc :juxt.site/subject subject)
+             resource (assoc :juxt.site/resource resource)))]
 
       #_(log/debugf "Permitted actions: %s" (pr-str permitted-actions))
       (log/tracef "Subject is %s" (pr-str subject))
 
       (if (seq permitted-actions)
-        (h (assoc req ::site/permitted-actions permitted-actions))
+        (h (assoc req :juxt.site/permitted-actions permitted-actions))
 
         (if subject
           (throw
            (ex-info
             (format "No permission for actions: %s" (pr-str actions))
             {:ring.response/status 403
-             ::site/request-context req}))
+             :juxt.site/request-context req}))
 
           ;; No subject?
-          (if-let [protection-spaces (::site/protection-space resource)]
+          (if-let [protection-spaces (:juxt.site/protection-space resource)]
             ;; We are in a protection space, so this is HTTP Authentication (401
             ;; + WWW-Authenticate header)
             (throw
@@ -785,7 +784,7 @@
               {:ring.response/status 401
                :ring.response/headers
                {"www-authenticate" (http-authn/www-authenticate-header db protection-spaces)}
-               ::site/request-context req}))
+               :juxt.site/request-context req}))
 
             ;; We are outside a protection space, there is nothing we can do
             ;; except return a 403 status.
@@ -801,7 +800,7 @@
             ;; respond with a redirect to a page that will establish (immediately
             ;; or eventually), the cookie.
 
-            (if-let [session-scope (::site/session-scope req)]
+            (if-let [session-scope (:juxt.site/session-scope req)]
               (let [login-uri (:juxt.site/login-uri session-scope)
                     redirect (str login-uri "?return-to=" (codec/url-encode uri))]
                 ;; If we are in a session-scope that contains a login-uri, let's redirect to that
@@ -810,12 +809,12 @@
                   (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))
                   {:ring.response/status 302
                    :ring.response/headers {"location" redirect}
-                   ::site/request-context req})))
+                   :juxt.site/request-context req})))
               (throw
                (ex-info
                 (format "No anonymous permission for actions: %s" (pr-str actions))
                 {:ring.response/status 403
-                 ::site/request-context req})))))))))
+                 :juxt.site/request-context req})))))))))
 
 (comment
   (sci/eval-string

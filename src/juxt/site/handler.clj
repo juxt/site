@@ -6,7 +6,6 @@
    [clojure.string :as str]
    [clojure.tools.logging :as log]
    [jsonista.core :as json]
-   [juxt.http :as-alias http]
    [juxt.pick.core :refer [rate-representation]]
    [juxt.pick.ring :refer [decode-maybe]]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
@@ -14,7 +13,6 @@
    [juxt.reap.alpha.regex :as re]
    [juxt.reap.alpha.rfc7230 :as-alias rfc7230]
    [juxt.reap.alpha.ring :refer [headers->decoded-preferences]]
-   [juxt.site :as-alias site]
    [juxt.site.actions :as actions]
    [juxt.site.cache :as cache]
    [juxt.site.conditional :as conditional]
@@ -41,7 +39,7 @@
 
 (defn receive-representation
   "Check and load the representation enclosed in the request message payload."
-  [{::site/keys [resource start-date] :ring.request/keys [method] :as req}]
+  [{:juxt.site/keys [resource start-date] :ring.request/keys [method] :as req}]
 
   (log/debugf "Receiving representation, for resource %s" (:xt/id resource))
 
@@ -55,7 +53,7 @@
              (ex-info
               "Bad content length"
               {:ring.response/status 400
-               ::site/request-context req}
+               :juxt.site/request-context req}
               e))))]
 
     (when (nil? content-length)
@@ -63,40 +61,40 @@
        (ex-info
         "No Content-Length header found"
         {:ring.response/status 411
-         ::site/request-context req})))
+         :juxt.site/request-context req})))
 
     ;; Protects resources from PUTs that are too large. If you need to
     ;; exceed this limitation, explicitly declare ::spin/max-content-length in
     ;; your resource.
-    (when-let [max-content-length (get resource ::http/max-content-length (Math/pow 2 24))] ;;16MB
+    (when-let [max-content-length (get resource :juxt.http/max-content-length (Math/pow 2 24))] ;;16MB
       (when (> content-length max-content-length)
         (throw
          (ex-info
           "Payload too large"
           {:ring.response/status 413
-           ::site/request-context req}))))
+           :juxt.site/request-context req}))))
 
     (when-not (:ring.request/body req)
       (throw
        (ex-info
         "No body in request"
         {:ring.response/status 400
-         ::site/request-context req})))
+         :juxt.site/request-context req})))
 
     (let [decoded-representation
           (decode-maybe
 
            ;; See Section 3.1.1.5, RFC 7231 as to why content-type defaults
            ;; to application/octet-stream
-           (cond-> {::http/content-type "application/octet-stream"}
+           (cond-> {:juxt.http/content-type "application/octet-stream"}
              (contains? (:ring.request/headers req) "content-type")
-             (assoc ::http/content-type (get-in req [:ring.request/headers "content-type"]))
+             (assoc :juxt.http/content-type (get-in req [:ring.request/headers "content-type"]))
 
              (contains? (:ring.request/headers req) "content-encoding")
-             (assoc ::http/content-encoding (get-in req [:ring.request/headers "content-encoding"]))
+             (assoc :juxt.http/content-encoding (get-in req [:ring.request/headers "content-encoding"]))
 
              (contains? (:ring.request/headers req) "content-language")
-             (assoc ::http/content-language (get-in req [:ring.request/headers "content-language"]))))]
+             (assoc :juxt.http/content-language (get-in req [:ring.request/headers "content-language"]))))]
 
       ;; TODO: Someday there should be a functions that could be specified to
       ;; handle conversions as described in RFC 7231 Section 4.3.4
@@ -105,7 +103,7 @@
       ;; and POST
 
       (when-let [acceptable
-                 (get-in resource [::site/methods method ::site/acceptable])]
+                 (get-in resource [:juxt.site/methods method :juxt.site/acceptable])]
 
         (let [prefs (headers->decoded-preferences acceptable)
               request-rep (rate-representation prefs decoded-representation)]
@@ -119,7 +117,7 @@
                 {:ring.response/status 415
                  ::acceptable acceptable
                  ::content-type (get request-rep "content-type")
-                 ::site/request-context req}))
+                 :juxt.site/request-context req}))
 
               (and
                (= "text" (get-in request-rep [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/type]))
@@ -131,7 +129,7 @@
                 {:ring.response/status 415
                  ::acceptable acceptable
                  ::content-type (get request-rep "content-type")
-                 ::site/request-context req}))
+                 :juxt.site/request-context req}))
 
               (= (:juxt.pick/charset-qvalue request-rep) 0.0)
               (throw
@@ -140,7 +138,7 @@
                 {:ring.response/status 415
                  ::acceptable acceptable
                  ::content-type (get request-rep "content-type")
-                 ::site/request-context req}))))
+                 :juxt.site/request-context req}))))
 
           (when (get prefs "accept-encoding")
             (cond
@@ -151,7 +149,7 @@
                 {:ring.response/status 409
                  ::acceptable acceptable
                  ::content-encoding (get-in req [:ring.request/headers "content-encoding"] "identity")
-                 ::site/request-context req}))))
+                 :juxt.site/request-context req}))))
 
           (when (get prefs "accept-language")
             (cond
@@ -162,7 +160,7 @@
                 {:ring.response/status 409
                  ::acceptable acceptable
                  ::content-language (get-in req [:ring.request/headers "content-language"])
-                 ::site/request-context req}))
+                 :juxt.site/request-context req}))
 
               (= (:juxt.pick/content-language-qvalue request-rep) 0.0)
               (throw
@@ -171,14 +169,14 @@
                 {:ring.response/status 415
                  ::acceptable acceptable
                  ::content-language (get-in req [:ring.request/headers "content-language"])
-                 ::site/request-context req}))))))
+                 :juxt.site/request-context req}))))))
 
       (when (get-in req [:ring.request/headers "content-range"])
         (throw
          (ex-info
           "Content-Range header not allowed on a PUT request"
           {:ring.response/status 400
-           ::site/request-context req})))
+           :juxt.site/request-context req})))
 
       (with-open [in (:ring.request/body req)]
         (let [body (.readNBytes in content-length)
@@ -186,41 +184,41 @@
 
           (assoc
            req
-           ::site/received-representation
+           :juxt.site/received-representation
            (merge
             decoded-representation
-            {::http/content-length content-length
-             ::http/last-modified start-date}
+            {:juxt.http/content-length content-length
+             :juxt.http/last-modified start-date}
 
             (if (and
                  (= (:juxt.reap.alpha.rfc7231/type content-type) "text")
-                 (nil? (get decoded-representation ::http/content-encoding)))
+                 (nil? (get decoded-representation :juxt.http/content-encoding)))
               (let [charset
                     (get-in decoded-representation
                             [:juxt.reap.alpha.rfc7231/content-type :juxt.reap.alpha.rfc7231/parameter-map "charset"])]
                 (merge
-                 {::http/content (new String body (or charset "utf-8"))}
-                 (when charset {::http/charset charset})))
+                 {:juxt.http/content (new String body (or charset "utf-8"))}
+                 (when charset {:juxt.http/charset charset})))
 
-              {::http/body body}))))))))
+              {:juxt.http/body body}))))))))
 
-(defn GET [{::site/keys [resource subject]
+(defn GET [{:juxt.site/keys [resource subject]
             :as req}]
 
   (conditional/evaluate-preconditions! req)
   (let [req (assoc req :ring.response/status 200)
         ;; This use of 'first' is worrisome. Perhaps we should be merging the
         ;; results of every permitted action? TODO: resolve this
-        permitted-action (::site/action (first (::site/permitted-actions req)))]
+        permitted-action (:juxt.site/action (first (:juxt.site/permitted-actions req)))]
 
     (cond
 
       ;; It's rare but sometimes a GET will involve a transaction. For example,
       ;; the Authorization Request (RFC 6749 Section 4.2.1).
-      (and permitted-action (-> permitted-action ::site/transact))
+      (and permitted-action (-> permitted-action :juxt.site/transact))
       (actions/do-action
        (cond-> req
-         permitted-action (assoc ::site/action (:xt/id permitted-action))
+         permitted-action (assoc :juxt.site/action (:xt/id permitted-action))
          ;; A java.io.BufferedInputStream in the request can cause this error:
          ;; "invalid tx-op: Unfreezable type: class
          ;; java.io.BufferedInputStream".
@@ -235,7 +233,7 @@
                 (merge
                  {'user {'*action* permitted-action
                          '*resource* (:juxt.site/resource req)
-                         '*ctx* (dissoc req ::site/xt-node)
+                         '*ctx* (dissoc req :juxt.site/xt-node)
                          'logf (fn [& args] (eval `(log/debugf ~@args)))
                          'log (fn [& args] (eval `(log/debug ~@args)))}
                   'xt
@@ -272,7 +270,7 @@
                {'user (cond->
                           {'*action* permitted-action
                            '*resource* (:juxt.site/resource req)
-                           '*ctx* (dissoc req ::site/xt-node)
+                           '*ctx* (dissoc req :juxt.site/xt-node)
                            'logf (fn [& args] (eval `(log/debugf ~@args)))
                            'log (fn [& args] (eval `(log/debug ~@args)))}
                           state (assoc '*state* state))
@@ -287,7 +285,7 @@
                  'entity*
                  (fn [id] (xt/entity (:juxt.site/db req) id))}})})
 
-            _ (assert (::site/start-date response)"Rerpresentation response script must return a request context")]
+            _ (assert (:juxt.site/start-date response)"Rerpresentation response script must return a request context")]
 
         response)
 
@@ -297,13 +295,13 @@
 (defn perform-unsafe-method [req]
   (let [req (receive-representation req)
         ;; TODO: Should we fail if more than one permitted action available?
-        permitted-action (::site/action (first (::site/permitted-actions req)))
+        permitted-action (:juxt.site/action (first (:juxt.site/permitted-actions req)))
         ;; Default response status
         req (assoc req :ring.response/status 200)]
 
     (actions/do-action
      (-> req
-         (assoc ::site/action (:xt/id permitted-action))
+         (assoc :juxt.site/action (:xt/id permitted-action))
          ;; A java.io.BufferedInputStream in the request can provke this
          ;; error: "invalid tx-op: Unfreezable type: class
          ;; java.io.BufferedInputStream".
@@ -315,9 +313,9 @@
 (defn PUT [req]
   (perform-unsafe-method req))
 
-(defn PATCH [{::site/keys [resource] :as req}]
+(defn PATCH [{:juxt.site/keys [resource] :as req}]
   (let [req (receive-representation req)
-        patch-fn (::site/patch-fn resource)]
+        patch-fn (:juxt.site/patch-fn resource)]
 
     ;; TODO: evaluate preconditions (in tx fn)
     (cond
@@ -326,16 +324,16 @@
       (throw
        (ex-info
         "Resource allows PATCH but doesn't contain have a patch-fn function"
-        {::site/request-context req})))))
+        {:juxt.site/request-context req})))))
 
-(defn DELETE [{::site/keys [xt-node uri] :as req}]
+(defn DELETE [{:juxt.site/keys [xt-node uri] :as req}]
   (let [tx (xt/submit-tx xt-node [[:xtdb.api/delete uri]])]
     (xt/await-tx xt-node tx)
     (into req {:ring.response/status 204})))
 
-(defn OPTIONS [{::site/keys [resource allowed-methods] :as req}]
+(defn OPTIONS [{:juxt.site/keys [resource allowed-methods] :as req}]
   ;; TODO: Implement *
-  (let [{::site/keys [access-control-allow-origins]} resource
+  (let [{:juxt.site/keys [access-control-allow-origins]} resource
         request-origin (get-in req [:ring.request/headers "origin"])
 
         [resource-origin allow-origin]
@@ -346,11 +344,11 @@
            [ro "*"]))
 
         access-control-allow-methods
-        (get resource-origin ::site/access-control-allow-methods)
+        (get resource-origin :juxt.site/access-control-allow-methods)
         access-control-allow-headers
-        (get resource-origin ::site/access-control-allow-headers)
+        (get resource-origin :juxt.site/access-control-allow-headers)
         access-control-allow-credentials
-        (get resource-origin ::site/access-control-allow-credentials)]
+        (get resource-origin :juxt.site/access-control-allow-credentials)]
 
     (log/debug "In OPTIONS")
 
@@ -358,7 +356,7 @@
 
       true (update :ring.response/headers
                    merge
-                   (::http/options resource)
+                   (:juxt.http/options resource)
                    {"allow" (join-keywords allowed-methods true)
                     ;; TODO: Shouldn't this be a situation (a missing body) detected
                     ;; by middleware, which can set the content-length header
@@ -385,26 +383,26 @@
        (ex-info
         "Method not implemented"
         {:ring.response/status 501
-         ::site/request-context req})))
+         :juxt.site/request-context req})))
     (h req)))
 
 (defn wrap-locate-resource [h]
   (fn [req]
     (let [res (locator/locate-resource req)]
-      (log/debugf "Resource provider: %s" (::site/resource-provider res))
-      (h (assoc req ::site/resource res)))))
+      (log/debugf "Resource provider: %s" (:juxt.site/resource-provider res))
+      (h (assoc req :juxt.site/resource res)))))
 
 (defn wrap-redirect [h]
-  (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
-    (when (= (::site/type resource) "Redirect")
+  (fn [{:juxt.site/keys [resource] :ring.request/keys [method] :as req}]
+    (when (= (:juxt.site/type resource) "Redirect")
       (let [status (case method (:get :head) 302 307)]
         (throw
          (ex-info
           "Redirect"
           {:ring.response/status status
-           :ring.response/headers {"location" (::site/location resource)}
-           :location (::site/location resource)
-           ::site/request-context req}))))
+           :ring.response/headers {"location" (:juxt.site/location resource)}
+           :location (:juxt.site/location resource)
+           :juxt.site/request-context req}))))
     (h req)))
 
 (defn wrap-find-current-representations
@@ -427,8 +425,8 @@
            (ex-info
             "Not Found"
             {:ring.response/status 404
-             ::site/request-context req})))
-        (h (assoc req ::site/current-representations cur-reps)))
+             :juxt.site/request-context req})))
+        (h (assoc req :juxt.site/current-representations cur-reps)))
       (h req))))
 
 (defn wrap-negotiate-representation [h]
@@ -442,20 +440,20 @@
                            (not= new-resource original-resource)
                            (assoc :juxt.site/variant-of original-resource)))]
       (h (cond-> req
-           new-resource (assoc ::site/resource new-resource))))))
+           new-resource (assoc :juxt.site/resource new-resource))))))
 
 (defn wrap-http-authenticate [h]
   (fn [req]
     (h (http-authn/authenticate req))))
 
 (defn wrap-method-not-allowed? [h]
-  (fn [{::site/keys [resource] :ring.request/keys [method] :as req}]
-    (when-not (map? (::site/methods resource))
+  (fn [{:juxt.site/keys [resource] :ring.request/keys [method] :as req}]
+    (when-not (map? (:juxt.site/methods resource))
       (throw (ex-info "Resource :juxt.site/methods must be a map"
                       {:resource resource
-                       ::site/request-context req})))
+                       :juxt.site/request-context req})))
     (if resource
-      (let [allowed-methods (set (keys (::site/methods resource)))]
+      (let [allowed-methods (set (keys (:juxt.site/methods resource)))]
         (when-not (contains? allowed-methods method)
           (throw
            (ex-info
@@ -463,17 +461,17 @@
             {:ring.response/status 405
              :ring.response/headers {"allow" (join-keywords allowed-methods true)}
              :method method
-             ::site/allowed-methods allowed-methods
-             ::site/request-context req})))
-        (h (assoc req ::site/allowed-methods allowed-methods)))
+             :juxt.site/allowed-methods allowed-methods
+             :juxt.site/request-context req})))
+        (h (assoc req :juxt.site/allowed-methods allowed-methods)))
       (h req))))
 
 (defn wrap-invoke-method [h]
   (fn [{:ring.request/keys [method] :as req}]
 
     ;; Temporary assert while tracking down an issue
-    (assert (or (nil? (::site/subject req)) (map? (::site/subject req)))
-            (format "Subject must be a map, or nil: %s" (pr-str (::site/subject req))))
+    (assert (or (nil? (:juxt.site/subject req)) (map? (:juxt.site/subject req)))
+            (format "Subject must be a map, or nil: %s" (pr-str (:juxt.site/subject req))))
 
     (h (case method
          (:get :head) (GET req)
@@ -504,25 +502,25 @@
             (cond-> m v (assoc k v)))]
     (-> acc
         (assoc-when-some "content-type"
-                         (some-> rep ::http/content-type))
+                         (some-> rep :juxt.http/content-type))
         (assoc-when-some "content-encoding"
-                         (some-> rep ::http/content-encoding))
+                         (some-> rep :juxt.http/content-encoding))
         (assoc-when-some "content-language"
-                         (some-> rep ::http/content-language))
+                         (some-> rep :juxt.http/content-language))
         (assoc-when-some "content-location"
-                         (some-> rep ::http/content-location str))
+                         (some-> rep :juxt.http/content-location str))
         (assoc-when-some "last-modified"
-                         (some-> rep ::http/last-modified format-http-date))
-        (assoc-when-some "etag" (some-> rep ::http/etag))
-        (assoc-when-some "vary" (some-> rep ::http/vary))
+                         (some-> rep :juxt.http/last-modified format-http-date))
+        (assoc-when-some "etag" (some-> rep :juxt.http/etag))
+        (assoc-when-some "vary" (some-> rep :juxt.http/vary))
         (assoc-when-some "content-length"
                          (or
-                          (some-> rep ::http/content-length str)
+                          (some-> rep :juxt.http/content-length str)
                           (when (counted? body)
                             (some-> body count str))))
-        (assoc-when-some "content-range" (::http/content-range rep))
-        (assoc-when-some "trailer" (::http/trailer rep))
-        (assoc-when-some "transfer-encoding" (::http/transfer-encoding rep)))))
+        (assoc-when-some "content-range" (:juxt.http/content-range rep))
+        (assoc-when-some "trailer" (:juxt.http/trailer rep))
+        (assoc-when-some "transfer-encoding" (:juxt.http/transfer-encoding rep)))))
 
 (defn redact [req]
   (-> req
@@ -532,12 +530,12 @@
                   (contains? headers "authorization")
                   (assoc "authorization" "(redacted)"))))))
 
-(defn ->storable [{::site/keys [request-id db] :as req}]
+(defn ->storable [{:juxt.site/keys [request-id db] :as req}]
   (-> req
       (into (select-keys db [:xtdb.api/valid-time :xtdb.api/tx-id]))
-      (assoc :xt/id request-id ::site/type "Request")
+      (assoc :xt/id request-id :juxt.site/type "Request")
       redact
-      (dissoc ::site/xt-node ::site/db :ring.request/body :ring.response/body)
+      (dissoc :juxt.site/xt-node :juxt.site/db :ring.request/body :ring.response/body)
       (util/deep-replace
        (fn [form]
          (cond-> form
@@ -561,7 +559,7 @@
    (:ring.response/status req)))
 
 (defn respond
-  [{::site/keys [resource start-date request-id]
+  [{:juxt.site/keys [resource start-date request-id]
     :ring.request/keys [method]
     :ring.response/keys [body]
     :as req}]
@@ -571,9 +569,9 @@
 
   (let [end-date (java.util.Date.)
         req (assoc req
-                   ::site/end-date end-date
-                   ::site/date end-date
-                   ::site/duration-millis (- (.getTime end-date)
+                   :juxt.site/end-date end-date
+                   :juxt.site/date end-date
+                   :juxt.site/duration-millis (- (.getTime end-date)
                                              (.getTime start-date)))]
     (cond->
         (update req
@@ -610,11 +608,11 @@
 
 (defn wrap-cors-headers [h]
   (fn [req]
-    (let [{::site/keys [resource] :as req}
+    (let [{:juxt.site/keys [resource] :as req}
           (h req)
 
           request-origin (get-in req [:ring.request/headers "origin"])
-          {::site/keys [access-control-allow-origins]} resource
+          {:juxt.site/keys [access-control-allow-origins]} resource
 
           access-control
           (when request-origin
@@ -624,15 +622,15 @@
         access-control
         (assoc-in [:ring.response/headers "access-control-allow-origin"] request-origin)
 
-        (contains? access-control ::site/access-control-allow-methods)
+        (contains? access-control :juxt.site/access-control-allow-methods)
         (assoc-in [:ring.response/headers "access-control-allow-methods"]
-                  (join-keywords (get access-control ::site/access-control-allow-methods) true))
-        (contains? access-control ::site/access-control-allow-headers)
+                  (join-keywords (get access-control :juxt.site/access-control-allow-methods) true))
+        (contains? access-control :juxt.site/access-control-allow-headers)
         (assoc-in [:ring.response/headers "access-control-allow-headers"]
-                  (join-keywords (get access-control ::site/access-control-allow-headers) false))
-        (contains? access-control ::site/access-control-allow-credentials)
+                  (join-keywords (get access-control :juxt.site/access-control-allow-headers) false))
+        (contains? access-control :juxt.site/access-control-allow-credentials)
         (assoc-in [:ring.response/headers "access-control-allow-credentials"]
-                  (str (get access-control ::site/access-control-allow-credentials)))))))
+                  (str (get access-control :juxt.site/access-control-allow-credentials)))))))
 
 (defn status-message [status]
   (case status
@@ -667,13 +665,13 @@
          {:message (.getMessage e)
           :stack-trace (.getStackTrace e)}
        (instance? clojure.lang.ExceptionInfo e)
-       (assoc :ex-data (dissoc (ex-data e) ::site/request-context)))
+       (assoc :ex-data (dissoc (ex-data e) :juxt.site/request-context)))
      (when cause (errors-with-causes cause)))))
 
 (defn put-error-representation
   "If method is PUT"
-  [{::site/keys [resource] :ring.response/keys [status] :as req}]
-  (let [{::http/keys [put-error-representations]} resource
+  [{:juxt.site/keys [resource] :ring.response/keys [status] :as req}]
+  (let [{:juxt.http/keys [put-error-representations]} resource
         put-error-representations
         (filter
          (fn [rep]
@@ -684,12 +682,12 @@
     (when (seq put-error-representations)
       (some-> (conneg/negotiate-representation req put-error-representations)
               ;; Content-Location is not appropriate for errors.
-              (dissoc ::http/content-location)))))
+              (dissoc :juxt.http/content-location)))))
 
 (defn post-error-representation
   "If method is POST"
-  [{::site/keys [resource] :ring.response/keys [status] :as req}]
-  (let [{::http/keys [post-error-representations]} resource
+  [{:juxt.site/keys [resource] :ring.response/keys [status] :as req}]
+  (let [{:juxt.http/keys [post-error-representations]} resource
         post-error-representations
         (filter
          (fn [rep]
@@ -700,7 +698,7 @@
     (when (seq post-error-representations)
       (some-> (conneg/negotiate-representation req post-error-representations)
               ;; Content-Location is not appropriate for errors.
-              (dissoc ::http/content-location)))))
+              (dissoc :juxt.http/content-location)))))
 
 ;; TODO: I'm beginning to think that a resource should include the handling of
 ;; all possible errors and error representations. So there shouldn't be such a
@@ -716,10 +714,10 @@
   'ErrorResource' entity matching the status. In future this could use rules to
   use the environment (dev vs. prod), subject (developer vs. customer) or other
   variables to determine the resource to use."
-  [{::site/keys [db]} status]
+  [{:juxt.site/keys [db]} status]
   (when-let [res (ffirst
             (xt/q db '{:find [(pull er [*])]
-                      :where [[er ::site/type "ErrorResource"]
+                      :where [[er :juxt.site/type "ErrorResource"]
                               [er :ring.response/status status]]
                       :in [status]} status))]
     (log/debugf "ErrorResource found for status %d: %s" status res)
@@ -737,32 +735,32 @@
             ;; Allow errors to be transmitted to developers
             er
             (assoc er
-                   ::site/access-control-allow-origins
+                   :juxt.site/access-control-allow-origins
                    {"http://localhost:8000"
-                    {::site/access-control-allow-methods #{:get :put :post :delete}
-                     ::site/access-control-allow-headers #{"authorization" "content-type"}
-                     ::site/access-control-allow-credentials true}})
+                    {:juxt.site/access-control-allow-methods #{:get :put :post :delete}
+                     :juxt.site/access-control-allow-headers #{"authorization" "content-type"}
+                     :juxt.site/access-control-allow-credentials true}})
 
             er
             (-> er
-                #_(update ::site/template-model assoc
+                #_(update :juxt.site/template-model assoc
                           "_site" {"status" {"code" status
                                              "message" (status-message status)}
                                    "error" {"message" (.getMessage e)}
-                                   "uri" (::site/uri req)}))
+                                   "uri" (:juxt.site/uri req)}))
 
             error-representations
             (conneg/current-representations
              (assoc req
-                    ::site/resource er
-                    ::site/uri (:xt/id er)))]
+                    :juxt.site/resource er
+                    :juxt.site/uri (:xt/id er)))]
 
         (when (seq error-representations)
           (some-> (conneg/negotiate-representation req error-representations)
                   ;; Content-Location is not appropriate for errors.
-                  (dissoc ::http/content-location)))))))
+                  (dissoc :juxt.http/content-location)))))))
 
-(defn respond-internal-error [{::site/keys [request-id] :as req} e]
+(defn respond-internal-error [{:juxt.site/keys [request-id] :as req} e]
   (log/error e (str "Internal Error: " (.getMessage e)))
   ;; TODO: We should allow an ErrorResource for 500 errors
 
@@ -778,10 +776,10 @@
       req
       {:ring.response/status 500
        :ring.response/body default-body
-       ::site/errors (errors-with-causes e)
-       ::site/resource
-       {::http/content-type "text/html;charset=utf-8"
-        ::http/content-length (count default-body)
+       :juxt.site/errors (errors-with-causes e)
+       :juxt.site/resource
+       {:juxt.http/content-type "text/html;charset=utf-8"
+        :juxt.http/content-length (count default-body)
         :ring.response/body default-body}
        }))))
 
@@ -789,11 +787,11 @@
   "Respond with the given error"
   [req e]
 
-  (assert (::site/start-date req))
+  (assert (:juxt.site/start-date req))
 
   (let [{:ring.response/keys [status]
          :ring.request/keys [method]
-         ::site/keys [request-id]} req
+         :juxt.site/keys [request-id]} req
 
         representation
         (or
@@ -814,34 +812,34 @@
                   ;; information, unauthorized users don't.
                   (cond-> (str (status-message status) "\r\n")
                     request-id (str (format "<a href=\"%s\" target=\"_site_error\">%s</a>\r\n" request-id "Error")))]
-              {::http/content-type "text/html;charset=utf-8"
-               ::http/content-length (count content)
-               ::http/content content})
+              {:juxt.http/content-type "text/html;charset=utf-8"
+               :juxt.http/content-length (count content)
+               :juxt.http/content content})
             (let [content (str (status-message status) "\r\n")]
-              {::http/content-type "text/plain;charset=utf-8"
-               ::http/content-length (count content)
-               ::http/content content})])
+              {:juxt.http/content-type "text/plain;charset=utf-8"
+               :juxt.http/content-length (count content)
+               :juxt.http/content content})])
 
           ;; This is an error, it won't be cached, it isn't negotiable 'content'
           ;; so the Vary header isn't deemed applicable. Let's not set it.
-          (dissoc ::http/vary))
+          (dissoc :juxt.http/vary))
 
          ;; A last ditch error in plain-text, even though plain-text is not acceptable, we override this
          (let [content (.getBytes (str (status-message status) "\r\n") "US-ASCII")]
-           {::http/content-type "text/plain;charset=us-ascii"
-            ::http/content-length (count content)
-            ::http/content content}))
+           {:juxt.http/content-type "text/plain;charset=us-ascii"
+            :juxt.http/content-length (count content)
+            :juxt.http/content content}))
 
         error-resource (merge
                         {:ring.response/status 500
-                         ::site/errors (errors-with-causes e)}
-                        (dissoc req ::site/request-context)
+                         :juxt.site/errors (errors-with-causes e)}
+                        (dissoc req :juxt.site/request-context)
                         ;; For the error itself
-                        {::site/resource representation})
+                        {:juxt.site/resource representation})
 
         error-resource (assoc
                         error-resource
-                        ::site/status-message (status-message (:ring.response/status error-resource)))
+                        :juxt.site/status-message (status-message (:ring.response/status error-resource)))
 
         response (try
                    (cond-> error-resource
@@ -856,12 +854,12 @@
   "Return a handler that constructs proper Ring responses, logs and error
   handling where appropriate."
   [h]
-  (fn [{::site/keys [request-id] :as req}]
+  (fn [{:juxt.site/keys [request-id] :as req}]
     (org.slf4j.MDC/put "reqid" request-id)
     (try
       (h req)
       (catch clojure.lang.ExceptionInfo e
-        ;; When throwing ex-info, try to add the ::site/request-context key,
+        ;; When throwing ex-info, try to add the :juxt.site/request-context key,
         ;; using the request of the cause as the base. In this way, the cause
         ;; request (which is more recent), predominates but a catcher can always
         ;; override aspects, such as the ring.response/status.
@@ -869,7 +867,7 @@
         (log/errorf e "wrap-error-handling, ex-data: %s" (pr-str (ex-data e)))
 
         (let [ex-data (ex-data e)
-              ctx (or (::site/request-context ex-data) req)
+              ctx (or (:juxt.site/request-context ex-data) req)
               status (or
                       (:ring.response/status ex-data) ; explicit error status
                       500)
@@ -880,18 +878,18 @@
                     status (assoc :ring.response/status status)
                     headers (assoc :ring.response/headers headers))]
 
-          (if (::site/start-date ctx)
+          (if (:juxt.site/start-date ctx)
             (do
               ;; Don't log exceptions which are used to escape (e.g. 302, 401).
               (when (or (not (integer? status)) (>= status 500))
                 (let [ex-data (->storable ex-data)]
-                  (log/errorf e "%s: %s" (.getMessage e) (pr-str (dissoc ex-data ::site/request-context)))))
+                  (log/errorf e "%s: %s" (.getMessage e) (pr-str (dissoc ex-data :juxt.site/request-context)))))
 
               (error-response ctx e))
 
             (error-response
              req
-             (ex-info "ExceptionInfo caught, but with an invalid request-context attached" {::site/request-context ctx} e)))))
+             (ex-info "ExceptionInfo caught, but with an invalid request-context attached" {:juxt.site/request-context ctx} e)))))
 
       (catch Throwable t (respond-internal-error req t))
       (finally (org.slf4j.MDC/clear)))))
@@ -952,11 +950,11 @@
 
 (defn wrap-initialize-request
   "Initialize request state."
-  [h {::site/keys [xt-node base-uri uri-prefix] :as opts}]
+  [h {:juxt.site/keys [xt-node base-uri uri-prefix] :as opts}]
   (assert xt-node)
   (assert base-uri)
   (fn [{:ring.request/keys [scheme path]
-        ::site/keys [uri] :as req}]
+        :juxt.site/keys [uri] :as req}]
 
     (assert (not (and uri path)))
 
@@ -989,11 +987,11 @@
                     (str scheme+authority (normalize-path (:ring.request/path req)))))
 
           req (into req (merge
-                         {::site/start-date (java.util.Date.)
-                          ::site/request-id req-id
-                          ::site/uri uri
-                          ::site/db db}
-                         (dissoc opts ::site/uri-prefix)))]
+                         {:juxt.site/start-date (java.util.Date.)
+                          :juxt.site/request-id req-id
+                          :juxt.site/uri uri
+                          :juxt.site/db db}
+                         (dissoc opts :juxt.site/uri-prefix)))]
 
       ;; The Ring request map becomes the container for all state collected
       ;; along the request processing pathway.
@@ -1036,26 +1034,26 @@
 (defn wrap-store-request-in-request-cache [h]
   (fn [req]
     (let [req (h req)]
-      (when-let [req-id (::site/request-id req)]
+      (when-let [req-id (:juxt.site/request-id req)]
         (cache/put! cache/requests-cache req-id (->storable req)))
       req)))
 
 (defn wrap-store-request [h]
   (fn [req]
     (let [req (h req)]
-      (when-let [req-id (::site/request-id req)]
-        (let [{:ring.request/keys [method] ::site/keys [xt-node]} req]
+      (when-let [req-id (:juxt.site/request-id req)]
+        (let [{:ring.request/keys [method] :juxt.site/keys [xt-node]} req]
           (when (or (= method :post) (= method :put))
             (xt/submit-tx
              xt-node
              [[:xtdb.api/put (-> req ->storable
                                 (select-keys [:juxt.site/subject
-                                              ::site/date
-                                              ::site/uri
+                                              :juxt.site/date
+                                              :juxt.site/uri
                                               :ring.request/method
                                               :ring.response/status])
                                 (assoc :xt/id req-id
-                                       ::site/type "Request"))]]))))
+                                       :juxt.site/type "Request"))]]))))
       req)))
 
 (defn wrap-log-request [h]
@@ -1085,7 +1083,7 @@
         "Service unavailable"
         {:ring.response/status 503
          :ring.response/headers {"retry-after" "120"}
-         ::site/request-context req})))
+         :juxt.site/request-context req})))
     (h req)))
 
 (defn wrap-bind-uri-to-mdc [h]

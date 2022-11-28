@@ -4,10 +4,9 @@
   (:require
    [clojure.tools.logging :as log]
    [integrant.core :as ig]
-   [nrepl.server :refer [start-server stop-server]]
-   [juxt.site :as-alias site]))
+   [nrepl.server :refer [start-server stop-server]]))
 
-(defmethod ig/init-key ::server [_ {::site/keys [port]}]
+(defmethod ig/init-key ::server [_ {:juxt.site/keys [port]}]
   (log/infof "Starting nREPL server on port %d" port)
   (start-server :port port))
 

@@ -11,13 +11,11 @@
    [juxt.grab.alpha.document :as grab.document]
    [juxt.grab.alpha.parser :as grab.parser]
    [juxt.grab.alpha.schema :as grab.schema]
-   [juxt.http :as-alias http]
    [juxt.site.resources.form-based-auth :as form-based-auth]
    [juxt.site.resources.oauth :as oauth]
    [juxt.site.resources.protection-space :as protection-space]
    [juxt.site.resources.session-scope :as session-scope]
    [juxt.site.resources.user :as user]
-   [juxt.site :as-alias site]
    [juxt.site.eql-datalog-compiler :as eqlc]
    [juxt.site.graphql-eql-compiler :refer [graphql->eql-ast]]
    [juxt.site.init :as init]
@@ -187,7 +185,7 @@
            {:xt/id id
             :patient patient-id
             :doctor doctor-id
-            ::site/type "https://site.test/types/doctor-patient-assignment"}]]))}
+            :juxt.site/type "https://site.test/types/doctor-patient-assignment"}]]))}
 
     :juxt.site/rules
     '[
@@ -219,7 +217,7 @@
     :juxt.site/action-contexts
     {"https://site.test/actions/get-doctor"
      {:juxt.site/additional-where-clauses
-      '[[ass ::site/type "https://site.test/types/doctor-patient-assignment"]
+      '[[ass :juxt.site/type "https://site.test/types/doctor-patient-assignment"]
         [ass :patient e]
         [ass :doctor parent]]}}
 
@@ -375,7 +373,7 @@
     {"https://site.test/actions/get-patient"
      {:juxt.site/additional-where-clauses
       '[[e :patient parent]
-        [e ::site/type "https://site.test/types/measurement"]]}}
+        [e :juxt.site/type "https://site.test/types/measurement"]]}}
 
     :juxt.site/rules
     '[
@@ -470,8 +468,8 @@
      "https://site.test/actions/register-doctor"
      {:xt/id id
       :name name
-      ::http/content-type "application/json"
-      ::http/content (json/write-value-as-string {"name" name})})))
+      :juxt.http/content-type "application/json"
+      :juxt.http/content (json/write-value-as-string {"name" name})})))
 
 (defn register-patient! [{:keys [id params]}]
   (let [pid (get params "pid")
@@ -482,8 +480,8 @@
      "https://site.test/actions/register-patient"
      {:xt/id id
       :name name
-      ::http/content-type "application/json"
-      ::http/content (json/write-value-as-string {"name" name})})))
+      :juxt.http/content-type "application/json"
+      :juxt.http/content (json/write-value-as-string {"name" name})})))
 
 (def dependency-graph
   {"https://site.test/actions/register-doctor"
@@ -565,7 +563,7 @@
         {:get
          {:juxt.site/actions #{"https://site.test/actions/list-patients"}}}
         :juxt.site/protection-spaces #{"https://site.test/protection-spaces/bearer"}
-        ::http/content-type "application/json"
+        :juxt.http/content-type "application/json"
         :juxt.site/respond
         {:juxt.site.sci/program
          (pr-str
@@ -842,10 +840,10 @@
         (let [db (xt/db *xt-node*)
               extract-subject-with-token
               (fn [token]
-                (::site/subject
+                (:juxt.site/subject
                  (ffirst
                   (xt/q db '{:find [(pull e [*])]
-                             :where [[e ::site/token token]]
+                             :where [[e :juxt.site/token token]]
                              :in [token]} token))))
               alice (extract-subject-with-token alice-access-token)
               bob (extract-subject-with-token bob-access-token)]
@@ -879,11 +877,11 @@
                        db
                        (eql/query->ast
                         '[
-                          {(:patients {::site/action "https://site.test/actions/get-patient"})
+                          {(:patients {:juxt.site/action "https://site.test/actions/get-patient"})
                            [:xt/id
                             :name
-                            ::site/type
-                            {(:measurements {::site/action "https://site.test/actions/read-any-measurement"})
+                            :juxt.site/type
+                            {(:measurements {:juxt.site/action "https://site.test/actions/read-any-measurement"})
                              [:reading]}]}])))]
 
               (testing "Alice's view"
@@ -994,15 +992,15 @@
                       (eqlc/compile-ast
                        db
                        (eql/query->ast
-                        '[{(:doctors {::site/action "https://site.test/actions/get-doctor"})
+                        '[{(:doctors {:juxt.site/action "https://site.test/actions/get-doctor"})
                            [:xt/id
                             :name
-                            ::site/type
-                            {(:patients {::site/action "https://site.test/actions/get-patient"})
+                            :juxt.site/type
+                            {(:patients {:juxt.site/action "https://site.test/actions/get-patient"})
                              [:xt/id
                               :name
-                              ::site/type
-                              {(:readings {::site/action "https://site.test/actions/read-any-measurement"})
+                              :juxt.site/type
+                              {(:readings {:juxt.site/action "https://site.test/actions/read-any-measurement"})
                                [:reading]}]}]}])))]
 
               (testing "Alice's view"
@@ -1095,16 +1093,16 @@
                       (eqlc/compile-ast
                        db
                        (eql/query->ast
-                        '[{(:doctor {::site/action "https://site.test/actions/get-doctor"
+                        '[{(:doctor {:juxt.site/action "https://site.test/actions/get-doctor"
                                      :search "jack"})
                            [:xt/id
                             :name
-                            ::site/type
-                            {(:patients {::site/action "https://site.test/actions/get-patient"})
+                            :juxt.site/type
+                            {(:patients {:juxt.site/action "https://site.test/actions/get-patient"})
                              [:xt/id
                               :name
-                              ::site/type
-                              {(:readings {::site/action "https://site.test/actions/read-any-measurement"})
+                              :juxt.site/type
+                              {(:readings {:juxt.site/action "https://site.test/actions/read-any-measurement"})
                                [:reading]}]}]}])))]
 
               (testing "Alice's view"
@@ -1255,7 +1253,7 @@
         ;; be deduped via reference to independent documents, or even one to the
         ;; other:
 
-        ;; {:xt/id "list-patients" ::site/rules "get-patient"}
+        ;; {:xt/id "list-patients" :juxt.site/rules "get-patient"}
 
         ;; Idea: Break GraphQL schemas into constituent types and create
         ;; individual resources, one resource per type. Use 'set' difference to
@@ -1369,10 +1367,10 @@
             ;; against the database, rather than going via Ring .
             extract-subject-with-token
             (fn [token]
-              (::site/subject
+              (:juxt.site/subject
                (ffirst
                 (xt/q db '{:find [(pull e [*])]
-                           :where [[e ::site/token token]]
+                           :where [[e :juxt.site/token token]]
                            :in [token]} token))))
             alice (extract-subject-with-token alice-access-token)
             bob (extract-subject-with-token bob-access-token)

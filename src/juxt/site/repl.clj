@@ -8,9 +8,7 @@
    [clojure.walk :refer [postwalk]]
    [crypto.password.bcrypt :as password]
    [io.aviso.ansi :as ansi]
-   [juxt.http :as-alias http]
    [juxt.site.actions :as actions]
-   [juxt.site :as-alias site]
    [juxt.site.cache :as cache]
    [juxt.site.init :as init :refer [config base-uri xt-node]]
    [juxt.site.util :as util]
@@ -40,12 +38,12 @@
 (defn e [id]
   (postwalk
    (fn [x] (if (and (vector? x)
-                    (#{::http/content ::http/body} (first x))
+                    (#{:juxt.http/content :juxt.http/body} (first x))
                     (> (count (second x)) 1024))
 
              [(first x)
               (cond
-                (= ::http/content (first x)) (str (subs (second x) 0 80) "…")
+                (= :juxt.http/content (first x)) (str (subs (second x) 0 80) "…")
                 :else (format "(%d bytes)" (count (second x))))]
              x))
    (xt/entity (db) id)))
@@ -80,7 +78,7 @@
 (defn t [t]
   (map
    first
-   (xt/q (db) '{:find [e] :where [[e ::site/type t]] :in [t]} t)))
+   (xt/q (db) '{:find [e] :where [[e :juxt.site/type t]] :in [t]} t)))
 
 (defn t* [t]
   (map
@@ -89,14 +87,14 @@
 
 (defn types []
   (->> (q '{:find [t]
-            :where [[_ ::site/type t]]})
+            :where [[_ :juxt.site/type t]]})
        (map first)
        (sort)))
 
 (defn ls
   "List Site resources"
   ([]
-   (->> (q '{:find [(pull e [:xt/id ::site/type])]
+   (->> (q '{:find [(pull e [:xt/id :juxt.site/type])]
              :where [[e :xt/id]]})
         (map first)
         (filter (fn [e]
@@ -105,7 +103,7 @@
                           "Session"
                           "SessionToken"
                           }
-                        (::site/type e)))))
+                        (:juxt.site/type e)))))
         (map :xt/id)
         (sort-by str)))
   ([pat]
@@ -123,7 +121,7 @@
   [t]
   (->> (q '{:find [e]
             :where [[e :xt/id]
-                    [e ::site/type t]]
+                    [e :juxt.site/type t]]
             :in [t]} t)
        (map first)
        (sort)))
@@ -201,7 +199,7 @@
          (cond->> (q '{:find [(pull e [*])]
                        :where [[e :xt/id]]})
            true (map first)
-           true (filter #(not= (::site/type %) "Request"))
+           true (filter #(not= (:juxt.site/type %) "Request"))
            pred (filter pred)
            uri-mapping (map (apply-uri-mappings uri-mapping))
            true (sort-by :xt/id))]
@@ -242,7 +240,7 @@
 (defn recent
   ([] (recent 5))
   ([n]
-   (map (juxt ::site/request-id ::site/date ::site/uri :ring.request/method :ring.response/status)
+   (map (juxt :juxt.site/request-id :juxt.site/date :juxt.site/uri :ring.request/method :ring.response/status)
         (cache/recent cache/requests-cache n))
    ))
 
@@ -255,8 +253,8 @@
   ([seconds]
    (let [records (map first
                       (q '{:find [e]
-                           :where [[e ::site/type "Request"]
-                                   [e ::site/end-date ended]
+                           :where [[e :juxt.site/type "Request"]
+                                   [e :juxt.site/end-date ended]
                                    [(< ended checkpoint)]]
                            :in [checkpoint]}
                          (Date. (- (.getTime (Date.)) (* seconds 1000)))))]
@@ -273,13 +271,13 @@
 
 #_(defn superusers
   ([] (superusers (config)))
-  ([{::site/keys [base-uri]}]
+  ([{:juxt.site/keys [base-uri]}]
    (map first
         (xt/q (db) '{:find [user]
-                     :where [[user ::site/type "User"]
-                             [mapping ::site/type "UserRoleMapping"]
-                             [mapping ::site/assignee user]
-                             [mapping ::site/role superuser]]
+                     :where [[user :juxt.site/type "User"]
+                             [mapping :juxt.site/type "UserRoleMapping"]
+                             [mapping :juxt.site/assignee user]
+                             [mapping :juxt.site/role superuser]]
                      :in [superuser]}
               (str base-uri "/_site/roles/superuser")))))
 
@@ -289,13 +287,13 @@
    (map
     first
     (xt/q db {:find '[e]
-              :where [['e ::site/client (str base-uri "/_site/apps/admin")]
-                      ['e ::site/type "AccessToken"]]}))))
+              :where [['e :juxt.site/client (str base-uri "/_site/apps/admin")]
+                      ['e :juxt.site/type "AccessToken"]]}))))
 
 (defn steps
   ([] (steps (config)))
   ([opts]
-   (let [{::site/keys [base-uri]} opts
+   (let [{:juxt.site/keys [base-uri]} opts
          _ (assert base-uri)
          db (xt/db (xt-node))]
      [ ;; Awaiting a fix to https://github.com/juxt/xtdb/issues/1480
@@ -362,7 +360,7 @@
   (actions/check-permissions (db) actions options))
 
 (defn factory-reset! []
-  (apply evict! (->> (q '{:find [(pull e [:xt/id ::site/type])]
+  (apply evict! (->> (q '{:find [(pull e [:xt/id :juxt.site/type])]
                           :where [[e :xt/id]]})
                      (map first)
                      (map :xt/id))))
@@ -371,13 +369,13 @@
   (let [db (db)]
     (for [tok (->> (q '{:find [e]
                         :where [[e :xt/id]
-                                [e ::site/type "https://meta.juxt.site/site/session"]]
+                                [e :juxt.site/type "https://meta.juxt.site/site/session"]]
                         :in [t]} t)
                    (map first)
                    )
-          :let [session-id (::site/session (xt/entity db tok))
+          :let [session-id (:juxt.site/session (xt/entity db tok))
                 session (xt/entity db session-id)
-                subject-id (::site/subject session)
+                subject-id (:juxt.site/subject session)
                 subject (xt/entity db subject-id)]]
       {:session-token tok
        :session session
@@ -391,14 +389,14 @@
     (->>
      (for [tok (->> (q '{:find [e]
                          :where [[e :xt/id]
-                                 [e ::site/type #{"https://meta.juxt.site/site/session"
+                                 [e :juxt.site/type #{"https://meta.juxt.site/site/session"
                                                   "https://meta.juxt.site/site/session-token"}]]
                          :in [t]} t)
                     (map first)
                     )
-           :let [session-id (::site/session (xt/entity db tok))
+           :let [session-id (:juxt.site/session (xt/entity db tok))
                  session (xt/entity db session-id)
-                 subject (::site/subject session)]]
+                 subject (:juxt.site/subject session)]]
        (remove nil? [tok session-id subject]))
      (mapcat seq)
      (apply evict!))))

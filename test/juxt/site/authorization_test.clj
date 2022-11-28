@@ -4,10 +4,7 @@
   (:require
    [clojure.set :as set]
    [clojure.test :refer [deftest is are use-fixtures testing] :as t]
-   [juxt.site.malli :as-alias site.malli]
-   [juxt.site.process :as-alias site.process]
    [juxt.site.actions :as authz]
-   [juxt.site :as-alias site]
    [juxt.test.util :refer [with-xt submit-and-await! *xt-node*]]
    [xtdb.api :as xt]))
 
@@ -54,9 +51,9 @@
 #_(def USER_APP
   {:xt/id "https://example.org/_site/apps/user"
    ::name "User App"
-   ::site/client-id "100"
-   ::site/client-secret "SecretUmbrella"
-   ::site/scope #{"read:resource" "write:resource"
+   :juxt.site/client-id "100"
+   :juxt.site/client-secret "SecretUmbrella"
+   :juxt.site/scope #{"read:resource" "write:resource"
                   "read:user"
                   "read:messages"
                   "read:health"}})
@@ -95,7 +92,7 @@
 ;; All access is via an access token. Access tokens reference the application
 ;; being used and the subject that the application is acting on behalf
 ;; of. Access tokens are Site documents and must contain, at the minimum,
-;; ::site/type, ::site/subject and ::site/application-client. An access token
+;; :juxt.site/type, :juxt.site/subject and :juxt.site/application-client. An access token
 ;; might not be granted all the scopes that the application requests. When the
 ;; access token's scopes are limited with respect to the application's allowed
 ;; scopes, a :site/scope entry is added. This might be added at the creation of
@@ -108,11 +105,11 @@
 
 (def EMPLOYEE_LIST
   {:xt/id "https://example.org/employees/"
-   ::site/classification "INTERNAL"})
+   :juxt.site/classification "INTERNAL"})
 
 (def LOGIN_PAGE
   {:xt/id "https://example.org/login"
-   ::site/classification "PUBLIC"})
+   :juxt.site/classification "PUBLIC"})
 
 ;; Neither Alice nor Carlos can see this resource because it doesn't have an
 ;; explicit classification.
@@ -127,39 +124,39 @@
 ;; action.
 (def GET_RESOURCE_ACTION
   {:xt/id "https://example.org/_site/actions/get-resource"
-   ::site/type "https://meta.juxt.site/site/action"
-   ::site/scope "read:resource"
-   ::site/rules
+   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/scope "read:resource"
+   :juxt.site/rules
    '[
      ;; Unidentified visitors can read of PUBLIC resources
      [(allowed? subject resource permission)
-      [resource ::site/classification "PUBLIC"]
+      [resource :juxt.site/classification "PUBLIC"]
       [(nil? subject)]
       ]
 
      ;; Identified visitors can also read PUBLIC resource
      [(allowed? subject resource permission)
-      [resource ::site/classification "PUBLIC"]
+      [resource :juxt.site/classification "PUBLIC"]
       [subject :xt/id]]
 
      ;; Only persons granted permission to read INTERNAL resources
      [(allowed? subject resource permission)
-      [resource ::site/classification "INTERNAL"]
+      [resource :juxt.site/classification "INTERNAL"]
       [permission ::person person]
       [subject ::person person]]
 ]})
 
 (def ANYONE_CAN_READ_PUBLIC_RESOURCES
   {:xt/id "https://example.org/permissions/anyone-can-read-public-resources"
-   ::site/type "https://meta.juxt.site/site/permission"
-   ::site/action (:xt/id GET_RESOURCE_ACTION)
-   ::site/purpose nil})
+   :juxt.site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/action (:xt/id GET_RESOURCE_ACTION)
+   :juxt.site/purpose nil})
 
 (def ALICE_CAN_READ_INTERNAL_RESOURCES
   {:xt/id "https://example.org/permissions/alice-can-read-internal-resources"
-   ::site/type "https://meta.juxt.site/site/permission"
-   ::site/action (:xt/id GET_RESOURCE_ACTION)
-   ::site/purpose nil
+   :juxt.site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/action (:xt/id GET_RESOURCE_ACTION)
+   :juxt.site/purpose nil
    ::person (:xt/id ALICE)})
 
 #_((t/join-fixtures [with-xt])
@@ -195,8 +192,8 @@
                db
                #{(:xt/id GET_RESOURCE_ACTION)}
                (cond-> {}
-                 subject (assoc ::site/subject subject)
-                 resource (assoc ::site/resource resource)))]
+                 subject (assoc :juxt.site/subject subject)
+                 resource (assoc :juxt.site/resource resource)))]
           (if expected
             (is (seq permissions))
             (is (not (seq permissions)))))
@@ -231,9 +228,9 @@
 
 (def READ_USER_DIR_ACTION
   {:xt/id "https://example.org/actions/read-user-dir"
-   ::site/type "https://meta.juxt.site/site/action"
-   ::site/scope "read:resource"
-   ::site/rules
+   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/scope "read:resource"
+   :juxt.site/rules
    '[[(allowed? subject resource permission)
       [permission ::person person]
       [subject ::person person]
@@ -246,9 +243,9 @@
 
 (def WRITE_USER_DIR_ACTION
   {:xt/id "https://example.org/actions/write-user-dir"
-   ::site/type "https://meta.juxt.site/site/action"
-   ::site/scope "write:resource"
-   ::site/rules
+   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/scope "write:resource"
+   :juxt.site/rules
    '[[(allowed? subject resource permission)
       [permission ::person person]
       [subject ::person person]
@@ -260,64 +257,64 @@
 
 (def READ_SHARED_ACTION
   {:xt/id "https://example.org/actions/read-shared"
-   ::site/type "https://meta.juxt.site/site/action"
-   ::site/scope "read:resource"
-   ::site/rules
+   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/scope "read:resource"
+   :juxt.site/rules
    '[[(allowed? subject resource permission)
       [permission ::person person]
       [person ::type "Person"]
       [subject ::person person]
       [resource :xt/id]
-      [permission ::site/resource resource]]]})
+      [permission :juxt.site/resource resource]]]})
 
 (def ALICE_CAN_READ
   {:xt/id "https://example.org/permissions/alice-can-read"
-   ::site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/site/permission"
    ::person "https://example.org/people/alice"
-   ::site/action #{"https://example.org/actions/read-shared"
+   :juxt.site/action #{"https://example.org/actions/read-shared"
                    "https://example.org/actions/read-user-dir"}
-   ::site/purpose nil})
+   :juxt.site/purpose nil})
 
 (def ALICE_CAN_WRITE_USER_DIR_CONTENT
   {:xt/id "https://example.org/permissions/alice-can-write-user-dir-content"
-   ::site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/site/permission"
    ::person "https://example.org/people/alice"
-   ::site/action "https://example.org/actions/write-user-dir"
-   ::site/purpose nil})
+   :juxt.site/action "https://example.org/actions/write-user-dir"
+   :juxt.site/purpose nil})
 
 (def BOB_CAN_READ
   {:xt/id "https://example.org/permissions/bob-can-read"
-   ::site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/site/permission"
    ::person "https://example.org/people/bob"
-   ::site/action #{"https://example.org/actions/read-shared"
+   :juxt.site/action #{"https://example.org/actions/read-shared"
                    "https://example.org/actions/read-user-dir"}
-   ::site/purpose nil})
+   :juxt.site/purpose nil})
 
 (def ALICES_SHARES_FILE_WITH_BOB
   {:xt/id "https://example.org/permissions/alice-shares-file-with-bob"
-   ::site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/site/permission"
    ::person "https://example.org/people/bob"
-   ::site/action "https://example.org/actions/read-shared"
-   ::site/purpose nil
-   ::site/resource "https://example.org/~alice/shared.txt"})
+   :juxt.site/action "https://example.org/actions/read-shared"
+   :juxt.site/purpose nil
+   :juxt.site/resource "https://example.org/~alice/shared.txt"})
 
 (def BOB_CAN_WRITE_USER_DIR_CONTENT
   {:xt/id "https://example.org/permissions/bob-can-write-user-dir-content"
-   ::site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/site/permission"
    ::person "https://example.org/people/bob"
-   ::site/action "https://example.org/actions/write-user-dir"
-   ::site/purpose nil})
+   :juxt.site/action "https://example.org/actions/write-user-dir"
+   :juxt.site/purpose nil})
 
 ;; Scopes. Actions inhabit scopes.
 
 (defn effective-scope [db access-token]
   (let [access-token-doc (xt/entity db access-token)
         _ (assert access-token-doc)
-        app (xt/entity db (::site/application-client access-token-doc))
+        app (xt/entity db (:juxt.site/application-client access-token-doc))
         _ (assert app)
-        scope (::site/scope app)
+        scope (:juxt.site/scope app)
         _ (assert scope)
-        access-token-scope (::site/scope access-token-doc)]
+        access-token-scope (:juxt.site/scope access-token-doc)]
     (cond-> scope
       access-token-scope (set/intersection access-token-scope))))
 
@@ -355,8 +352,8 @@
         (let [actual (authz/check-permissions
                       db
                       #{(:xt/id action)}
-                      {::site/subject subject
-                       ::site/resource resource})]
+                      {:juxt.site/subject subject
+                       :juxt.site/resource resource})]
           (if ok? (is (seq actual)) (is (not (seq actual)))))
 
       ;; Alice can read her own private file.
@@ -436,7 +433,7 @@
                (authz/allowed-resources
                 db
                 actions
-                {::site/subject subject})))
+                {:juxt.site/subject subject})))
 
       ;; Alice can see all her files.
       ALICE_SUBJECT
@@ -489,51 +486,51 @@
 (deftest constrained-pull-test
   (let [READ_USERNAME_ACTION
         {:xt/id "https://example.org/actions/read-username"
-         ::site/type "https://meta.juxt.site/site/action"
-         ::site/scope "read:user"
-         ::site/pull [::username]
-         ::site/rules
+         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/scope "read:user"
+         :juxt.site/pull [::username]
+         :juxt.site/rules
          '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
-            [permission ::site/resource resource]]]}
+            [permission :juxt.site/resource resource]]]}
 
         READ_SECRETS_ACTION
         {:xt/id "https://example.org/actions/read-secrets"
-         ::site/type "https://meta.juxt.site/site/action"
-         ::site/scope "read:user"
-         ::site/pull [::secret]
-         ::site/rules
+         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/scope "read:user"
+         :juxt.site/pull [::secret]
+         :juxt.site/rules
          '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
-            [permission ::site/resource resource]]]}
+            [permission :juxt.site/resource resource]]]}
 
         BOB_CAN_READ_ALICE_USERNAME
         {:xt/id "https://example.org/permissions/bob-can-read-alice-username"
-         ::site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/site/permission"
          ::person "https://example.org/people/bob"
-         ::site/action "https://example.org/actions/read-username"
-         ::site/purpose nil
-         ::site/resource "https://example.org/people/alice"}
+         :juxt.site/action "https://example.org/actions/read-username"
+         :juxt.site/purpose nil
+         :juxt.site/resource "https://example.org/people/alice"}
 
         BOB_CAN_READ_ALICE_SECRETS
         {:xt/id "https://example.org/permissions/bob-can-read-alice-secrets"
-         ::site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/site/permission"
          ::person "https://example.org/people/bob"
-         ::site/action "https://example.org/actions/read-secrets"
-         ::site/purpose nil
-         ::site/resource "https://example.org/people/alice"}
+         :juxt.site/action "https://example.org/actions/read-secrets"
+         :juxt.site/purpose nil
+         :juxt.site/resource "https://example.org/people/alice"}
 
         CARLOS_CAN_READ_ALICE_USERNAME
         {:xt/id "https://example.org/permissions/carlos-can-read-alice-username"
-         ::site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/site/permission"
          ::person "https://example.org/people/carlos"
-         ::site/action "https://example.org/actions/read-username"
-         ::site/purpose nil
-         ::site/resource "https://example.org/people/alice"}]
+         :juxt.site/action "https://example.org/actions/read-username"
+         :juxt.site/purpose nil
+         :juxt.site/resource "https://example.org/people/alice"}]
 
     (submit-and-await!
      [
@@ -565,7 +562,7 @@
                  db
                  #{(:xt/id READ_USERNAME_ACTION) (:xt/id READ_SECRETS_ACTION)}
                  ALICE
-                 {::site/subject subject})]
+                 {:juxt.site/subject subject})]
             (is (= expected actual)))
 
         BOB_SUBJECT {::username "alice" ::secret "foo"}
@@ -577,7 +574,7 @@
 ;; was sent, between which participants, etc.) but for privacy reasons cannot
 ;; see the content of each message.
 ;;
-;; This test tests the ::site/pull feature which restricts what documents
+;; This test tests the :juxt.site/pull feature which restricts what documents
 ;; attributes can be read.
 ;;
 ;; Permissions are modelled here as 'group membership', meaning that if a
@@ -594,59 +591,59 @@
 (deftest pull-allowed-resources-test
   (let [READ_MESSAGE_CONTENT_ACTION
         {:xt/id "https://example.org/actions/read-message-content"
-         ::site/type "https://meta.juxt.site/site/action"
-         ::site/scope "read:messages"
-         ::site/pull [::content]
-         ::site/rules
+         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/scope "read:messages"
+         :juxt.site/pull [::content]
+         :juxt.site/rules
          '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
             [permission ::group group]
             [resource ::group group]
-            [resource ::site/type "Message"]]]}
+            [resource :juxt.site/type "Message"]]]}
 
         READ_MESSAGE_METADATA_ACTION
         {:xt/id "https://example.org/actions/read-message-metadata"
-         ::site/type "https://meta.juxt.site/site/action"
-         ::site/scope "read:messages"
-         ::site/pull [::from ::to ::date]
-         ::site/rules
+         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/scope "read:messages"
+         :juxt.site/pull [::from ::to ::date]
+         :juxt.site/rules
          '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
             [permission ::group group]
             [resource ::group group]
-            [resource ::site/type "Message"]]]}
+            [resource :juxt.site/type "Message"]]]}
 
         ALICE_BELONGS_GROUP_A
         {:xt/id "https://example.org/group/a/alice"
-         ::site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/site/permission"
          ::person (:xt/id ALICE)
          ::group :a
-         ::site/action #{(:xt/id READ_MESSAGE_CONTENT_ACTION)
+         :juxt.site/action #{(:xt/id READ_MESSAGE_CONTENT_ACTION)
                          (:xt/id READ_MESSAGE_METADATA_ACTION)}
-         ::site/purpose nil}
+         :juxt.site/purpose nil}
 
         BOB_BELONGS_GROUP_A
         {:xt/id "https://example.org/group/a/bob"
-         ::site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/site/permission"
          ::person (:xt/id BOB)
          ::group :a
-         ::site/action #{(:xt/id READ_MESSAGE_CONTENT_ACTION)
+         :juxt.site/action #{(:xt/id READ_MESSAGE_CONTENT_ACTION)
                          (:xt/id READ_MESSAGE_METADATA_ACTION)}
-         ::site/purpose nil}
+         :juxt.site/purpose nil}
 
         ;; Faythe is a trusted admin of Group A. She can see the metadata but
         ;; not the content of messages.
         FAYTHE_MONITORS_GROUP_A
         {:xt/id "https://example.org/group/a/faythe"
-         ::site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/site/permission"
          ::person (:xt/id FAYTHE)
          ::group :a
-         ::site/action #{(:xt/id READ_MESSAGE_METADATA_ACTION)}
-         ::site/purpose nil}]
+         :juxt.site/action #{(:xt/id READ_MESSAGE_METADATA_ACTION)}
+         :juxt.site/purpose nil}]
 
     (submit-and-await!
      [
@@ -674,7 +671,7 @@
       ;; Messages
       [::xt/put
        {:xt/id "https://example.org/messages/1"
-        ::site/type "Message"
+        :juxt.site/type "Message"
         ::group :a
         ::from (:xt/id ALICE)
         ::to (:xt/id BOB)
@@ -683,7 +680,7 @@
 
       [::xt/put
        {:xt/id "https://example.org/messages/2"
-        ::site/type "Message"
+        :juxt.site/type "Message"
         ::group :a
         ::from (:xt/id BOB)
         ::to (:xt/id ALICE)
@@ -692,7 +689,7 @@
 
       [::xt/put
        {:xt/id "https://example.org/messages/3"
-        ::site/type "Message"
+        :juxt.site/type "Message"
         ::group :a
         ::from (:xt/id ALICE)
         ::to (:xt/id BOB)
@@ -701,7 +698,7 @@
 
       [::xt/put
        {:xt/id "https://example.org/messages/4"
-        ::site/type "Message"
+        :juxt.site/type "Message"
         ::group :a
         ::from (:xt/id BOB)
         ::to (:xt/id ALICE)
@@ -710,7 +707,7 @@
 
       [::xt/put
        {:xt/id "https://example.org/messages/5"
-        ::site/type "Message"
+        :juxt.site/type "Message"
         ::group :a
         ::from (:xt/id ALICE)
         ::to (:xt/id BOB)
@@ -719,7 +716,7 @@
 
       [::xt/put
        {:xt/id "https://example.org/messages/6"
-        ::site/type "Message"
+        :juxt.site/type "Message"
         ::group :a
         ::from (:xt/id BOB)
         ::to (:xt/id ALICE)
@@ -733,7 +730,7 @@
                db
                #{(:xt/id READ_MESSAGE_CONTENT_ACTION)
                  (:xt/id READ_MESSAGE_METADATA_ACTION)}
-               {::site/subject subject})))]
+               {:juxt.site/subject subject})))]
 
       ;; Alice and Bob can read all the messages in the group
       (let [messages (get-messages ALICE_SUBJECT)]
@@ -763,8 +760,8 @@
                    db
                    #{(:xt/id READ_MESSAGE_CONTENT_ACTION)
                      (:xt/id READ_MESSAGE_METADATA_ACTION)}
-                   {::site/subject ALICE_SUBJECT
-                    ::site/include-rules [['(include? subject action message)
+                   {:juxt.site/subject ALICE_SUBJECT
+                    :juxt.site/include-rules [['(include? subject action message)
                                            ['message ::from (:xt/id ALICE)]]]}))))))))
 
 ;; Alice has a medical record. She wants to allow Oscar access to it, but only
@@ -775,29 +772,29 @@
 (deftest purpose-with-distinct-actions-test
   (let [READ_MEDICAL_RECORD_ACTION
         {:xt/id "https://example.org/actions/read-medical-record"
-         ::site/type "https://meta.juxt.site/site/action"
-         ::site/scope "read:health"
-         ::site/pull ['*]
-         ::site/alert-log false
-         ::site/rules
+         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/scope "read:health"
+         :juxt.site/pull ['*]
+         :juxt.site/alert-log false
+         :juxt.site/rules
          '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
-            [resource ::site/type "MedicalRecord"]]]}
+            [resource :juxt.site/type "MedicalRecord"]]]}
 
         EMERGENCY_READ_MEDICAL_RECORD_ACTION
         {:xt/id "https://example.org/actions/emergency-read-medical-record"
-         ::site/type "https://meta.juxt.site/site/action"
-         ::site/scope "read:health"
-         ::site/pull ['*]
-         ::site/alert-log true
-         ::site/rules
+         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/scope "read:health"
+         :juxt.site/pull ['*]
+         :juxt.site/alert-log true
+         :juxt.site/rules
          '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
-            [resource ::site/type "MedicalRecord"]]]}]
+            [resource :juxt.site/type "MedicalRecord"]]]}]
 
     (submit-and-await!
      [
@@ -816,15 +813,15 @@
       ;; Permissions
       [::xt/put
        {:xt/id "https://example.org/alice/medical-record/grants/oscar"
-        ::site/type "https://meta.juxt.site/site/permission"
+        :juxt.site/type "https://meta.juxt.site/site/permission"
         ::person (:xt/id OSCAR)
-        ::site/action #{(:xt/id EMERGENCY_READ_MEDICAL_RECORD_ACTION)}
-        ::site/purpose nil}]
+        :juxt.site/action #{(:xt/id EMERGENCY_READ_MEDICAL_RECORD_ACTION)}
+        :juxt.site/purpose nil}]
 
       ;; Resources
       [::xt/put
        {:xt/id "https://example.org/alice/medical-record"
-        ::site/type "MedicalRecord"
+        :juxt.site/type "MedicalRecord"
         ::content "Medical info"}]])
 
     (let [get-medical-records
@@ -833,7 +830,7 @@
               (authz/pull-allowed-resources
                db
                #{(:xt/id action)}
-               {::site/subject subject})))
+               {:juxt.site/subject subject})))
 
           get-medical-record
           (fn [subject action]
@@ -842,7 +839,7 @@
                db
                #{(:xt/id action)}
                {:xt/id "https://example.org/alice/medical-record"}
-               {::site/subject subject})))]
+               {:juxt.site/subject subject})))]
 
       (is (zero? (count (get-medical-records OSCAR_SUBJECT READ_MEDICAL_RECORD_ACTION))))
       (is (= 1 (count (get-medical-records OSCAR_SUBJECT EMERGENCY_READ_MEDICAL_RECORD_ACTION))))
@@ -856,16 +853,16 @@
 (deftest purpose-test
   (let [READ_MEDICAL_RECORD_ACTION
         {:xt/id "https://example.org/actions/read-medical-record"
-         ::site/type "https://meta.juxt.site/site/action"
-         ::site/scope "read:health"
-         ::site/pull ['*]
-         ::site/rules
+         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/scope "read:health"
+         :juxt.site/pull ['*]
+         :juxt.site/rules
          '[[(allowed? subject resource permission)
             [permission ::person person]
             [subject ::person person]
             [person ::type "Person"]
-            [permission ::site/purpose purpose]
-            [resource ::site/type "MedicalRecord"]]]}]
+            [permission :juxt.site/purpose purpose]
+            [resource :juxt.site/type "MedicalRecord"]]]}]
 
     (submit-and-await!
      [
@@ -883,22 +880,22 @@
       ;; Purposes
       [::xt/put
        {:xt/id "https://example.org/purposes/emergency"
-        ::site/type "Purpose"
+        :juxt.site/type "Purpose"
         ::description "Emergency access to vital personal information."
         ::gdpr-interest "VITAL"}]
 
       ;; Permissions
       [::xt/put
        {:xt/id "https://example.org/alice/medical-record/grants/oscar"
-        ::site/type "https://meta.juxt.site/site/permission"
+        :juxt.site/type "https://meta.juxt.site/site/permission"
         ::person (:xt/id OSCAR)
-        ::site/action (:xt/id READ_MEDICAL_RECORD_ACTION)
-        ::site/purpose "https://example.org/purposes/emergency"}]
+        :juxt.site/action (:xt/id READ_MEDICAL_RECORD_ACTION)
+        :juxt.site/purpose "https://example.org/purposes/emergency"}]
 
       ;; Resources
       [::xt/put
        {:xt/id "https://example.org/alice/medical-record"
-        ::site/type "MedicalRecord"
+        :juxt.site/type "MedicalRecord"
         ::content "Medical info"}]])
 
     (let [get-medical-records
@@ -907,8 +904,8 @@
               (authz/pull-allowed-resources
                db
                #{(:xt/id action)}
-               {::site/subject subject
-                ::site/purpose purpose})))
+               {:juxt.site/subject subject
+                :juxt.site/purpose purpose})))
 
           get-medical-record
           (fn [subject action purpose]
@@ -917,8 +914,8 @@
                db
                #{(:xt/id action)}
                {:xt/id "https://example.org/alice/medical-record"}
-               {::site/subject subject
-                ::site/purpose purpose})))]
+               {:juxt.site/subject subject
+                :juxt.site/purpose purpose})))]
 
       (is (zero? (count (get-medical-records OSCAR_SUBJECT READ_MEDICAL_RECORD_ACTION "https://example.org/purposes/marketing"))))
       (is (= 1 (count (get-medical-records OSCAR_SUBJECT READ_MEDICAL_RECORD_ACTION "https://example.org/purposes/emergency"))))
@@ -942,9 +939,9 @@
 #_(def ADMIN_APP
   {:xt/id "https://example.org/_site/apps/admin"
    ::name "Admin App"
-   ::site/client-id "101"
-   ::site/client-secret "SecretArmadillo"
-   ::site/scope #{"read:admin" "write:admin"}})
+   :juxt.site/client-id "101"
+   :juxt.site/client-secret "SecretArmadillo"
+   :juxt.site/scope #{"read:admin" "write:admin"}})
 
 (def SUE_SUBJECT
   {:xt/id "https://example.org/subjects/sue"
@@ -953,22 +950,22 @@
 
 (def CREATE_PERSON_ACTION
   {:xt/id "https://example.org/actions/create-person"
-   ::site/type "https://meta.juxt.site/site/action"
-   ::site/scope "write:admin"
+   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/scope "write:admin"
 
-   ::site.malli/args-schema
+   :juxt.site.malli/args-schema
    [:tuple
     [:map
      [::type [:= "Person"]]
      [::username [:string]]]]
 
-   ::site/process
+   :juxt.site/process
    [
-    [::site.process/update-in [0] 'merge {::type "Person"}]
-    [::site.malli/validate]
+    [:juxt.site.process/update-in [0] 'merge {::type "Person"}]
+    [:juxt.site.malli/validate]
     [::xt/put]]
 
-   ::site/rules
+   :juxt.site/rules
    '[[(allowed? subject resource permission)
       [permission ::person person]
       [subject ::person person]
@@ -992,10 +989,10 @@
     ;; Permissions
     [::xt/put
      {:xt/id "https://example.org/permissions/sue/create-person"
-      ::site/type "https://meta.juxt.site/site/permission"
+      :juxt.site/type "https://meta.juxt.site/site/permission"
       ::person (:xt/id SUE)
-      ::site/action (:xt/id CREATE_PERSON_ACTION)
-      ::site/purpose nil #_"https://example.org/purposes/bootsrapping-system"}]
+      :juxt.site/action (:xt/id CREATE_PERSON_ACTION)
+      :juxt.site/purpose nil #_"https://example.org/purposes/bootsrapping-system"}]
 
     ;; Functions
     [::xt/put (authz/install-do-action-fn)]])
@@ -1007,22 +1004,22 @@
       (authz/check-permissions
        db
        #{(:xt/id CREATE_PERSON_ACTION)}
-       {::site/subject (:xt/id SUE_SUBJECT)})))
+       {:juxt.site/subject (:xt/id SUE_SUBJECT)})))
     (is
      (not
       (seq
        (authz/check-permissions
         db
         #{}
-        {::site/subject (:xt/id SUE_SUBJECT)}
+        {:juxt.site/subject (:xt/id SUE_SUBJECT)}
         )))))
 
   (assert *xt-node*)
 
   (authz/do-action
-   {::site/xt-node *xt-node*
-    ::site/subject (:xt/id SUE_SUBJECT)
-    ::site/action CREATE_PERSON_ACTION}
+   {:juxt.site/xt-node *xt-node*
+    :juxt.site/subject (:xt/id SUE_SUBJECT)
+    :juxt.site/action CREATE_PERSON_ACTION}
    ALICE)
 
   (is (xt/entity (xt/db *xt-node*) (:xt/id ALICE)))
@@ -1032,7 +1029,7 @@
   (is (thrown? clojure.lang.ExceptionInfo
                (authz/do-action
                 {:juxt.site/xt-node *xt-node*}
-                {::site/subject (:xt/id ALICE_SUBJECT)}
+                {:juxt.site/subject (:xt/id ALICE_SUBJECT)}
                 (:xt/id CREATE_PERSON_ACTION)
                 BOB)))
 
@@ -1064,9 +1061,9 @@
 
     ;; Add an action that lists trades, pulling all attributes
     [::xt/put {:xt/id "https://example.org/actions/list-trades"
-               ::site/type "https://meta.juxt.site/site/action"
-               ::site/pull '[*]
-               ::site/rules
+               :juxt.site/type "https://meta.juxt.site/site/action"
+               :juxt.site/pull '[*]
+               :juxt.site/rules
                '[
                  ;; Allow traders to see their own trades
                  [(allowed? person trade role-membership)
@@ -1088,9 +1085,9 @@
     ;; Add an action that lists trades, pulling only that trade attributes that
     ;; are accessible to a regulatory risk controller.
     [::xt/put {:xt/id "https://example.org/actions/control-list-trades"
-               ::site/type "https://meta.juxt.site/site/action"
-               ::site/pull '[::desk ::value :xt/id]
-               ::site/rules
+               :juxt.site/type "https://meta.juxt.site/site/action"
+               :juxt.site/pull '[::desk ::value :xt/id]
+               :juxt.site/rules
                '[
                  [(allowed? person trade role-membership)
                   [role-membership ::role "https://example.org/roles/regulatory-risk-controller"]
@@ -1099,20 +1096,20 @@
                   ]]}]
 
     [::xt/put {:xt/id "https://example.org/actions/get-trader-personal-info"
-               ::site/type "https://meta.juxt.site/site/action"
-               ::site/pull '[*]
-               ::site/rules
+               :juxt.site/type "https://meta.juxt.site/site/action"
+               :juxt.site/pull '[*]
+               :juxt.site/rules
                '[
                  [(allowed? head-of-desk trader role-membership)
 
                   ;; Subjects who have the head-of-desk role
-                  [role-membership ::site/type "https://meta.juxt.site/site/permission"]
+                  [role-membership :juxt.site/type "https://meta.juxt.site/site/permission"]
                   [role-membership ::role "https://example.org/roles/head-of-desk"]
                   [role-membership ::person head-of-desk]
 
                   [trader ::type "Person"]
                   ;; Only for a trader that works on the same desk
-                  [trader-role-membership ::site/type "https://meta.juxt.site/site/permission"]
+                  [trader-role-membership :juxt.site/type "https://meta.juxt.site/site/permission"]
                   [trader-role-membership ::person trader]
                   [trader-role-membership ::desk desk]
                   [role-membership ::desk desk]]]}]
@@ -1128,9 +1125,9 @@
     ;; trader. This document authorizes her, according to the rules of
     ;; (potentially various) actions.
     [::xt/put {:xt/id "https://example.org/people/sam/position"
-               ::site/type "https://meta.juxt.site/site/permission"
-               ::site/action #{"https://example.org/actions/list-trades"}
-               ::site/purpose "Trading"
+               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/action #{"https://example.org/actions/list-trades"}
+               :juxt.site/purpose "Trading"
                ::person "https://example.org/people/sam"
                ::role #{"https://example.org/roles/trader"}
                ::desk "https://example.org/desks/equities/swaps"}]
@@ -1142,9 +1139,9 @@
 
     ;; Steve is also a swaps trader
     [::xt/put {:xt/id "https://example.org/people/steve/position"
-               ::site/type "https://meta.juxt.site/site/permission"
-               ::site/action #{"https://example.org/actions/list-trades"}
-               ::site/purpose "Trading"
+               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/action #{"https://example.org/actions/list-trades"}
+               :juxt.site/purpose "Trading"
                ::person "https://example.org/people/steve"
                ::role #{"https://example.org/roles/trader"}
                ::desk "https://example.org/desks/equities/swaps"}]
@@ -1156,9 +1153,9 @@
 
     ;; Susie is the head of the swaps desk
     [::xt/put {:xt/id "https://example.org/people/susie/position"
-               ::site/type "https://meta.juxt.site/site/permission"
-               ::site/action #{"https://example.org/actions/list-trades" "https://example.org/actions/get-trader-personal-info"}
-               ::site/purpose #{"Trading" "LineManagement"}
+               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/action #{"https://example.org/actions/list-trades" "https://example.org/actions/get-trader-personal-info"}
+               :juxt.site/purpose #{"Trading" "LineManagement"}
                ::person "https://example.org/people/susie"
                ::role #{"https://example.org/roles/head-of-desk"}
                ::desk "https://example.org/desks/equities/swaps"}]
@@ -1169,9 +1166,9 @@
                ::name "Brian Tanner"}]
 
     [::xt/put {:xt/id "https://example.org/people/brian/position"
-               ::site/type "https://meta.juxt.site/site/permission"
-               ::site/action #{"https://example.org/actions/list-trades"}
-               ::site/purpose "Trading"
+               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/action #{"https://example.org/actions/list-trades"}
+               :juxt.site/purpose "Trading"
                ::person "https://example.org/people/brian"
                ::role #{"https://example.org/roles/trader"}
                ::desk "https://example.org/desks/equities/bonds"}]
@@ -1182,9 +1179,9 @@
                ::name "Betty Jacobs"}]
 
     [::xt/put {:xt/id "https://example.org/people/betty/position"
-               ::site/type "https://meta.juxt.site/site/permission"
-               ::site/action #{"https://example.org/actions/list-trades"}
-               ::site/purpose "Trading"
+               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/action #{"https://example.org/actions/list-trades"}
+               :juxt.site/purpose "Trading"
                ::person "https://example.org/people/betty"
                ::role #{"https://example.org/roles/trader"}
                ::desk "https://example.org/desks/equities/bonds"}]
@@ -1195,9 +1192,9 @@
                ::name "Boris Sokolov"}]
 
     [::xt/put {:xt/id "https://example.org/people/boris/position"
-               ::site/type "https://meta.juxt.site/site/permission"
-               ::site/action #{"https://example.org/actions/list-trades"}
-               ::site/purpose "Trading"
+               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/action #{"https://example.org/actions/list-trades"}
+               :juxt.site/purpose "Trading"
                ::person "https://example.org/people/boris"
                ::role #{"https://example.org/roles/trader"}
                ::desk "https://example.org/desks/equities/bonds"}]
@@ -1208,9 +1205,9 @@
                ::name "Bernadette Pulson"}]
 
     [::xt/put {:xt/id "https://example.org/people/bernie/position"
-               ::site/type "https://meta.juxt.site/site/permission"
-               ::site/action #{"https://example.org/actions/list-trades"  "https://example.org/actions/get-trader-personal-info"}
-               ::site/purpose #{"Trading" "LineManagement"}
+               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/action #{"https://example.org/actions/list-trades"  "https://example.org/actions/get-trader-personal-info"}
+               :juxt.site/purpose #{"Trading" "LineManagement"}
                ::person "https://example.org/people/bernie"
                ::role #{"https://example.org/roles/head-of-desk"}
                ::desk "https://example.org/desks/equities/bonds"}]
@@ -1223,9 +1220,9 @@
                ::name "Cameron White"}]
 
     [::xt/put {:xt/id "https://example.org/people/cameron/position"
-               ::site/type "https://meta.juxt.site/site/permission"
-               ::site/action #{"https://example.org/actions/control-list-trades"}
-               ::site/purpose "RiskReporting"
+               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/action #{"https://example.org/actions/control-list-trades"}
+               :juxt.site/purpose "RiskReporting"
                ::person "https://example.org/people/cameron"
                ;; Cameron's role means he can see all trades, but can't see trader details
                ::role #{"https://example.org/roles/regulatory-risk-controller"}}]
@@ -1264,8 +1261,8 @@
                 (authz/pull-allowed-resources
                  db
                  actions
-                 {::site/subject {:xt/id subject}
-                  ::site/purpose purpose})]
+                 {:juxt.site/subject {:xt/id subject}
+                  :juxt.site/purpose purpose})]
             (is (= expected (count resources)))
             (assert (= expected (count resources)))
             resources))]
@@ -1297,8 +1294,8 @@
           (authz/pull-allowed-resources
            db
            #{"https://example.org/actions/list-trades"}
-           {::site/subject {:xt/id subject}
-            ::site/purpose "Trading"})
+           {:juxt.site/subject {:xt/id subject}
+            :juxt.site/purpose "Trading"})
           result
           (->>
            (authz/join-with-pull-allowed-resources
@@ -1306,8 +1303,8 @@
             trades
             ::trader
             #{"https://example.org/actions/get-trader-personal-info"}
-            {::site/subject {:xt/id subject}
-             ::site/purpose "LineManagement"})
+            {:juxt.site/subject {:xt/id subject}
+             :juxt.site/purpose "LineManagement"})
            (map (juxt :xt/id identity))
            (into {}))]
 
@@ -1325,9 +1322,9 @@
         eids (map first (xt/q db '{:find [e] :where [[e ::type "Trade"]]}))
         * '*]
     (xt/pull-many db [*
-                      ^{::site/subject "sam" ; this is established on the http request
-                        ::site/action "foo" ; this is often given in the OpenAPI definition or GraphQL type schema
-                        ::site/purpose "Trading"}
+                      ^{:juxt.site/subject "sam" ; this is established on the http request
+                        :juxt.site/action "foo" ; this is often given in the OpenAPI definition or GraphQL type schema
+                        :juxt.site/purpose "Trading"}
                       {::trader [*]}] eids))
 
 ;; TODO: Extend to GraphQL -> pull
@@ -1361,7 +1358,7 @@
 ;; * An login endpoint that sets up the session and redirects to an issuer
 ;; * OpenID Authorization Server details (so we can do $issuer/.wellknown/openid-config)
 ;; * JWKS for the issuer
-;; * An identity (::site/type "Identity") that links to a user (::site/user) and has a matching iss/sub
+;; * An identity (:juxt.site/type "Identity") that links to a user (:juxt.site/user) and has a matching iss/sub
 ;; * OpenID Connect client application details that have been registered with the OpenID Authorization Server
 ;; * A callback endpoint for the application (this will update the session and set the cookie)
 ;; * A token endpoint that can be used to acquire tokens
@@ -1385,30 +1382,30 @@
  (fn []
    (let [CREATE_ACCESS_TOKEN_ACTION
          {:xt/id "https://example.org/actions/create-access-token"
-          ::site/type "https://meta.juxt.site/site/action"
+          :juxt.site/type "https://meta.juxt.site/site/action"
 
-          ::site.malli/args-schema
+          :juxt.site.malli/args-schema
           [:tuple
            [:map
             [:xt/id [:re "urn:site:access-token:(.*)"]]
-            [::site/type [:= "AccessToken"]]
-            [::site/subject [:= [::site/resolve ::site/subject]]]]]
+            [:juxt.site/type [:= "AccessToken"]]
+            [:juxt.site/subject [:= [:juxt.site/resolve :juxt.site/subject]]]]]
 
-          ::site/process
+          :juxt.site/process
           '[
             ;; postwalk would be a very useful way of creating a lisp-like
             ;; evaluator here
             [:gen-hex-string :token-id 20]
             [:add-prefix :token-id "urn:site:access-token:"]
-            [::site.process/update-in
+            [:juxt.site.process/update-in
              [0] merge
-             {:xt/id [::site/resolve :token-id]
-              ::site/type "AccessToken"
-              ::site/subject [::site/resolve ::site/subject]}]
-            [::site.malli/validate]
+             {:xt/id [:juxt.site/resolve :token-id]
+              :juxt.site/type "AccessToken"
+              :juxt.site/subject [:juxt.site/resolve :juxt.site/subject]}]
+            [:juxt.site.malli/validate]
             [::xt/put]]
 
-          ::site/rules
+          :juxt.site/rules
           '[[(allowed? subject resource permission)
              [permission ::person person]
              [subject ::person person]
@@ -1428,25 +1425,25 @@
        ;; Permissions
        [::xt/put
         {:xt/id "https://example.org/permissions/alice/create-access-token"
-         ::site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/site/permission"
          ::person (:xt/id ALICE)
-         ::site/action (:xt/id CREATE_ACCESS_TOKEN_ACTION)
-         ::site/purpose nil}]
+         :juxt.site/action (:xt/id CREATE_ACCESS_TOKEN_ACTION)
+         :juxt.site/purpose nil}]
 
        ;; Functions
        [::xt/put (authz/install-do-action-fn)]])
 
      (let [tmr
            (authz/do-action
-            (::site/xt-node *xt-node*)
-            {::site/subject (:xt/id ALICE_SUBJECT)}
+            (:juxt.site/xt-node *xt-node*)
+            {:juxt.site/subject (:xt/id ALICE_SUBJECT)}
             (:xt/id CREATE_ACCESS_TOKEN_ACTION)
-            {::site/client :client})
+            {:juxt.site/client :client})
            db (xt/db *xt-node*)]
 
        tmr
 
-       (xt/entity db (get-in tmr [::site/puts 0]))))))
+       (xt/entity db (get-in tmr [:juxt.site/puts 0]))))))
 
 ;; TODO: Build back access-token concept, apps, scopes and filtering of available
 ;; actions.

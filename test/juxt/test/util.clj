@@ -7,7 +7,6 @@
    [juxt.site.main :as main]
    [juxt.site.init :as init]
    [juxt.site.bootstrap :as bootstrap]
-   [juxt.site :as-alias site]
    [xtdb.api :as xt])
   (:import
    (xtdb.api IXtdb)))
@@ -44,8 +43,8 @@
 (defn with-handler [f]
   (binding [*handler* (make-handler
                        (init/substitute-actual-base-uri
-                        {::site/xt-node *xt-node*
-                         ::site/base-uri "https://example.org"}))]
+                        {:juxt.site/xt-node *xt-node*
+                         :juxt.site/base-uri "https://example.org"}))]
     (f)))
 
 (defn with-timing [f]
@@ -67,10 +66,10 @@
 ;; Deprecated
 (def access-all-areas
   {:xt/id "https://example.org/access-rule"
-   ::site/description "A rule allowing access everything"
-   ::site/type "Rule"
-   ::site/target '[]
-   ::site/effect ::site/allow})
+   :juxt.site/description "A rule allowing access everything"
+   :juxt.site/type "Rule"
+   :juxt.site/target '[]
+   :juxt.site/effect :juxt.site/allow})
 
 (defmacro with-fixtures [& body]
   `((clojure.test/join-fixtures [with-system-xt with-handler])

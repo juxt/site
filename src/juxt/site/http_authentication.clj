@@ -7,7 +7,6 @@
    [crypto.password.bcrypt :as password]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.rfc7235 :as rfc7235]
-   [juxt.site :as-alias site]
    [xtdb.api :as xt]))
 
 (defn authenticate-with-bearer-auth [req db token68 protection-spaces]
@@ -19,9 +18,9 @@
             (xt/q db '{:find [(pull sub [*]) (pull at [*])]
                        :keys [subject access-token]
                        :where [[at :juxt.site/token tok]
-                               [at ::site/type "https://meta.juxt.site/site/access-token"]
+                               [at :juxt.site/type "https://meta.juxt.site/site/access-token"]
                                [at :juxt.site/subject sub]
-                               [sub ::site/type "https://meta.juxt.site/site/subject"]]
+                               [sub :juxt.site/type "https://meta.juxt.site/site/subject"]]
                        :in [tok]} token68))]
        (when subject (assoc req :juxt.site/subject subject :juxt.site/access-token access-token))))
    req))
@@ -30,9 +29,9 @@
 ;; the bearer token is more difficult to use if intercepted.
 
 (defn find-or-create-basic-auth-subject [req user-identity protection-space]
-  (assert (::site/base-uri req))
-  (let [xt-node (::site/xt-node req)
-        subject {:xt/id (format "%s/_site/subjects/%s" (::site/base-uri req) (random-uuid))
+  (assert (:juxt.site/base-uri req))
+  (let [xt-node (:juxt.site/xt-node req)
+        subject {:xt/id (format "%s/_site/subjects/%s" (:juxt.site/base-uri req) (random-uuid))
                  :juxt.site/type "https://meta.juxt.site/site/subject"
                  :juxt.site/user-identity (:xt/id user-identity)
                  :juxt.site/protection-space (:xt/id protection-space)}
@@ -45,7 +44,7 @@
       subject (assoc :juxt.site/subject subject)
       ;; We need to update the db because we have injected a subject and it will
       ;; need to be in the database for authorization rules to work.
-      subject (assoc ::site/db (xt/db xt-node)))))
+      subject (assoc :juxt.site/db (xt/db xt-node)))))
 
 (defn authenticate-with-basic-auth [req db token68 protection-spaces]
   (when-let [{:juxt.site/keys [canonical-root-uri realm] :as protection-space} (first protection-spaces)]
@@ -56,7 +55,7 @@
 
           query (cond-> '{:find [(pull e [*])]
                           :keys [identity]
-                          :where [[e ::site/type "https://meta.juxt.site/site/user-identity"]
+                          :where [[e :juxt.site/type "https://meta.juxt.site/site/user-identity"]
                                   [e :juxt.site/canonical-root-uri canonical-root-uri]
                                   [e :juxt.site/username username]]
                           :in [username canonical-root-uri realm]}
@@ -108,7 +107,7 @@
       (throw
        (ex-info
         "Auth scheme unsupported"
-        {::site/request-context
+        {:juxt.site/request-context
          (cond-> (assoc req :ring.response/status 401)
            protection-spaces
            (assoc
@@ -119,7 +118,7 @@
 (defn authenticate
   "Authenticate a request. Return a modified request, with information about user,
   roles and other credentials."
-  [{::site/keys [db resource] :as req}]
+  [{:juxt.site/keys [db resource] :as req}]
 
   ;; TODO: This might be where we also add the 'on-behalf-of' info
 

@@ -1,17 +1,14 @@
 ;; Copyright © 2021, JUXT LTD.
 
-(ns juxt.site.response
-  (:require
-   [juxt.http :as-alias http]
-   [juxt.site :as-alias site]))
+(ns juxt.site.response)
 
-(defn add-payload [{::site/keys [resource]
+(defn add-payload [{:juxt.site/keys [resource]
                     :ring.request/keys [method]
                     :as req}]
   ;; Should not be called if method is HEAD
   (assert (not= method :head))
 
-  (let [{::http/keys [body content]} resource]
+  (let [{:juxt.http/keys [body content]} resource]
     (cond
       ;; TODO: Fish out the charset from the content-type of the resource and
       ;; use when converting to bytes.
@@ -27,13 +24,13 @@
       :else req)))
 
 (defn add-error-payload
-  [{::site/keys [resource]
+  [{:juxt.site/keys [resource]
     :ring.request/keys [method]
     :as req}]
   ;; Should not be called if method is HEAD
   (assert (not= method :head))
 
-  (let [{::http/keys [body content]} resource]
+  (let [{:juxt.http/keys [body content]} resource]
     (cond
       content (assoc req :ring.response/body content)
       body (assoc req :ring.response/body body)

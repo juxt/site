@@ -3,8 +3,7 @@
 (ns juxt.site.locator
   (:require
    [clojure.string :as str]
-   [xtdb.api :as xt]
-   [juxt.site :as-alias site]))
+   [xtdb.api :as xt]))
 
 ;; TODO: Definitely a candidate for clojure.core.cache (or memoize). Always be
 ;; careful using memoize, but in case performance is scarcer than memory.
@@ -35,7 +34,7 @@
                db
                '{:find [(pull resource [*]) grps]
                  :keys [resource groups]
-                 :where [[resource ::site/uri-template true]
+                 :where [[resource :juxt.site/uri-template true]
                          ;; Compile the URI to a java.util.regex.Pattern
                          [(juxt.site.locator/to-regex resource) pat]
                          [(re-matches pat uri) grps]
@@ -45,7 +44,7 @@
                uri))]
     (assoc
      resource
-     ::site/path-params
+     :juxt.site/path-params
      (zipmap
       ;; Keys
       (map second (re-seq #"\{(\p{Alpha}+)\}" (:xt/id resource)))
@@ -55,7 +54,7 @@
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
   in :default."
-  [{::site/keys [db uri base-uri]}]
+  [{:juxt.site/keys [db uri base-uri]}]
 
   (assert uri)
   (assert base-uri)
@@ -67,8 +66,8 @@
 
    ;; Is it in XTDB?
    (when-let [e (xt/entity db uri)]
-     (when-not (::site/uri-template e)
-       (assoc e ::site/resource-provider ::db)))
+     (when-not (:juxt.site/uri-template e)
+       (assoc e :juxt.site/resource-provider ::db)))
 
    ;; Is it found by any resource locators registered in the database?
    (match-uri-templated-uris db uri)
@@ -77,5 +76,5 @@
    ;; default.
    (xt/entity db (str base-uri "/_site/not-found"))
 
-   {::site/resource-provider ::default-empty-resource
-    ::site/methods {:get {} :head {} :options {} :put {} :post {}}}))
+   {:juxt.site/resource-provider ::default-empty-resource
+    :juxt.site/methods {:get {} :head {} :options {} :put {} :post {}}}))
