@@ -15,7 +15,7 @@
    (com.auth0.jwt.algorithms Algorithm)
    (com.auth0.jwk Jwk)))
 
-(defn find-key [kid jwks]
+(defn- find-key [kid jwks]
   (when kid
     (some (fn [m] (when (= kid (get m "kid")) m)) (get jwks "keys"))))
 
