@@ -1,9 +1,9 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.site.graphql.graphql-query-processor
+(ns juxt.site.graphql-query-processor
   (:require
    [xtdb.api :as xt]
-   [juxt.site.graphql.graphql-compiler :as gcompiler]
+   [juxt.site.graphql-compiler :as gcompiler]
    [juxt.site.actions :as actions]))
 
 (defn graphql-query->xtdb-query

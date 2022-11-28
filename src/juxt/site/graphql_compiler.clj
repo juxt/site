@@ -1,6 +1,6 @@
 ;; Copyright © 2022, JUXT LTD.
 
-(ns juxt.site.graphql.graphql-compiler
+(ns juxt.site.graphql-compiler
   (:require
    [juxt.grab.alpha.parser :as parser]
    [juxt.grab.alpha.document :as document]
