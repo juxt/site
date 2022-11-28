@@ -3,6 +3,7 @@
 (ns juxt.site.eql-datalog-compiler-test
   (:require
    [clojure.java.io :as io]
+   [clojure.tools.logging :as log]
    [clojure.test :refer [deftest is testing use-fixtures] :as t]
    [edn-query-language.core :as eql]
    [jsonista.core :as json]
@@ -20,14 +21,10 @@
    [juxt.site.eql-datalog-compiler :as eqlc]
    [juxt.site.graphql-eql-compiler :refer [graphql->eql-ast]]
    [juxt.site.init :as init]
-   [juxt.test.util :refer [with-system-xt with-resources with-handler *xt-node* *handler*] :as tutil]
+   [juxt.test.util :refer [with-system-xt with-fixtures with-resources with-handler *xt-node* *handler*] :as tutil]
    [xtdb.api :as xt]))
 
 (use-fixtures :each with-system-xt with-handler)
-
-(defmacro with-fixtures [& body]
-  `((t/join-fixtures [with-system-xt with-handler])
-    (fn [] ~@body)))
 
 (defn create-action-register-doctor! [_]
   (init/do-action
