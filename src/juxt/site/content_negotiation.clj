@@ -63,38 +63,22 @@
     (when (pos? (count variants))
       (cond-> (for [[v] variants]
                 (assoc v :juxt.http/content-location (:xt/id v)))
-        ;; If the resource has a content-type (or template), then add it as an
-        ;; additional representation.
-        (or (:juxt.http/content-type resource) (:juxt.site/template resource))
+        (:juxt.http/content-type resource)
         (conj resource)))))
 
-(defn merge-template-maybe
-  "Some representations use a template engine to generate the payload. The
-  referenced template (:juxt.site/template) may provide defaults for the
-  representation metadata. This function takes a representation and merges in
-  its template's metadata, if necessary."
-  [db representation]
-  (if-let [template (some->> representation :juxt.site/template (xt/entity db))]
-    (merge
-     (select-keys template [:juxt.http/content-type :juxt.http/content-encoding :juxt.http/content-language])
-     representation)
-    representation))
-
 (defn current-representations [{:juxt.site/keys [resource db] :as req}]
-  (->> (or
-        ;; This is not common to find statically in the db, but this option
-        ;; allows 'dynamic' resources to declare multiple representations.
-        (:juxt.http/representations resource)
+  (or
+   ;; This is not common to find statically in the db, but this option
+   ;; allows 'dynamic' resources to declare multiple representations.
+   (:juxt.http/representations resource)
 
-        ;; See if there are variants
-        (find-variants req)
+   ;; See if there are variants
+   (find-variants req)
 
-        ;; Most resources have a content-type, which indicates there is only one
-        ;; variant.
-        (when (or (:juxt.http/content-type resource) (:juxt.site/template resource))
-          [resource])
+   ;; Most resources have a content-type, which indicates there is only one
+   ;; variant.
+   (when (:juxt.http/content-type resource)
+     [resource])
 
-        ;; No representations. On a GET, this would yield a 404.
-        [])
-       ;; Merge in an template defaults
-       (mapv #(merge-template-maybe db %))))
+   ;; No representations. On a GET, this would yield a 404.
+   []))
