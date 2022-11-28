@@ -24,10 +24,7 @@
      {:juxt.pick/vary? true})))
 
 (defn negotiate-representation [req representations]
-  ;; Negotiate the best representation, determining the vary
-  ;; header.
-  #_(log/debug "current-representations" (map (fn [rep] (dissoc rep :juxt.http/body :juxt.http/content)) current-representations))
-
+  ;; Negotiate the best representation, determining the vary header.
   (let [{selected-representation :juxt.pick/representation
          vary :juxt.pick/vary}
         (pick-with-vary req representations)]
