@@ -7,33 +7,6 @@
    [xtdb.api :as xt]
    [clojure.tools.logging :as log]))
 
-;; Deprecated, because from now on we want resources to EXPLICITLY reference
-;; session scopes. Basing security on something as arbitary as the format of the
-;; URI is definitely NOT simple, as well as insecure.
-#_(defn infer-session-scope [db uri]
-  (let [scopes
-        (for [{:keys [session-scope]}
-              (xt/q
-               db
-               '{:find [(pull cs [*])]
-                 :keys [session-scope]
-                 :where [[cs ::site/type "https://meta.juxt.site/site/session-scope"]
-                         [cs ::site/cookie-path path]
-                         [cs ::site/cookie-domain domain]
-                         [(format "%s%s" domain path) uri-prefix]
-                         [(clojure.string/starts-with? uri uri-prefix)]]
-                 :in [uri]}
-               uri)]
-          session-scope)]
-    (when (> (count scopes) 1)
-      (throw
-       (ex-info
-        "Multiple matching session scopes"
-        {:uri uri
-         :session-scopes scopes})))
-
-    (first scopes)))
-
 (defn lookup-session-details [db session-token-id!]
   (let [session-details
         (first
