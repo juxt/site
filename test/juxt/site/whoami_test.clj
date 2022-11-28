@@ -10,7 +10,7 @@
    [juxt.site.resources.form-based-auth :as form-based-auth]
    [juxt.site.resources.example-users :as example-users]
    [juxt.site.resources.example-applications :as example-applications]
-   [juxt.site.init :as init]
+   [juxt.site.init :as init :refer [do-action]]
    [juxt.test.util :refer [with-system-xt with-resources *handler* with-resources with-handler]]))
 
 (use-fixtures :each with-system-xt with-handler)
@@ -19,9 +19,9 @@
   {"https://example.org/actions/whoami"
    {:deps #{::init/system}
     :create (fn [{:keys [id]}]
-              (init/do-action
-               (init/substitute-actual-base-uri "https://example.org/subjects/system")
-               (init/substitute-actual-base-uri "https://example.org/actions/create-action")
+              (do-action
+               "https://example.org/subjects/system"
+               "https://example.org/actions/create-action"
                {:xt/id id
 
                 ;; NOTE: This means: Use the action to extract part of the
@@ -53,15 +53,14 @@
             "https://example.org/actions/whoami"}
     :create (fn [{:keys [id params]}]
               (let [username (get params "username")]
-                (juxt.site.init/do-action
-                 (init/substitute-actual-base-uri "https://example.org/subjects/system")
-                 (init/substitute-actual-base-uri "https://example.org/actions/grant-permission")
+                (do-action
+                 "https://example.org/subjects/system"
+                 "https://example.org/actions/grant-permission"
                  (let [user (format "https://example.org/users/%s" username)]
-                   (init/substitute-actual-base-uri
-                    {:xt/id id
-                     :juxt.site/action "https://example.org/actions/whoami"
-                     :juxt.site/purpose nil
-                     :juxt.site/user user})))))}
+                   {:xt/id id
+                    :juxt.site/action "https://example.org/actions/whoami"
+                    :juxt.site/purpose nil
+                    :juxt.site/user user}))))}
 
    ;; TODO: Create an action for establishing a protection space
    "https://example.org/bearer-protection-space"

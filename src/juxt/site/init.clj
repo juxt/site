@@ -56,6 +56,7 @@
                       {::http/content-type "application/edn"
                        ::http/body (.getBytes (pr-str edn-arg))}}))))
 
+;; TODO: Rename this to do-action! ?
 (defn do-action
   ([subject-id action-id]
    (do-action subject-id action-id nil))
@@ -63,12 +64,16 @@
 
    (assert (or (nil? subject-id) (string? subject-id)) "Subject must a string or nil")
 
-   (let [xt-node (xt-node)
+
+   (let [subject-id (substitute-actual-base-uri subject-id)
+         action-id (substitute-actual-base-uri action-id)
+         xt-node (xt-node)
          db (xt/db xt-node)
          subject (when subject-id (xt/entity db subject-id))]
      (::site/action-result
       (actions/do-action
-       (make-repl-request-context subject action-id edn-arg))))))
+       (make-repl-request-context
+        subject action-id (substitute-actual-base-uri edn-arg)))))))
 
 (def host-parser (rfc7230.decoders/host {}))
 
