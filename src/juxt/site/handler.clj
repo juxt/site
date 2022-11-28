@@ -204,7 +204,7 @@
 
               {::http/body body}))))))))
 
-(defn GET [{::site/keys [selected-representation subject]
+(defn GET [{::site/keys [resource subject]
             :as req}]
 
   (conditional/evaluate-preconditions! req)
@@ -226,7 +226,7 @@
          ;; java.io.BufferedInputStream".
          (:ring.request/body req) (dissoc :ring.request/body)))
 
-      (-> selected-representation :juxt.http/respond :juxt.site.sci/program)
+      (-> resource :juxt.http/respond :juxt.site.sci/program)
       (let [state
             (when-let [program (-> permitted-action :juxt.site/state :juxt.site.sci/program)]
               (sci/eval-string
@@ -262,7 +262,7 @@
                  'java.time.Duration java.time.Duration}}))
 
             respond-program
-            (-> selected-representation :juxt.http/respond :juxt.site.sci/program)
+            (-> resource :juxt.http/respond :juxt.site.sci/program)
 
             response
             (sci/eval-string
@@ -432,13 +432,17 @@
       (h req))))
 
 (defn wrap-negotiate-representation [h]
-  (fn [req]
-    (let [cur-reps (::site/current-representations req)]
+  (fn [{original-resource :juxt.site/resource
+        cur-reps :juxt.site/current-representations
+        :as req}]
+    (let [new-resource (when (seq cur-reps)
+                         (conneg/negotiate-representation req cur-reps))
+          new-resource (when new-resource
+                         (cond-> new-resource
+                           (not= new-resource original-resource)
+                           (assoc :juxt.site/variant-of original-resource)))]
       (h (cond-> req
-           (seq cur-reps)
-           (assoc
-            ::site/selected-representation
-            (conneg/negotiate-representation req cur-reps)))))))
+           new-resource (assoc ::site/resource new-resource))))))
 
 (defn wrap-http-authenticate [h]
   (fn [req]
@@ -494,6 +498,7 @@
         ;; Don't allow Google to track your site visitors. Disable FLoC.
         true (assoc-in [:ring.response/headers "permissions-policy"] "interest-cohort=()")))))
 
+;; TODO: Just use a ring.response/headers entry in the resource
 (defn representation-headers [acc rep body]
   (letfn [(assoc-when-some [m k v]
             (cond-> m v (assoc k v)))]
@@ -556,7 +561,7 @@
    (:ring.response/status req)))
 
 (defn respond
-  [{::site/keys [selected-representation start-date request-id]
+  [{::site/keys [resource start-date request-id]
     :ring.request/keys [method]
     :ring.response/keys [body]
     :as req}]
@@ -584,9 +589,9 @@
                   #_(.startsWith request-id base-uri)
                   #_(subs (count base-uri))))
 
-        selected-representation
+        resource
         (update :ring.response/headers
-                representation-headers selected-representation body)
+                representation-headers resource body)
 
         (= method :head) (dissoc :ring.response/body))))
 
@@ -774,7 +779,7 @@
       {:ring.response/status 500
        :ring.response/body default-body
        ::site/errors (errors-with-causes e)
-       ::site/selected-representation
+       ::site/resource
        {::http/content-type "text/html;charset=utf-8"
         ::http/content-length (count default-body)
         :ring.response/body default-body}
@@ -832,7 +837,7 @@
                          ::site/errors (errors-with-causes e)}
                         (dissoc req ::site/request-context)
                         ;; For the error itself
-                        {::site/selected-representation representation})
+                        {::site/resource representation})
 
         error-resource (assoc
                         error-resource

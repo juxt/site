@@ -5,19 +5,16 @@
    [juxt.http :as-alias http]
    [juxt.site :as-alias site]))
 
-(defn add-payload [{::site/keys [selected-representation ]
+(defn add-payload [{::site/keys [resource]
                     :ring.request/keys [method]
                     :as req}]
   ;; Should not be called if method is HEAD
   (assert (not= method :head))
 
-  (let [{::http/keys [body content]} selected-representation
-        ;;template (some->> selected-representation ::site/template (xt/entity db))
-        ;;custom-handler (get-in req [::site/methods method ::site/handler])
-        ]
+  (let [{::http/keys [body content]} resource]
     (cond
-      ;; TODO: Fish out the charset from the content-type of the
-      ;; selected-representation and use when converting to bytes.
+      ;; TODO: Fish out the charset from the content-type of the resource and
+      ;; use when converting to bytes.
 
       ;; Note: Although :ring.response/body supports anything that satisfies
       ;; ring.core.protocols.StreamableResponseBody, Ring will extract the
@@ -30,13 +27,13 @@
       :else req)))
 
 (defn add-error-payload
-  [{::site/keys [selected-representation]
+  [{::site/keys [resource]
     :ring.request/keys [method]
     :as req}]
   ;; Should not be called if method is HEAD
   (assert (not= method :head))
 
-  (let [{::http/keys [body content]} selected-representation]
+  (let [{::http/keys [body content]} resource]
     (cond
       content (assoc req :ring.response/body content)
       body (assoc req :ring.response/body body)

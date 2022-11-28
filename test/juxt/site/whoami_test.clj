@@ -11,7 +11,7 @@
    [juxt.site.resources.example-users :as example-users]
    [juxt.site.resources.example-applications :as example-applications]
    [juxt.site.init :as init :refer [do-action]]
-   [juxt.test.util :refer [with-system-xt with-resources *handler* with-resources with-handler]]))
+   [juxt.test.util :refer [with-system-xt with-resources with-fixtures *handler* with-resources with-handler]]))
 
 (use-fixtures :each with-system-xt with-handler)
 
@@ -62,7 +62,8 @@
                     :juxt.site/purpose nil
                     :juxt.site/user user}))))}
 
-   ;; TODO: Create an action for establishing a protection space
+   ;; TODO: Create an action for establishing a protection space, and inherit
+   ;; this from example-protection-spaces or similar.
    "https://example.org/bearer-protection-space"
    {:deps #{::init/system}
     :create (fn [{:keys [id]}]
@@ -103,8 +104,7 @@
                           (assoc :ring.response/body content)
                           (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
                           )))}
-                 ;; TODO: protection space?
-                 })))}
+                 :juxt.site/protection-spaces #{"https://example.org/bearer-protection-space"}})))}
 
    "https://example.org/whoami.html"
    {:deps #{::init/system
@@ -124,7 +124,8 @@
                       (-> *ctx*
                           (assoc :ring.response/body content)
                           (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
-                          )))}})))}})
+                          )))}
+                 :juxt.site/protection-spaces #{"https://example.org/bearer-protection-space"}})))}})
 
 (deftest get-subject-test
   (with-resources
@@ -161,19 +162,32 @@
            {:juxt.site/session-token session-token
             "client_id" "test-app"})]
 
-      (when access-token
-        (let [{:ring.response/keys [status body]}
-              (*handler*
-               {:juxt.site/uri "https://site.test/whoami"
-                :ring.request/method :get
-                :ring.request/headers
-                {"authorization" (format "Bearer %s" access-token)
-                 "accept" "application/json"}})]
-          (is (= 200 status))
-          (is (= "Alice"
-                 (-> body
-                     json/read-value
-                     (get-in ["subject"
-                              "juxt.site/user-identity"
-                              "juxt.site/user"
-                              "name"] body)))))))))
+      (assert access-token)
+
+      (let [{:ring.response/keys [status headers body]}
+            (*handler*
+             {:juxt.site/uri "https://site.test/whoami"
+              :ring.request/method :get
+              :ring.request/headers
+              {"authorization" (format "Bearer %s" access-token)
+               "accept" "application/json"}})]
+        (is (= 200 status))
+        (is (= "Alice"
+               (-> body
+                   json/read-value
+                   (get-in ["subject"
+                            "juxt.site/user-identity"
+                            "juxt.site/user"
+                            "name"] body))))
+        (is (= "application/json" (get headers "content-type")))
+        (is (= "https://site.test/whoami.json" (get headers "content-location"))))
+
+      (let [{:ring.response/keys [status headers body] :as response}
+            (*handler*
+             {:juxt.site/uri "https://site.test/whoami.html"
+              :ring.request/method :get
+              :ring.request/headers
+              {"authorization" (format "Bearer %s" access-token)
+               }})]
+        (is (= 200 status))
+        (is (= "text/html;charset=utf-8" (get headers "content-type")))))))

@@ -57,13 +57,13 @@
   resource and, when applicable, the representation metadata of the selected
   representation. If the precondition is found to be false, an exception is
   thrown with ex-data containing the proper response."
-  [{::site/keys [selected-representation] :as req}]
+  [{::site/keys [resource] :as req}]
   ;; (All quotes in this function's comments are from Section 3.2, RFC 7232,
   ;; unless otherwise stated).
   (let [header-field (reap/if-none-match (get-in req [:ring.request/headers "if-none-match"]))]
     (cond
       (sequential? header-field)
-      (when-let [rep-etag (some-> (get selected-representation ::http/etag) reap/entity-tag)]
+      (when-let [rep-etag (some-> (get resource ::http/etag) reap/entity-tag)]
         ;; "If the field-value is a list of entity-tags, the condition is false
         ;; if one of the listed tags match the entity-tag of the selected
         ;; representation."
@@ -88,7 +88,7 @@
       (and (map? header-field) (::rfc7232/wildcard header-field))
       ;; "… the condition is false if the origin server has a current
       ;; representation for the target resource."
-      (when selected-representation
+      (when resource
         (throw
          (ex-info
           "At least one representation already exists for this resource"
@@ -105,21 +105,21 @@
               ;; request methods."
               412))}))))))
 
-(defn evaluate-if-unmodified-since! [{::site/keys [selected-representation] :as req}]
+(defn evaluate-if-unmodified-since! [{::site/keys [resource] :as req}]
   (let [if-unmodified-since-date
         (-> req
             (get-in [:ring.request/headers "if-unmodified-since"])
             reap/http-date
             ::rfc7231/date)]
     (when (.isAfter
-           (.toInstant (get selected-representation ::http/last-modified (java.util.Date.)))
+           (.toInstant (get resource ::http/last-modified (java.util.Date.)))
            (.toInstant if-unmodified-since-date))
       (throw
        (ex-info
         "Precondition failed"
         {::site/request-context (assoc req :ring.resposne/status 304)})))))
 
-(defn evaluate-if-modified-since! [{::site/keys [selected-representation] :as req}]
+(defn evaluate-if-modified-since! [{::site/keys [resource] :as req}]
   (let [if-modified-since-date
         (-> req
             (get-in [:ring.request/headers "if-modified-since"])
@@ -127,7 +127,7 @@
             ::rfc7231/date)]
 
     (when-not (.isAfter
-               (.toInstant (get selected-representation ::http/last-modified (java.util.Date.)))
+               (.toInstant (get resource ::http/last-modified (java.util.Date.)))
                (.toInstant if-modified-since-date))
       (throw
        (ex-info
