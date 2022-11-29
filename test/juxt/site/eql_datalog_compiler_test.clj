@@ -1255,11 +1255,6 @@
 
         ;; {:xt/id "list-patients" :juxt.site/rules "get-patient"}
 
-        ;; Idea: Break GraphQL schemas into constituent types and create
-        ;; individual resources, one resource per type. Use 'set' difference to
-        ;; identity types to delete. Create HTML from /graphql to show a nice
-        ;; HTML page with a list of types.
-
 
         ))))
 
