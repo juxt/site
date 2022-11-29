@@ -60,6 +60,15 @@
     :juxt.site/action "https://example.org/actions/put-protection-space"
     :juxt.site/purpose nil}))
 
+(def dependency-graph
+  {"https://example.org/actions/put-protection-space"
+   {:create #'create-action-put-protection-space!
+    :deps #{::init/system}}
+
+   "https://example.org/permissions/system/put-protection-space"
+   {:create #'grant-permission-to-put-protection-space!
+    :deps #{::init/system}}})
+
 (defn put-basic-protection-space! [_]
   (do-action
    "https://example.org/subjects/system"
@@ -77,28 +86,3 @@
    "https://example.org/actions/put-protection-space"
    {:xt/id "https://example.org/protection-spaces/bearer"
     :juxt.site/auth-scheme "Bearer"}))
-
-(def dependency-graph
-  {"https://example.org/actions/put-protection-space"
-   {:create #'create-action-put-protection-space!
-    :deps #{::init/system}}
-
-   "https://example.org/permissions/system/put-protection-space"
-   {:create #'grant-permission-to-put-protection-space!
-    :deps #{::init/system}}
-
-   "https://example.org/protection-spaces/basic"
-   {:deps #{::init/system
-            "https://example.org/_site/do-action"
-            "https://example.org/subjects/system"
-            "https://example.org/actions/put-protection-space"
-            "https://example.org/permissions/system/put-protection-space"}
-    :create #'put-basic-protection-space!}
-
-   "https://example.org/protection-spaces/bearer"
-   {:deps #{::init/system
-            "https://example.org/_site/do-action"
-            "https://example.org/subjects/system"
-            "https://example.org/actions/put-protection-space"
-            "https://example.org/permissions/system/put-protection-space"}
-    :create #'put-bearer-protection-space!}})

@@ -14,6 +14,7 @@
    [juxt.site.resources.form-based-auth :as form-based-auth]
    [juxt.site.resources.oauth :as oauth]
    [juxt.site.resources.protection-space :as protection-space]
+   [juxt.site.resources.example-protection-spaces :as example-protection-spaces]
    [juxt.site.resources.session-scope :as session-scope]
    [juxt.site.resources.user :as user]
    [juxt.site.eql-datalog-compiler :as eqlc]
@@ -676,6 +677,7 @@
            protection-space/dependency-graph
            form-based-auth/dependency-graph
            example-users/dependency-graph
+           example-protection-spaces/dependency-graph
            oauth/dependency-graph
            dependency-graph}})
 

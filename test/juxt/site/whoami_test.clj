@@ -8,6 +8,7 @@
    [juxt.site.resources.session-scope :as session-scope]
    [juxt.site.resources.user :as user]
    [juxt.site.resources.form-based-auth :as form-based-auth]
+   [juxt.site.resources.protection-space :as protection-space]
    [juxt.site.resources.example-users :as example-users]
    [juxt.site.resources.example-applications :as example-applications]
    [juxt.site.resources.example-protection-spaces :as example-protection-spaces]
@@ -66,18 +67,19 @@
    "https://example.org/whoami"
    {:deps #{::init/system
             "https://example.org/actions/whoami"
-            "https://example.org/bearer-protection-space"}
+            "https://example.org/protection-spaces/bearer"}
     :create (fn [{:keys [id]}]
               (init/put!
                (init/substitute-actual-base-uri
                 {:xt/id id
                  :juxt.site/methods
                  {:get {:juxt.site/actions #{"https://example.org/actions/whoami"}}}
-                 :juxt.site/protection-spaces #{"https://example.org/bearer-protection-space"}})))}
+                 :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}})))}
 
    "https://example.org/whoami.json"
    {:deps #{::init/system
-            "https://example.org/actions/whoami"}
+            "https://example.org/actions/whoami"
+            "https://example.org/protection-spaces/bearer"}
     :create (fn [{:keys [id]}]
               (init/put!
                (init/substitute-actual-base-uri
@@ -94,11 +96,12 @@
                           (assoc :ring.response/body content)
                           (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
                           )))}
-                 :juxt.site/protection-spaces #{"https://example.org/bearer-protection-space"}})))}
+                 :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}})))}
 
    "https://example.org/whoami.html"
    {:deps #{::init/system
-            "https://example.org/actions/whoami"}
+            "https://example.org/actions/whoami"
+            "https://example.org/protection-spaces/bearer"}
     :create (fn [{:keys [id]}]
               (init/put!
                (init/substitute-actual-base-uri
@@ -115,7 +118,7 @@
                           (assoc :ring.response/body content)
                           (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
                           )))}
-                 :juxt.site/protection-spaces #{"https://example.org/bearer-protection-space"}})))}})
+                 :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}})))}})
 
 (deftest get-subject-test
   (with-resources
@@ -124,6 +127,7 @@
         user/dependency-graph
         form-based-auth/dependency-graph
         oauth/dependency-graph
+        protection-space/dependency-graph
         example-users/dependency-graph
         example-applications/dependency-graph
         example-protection-spaces/dependency-graph
