@@ -10,6 +10,7 @@
    [juxt.site.resources.form-based-auth :as form-based-auth]
    [juxt.site.resources.example-users :as example-users]
    [juxt.site.resources.example-applications :as example-applications]
+   [juxt.site.resources.example-protection-spaces :as example-protection-spaces]
    [juxt.site.init :as init :refer [do-action]]
    [juxt.test.util :refer [with-system-xt with-resources with-fixtures *handler* with-resources with-handler]]))
 
@@ -61,16 +62,6 @@
                     :juxt.site/action "https://example.org/actions/whoami"
                     :juxt.site/purpose nil
                     :juxt.site/user user}))))}
-
-   ;; TODO: Create an action for establishing a protection space, and inherit
-   ;; this from example-protection-spaces or similar.
-   "https://example.org/bearer-protection-space"
-   {:deps #{::init/system}
-    :create (fn [{:keys [id]}]
-              (init/put!
-               (init/substitute-actual-base-uri
-                {:xt/id id
-                 :juxt.site/auth-scheme "Bearer"})))}
 
    "https://example.org/whoami"
    {:deps #{::init/system
@@ -135,6 +126,7 @@
         oauth/dependency-graph
         example-users/dependency-graph
         example-applications/dependency-graph
+        example-protection-spaces/dependency-graph
         dependency-graph}}
     #{"https://site.test/login"
       "https://site.test/user-identities/alice"
