@@ -229,6 +229,7 @@
   (let [state (make-nonce 10)
         request {:ring.request/method :get
                  :juxt.site/uri (substitute-actual-base-uri "https://example.org/oauth/authorize")
+                 ;; TODO: Instead, use assoc-body
                  :ring.request/headers {"cookie" (format "id=%s" session-token)}
                  :ring.request/query
                  (codec/form-encode

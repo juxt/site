@@ -99,16 +99,15 @@
                 :in [session-token]}
            session-token))))
 
-(defn assoc-session-token [req session-token]
+(defn with-session-token [req session-token]
   (let [{:keys [scope]}
         (lookup-session-details session-token)
 
         {:juxt.site/keys [cookie-name]} scope]
     (assoc-in req [:ring.request/headers "cookie"] (format "%s=%s" cookie-name session-token))))
 
-(defn assoc-body [req body-bytes]
+(defn with-request-body [req body-bytes]
   (-> req
-      body-bytes
       (->
        (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
        (assoc :ring.request/body (io/input-stream body-bytes)))))

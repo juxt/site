@@ -31,8 +31,9 @@
 
     (let [scope-id (:juxt.site/session-scope resource)
 
-          _ (log/debugf "session-scope for %s is %s" uri scope-id)
-          _ (log/debugf "resources is %s" (pr-str resource))
+          _ (when scope-id
+              (log/debugf "session-scope for %s is %s" uri scope-id)
+              (log/debugf "resource is %s" (pr-str resource)))
 
           scope (when scope-id (xt/entity db scope-id))
 
@@ -44,13 +45,14 @@
                 cookies-request
                 :cookies (get cookie-name) :value))
 
-          _ (log/debugf "session-token-id is %s" session-token-id!)
+          _ (when session-token-id! (log/debugf "session-token-id is %s" session-token-id!))
 
           session-details
           (when session-token-id!
             (lookup-session-details db session-token-id!))
 
-          _ (log/debugf "Session details for %s is %s" uri (pr-str session-details))
+          _ (when session-details
+              (log/debugf "Session details for %s is %s" uri (pr-str session-details)))
           ]
 
       (h (cond-> req

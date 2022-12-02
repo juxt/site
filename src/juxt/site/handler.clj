@@ -830,12 +830,16 @@
             :juxt.http/content-length (count content)
             :juxt.http/content content}))
 
+        original-resource (:juxt.site/resource req)
+
         error-resource (merge
                         {:ring.response/status 500
                          :juxt.site/errors (errors-with-causes e)}
                         (dissoc req :juxt.site/request-context)
                         ;; For the error itself
-                        {:juxt.site/resource representation})
+                        (cond->
+                            {:juxt.site/resource representation}
+                          original-resource (assoc :juxt.site/original-resource original-resource)))
 
         error-resource (assoc
                         error-resource
