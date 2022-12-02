@@ -118,7 +118,16 @@
        ~@body)))
 
 (defn assoc-bearer-token [req token]
-  (assoc-in req [:ring.request/headers "authorization"] (format "Bearer %s" token)))
+  (update-in
+   req
+   [:ring.request/headers "authorization"]
+   (fn [old]
+     (when old
+       (throw
+        (ex-info
+         "To avoid confusion, assoc-bearer-token will not override an already set authorization header"
+         {})))
+     (format "Bearer %s" token))))
 
 (defmacro with-bearer-token [token & body]
   `(let [dlg# *handler*

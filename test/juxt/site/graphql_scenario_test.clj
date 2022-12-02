@@ -119,7 +119,10 @@
              {"client_id" "test-app"}))]
 
       (when-not access-token
-        (throw (ex-info "Error on authorize" {:authorize-response authorize-response})))
+        (throw
+         (ex-info
+          "Error on authorize"
+          {:authorize-response authorize-response})))
 
       (with-bearer-token access-token
         (*handler*
