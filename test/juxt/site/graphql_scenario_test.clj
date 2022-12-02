@@ -17,7 +17,8 @@
    [juxt.site.repl :as repl]
    [juxt.test.util :refer [with-system-xt with-resources with-fixtures *handler*
                            with-resources with-handler
-                           with-request-body]]))
+                           assoc-request-body
+                           with-session-token with-bearer-token]]))
 
 (use-fixtures :each with-system-xt with-handler)
 
@@ -110,22 +111,19 @@
            "password" "garden"
            :juxt.site/uri "https://site.test/login")
 
-          session-token (:juxt.site/session-token login-result)
-          _ (assert session-token)
+          _ (assert (:juxt.site/session-token login-result))
 
-          {access-token "access_token"}
-          (oauth/authorize!
-           {:juxt.site/session-token session-token
-            "client_id" "test-app"})]
+          {access-token "access_token" :as authorize-response}
+          (with-session-token (:juxt.site/session-token login-result)
+            (oauth/authorize!
+             {"client_id" "test-app"}))]
 
-      (assert access-token)
+      (when-not access-token
+        (throw (ex-info "Error on authorize" {:authorize-response authorize-response})))
 
-      (repl/e "https://site.test/graphql/_types/{typename}")
-
-      (*handler*
-       (with-request-body
-         {:ring.request/path "/graphql/_types/Customer"
-          :ring.request/method :put
-          :ring.request/headers
-          {"authorization" (format "Bearer %s" access-token)}}
-         (.getBytes (pr-str {})))))))
+      (with-bearer-token access-token
+        (*handler*
+         (assoc-request-body
+          {:ring.request/method :put
+           :ring.request/path "/graphql/_types/Customer"}
+          (.getBytes (pr-str {}))))))))

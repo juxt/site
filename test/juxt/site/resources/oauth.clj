@@ -244,7 +244,7 @@
  authorize-response!
  [:=> [:cat
        [:map
-        ^{:doc "to authenticate with authorization server"} [:juxt.site/session-token :string]
+;;        ^{:doc "to authenticate with authorization server"} [:juxt.site/session-token :string]
         ["client_id" :string]
         ["scope" {:optional true} [:sequential :string]]]]
   [:map
@@ -263,16 +263,19 @@
 
         location-header (-> response :ring.response/headers (get "location"))
 
-        [_ _ encoded] (re-matches #"https://(.*?)/.*?#(.*)" location-header)]
+        [_ _ encoded-access-token]
+        (re-matches #"https://(.*?)/.*?#(.*)" location-header)]
 
-    (assert encoded)
-    (codec/form-decode encoded)))
+    (when-not encoded-access-token
+      (throw (ex-info "No access-token fragment" {:response response})))
+
+    (codec/form-decode encoded-access-token)))
 
 (malli/=>
  authorize!
  [:=> [:cat
        [:map
-        ^{:doc "to authenticate with authorization server"} [:juxt.site/session-token :string]
+;;        ^{:doc "to authenticate with authorization server"} [:juxt.site/session-token :string]
         ["client_id" :string]
         ["scope" {:optional true} [:sequential :string]]]]
   [:map

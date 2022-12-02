@@ -99,14 +99,38 @@
                 :in [session-token]}
            session-token))))
 
-(defn with-session-token [req session-token]
+(defn assoc-session-token [req session-token]
   (let [{:keys [scope]}
         (lookup-session-details session-token)
-
         {:juxt.site/keys [cookie-name]} scope]
+    (when-not cookie-name
+      (throw (ex-info "No cookie name determined for session-token" {:session-token session-token})))
     (assoc-in req [:ring.request/headers "cookie"] (format "%s=%s" cookie-name session-token))))
 
-(defn with-request-body [req body-bytes]
+(defmacro with-session-token [token & body]
+  `(let [dlg# *handler*
+         token# ~token]
+     (when-not token#
+       (throw (ex-info "with-session-token called without a valid session token" {})))
+     (binding [*handler*
+               (fn [req#]
+                 (dlg# (assoc-session-token req# token#)))]
+       ~@body)))
+
+(defn assoc-bearer-token [req token]
+  (assoc-in req [:ring.request/headers "authorization"] (format "Bearer %s" token)))
+
+(defmacro with-bearer-token [token & body]
+  `(let [dlg# *handler*
+         token# ~token]
+     (when-not token#
+       (throw (ex-info "with-bearer-token called without a bearer token" {})))
+     (binding [*handler*
+               (fn [req#]
+                 (dlg# (assoc-bearer-token req# token#)))]
+       ~@body)))
+
+(defn assoc-request-body [req body-bytes]
   (-> req
       (->
        (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
