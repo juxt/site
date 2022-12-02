@@ -124,9 +124,10 @@
           "Error on authorize"
           {:authorize-response authorize-response})))
 
-      (with-bearer-token access-token
-        (*handler*
-         (assoc-request-body
-          {:ring.request/method :put
-           :ring.request/path "/graphql/_types/Customer"}
-          (.getBytes (pr-str {}))))))))
+      (with-bearer-token "foo"
+        (with-bearer-token access-token
+          (*handler*
+           (assoc-request-body
+            {:ring.request/method :put
+             :ring.request/path "/graphql/_types/Customer"}
+            (.getBytes (pr-str {})))))))))

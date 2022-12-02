@@ -121,13 +121,15 @@
   (update-in
    req
    [:ring.request/headers "authorization"]
-   (fn [old]
-     (when old
-       (throw
-        (ex-info
-         "To avoid confusion, assoc-bearer-token will not override an already set authorization header"
-         {})))
-     (format "Bearer %s" token))))
+   (fn [existing-value]
+     (let [new-value (format "Bearer %s" token)]
+       (when (and existing-value (not= existing-value new-value))
+         (throw
+          (ex-info
+           "To avoid confusion when debugging, assoc-bearer-token will not override an already set authorization header"
+           {:new-value {"authorization" new-value}
+            :existing-value {"authorization" existing-value}})))
+       new-value))))
 
 (defmacro with-bearer-token [token & body]
   `(let [dlg# *handler*
