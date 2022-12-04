@@ -52,6 +52,8 @@
              (let [compile-output
                    (grab.compile-schema
                     (->>
+                     ;; Attempt to combine any existing types in the database
+                     ;; with the new/replacement ones brought in here.
                      (concat
                       (map (juxt :juxt.grab.alpha.graphql/name identity) (grab.parsed-types))
                       (map (fn [typ] [(:juxt.grab.alpha.graphql/name :juxt.grab/type-definition typ)
@@ -66,14 +68,9 @@
                   {:xt/id compile-output-id
                    :juxt.site/type "https://meta.juxt.site/site/graphql-compile-status"
                    :juxt.site/graphql-schema (:xt/id *resource*)
-                   :juxt.grab/compile-status compile-output
-                   :existing-types (grab.parsed-types)
-                   }]
+                   :juxt.grab/compile-status compile-output}]
                  [:ring.response/headers {"location" compile-output-id}]
-                 [:ring.response/status 201]
-
-
-                 ]
+                 [:ring.response/status 201]]
                 (mapv (fn [x] [:xtdb.api/put x]) *prepare*)))))}
 
         :juxt.site/rules
