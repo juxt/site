@@ -463,14 +463,14 @@
 
                       'grab
                       {'parsed-types
-                       (fn []
+                       (fn parsed-types [schema-id]
                          (map :juxt.grab/type-definition
                               (map first
                                    (xt/q db '{:find [(pull e [:juxt.grab/type-definition])]
                                               :where [[e :juxt.site/type "https://meta.juxt.site/site/graphql-type"]
                                                       [e :juxt.site/graphql-schema schema-id]]
                                               :in [schema-id]}
-                                         (:xt/id resource)))))}}
+                                         schema-id))))}}
 
                      (common-sci-namespaces action-doc))
 
@@ -761,10 +761,14 @@
 
     (let [actions (get-in resource [:juxt.site/methods method :juxt.site/actions])
 
+          _ (assert actions (format "No actions for method %s" method))
+
           _ (doseq [action actions]
               (when-not (xt/entity db action)
                 (throw (ex-info (format "No such action: %s" action) {:juxt.site/request-context req
                                                                       :missing-action action}))))
+
+          _ (log/tracef "actions are %s" (pr-str {:actions actions}))
 
           permitted-actions
           (check-permissions

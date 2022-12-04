@@ -23,7 +23,108 @@
 (use-fixtures :each with-system-xt with-handler)
 
 (def dependency-graph
-  {"https://example.org/actions/install-graphql-type"
+  {"https://example.org/actions/get-graphql-type"
+   {:deps #{::init/system}
+    :create
+    (fn [{:keys [id]}]
+      (do-action
+       "https://example.org/subjects/system"
+       "https://example.org/actions/create-action"
+       {:xt/id id
+        ;; TODO: Do a view
+        :juxt.site/rules
+        '[
+          [(allowed? subject resource permission)
+           [subject :juxt.site/user-identity id]
+           [id :juxt.site/user user]
+           [permission :juxt.site/user user]]]
+        }))}
+
+   "https://example.org/permissions/{username}/get-graphql-type"
+   {:deps #{::init/system
+            "https://example.org/actions/get-graphql-type"}
+    :create
+    (fn [{:keys [id params]}]
+      (do-action
+       "https://example.org/subjects/system"
+       "https://example.org/actions/grant-permission"
+       {:xt/id id
+        :juxt.site/action "https://example.org/actions/get-graphql-type"
+        :juxt.site/purpose nil
+        :juxt.site/user (format "https://example.org/users/%s" (get params "username"))}))}
+
+   "https://example.org/actions/delete-graphql-type"
+   {:deps #{::init/system}
+    :create
+    (fn [{:keys [id]}]
+      (do-action
+       "https://example.org/subjects/system"
+       "https://example.org/actions/create-action"
+       {:xt/id id
+        ;; TODO: The reason we want a transact here is so we can recompile the
+        ;; GraphQL schema, after deleting the type. Our handler doesn't support
+        ;; this yet.
+        :juxt.site/transact
+        {:juxt.site.sci/program
+         (pr-str
+          '(do
+             ;; We must recompile
+
+             (let [schema-id (:juxt.site/graphql-schema *resource*)
+
+                   _ (when-not schema-id
+                       (throw
+                        (ex-info
+                         "This action requires that the resource contain a :juxt.site/graphql-schema entry"
+                         {:resource *resource*})))
+
+                   name-to-delete (get-in *resource* [:juxt.grab/type-definition :juxt.grab.alpha.graphql/name])
+
+                   _ (when-not name-to-delete
+                       (throw
+                        (ex-info
+                         "This action requires that the resource contain a named type definition"
+                         {:resource *resource*})))
+
+                   types (->
+                          (into {} (map (juxt :juxt.grab.alpha.graphql/name identity) (grab.parsed-types schema-id)))
+                          (dissoc name-to-delete)
+                          vals)
+
+                   compile-output (grab.compile-schema types)
+
+                   compile-output-id (str schema-id "compile-status")]
+
+               (into
+                [[:xtdb.api/put
+                  {:xt/id compile-output-id
+                   :juxt.site/type "https://meta.juxt.site/site/graphql-compile-status"
+                   :juxt.site/graphql-schema schema-id
+                   :juxt.grab/compile-status compile-output}]
+                 [:xtdb.api/delete (:xt/id *resource*)]
+                 [:ring.response/status 204]]))))}
+
+        :juxt.site/rules
+        '[
+          [(allowed? subject resource permission)
+           [subject :juxt.site/user-identity id]
+           [id :juxt.site/user user]
+           [permission :juxt.site/user user]]]}))}
+
+   "https://example.org/permissions/{username}/delete-graphql-type"
+   {:deps #{::init/system
+            "https://example.org/actions/delete-graphql-type"}
+    :create
+    (fn [{:keys [id params]}]
+      (do-action
+       "https://example.org/subjects/system"
+       "https://example.org/actions/grant-permission"
+       {:xt/id id
+        :juxt.site/action "https://example.org/actions/delete-graphql-type"
+        :juxt.site/purpose nil
+        :juxt.site/user (format "https://example.org/users/%s" (get params "username"))}))}
+
+   "https://example.org/actions/install-graphql-type"
    {:deps #{::init/system}
     :create
     (fn [{:keys [id]}]
@@ -42,8 +143,14 @@
                    (let [type-name (:juxt.grab.alpha.graphql/name typedef)]
                      {:xt/id (str (:xt/id *resource*) "types/" type-name)
                       :juxt.site/type "https://meta.juxt.site/site/graphql-type"
+                      :juxt.site/methods
+                      {:get {:juxt.site/actions #{"https://example.org/actions/get-graphql-type"}}
+                       :delete {:juxt.site/actions #{"https://example.org/actions/delete-graphql-type"}}}
                       :juxt.site/graphql-schema (:xt/id *resource*)
-                      :juxt.grab/type-definition typedef})))))}
+                      :juxt.grab/type-definition typedef
+                      ;; Inherit the protection space of the resource
+                      :juxt.site/protection-spaces (:juxt.site/protection-spaces *resource*)
+                      })))))}
 
         :juxt.site/transact
         {:juxt.site.sci/program
@@ -55,7 +162,7 @@
                      ;; Attempt to combine any existing types in the database
                      ;; with the new/replacement ones brought in here.
                      (concat
-                      (map (juxt :juxt.grab.alpha.graphql/name identity) (grab.parsed-types))
+                      (map (juxt :juxt.grab.alpha.graphql/name identity) (grab.parsed-types (:xt/id *resource*)))
                       (map (fn [typ] [(:juxt.grab.alpha.graphql/name :juxt.grab/type-definition typ)
                                       (:juxt.grab/type-definition typ)]) *prepare*))
                      (into {})
@@ -160,8 +267,13 @@
       "https://site.test/actions/install-graphql-type"
       "https://site.test/permissions/alice/install-graphql-type"
 
-      "https://site.test/graphql/schema/"
-      }
+      "https://site.test/actions/delete-graphql-type"
+      "https://site.test/permissions/alice/delete-graphql-type"
+
+      "https://site.test/actions/get-graphql-type"
+      "https://site.test/permissions/alice/get-graphql-type"
+
+      "https://site.test/graphql/schema/"}
 
     (let [login-result
           (form-based-auth/login-with-form!
@@ -187,23 +299,23 @@
       ;; build up the schema incrementally, posting any type or types which will
       ;; add to the schema. If we want to start over, we can DELETE the schema.
       (with-bearer-token access-token
-        (*handler*
-         (-> {:ring.request/method :post
-              :ring.request/path "/graphql/schema/"}
-             (assoc-request-payload
-              "text/plain"
-              "
+        (let [response
+              (*handler*
+               (-> {:ring.request/method :post
+                    :ring.request/path "/graphql/schema/"}
+                   (assoc-request-payload
+                    "text/plain"
+                    "
 type Patient {
   name: String
   age: Int
-  picture: Url
+  medicalRecords: [MedicalRecord]
 }
 
-type Project {
-  name: String
-  tagline: String
-  contributors: [User]
-}")))
+type MedicalRecord {
+  description: String
+}")))]
+          (assert (= 201 (:ring.response/status response))))
 
         ;; Second interaction, we fix one of the problems by adding another type
         ;; (Query)
@@ -211,15 +323,26 @@ type Project {
         ;; In this way, we allow an incremental approach to working with GraphQL
         ;; schema. This could be used by a GraphQL schema builder tool.
 
-        (*handler*
-         (-> {:ring.request/method :post
-              :ring.request/path "/graphql/schema/"}
-             (assoc-request-payload
-              "text/plain"
-              "type Query { patients: [Patient] }"))))
+        (let [response
+              (*handler*
+               (-> {:ring.request/method :post
+                    :ring.request/path "/graphql/schema/"}
+                   (assoc-request-payload
+                    "text/plain"
+                    "type Query { patients: [Patient] }")))]
+          (assert (= 201 (:ring.response/status response)))))
 
       (repl/e "https://site.test/graphql/schema/compile-status")
 
+      (with-bearer-token access-token
+        (*handler*
+         {:ring.request/method :delete
+          :ring.request/path "/graphql/schema/types/MedicalRecord"}))
+
+      (repl/e "https://site.test/graphql/schema/compile-status")
+      ;;(repl/e "https://site.test/graphql/schema/types/Query")
+
+      ;;(repl/ls)
 
       ;; Call an action to compile the schema?
       ;; The compilation status is held in /graphql/schema-compilation-status
