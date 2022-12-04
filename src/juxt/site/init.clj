@@ -32,13 +32,6 @@
 (defn base-uri []
   (:juxt.site/base-uri (config)))
 
-(defn substitute-actual-base-uri [form]
-  (postwalk
-   (fn [s]
-     (cond-> s
-       (string? s) (str/replace "https://example.org" (base-uri))))
-   form))
-
 (defn make-repl-request-context [subject action edn-arg]
   (let [xt-node (xt-node)]
     (cond->
@@ -59,16 +52,15 @@
 
    (assert (or (nil? subject-id) (string? subject-id)) "Subject must a string or nil")
 
-
-   (let [subject-id (substitute-actual-base-uri subject-id)
-         action-id (substitute-actual-base-uri action-id)
+   (let [subject-id subject-id
+         action-id action-id
          xt-node (xt-node)
          db (xt/db xt-node)
          subject (when subject-id (xt/entity db subject-id))]
      (:juxt.site/action-result
       (actions/do-action
        (make-repl-request-context
-        subject action-id (substitute-actual-base-uri edn-arg)))))))
+        subject action-id edn-arg))))))
 
 (def host-parser (rfc7230.decoders/host {}))
 

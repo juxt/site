@@ -3,7 +3,7 @@
 (ns juxt.site.resources.example-users
   (:require
    [clojure.string :as str]
-   [juxt.site.init :as init :refer [substitute-actual-base-uri do-action]]
+   [juxt.site.init :as init :refer [do-action]]
    [juxt.site.resources.user :as user]
    [malli.core :as malli]))
 
@@ -59,13 +59,11 @@
 
    "https://example.org/user-identities/{username}"
    {:deps (fn [params _]
-            ;; Since this is a function, we need to convert the example.org URIs
-            (substitute-actual-base-uri
-             #{::init/system
-               (format "https://example.org/users/%s" (get params "username"))
-               "https://example.org/actions/put-user-identity"
-               "https://example.org/permissions/system/put-user-identity"
-               }))
+            #{::init/system
+              (format "https://example.org/users/%s" (get params "username"))
+              "https://example.org/actions/put-user-identity"
+              "https://example.org/permissions/system/put-user-identity"
+              })
     :create (fn [{:keys [id params]}]
               ;; TODO: Make this data rather than calling a function! (The
               ;; intention here is to demote this graphs to data;

@@ -87,7 +87,7 @@
     :deps #{::init/system
             "https://example.org/actions/put-session-scope"}}
 
-   "https://site.test/session-scopes/default"
+   "https://example.org/session-scopes/default"
    {:deps #{::init/system
             "https://example.org/actions/put-session-scope"
             "https://example.org/permissions/system/put-session-scope"}

@@ -245,7 +245,7 @@
 
    })
 
-(with-fixtures
+#_(with-fixtures
   (with-resources
     ^{:dependency-graphs
       #{session-scope/dependency-graph

@@ -5,7 +5,7 @@
    [clojure.string :as str]
    [clojure.pprint :refer [pprint]]
    [juxt.site.util :refer [make-nonce]]
-   [juxt.site.init :as init :refer [substitute-actual-base-uri do-action]]
+   [juxt.site.init :as init :refer [do-action]]
    [juxt.test.util :refer [*handler*]]
    [malli.core :as malli]
    [ring.util.codec :as codec]))
@@ -228,7 +228,7 @@
     scope "scope"}]
   (let [state (make-nonce 10)
         request {:ring.request/method :get
-                 :juxt.site/uri (substitute-actual-base-uri "https://example.org/oauth/authorize")
+                 :juxt.site/uri "https://example.org/oauth/authorize"
                  ;; TODO: Instead, use assoc-body
                  :ring.request/headers {"cookie" (format "id=%s" session-token)}
                  :ring.request/query

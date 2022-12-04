@@ -42,9 +42,8 @@
 
 (defn with-handler [f]
   (binding [*handler* (make-handler
-                       (init/substitute-actual-base-uri
-                        {:juxt.site/xt-node *xt-node*
-                         :juxt.site/base-uri "https://example.org"}))]
+                       {:juxt.site/xt-node *xt-node*
+                        :juxt.site/base-uri "https://example.org"})]
     (f)))
 
 (defn with-timing [f]
@@ -80,10 +79,9 @@
      (let [resources# ~resources]
        (init/converge!
         (conj resources# ::init/system)
-        (init/substitute-actual-base-uri
-         (apply merge
-                bootstrap/dependency-graph
-                (:dependency-graphs (meta resources#))))
+        (apply merge
+               bootstrap/dependency-graph
+               (:dependency-graphs (meta resources#)))
         {:dry-run? false :recreate? false}))
      ~@body))
 
