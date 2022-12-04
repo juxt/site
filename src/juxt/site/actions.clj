@@ -2,6 +2,8 @@
 
 (ns juxt.site.actions
   (:require
+   [juxt.grab.alpha.parser :as graphql.parser]
+   [juxt.grab.alpha.schema :as graphql.schema]
    [clojure.tools.logging :as log]
    [crypto.password.bcrypt :as bcrypt]
    [java-http-clj.core :as hc]
@@ -316,6 +318,10 @@
              :schema schema})))
         input))}
 
+   'grab
+   {'parse graphql.parser/parse
+    'compile-schema graphql.schema/compile-schema*}
+
    'ring.util.codec
    {'form-encode codec/form-encode
     'form-decode codec/form-decode}})
@@ -453,7 +459,18 @@
                                (throw
                                 (ex-info
                                  (format "No such scope: %s" scope)
-                                 {:error "invalid_scope"}))))))}}
+                                 {:error "invalid_scope"}))))))}
+
+                      'grab
+                      {'parsed-types
+                       (fn []
+                         (map :juxt.grab/type-definition
+                              (map first
+                                   (xt/q db '{:find [(pull e [:juxt.grab/type-definition])]
+                                              :where [[e :juxt.site/type "https://meta.juxt.site/site/graphql-type"]
+                                                      [e :juxt.site/graphql-schema schema-id]]
+                                              :in [schema-id]}
+                                         (:xt/id resource)))))}}
 
                      (common-sci-namespaces action-doc))
 
@@ -524,15 +541,15 @@
                       :juxt.site/action action
                       :juxt.site/purpose purpose
                       :juxt.site/puts (vec
-                                   (keep
-                                    (fn [[tx-op {id :xt/id}]]
-                                      (when (= tx-op ::xt/put) id))
-                                    xtdb-ops))
+                                       (keep
+                                        (fn [[tx-op {id :xt/id}]]
+                                          (when (= tx-op ::xt/put) id))
+                                        xtdb-ops))
                       :juxt.site/deletes (vec
-                                      (keep
-                                       (fn [[tx-op {id :xt/id}]]
-                                         (when (= tx-op ::xt/delete) id))
-                                       xtdb-ops))}
+                                          (keep
+                                           (fn [[tx-op {id :xt/id}]]
+                                             (when (= tx-op ::xt/delete) id))
+                                           xtdb-ops))}
                      tx (into tx)
 
                      ;; Any quotations that we want to apply to the request context?
@@ -562,20 +579,20 @@
              :juxt.site/resource resource
              :juxt.site/purpose purpose
              :juxt.site/error {:message (.getMessage e)
-                           ;; ex-data is just too problematic to put into the
-                           ;; database as-is without some sanitization ensuring
-                           ;; it's nippyable.
-                           :ex-data (ex-data e)
-                           ;; The site db will not be nippyable
+                               ;; ex-data is just too problematic to put into the
+                               ;; database as-is without some sanitization ensuring
+                               ;; it's nippyable.
+                               :ex-data (ex-data e)
+                               ;; The site db will not be nippyable
 
-                           #_(dissoc (ex-data e) :env)
-                           ;; TODO: Ideally we'd like the environment in the
-                           ;; action log for debugging purposes. But the below
-                           ;; stills fails with a nippy error, haven't
-                           ;; investigated thorougly enough.
-                           #_(let [ex-data (ex-data e)]
-                               (cond-> ex-data
-                                 (:env ex-data) (dissoc :env)#_(update :env dissoc :juxt.site/db :juxt.site/xt-node)))}}]])))))
+                               #_(dissoc (ex-data e) :env)
+                               ;; TODO: Ideally we'd like the environment in the
+                               ;; action log for debugging purposes. But the below
+                               ;; stills fails with a nippy error, haven't
+                               ;; investigated thorougly enough.
+                               #_(let [ex-data (ex-data e)]
+                                   (cond-> ex-data
+                                     (:env ex-data) (dissoc :env)#_(update :env dissoc :juxt.site/db :juxt.site/xt-node)))}}]])))))
 
 (defn install-do-action-fn [uri]
   {:xt/id (str uri "/_site/do-action")

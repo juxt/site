@@ -3,7 +3,7 @@
 (ns juxt.site.graphql-scenario-test
   (:require
    [juxt.site.logging :refer [with-logging]]
-   [jsonista.core :as json]
+   [juxt.grab.alpha.schema :as gs]
    [clojure.test :refer [deftest is use-fixtures]]
    [juxt.site.resources.oauth :as oauth]
    [juxt.site.resources.session-scope :as session-scope]
@@ -13,11 +13,11 @@
    [juxt.site.resources.example-users :as example-users]
    [juxt.site.resources.example-applications :as example-applications]
    [juxt.site.resources.example-protection-spaces :as example-protection-spaces]
-   [juxt.site.init :as init :refer [do-action]]
    [juxt.site.repl :as repl]
+   [juxt.site.init :as init :refer [do-action]]
    [juxt.test.util :refer [with-system-xt with-resources with-fixtures *handler*
                            with-resources with-handler
-                           assoc-request-body
+                           assoc-request-payload
                            with-session-token with-bearer-token]]))
 
 (use-fixtures :each with-system-xt with-handler)
@@ -25,47 +25,107 @@
 (def dependency-graph
   {"https://example.org/actions/install-graphql-type"
    {:deps #{::init/system}
-    :create (fn [{:keys [id]}]
-              (do-action
-               "https://example.org/subjects/system"
-               "https://example.org/actions/create-action"
-               {:xt/id id
+    :create
+    (fn [{:keys [id]}]
+      (do-action
+       "https://example.org/subjects/system"
+       "https://example.org/actions/create-action"
+       {:xt/id id
 
-                :juxt.site/transact
-                {:juxt.site.sci/program
-                 (pr-str
-                  '(do (throw (ex-info "TODO" {}))))}
+        :juxt.site/prepare
+        {:juxt.site.sci/program
+         (pr-str
+          '(->> (get-in *ctx* [:juxt.site/received-representation :juxt.http/content])
+                grab.parse
+                (mapv
+                 (fn [typedef]
+                   (let [type-name (:juxt.grab.alpha.graphql/name typedef)]
+                     {:xt/id (str (:xt/id *resource*) "types/" type-name)
+                      :juxt.site/type "https://meta.juxt.site/site/graphql-type"
+                      :juxt.site/graphql-schema (:xt/id *resource*)
+                      :juxt.grab/type-definition typedef})))))}
 
-                :juxt.site/rules
-                '[
-                  [(allowed? subject resource permission)
-                   [subject :juxt.site/user-identity id]
-                   [id :juxt.site/user user]
-                   [permission :juxt.site/user user]]]}))}
+        :juxt.site/transact
+        {:juxt.site.sci/program
+         (pr-str
+          '(do
+             (let [compile-output
+                   (grab.compile-schema
+                    (->>
+                     (concat
+                      (map (juxt :juxt.grab.alpha.graphql/name identity) (grab.parsed-types))
+                      (map (fn [typ] [(:juxt.grab.alpha.graphql/name :juxt.grab/type-definition typ)
+                                      (:juxt.grab/type-definition typ)]) *prepare*))
+                     (into {})
+                     vals))
+
+                   compile-output-id (str (:xt/id *resource*) "compile-status")]
+
+               (into
+                [[:xtdb.api/put
+                  {:xt/id compile-output-id
+                   :juxt.site/type "https://meta.juxt.site/site/graphql-compile-status"
+                   :juxt.site/graphql-schema (:xt/id *resource*)
+                   :juxt.grab/compile-status compile-output
+                   :existing-types (grab.parsed-types)
+                   }]
+                 [:ring.response/headers {"location" compile-output-id}]
+                 [:ring.response/status 201]
+
+
+                 ]
+                (mapv (fn [x] [:xtdb.api/put x]) *prepare*)))))}
+
+        :juxt.site/rules
+        '[
+          [(allowed? subject resource permission)
+           [subject :juxt.site/user-identity id]
+           [id :juxt.site/user user]
+           [permission :juxt.site/user user]]]}))}
 
    "https://example.org/permissions/{username}/install-graphql-type"
    {:deps #{::init/system
             "https://example.org/actions/install-graphql-type"}
-    :create (fn [{:keys [id params]}]
-              (do-action
-               "https://example.org/subjects/system"
-               "https://example.org/actions/grant-permission"
-               {:xt/id id
-                :juxt.site/action "https://example.org/actions/install-graphql-type"
-                :juxt.site/purpose nil
-                :juxt.site/user (format "https://example.org/users/%s" (get params "username"))}))}
+    :create
+    (fn [{:keys [id params]}]
+      (do-action
+       "https://example.org/subjects/system"
+       "https://example.org/actions/grant-permission"
+       {:xt/id id
+        :juxt.site/action "https://example.org/actions/install-graphql-type"
+        :juxt.site/purpose nil
+        :juxt.site/user (format "https://example.org/users/%s" (get params "username"))}))}
 
-   "https://example.org/graphql/_types/{typename}"
+   "https://example.org/graphql/schema/"
    {:deps #{::init/system
             "https://example.org/protection-spaces/bearer"}
-    :create (fn [{:keys [id]}]
-              (init/put! ;; TODO: install remotely
-               (init/substitute-actual-base-uri
-                {:xt/id id
-                 :juxt.site/uri-template true
-                 :juxt.site/methods
-                 {:put {:juxt.site/actions #{"https://example.org/actions/install-graphql-type"}}}
-                 :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}})))}
+    :create
+    (fn [{:keys [id]}]
+      (init/put! ;; TODO: install remotely
+       (init/substitute-actual-base-uri
+        {:xt/id id
+         :juxt.site/uri-template true
+         :juxt.site/methods
+         {:post
+          {:juxt.site/actions #{"https://example.org/actions/install-graphql-type"}
+           :juxt.site/acceptable {"accept" "text/plain"}}}
+         :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}})))}
+
+   #_#_"https://example.org/graphql/schema-compilation"
+   {:deps #{::init/system
+            "https://example.org/protection-spaces/bearer"}
+    :create
+    (fn [{:keys [id]}]
+      (init/put! ;; TODO: install remotely
+       (init/substitute-actual-base-uri
+        {:xt/id id
+         :juxt.site/graphql-schema "https://example.org/graphql/schema/"
+         :juxt.site/methods
+         {:post
+          {:juxt.site/actions #{"https://example.org/actions/compile-graphql-schema"}}}
+         :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}})))}
+
+
 
    #_"https://example.org/graphql"
    #_{:deps #{::init/system
@@ -93,6 +153,7 @@
         example-applications/dependency-graph
         example-protection-spaces/dependency-graph
         dependency-graph}}
+
     #{"https://site.test/user-identities/alice" ; Alice
       "https://site.test/login"         ; a way Alice can identity herself
       "https://site.test/applications/test-app" ; an app
@@ -102,7 +163,8 @@
       "https://site.test/actions/install-graphql-type"
       "https://site.test/permissions/alice/install-graphql-type"
 
-      "https://site.test/graphql/_types/{typename}"}
+      "https://site.test/graphql/schema/"
+      }
 
     (let [login-result
           (form-based-auth/login-with-form!
@@ -124,10 +186,92 @@
           "Error on authorize"
           {:authorize-response authorize-response})))
 
-      (with-bearer-token "foo"
-        (with-bearer-token access-token
-          (*handler*
-           (assoc-request-body
-            {:ring.request/method :put
-             :ring.request/path "/graphql/_types/Customer"}
-            (.getBytes (pr-str {})))))))))
+      ;; To install a GraphQL schema, we POST to the schema resource. We can
+      ;; build up the schema incrementally, posting any type or types which will
+      ;; add to the schema. If we want to start over, we can DELETE the schema.
+      (with-bearer-token access-token
+        (*handler*
+         (-> {:ring.request/method :post
+              :ring.request/path "/graphql/schema/"}
+             (assoc-request-payload
+              "text/plain"
+              "
+type Patient {
+  name: String
+  age: Int
+  picture: Url
+}
+
+type Project {
+  name: String
+  tagline: String
+  contributors: [User]
+}")))
+
+        ;; Second interaction, we fix one of the problems by adding another type
+        ;; (Query)
+
+        ;; In this way, we allow an incremental approach to working with GraphQL
+        ;; schema. This could be used by a GraphQL schema builder tool.
+
+        (*handler*
+         (-> {:ring.request/method :post
+              :ring.request/path "/graphql/schema/"}
+             (assoc-request-payload
+              "text/plain"
+              "type Query { patients: [Patient] }"))))
+
+      (repl/e "https://site.test/graphql/schema/compile-status")
+
+
+      ;; Call an action to compile the schema?
+      ;; The compilation status is held in /graphql/schema-compilation-status
+      ;; The POST to the /graphql/schema-compilation-status causes the schema to be compiled, with gs/compile-schema over a vector of the types in /graphql/schema/*
+      )))
+
+
+#_(juxt.grab.alpha.parser/parse
+  "
+
+type Patient {
+  name: String
+  age: Int
+  picture: Url
+}
+
+type Project {
+  name: String
+  tagline: String
+  contributors: [User]
+}")
+
+#_(gs/compile-schema
+   (juxt.grab.alpha.parser/parse
+  "
+
+type Patient {
+  name: String
+  age: Int
+  picture: Url
+}
+
+type Project {
+  name: String
+  tagline: String
+  contributors: [User]
+}"))
+
+#_(juxt.grab.alpha.parser/parse
+  "
+
+type Patient {
+  name: String
+  age: Int
+  picture: Url
+}
+
+type Project {
+  name: String
+  tagline: String
+  contributors: [User]
+}")

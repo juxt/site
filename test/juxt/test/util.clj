@@ -141,8 +141,18 @@
                  (dlg# (assoc-bearer-token req# token#)))]
        ~@body)))
 
-(defn assoc-request-body [req body-bytes]
-  (-> req
-      (->
-       (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
-       (assoc :ring.request/body (io/input-stream body-bytes)))))
+(defn assoc-request-payload
+  "Add a body payload onto the request. If the content-type is of type 'text',
+  e.g. text/plain, then give the body as a string."
+  [req content-type body]
+  (let [body-bytes
+        (cond
+          (re-matches #"text/.+" content-type)
+          (.getBytes body)
+          :else body)]
+    (-> req
+        (->
+         (update :ring.request/headers (fnil assoc {})
+                 "content-type" content-type
+                 "content-length" (str (count body-bytes)))
+         (assoc :ring.request/body (io/input-stream body-bytes))))))

@@ -31,9 +31,6 @@
                                                                                                                                   :req {:xt/id :string}},
                                                                                                               :juxt.site/purpose :string}}],
                                                                                                 :ret :any}}}},
-                                        juxt.site.resources.example-users {grant-permission-to-authorize! {:arities {1 {:args [{:op :keys,
-                                                                                                                                :req {:username :string}}],
-                                                                                                                        :ret :any}}}},
                                         juxt.site.resources.oauth {authorize-response! {:arities {1 {:args [{:op :keys,
                                                                                                              :opt {"scope" :sequential},
                                                                                                              :req {"client_id" :string}}],
@@ -45,4 +42,7 @@
                                                                                                     :req {"client_id" :string}}],
                                                                                             :ret {:op :keys,
                                                                                                   :opt {"access_token" :string,
-                                                                                                        "error" :string}}}}}}}}}}
+                                                                                                        "error" :string}}}}}},
+                                        juxt.site.resources.example-users {grant-permission-to-authorize! {:arities {1 {:args [{:op :keys,
+                                                                                                                                :req {:username :string}}],
+                                                                                                                        :ret :any}}}}}}}}
