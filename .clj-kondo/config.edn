@@ -1,4 +1,8 @@
 {:linters
- {:unused-namespace {:exclude [clojure.tools.logging]}
+ {:unused-namespace {:exclude [clojure.tools.logging
+                               juxt.site.logging
+                               juxt.site.repl]}
   :unused-referred-var {:exclude {juxt.test.util [with-fixtures]
-                                  clojure.pprint [pprint]}}}}
+                                  clojure.pprint [pprint]
+                                  juxt.site.logging [with-logging]
+                                  clojure.test [deftest is are]}}}}
