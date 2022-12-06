@@ -9,5 +9,6 @@ opt/graphiql/target
 /import
 *.dylib
 .clj-kondo/.cache
+.clj-kondo/metosin/malli-types/
 **/generated/*
 /target/
