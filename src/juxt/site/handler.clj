@@ -292,8 +292,9 @@
       :else
       (response/add-payload req))))
 
-(defn perform-unsafe-method [req]
-  (let [req (receive-representation req)
+(defn perform-unsafe-method [{:keys [ring.request/method] :as req}]
+  (let [req (cond-> req
+              (#{:post :put :patch} method) receive-representation)
         ;; TODO: Should we fail if more than one permitted action available?
         permitted-action (:juxt.site/action (first (:juxt.site/permitted-actions req)))
         ;; Default response status
@@ -302,7 +303,7 @@
     (actions/do-action
      (-> req
          (assoc :juxt.site/action (:xt/id permitted-action))
-         ;; A java.io.BufferedInputStream in the request can provke this
+         ;; A java.io.BufferedInputStream in the request can provoke this
          ;; error: "invalid tx-op: Unfreezable type: class
          ;; java.io.BufferedInputStream".
          (dissoc :ring.request/body)))))
@@ -313,23 +314,11 @@
 (defn PUT [req]
   (perform-unsafe-method req))
 
-(defn PATCH [{:juxt.site/keys [resource] :as req}]
-  (let [req (receive-representation req)
-        patch-fn (:juxt.site/patch-fn resource)]
+(defn PATCH [req]
+  (perform-unsafe-method req))
 
-    ;; TODO: evaluate preconditions (in tx fn)
-    (cond
-      (fn? patch-fn) (patch-fn req)
-      :else
-      (throw
-       (ex-info
-        "Resource allows PATCH but doesn't contain have a patch-fn function"
-        {:juxt.site/request-context req})))))
-
-(defn DELETE [{:juxt.site/keys [xt-node uri] :as req}]
-  (let [tx (xt/submit-tx xt-node [[:xtdb.api/delete uri]])]
-    (xt/await-tx xt-node tx)
-    (into req {:ring.response/status 204})))
+(defn DELETE [req]
+  (perform-unsafe-method req))
 
 (defn OPTIONS [{:juxt.site/keys [resource allowed-methods] :as req}]
   ;; TODO: Implement *
@@ -830,12 +819,16 @@
             :juxt.http/content-length (count content)
             :juxt.http/content content}))
 
+        original-resource (:juxt.site/resource req)
+
         error-resource (merge
                         {:ring.response/status 500
                          :juxt.site/errors (errors-with-causes e)}
                         (dissoc req :juxt.site/request-context)
                         ;; For the error itself
-                        {:juxt.site/resource representation})
+                        (cond->
+                            {:juxt.site/resource representation}
+                          original-resource (assoc :juxt.site/original-resource original-resource)))
 
         error-resource (assoc
                         error-resource

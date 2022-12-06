@@ -5,7 +5,6 @@
    [clojure.java.io :as io]
    [juxt.site.handler :as h]
    [juxt.site.main :as main]
-   [juxt.site.init :as init]
    [juxt.site.bootstrap :as bootstrap]
    [xtdb.api :as xt])
   (:import
@@ -42,9 +41,8 @@
 
 (defn with-handler [f]
   (binding [*handler* (make-handler
-                       (init/substitute-actual-base-uri
-                        {:juxt.site/xt-node *xt-node*
-                         :juxt.site/base-uri "https://example.org"}))]
+                       {:juxt.site/xt-node *xt-node*
+                        :juxt.site/base-uri "https://example.org"})]
     (f)))
 
 (defn with-timing [f]
@@ -77,14 +75,9 @@
 
 (defmacro with-resources [resources & body]
   `(do
-     (let [resources# ~resources]
-       (init/converge!
-        (conj resources# ::init/system)
-        (init/substitute-actual-base-uri
-         (apply merge
-                bootstrap/dependency-graph
-                (:dependency-graphs (meta resources#))))
-        {:dry-run? false :recreate? false}))
+     (bootstrap/bootstrap-resources!
+      ~resources
+      {:dry-run? false :recreate? false})
      ~@body))
 
 (defn lookup-session-details [session-token]
@@ -102,13 +95,57 @@
 (defn assoc-session-token [req session-token]
   (let [{:keys [scope]}
         (lookup-session-details session-token)
-
         {:juxt.site/keys [cookie-name]} scope]
+    (when-not cookie-name
+      (throw (ex-info "No cookie name determined for session-token" {:session-token session-token})))
     (assoc-in req [:ring.request/headers "cookie"] (format "%s=%s" cookie-name session-token))))
 
-(defn assoc-body [req body-bytes]
-  (-> req
-      body-bytes
-      (->
-       (update :ring.request/headers (fnil assoc {}) "content-length" (str (count body-bytes)))
-       (assoc :ring.request/body (io/input-stream body-bytes)))))
+(defmacro with-session-token [token & body]
+  `(let [dlg# *handler*
+         token# ~token]
+     (when-not token#
+       (throw (ex-info "with-session-token called without a valid session token" {})))
+     (binding [*handler*
+               (fn [req#]
+                 (dlg# (assoc-session-token req# token#)))]
+       ~@body)))
+
+(defn assoc-bearer-token [req token]
+  (update-in
+   req
+   [:ring.request/headers "authorization"]
+   (fn [existing-value]
+     (let [new-value (format "Bearer %s" token)]
+       (when (and existing-value (not= existing-value new-value))
+         (throw
+          (ex-info
+           "To avoid confusion when debugging, assoc-bearer-token will not override an already set authorization header"
+           {:new-value {"authorization" new-value}
+            :existing-value {"authorization" existing-value}})))
+       new-value))))
+
+(defmacro with-bearer-token [token & body]
+  `(let [dlg# *handler*
+         token# ~token]
+     (when-not token#
+       (throw (ex-info "with-bearer-token called without a bearer token" {})))
+     (binding [*handler*
+               (fn [req#]
+                 (dlg# (assoc-bearer-token req# token#)))]
+       ~@body)))
+
+(defn assoc-request-payload
+  "Add a body payload onto the request. If the content-type is of type 'text',
+  e.g. text/plain, then give the body as a string."
+  [req content-type body]
+  (let [body-bytes
+        (cond
+          (re-matches #"text/.+" content-type)
+          (.getBytes body)
+          :else body)]
+    (-> req
+        (->
+         (update :ring.request/headers (fnil assoc {})
+                 "content-type" content-type
+                 "content-length" (str (count body-bytes)))
+         (assoc :ring.request/body (io/input-stream body-bytes))))))

@@ -63,7 +63,7 @@
         (:juxt.http/content-type resource)
         (conj resource)))))
 
-(defn current-representations [{:juxt.site/keys [resource db] :as req}]
+(defn current-representations [{:juxt.site/keys [resource] :as req}]
   (or
    ;; This is not common to find statically in the db, but this option
    ;; allows 'dynamic' resources to declare multiple representations.

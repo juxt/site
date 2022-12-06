@@ -70,7 +70,9 @@
        (assoc e :juxt.site/resource-provider ::db)))
 
    ;; Is it found by any resource locators registered in the database?
-   (match-uri-templated-uris db uri)
+   (some->
+    (match-uri-templated-uris db uri)
+    (assoc :juxt.site/resource-provider ::db))
 
    ;; This can be put into the database to override the ::default-empty-resource
    ;; default.

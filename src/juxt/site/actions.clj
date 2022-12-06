@@ -2,6 +2,8 @@
 
 (ns juxt.site.actions
   (:require
+   [juxt.grab.alpha.parser :as graphql.parser]
+   [juxt.grab.alpha.schema :as graphql.schema]
    [clojure.tools.logging :as log]
    [crypto.password.bcrypt :as bcrypt]
    [java-http-clj.core :as hc]
@@ -316,6 +318,10 @@
              :schema schema})))
         input))}
 
+   'grab
+   {'parse graphql.parser/parse
+    'compile-schema graphql.schema/compile-schema*}
+
    'ring.util.codec
    {'form-encode codec/form-encode
     'form-decode codec/form-decode}})
@@ -329,13 +335,11 @@
     access-token :juxt.site/access-token
     resource :juxt.site/resource
     purpose :juxt.site/purpose
-    base-uri :juxt.site/base-uri
     prepare :juxt.site/prepare
     :as ctx}]
   (let [db (xt/db xt-ctx)
         tx (xt/indexing-tx xt-ctx)]
     (try
-      (assert base-uri "The base-uri must be provided")
       (assert (or (nil? subject) (map? subject)) "Subject to do-action-in-tx-fn expected to be a string, or null")
       (assert (or (nil? resource) (map? resource)) "Resource to do-action-in-tx-fn expected to be a string, or null")
 
@@ -453,7 +457,18 @@
                                (throw
                                 (ex-info
                                  (format "No such scope: %s" scope)
-                                 {:error "invalid_scope"}))))))}}
+                                 {:error "invalid_scope"}))))))}
+
+                      'grab
+                      {'parsed-types
+                       (fn parsed-types [schema-id]
+                         (map :juxt.grab/type-definition
+                              (map first
+                                   (xt/q db '{:find [(pull e [:juxt.grab/type-definition])]
+                                              :where [[e :juxt.site/type "https://meta.juxt.site/site/graphql-type"]
+                                                      [e :juxt.site/graphql-schema schema-id]]
+                                              :in [schema-id]}
+                                         schema-id))))}}
 
                      (common-sci-namespaces action-doc))
 
@@ -518,21 +533,21 @@
                [:xtdb.api/put
                 (into
                  (cond->
-                     {:xt/id (format "%s/_site/events/%s" base-uri (::xt/tx-id tx))
+                     {:xt/id (format "https://example.org/_site/events/%s" (::xt/tx-id tx))
                       :juxt.site/type "https://meta.juxt.site/site/event"
                       :juxt.site/subject-uri (:xt/id subject)
                       :juxt.site/action action
                       :juxt.site/purpose purpose
                       :juxt.site/puts (vec
-                                   (keep
-                                    (fn [[tx-op {id :xt/id}]]
-                                      (when (= tx-op ::xt/put) id))
-                                    xtdb-ops))
+                                       (keep
+                                        (fn [[tx-op {id :xt/id}]]
+                                          (when (= tx-op ::xt/put) id))
+                                        xtdb-ops))
                       :juxt.site/deletes (vec
-                                      (keep
-                                       (fn [[tx-op {id :xt/id}]]
-                                         (when (= tx-op ::xt/delete) id))
-                                       xtdb-ops))}
+                                          (keep
+                                           (fn [[tx-op {id :xt/id}]]
+                                             (when (= tx-op ::xt/delete) id))
+                                           xtdb-ops))}
                      tx (into tx)
 
                      ;; Any quotations that we want to apply to the request context?
@@ -551,7 +566,7 @@
           result-fx))
 
       (catch Throwable e
-        (let [event-id (format "%s/_site/events/%d" base-uri (::xt/tx-id tx))]
+        (let [event-id (format "https://example.org/_site/events/%d" (::xt/tx-id tx))]
           (log/errorf e "Error when performing action: %s %s" action event-id)
 
           [[::xt/put
@@ -562,23 +577,23 @@
              :juxt.site/resource resource
              :juxt.site/purpose purpose
              :juxt.site/error {:message (.getMessage e)
-                           ;; ex-data is just too problematic to put into the
-                           ;; database as-is without some sanitization ensuring
-                           ;; it's nippyable.
-                           :ex-data (ex-data e)
-                           ;; The site db will not be nippyable
+                               ;; ex-data is just too problematic to put into the
+                               ;; database as-is without some sanitization ensuring
+                               ;; it's nippyable.
+                               :ex-data (ex-data e)
+                               ;; The site db will not be nippyable
 
-                           #_(dissoc (ex-data e) :env)
-                           ;; TODO: Ideally we'd like the environment in the
-                           ;; action log for debugging purposes. But the below
-                           ;; stills fails with a nippy error, haven't
-                           ;; investigated thorougly enough.
-                           #_(let [ex-data (ex-data e)]
-                               (cond-> ex-data
-                                 (:env ex-data) (dissoc :env)#_(update :env dissoc :juxt.site/db :juxt.site/xt-node)))}}]])))))
+                               #_(dissoc (ex-data e) :env)
+                               ;; TODO: Ideally we'd like the environment in the
+                               ;; action log for debugging purposes. But the below
+                               ;; stills fails with a nippy error, haven't
+                               ;; investigated thorougly enough.
+                               #_(let [ex-data (ex-data e)]
+                                   (cond-> ex-data
+                                     (:env ex-data) (dissoc :env)#_(update :env dissoc :juxt.site/db :juxt.site/xt-node)))}}]])))))
 
-(defn install-do-action-fn [uri]
-  {:xt/id (str uri "/_site/do-action")
+(defn install-do-action-fn []
+  {:xt/id "https://meta.juxt.site/do-action"
    :xt/fn '(fn [xt-ctx ctx & args]
              (juxt.site.actions/do-action-in-tx-fn xt-ctx ctx))})
 
@@ -633,7 +648,7 @@
 
 (defn do-action
   [;; TODO: Arguably action should passed as a map
-   {:juxt.site/keys [xt-node db base-uri resource subject action] :as ctx}]
+   {:juxt.site/keys [xt-node db resource subject action] :as ctx}]
   (assert (:juxt.site/xt-node ctx) "xt-node must be present")
   (assert (:juxt.site/db ctx) "db must be present")
 
@@ -647,15 +662,12 @@
                                         (not (#{"Request"
                                                 "ActionLogEntry"
                                                 "Session"
-                                                "SessionToken"
-                                                }
+                                                "SessionToken"}
                                               (:juxt.site/type e)))))
                               (map :xt/id)
-                              (sort-by str))}))
-    )
+                              (sort-by str))})))
 
   (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
-
 
   (log/debugf "Doing action: %s" action)
 
@@ -682,7 +694,7 @@
         _ (when-not action-doc
             (throw (ex-info (format "Action not found in the database: %s" action) {:action action})))
         prepare (do-prepare ctx action-doc)
-        tx-fn (str base-uri "/_site/do-action")
+        tx-fn "https://meta.juxt.site/do-action"
         _ (assert (xt/entity db tx-fn) (format "do-action must exist in database: %s" tx-fn))
         tx-ctx (cond-> (sanitize-ctx ctx) prepare (assoc :juxt.site/prepare prepare))
         tx (xt/submit-tx xt-node [[::xt/fn tx-fn tx-ctx]])
@@ -700,7 +712,7 @@
     (let [result
           (xt/entity
            (xt/db xt-node)
-           (format "%s/_site/events/%d" base-uri tx-id))]
+           (format "https://example.org/_site/events/%d" tx-id))]
       (if-let [error (:juxt.site/error result)]
         (do
           (log/errorf "Transaction error: %s" error)
@@ -744,10 +756,14 @@
 
     (let [actions (get-in resource [:juxt.site/methods method :juxt.site/actions])
 
+          _ (assert actions (format "No actions for method %s" method))
+
           _ (doseq [action actions]
               (when-not (xt/entity db action)
                 (throw (ex-info (format "No such action: %s" action) {:juxt.site/request-context req
                                                                       :missing-action action}))))
+
+          _ (log/tracef "actions are %s" (pr-str {:actions actions}))
 
           permitted-actions
           (check-permissions

@@ -3,7 +3,6 @@
 (ns juxt.site.resources.example-users
   (:require
    [clojure.string :as str]
-   [juxt.site.init :as init :refer [substitute-actual-base-uri do-action]]
    [juxt.site.resources.user :as user]
    [malli.core :as malli]))
 
@@ -13,13 +12,13 @@
   [{:keys [username]}]
   ;;{:pre [(malli/validate [:map [:username [:string]]] args)]}
   ;; Grant user permission to perform /actions/oauth/authorize
-  (do-action
-   "https://example.org/subjects/system"
-   "https://example.org/actions/grant-permission"
+  {:juxt.site/subject-id "https://example.org/subjects/system"
+   :juxt.site/action-id "https://example.org/actions/grant-permission"
+   :juxt.site/input
    {:xt/id (format "https://example.org/permissions/%s-can-authorize" (str/lower-case username))
     :juxt.site/action "https://example.org/actions/oauth/authorize"
     :juxt.site/user (format "https://example.org/users/%s" (str/lower-case username))
-    :juxt.site/purpose nil}))
+    :juxt.site/purpose nil}})
 
 (malli/=>
  grant-permission-to-authorize!
@@ -36,13 +35,13 @@
   {"https://example.org/permissions/{username}-can-authorize"
    {:create (fn [{:keys [params]}]
               (grant-permission-to-authorize! {:username (get params "username")}))
-    :deps (fn [{:strs [username]} {:juxt.site/keys [base-uri]}]
-            #{::init/system
-              (format "%s/actions/oauth/authorize" base-uri)
-              (format "%s/users/%s" base-uri username)})}
+    :deps (fn [{:keys [params]}]
+            #{:juxt.site.init/system
+              (format "https://example.org/actions/oauth/authorize")
+              (format "https://example.org/users/%s" (get params "username"))})}
 
    "https://example.org/users/{username}"
-   {:deps #{::init/system
+   {:deps #{:juxt.site.init/system
             "https://example.org/actions/put-user"
             "https://example.org/permissions/system/put-user"}
     :create (fn [{:keys [id params]}]
@@ -58,24 +57,22 @@
                                   {:username username}))))})))}
 
    "https://example.org/user-identities/{username}"
-   {:deps (fn [params _]
-            ;; Since this is a function, we need to convert the example.org URIs
-            (substitute-actual-base-uri
-             #{::init/system
-               (format "https://example.org/users/%s" (get params "username"))
-               "https://example.org/actions/put-user-identity"
-               "https://example.org/permissions/system/put-user-identity"
-               }))
-    :create (fn [{:keys [id params]}]
-              ;; TODO: Make this data rather than calling a function! (The
-              ;; intention here is to demote this graphs to data;
-              (let [username (get params "username")]
-                (do-action
-                 "https://example.org/subjects/system"
-                 "https://example.org/actions/put-user-identity"
-                 (let [user-details (username->user-details username)
-                       user-id (format "https://example.org/users/%s" username)]
-                   {:xt/id id
-                    :juxt.site/user user-id
-                    :juxt.site/username username
-                    :juxt.site/password (:password user-details)}))))}})
+   {:deps (fn [{:keys [params]}]
+            #{:juxt.site.init/system
+              (format "https://example.org/users/%s" (get params "username"))
+              "https://example.org/actions/put-user-identity"
+              "https://example.org/permissions/system/put-user-identity"})
+    :create
+    (fn [{:keys [id params]}]
+      ;; TODO: Make this data rather than calling a function! (The
+      ;; intention here is to demote this graphs to data;
+      (let [username (get params "username")]
+        {:juxt.site/subject-id               "https://example.org/subjects/system"
+         :juxt.site/action-id "https://example.org/actions/put-user-identity"
+         :juxt.site/input
+         (let [user-details (username->user-details username)
+               user-id (format "https://example.org/users/%s" username)]
+           {:xt/id id
+            :juxt.site/user user-id
+            :juxt.site/username username
+            :juxt.site/password (:password user-details)})}))}})

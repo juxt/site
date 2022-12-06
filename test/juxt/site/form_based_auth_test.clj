@@ -19,15 +19,15 @@
         form-based-auth/dependency-graph
         example-users/dependency-graph
         user/dependency-graph}}
-    #{"https://site.test/login"
-      "https://site.test/session-scopes/default"
-      "https://site.test/users/alice"
-      "https://site.test/permissions/system/put-user-identity"
-      "https://site.test/user-identities/alice"}
+    #{"https://example.org/login"
+      "https://example.org/session-scopes/default"
+      "https://example.org/users/alice"
+      "https://example.org/permissions/system/put-user-identity"
+      "https://example.org/user-identities/alice"}
 
     (let [result (form-based-auth/login-with-form!
                   *handler*
-                  :juxt.site/uri "https://site.test/login"
+                  :juxt.site/uri "https://example.org/login"
                   "username" "ALICE"
                   "password" "garden")]
       (is (malli/validate [:map [:juxt.site/session-token :string]] result)))))
