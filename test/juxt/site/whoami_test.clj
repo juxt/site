@@ -167,7 +167,7 @@
                    (get-in ["subject"
                             "juxt.site/user-identity"
                             "juxt.site/user"
-                            "name"] body))))
+                            "name"]))))
         (is (= "application/json" (get headers "content-type")))
         (is (= "https://example.org/whoami.json" (get headers "content-location"))))
 
