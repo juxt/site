@@ -6,7 +6,6 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is are testing]]
    [java-http-clj.core :as hc]
-   [juxt.site.resources.openid :as openid]
    [juxt.site.resources.session-scope :as session-scope]
    [juxt.site :as-alias site]
    [juxt.site.init :as init]

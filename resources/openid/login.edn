@@ -1,9 +1,0 @@
-{:deps #{::init/system
-         "https://example.org/openid/auth0/client"
-         "https://example.org/permissions/system/install-openid-login-endpoint"
-         "https://example.org/actions/login-with-openid"}
- :create {:action "https://example.org/actions/install-openid-login-endpoint"
-          :input
-          {:xt/id "https://example.org/openid/login"
-           :juxt.pass.alpha/openid-client "https://example.org/openid/auth0/client"
-           :juxt.pass.alpha/redirect-uri "https://example.org/openid/callback"}}}

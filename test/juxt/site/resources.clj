@@ -16,4 +16,4 @@
    (slurp (io/file "resources" path))))
 
 (comment
-  (load-dependency-graph "juxt/site/oauth.edn"))
+  (load-dependency-graph "juxt/site/openid.edn"))
