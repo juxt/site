@@ -334,6 +334,10 @@
   [id]
   [:xtdb.api/delete id])
 
+(defn xt-evict
+  [id]
+  [:xtdb.api/evict id])
+
 (defn xt-put
   [object valid-from]
   (and (nil? (:xt/id object))
@@ -476,7 +480,7 @@
 
 
 (defn perform-mutation!
-  [{:keys [argument-values site-args xt-node lookup-entity field-kind pass/subject] :as opts}]
+  [{:keys [argument-values site-args xt-node db lookup-entity field-kind pass/subject] :as opts}]
   (let [action (or (get site-args "mutation") "put")
         validate-id! (fn [args]
                        (let [id (get args "id")]
@@ -490,7 +494,41 @@
         ;; TODO: Allow an argument to correspond to valid-time, via
         ;; @site(a: "xtdb.api/valid-time").
         (lookup-entity id))
-      "put"
+      "delete-cascade"
+      (let [id (validate-id! argument-values)
+            cascade-key (keyword (get site-args "cascadeKey"))
+            _ (when-not cascade-key
+                (throw (ex-info "evict-cascade requires a 'cascadeKey' site directive"
+                                {:site-args site-args})))
+            related-ids (map first
+                             (xt/q db {:find ['e]
+                                       :where [['e cascade-key id]]}))
+            delete-ids (conj (for [id related-ids]
+                               (xt-delete id))
+                             (xt-delete id))]
+        (log/warn "deleting" delete-ids)
+        (await-tx xt-node delete-ids)
+        ;; TODO: Allow an argument to correspond to valid-time, via
+        ;; @site(a: "xtdb.api/valid-time").
+        {:xt/id id})
+      "evict-cascade"
+      (let [id (validate-id! argument-values)
+            cascade-key (keyword (get site-args "cascadeKey"))
+            _ (when-not cascade-key
+                (throw (ex-info "evict-cascade requires a 'cascadeKey' site directive"
+                                {:site-args site-args})))
+            related-ids (map first
+                             (xt/q db {:find ['e]
+                                       :where [['e cascade-key id]]}))
+            evict-ids (conj (for [id related-ids]
+                              (xt-evict id))
+                            (xt-evict id))]
+        (log/warn "evicting" evict-ids)
+        (await-tx xt-node evict-ids)
+        ;; TODO: Allow an argument to correspond to valid-time, via
+        ;; @site(a: "xtdb.api/valid-time").
+        {:xt/id id})
+        "put"
       (if-let [validation-report (seq (invalid-arguments? opts))]
         (throw (Exception. (pr-str validation-report)))
         (if bulk-mutation
