@@ -5,6 +5,7 @@
    [clojure.string :as str]
    [clojure.walk :refer [postwalk]]
    [malli.core :as malli]
+   [selmer.parser :as selmer]
    [juxt.reap.alpha.combinators :as p]
    [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.site.locator :refer [to-regex]]
@@ -74,8 +75,10 @@
          (make-repl-request-context
           subject action-id edn-arg))))))
 
+;; TODO: Can likely be deleted
 (def host-parser (rfc7230.decoders/host {}))
 
+;; TODO: Can likely be deleted
 (def base-uri-parser
   (p/complete
    (p/into {}
@@ -98,8 +101,7 @@
                        (next matches)))))
            g))
     (catch Exception e
-      (throw (ex-info (format "Failed to lookup %s" id) {:id id} e))
-      )))
+      (throw (ex-info (format "Failed to lookup %s" id) {:id id} e)))))
 
 (def dependency-graph-malli-schema
   [:map-of [:or :string :keyword]
@@ -114,36 +116,58 @@
             [:map {:juxt.site/base-uri :string}]]
        [:set [:or :string :keyword]]]]]]])
 
+(defn render-form-templates [form params]
+  (postwalk (fn [x]
+              (cond-> x
+                (string? x) (selmer/render params))) form)
+  )
+
 (defn ids->nodes [ids graph]
   (->> ids
-       (mapcat (fn [id]
-                 (->> id
-                      (tree-seq some?
-                                (fn [id]
-                                  (let [{:keys [deps params]} (lookup graph id)]
-                                    (cond
-                                      (nil? deps) nil
-                                      (fn? deps) (deps {:params params})
-                                      (set? deps) deps
-                                      :else (throw (ex-info "Unexpected deps type" {:deps deps}))))))
-                      (keep (fn [id]
-                              (if-let [v (lookup graph id)]
-                                (when-not (keyword? id) [id v])
-                                (throw (ex-info (format "No dependency graph entry for %s" id) {:id id}))))))))
+       (mapcat
+        (fn [id]
+          (->> id
+               (tree-seq some?
+                         (fn [id]
+                           (let [{:keys [deps params]} (lookup graph id)]
+                             (cond
+                               (nil? deps) nil
+                               (fn? deps) (deps {:params params})
+                               (set? deps) deps
+                               :else (throw (ex-info "Unexpected deps type" {:deps deps}))))))
+               (keep (fn [id]
+                       (when-let [v (lookup graph id)]
+                         (when-not (keyword? id) [id v])
+                         ;; If we can't find the static dependency, that's ok, it may be a regex
+                         ;;(throw (ex-info (format "No dependency graph entry for %s" id) {:id id}))
+                         ))))))
        reverse distinct
        (reduce
-        (fn [acc [id {:keys [create] :as v}]]
+        (fn [acc [id {:keys [create params] :as v}]]
           (conj acc (cond-> {:id id}
-                      create (assoc ::init-data (create v))
+                      (fn? (cond-> create (var? create) deref)) (assoc ::init-data (create v))
+                      (map? create) (assoc
+                                     ::init-data
+                                     (render-form-templates (:create v) (assoc params "id" id))
+                                     )
                       (not create) (assoc :error "No creator function in dependency graph entry"))))
         [])))
 
 (defn do-action! [xt-node init-data]
-  (let [db (xt/db xt-node)
+  (when-not init-data
+    (throw (ex-info "No init data" {})))
+  (let [subject-id (:juxt.site/subject-id init-data)
+
+        _ (when-not subject-id
+            (throw (ex-info "No subject-id in init-data" {:init-data init-data})))
+
+        db (xt/db xt-node)
+        _ (assert (:juxt.site/subject-id init-data))
         subject (when (:juxt.site/subject-id init-data)
                   (xt/entity db (:juxt.site/subject-id init-data)))
 
-        _ (assert subject)]
+        _ (when-not subject
+            (throw (ex-info (format "No subject for %s" subject-id) {:subject-id subject-id})))]
 
     (try
       (:juxt.site/action-result
@@ -153,10 +177,10 @@
              :juxt.site/db db
              :juxt.site/subject subject
              :juxt.site/action (:juxt.site/action-id init-data)}
-          (:juxt.site/input init-data)
-          (merge {:juxt.site/received-representation
-                  {:juxt.http/content-type "application/edn"
-                   :juxt.http/body (.getBytes (pr-str (:juxt.site/input init-data)))}}))))
+            (:juxt.site/input init-data)
+            (merge {:juxt.site/received-representation
+                    {:juxt.http/content-type "application/edn"
+                     :juxt.http/body (.getBytes (pr-str (:juxt.site/input init-data)))}}))))
       (catch Exception cause
         (throw (ex-info "Failed to perform action" {:init-data init-data} cause))))))
 

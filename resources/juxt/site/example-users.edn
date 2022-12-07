@@ -1,0 +1,113 @@
+;; Copyright © 2022, JUXT LTD.
+
+;; These are example users that are useful for testing
+
+{"https://example.org/permissions/{username}-can-authorize"
+ {:deps #{:juxt.site.init/system
+          "https://example.org/actions/oauth/authorize"
+          "https://example.org/users/{username}"}
+  :create
+  {:juxt.site/subject-id "https://example.org/subjects/system"
+   :juxt.site/action-id "https://example.org/actions/grant-permission"
+   :juxt.site/input
+   {:xt/id "https://example.org/permissions/{{username|lower}}-can-authorize"
+    :juxt.site/action "https://example.org/actions/oauth/authorize"
+    :juxt.site/user "https://example.org/users/{{username|lower}}"
+    :juxt.site/purpose nil}}}
+
+ "https://example.org/users/alice"
+ {:deps #{:juxt.site.init/system
+          "https://example.org/actions/put-user"
+          "https://example.org/permissions/system/put-user"}
+  :create {:juxt.site/subject-id "https://example.org/subjects/system"
+           :juxt.site/action-id "https://example.org/actions/put-user"
+           :juxt.site/input
+           {:xt/id "{{id}}"
+            :name "Alice"}}}
+
+ "https://example.org/user-identities/alice"
+ {:deps #{:juxt.site.init/system
+          "https://example.org/users/alice"
+          "https://example.org/actions/put-user-identity"
+          "https://example.org/permissions/system/put-user-identity"}
+  :create
+  {:juxt.site/subject-id "https://example.org/subjects/system"
+   :juxt.site/action-id "https://example.org/actions/put-user-identity"
+   :juxt.site/input
+   {:xt/id "{{id}}"
+    :juxt.site/user "https://example.org/users/alice"
+    :juxt.site/username "alice"
+    :juxt.site/password "garden"}}}
+
+ "https://example.org/users/bob"
+ {:deps #{:juxt.site.init/system
+          "https://example.org/actions/put-user"
+          "https://example.org/permissions/system/put-user"}
+  :create {:juxt.site/subject-id "https://example.org/subjects/system"
+           :juxt.site/action-id "https://example.org/actions/put-user"
+           :juxt.site/input
+           {:xt/id "{{id}}"
+            :name "Bob"}}}
+
+ "https://example.org/user-identities/bob"
+ {:deps #{:juxt.site.init/system
+          "https://example.org/users/bob"
+          "https://example.org/actions/put-user-identity"
+          "https://example.org/permissions/system/put-user-identity"}
+  :create
+  {:juxt.site/subject-id "https://example.org/subjects/system"
+   :juxt.site/action-id "https://example.org/actions/put-user-identity"
+   :juxt.site/input
+   {:xt/id "{{id}}"
+    :juxt.site/user "https://example.org/users/bob"
+    :juxt.site/username "bob"
+    :juxt.site/password "walrus"}}}
+
+ "https://example.org/users/carlos"
+ {:deps #{:juxt.site.init/system
+          "https://example.org/actions/put-user"
+          "https://example.org/permissions/system/put-user"}
+  :create {:juxt.site/subject-id "https://example.org/subjects/system"
+           :juxt.site/action-id "https://example.org/actions/put-user"
+           :juxt.site/input
+           {:xt/id "{{id}}"
+            :name "Carlos"}}}
+
+ "https://example.org/user-identities/carlos"
+ {:deps #{:juxt.site.init/system
+          "https://example.org/users/carlos"
+          "https://example.org/actions/put-user-identity"
+          "https://example.org/permissions/system/put-user-identity"}
+  :create
+  {:juxt.site/subject-id "https://example.org/subjects/system"
+   :juxt.site/action-id "https://example.org/actions/put-user-identity"
+   :juxt.site/input
+   {:xt/id "{{id}}"
+    :juxt.site/user "https://example.org/users/carlos"
+    :juxt.site/username "carlos"
+    :juxt.site/password "jackal"}}}}
+
+
+#_(defn put-user! [& {:keys [id username name]}]
+  {:juxt.site/subject-id "https://example.org/subjects/system"
+   :juxt.site/action-id "https://example.org/actions/put-user"
+   :juxt.site/input
+   {:xt/id (or id (format "https://example.org/users/%s" username))
+    :name name}})
+
+#_(defn put-user-identity! [& {:juxt.site/keys [username password realm]}]
+  (assert username)
+  (assert password)
+  (assert realm)
+  {:juxt.site/subject-id "https://example.org/subjects/system"
+   :juxt.site/action-id "https://example.org/actions/put-user-identity"
+   :juxt.site/input
+   {:xt/id (format "https://example.org/user-identities/%s/basic" (str/lower-case username))
+    :juxt.site/user (format "https://example.org/users/%s" (str/lower-case username))
+    ;; Perhaps all user identities need this?
+    :juxt.site/canonical-root-uri "https://example.org"
+    :juxt.site/realm realm
+    ;; Basic auth will only work if these are present
+    :juxt.site/username username
+    ;; This will be encrypted
+    :juxt.site/password password}})

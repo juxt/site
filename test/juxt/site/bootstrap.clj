@@ -2,13 +2,8 @@
 
 (ns juxt.site.bootstrap
   (:require
-   [juxt.site.init :as init :refer [put! base-uri converge!]]
-   [juxt.site.actions :as actions]
-   ;;[juxt.site.resources.openid :as openid]
-   [juxt.site.resources.session-scope :as session-scope]
-   [juxt.site.resources.user :as user]
-   [clojure.string :as str]
-   [clojure.walk :refer [postwalk]]))
+   [juxt.site.init :as init :refer [converge!]]
+   [juxt.site.actions :as actions]))
 
 (defn install-system-subject! [_]
   {:put!

@@ -1,0 +1,61 @@
+;; Copyright © 2022, JUXT LTD.
+
+{"https://example.org/actions/put-protection-space"
+ {:deps #{:juxt.site.init/system}
+  :create
+  {:juxt.site/subject-id "https://example.org/subjects/system"
+   :juxt.site/action-id "https://example.org/actions/create-action"
+   :juxt.site/input
+   {:xt/id "https://example.org/actions/put-protection-space"
+
+    :juxt.site.malli/input-schema
+    [:map
+     [:xt/id [:re "https://example.org/protection-spaces/(.+)"]]
+     [:juxt.site/auth-scheme [:enum "Basic" "Bearer"]]
+     [:juxt.site/realm {:optional true} [:string {:min 1}]]
+     [:juxt.site/canonical-root-uri {:optional true} [:re "https?://[^/]*"]]]
+
+    :juxt.site/prepare
+    {:juxt.site.sci/program
+     #juxt.pprint
+     (let [content-type (-> *ctx*
+                            :juxt.site/received-representation
+                            :juxt.http/content-type)
+           body (-> *ctx*
+                    :juxt.site/received-representation
+                    :juxt.http/body)]
+       (case content-type
+         "application/edn"
+         (some->
+          body
+          (String.)
+          clojure.edn/read-string
+          juxt.site.malli/validate-input
+          (assoc :juxt.site/type "https://meta.juxt.site/site/protection-space"))))}
+
+    :juxt.site/transact
+    {:juxt.site.sci/program
+     #juxt.pprint
+     [[:xtdb.api/put *prepare*]]}
+
+    :juxt.site/rules
+    [
+      [(allowed? subject resource permission)
+       [permission :juxt.site/subject subject]]
+
+      [(allowed? subject resource permission)
+       [subject :juxt.site/user-identity id]
+       [id :juxt.site/user user]
+       [permission :role role]
+       [user :role role]]]}}}
+
+ "https://example.org/permissions/system/put-protection-space"
+ {:deps #{:juxt.site.init/system}
+  :create
+  {:juxt.site/subject-id "https://example.org/subjects/system"
+   :juxt.site/action-id "https://example.org/actions/grant-permission"
+   :juxt.site/input
+   {:xt/id "https://example.org/permissions/system/put-protection-space"
+    :juxt.site/subject "https://example.org/subjects/system"
+    :juxt.site/action "https://example.org/actions/put-protection-space"
+    :juxt.site/purpose nil}}}}

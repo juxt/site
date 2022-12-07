@@ -5,17 +5,11 @@
    [juxt.site.logging :refer [with-logging]]
    [juxt.grab.alpha.schema :as gs]
    [clojure.test :refer [deftest is use-fixtures]]
-   [juxt.site.resources.oauth :as oauth]
-   [juxt.site.resources.session-scope :as session-scope]
-   [juxt.site.resources.user :as user]
-   [juxt.site.resources.form-based-auth :as form-based-auth]
-   [juxt.site.resources.protection-space :as protection-space]
-   [juxt.site.resources.example-users :as example-users]
-   [juxt.site.resources.example-applications :as example-applications]
-   [juxt.site.resources.example-protection-spaces :as example-protection-spaces]
+   [juxt.site.resources :as resources]
+   [juxt.site.test-helpers.login :as login]
    [juxt.site.repl :as repl]
    [juxt.test.util :refer [with-system-xt with-resources with-fixtures *handler*
-                           with-resources with-handler
+                           with-handler
                            assoc-request-payload
                            with-session-token with-bearer-token]]))
 
@@ -241,67 +235,68 @@
 
    })
 
-#_(with-fixtures
-  (with-resources
-    ^{:dependency-graphs
-      #{session-scope/dependency-graph
-        user/dependency-graph
-        form-based-auth/dependency-graph
-        oauth/dependency-graph
-        protection-space/dependency-graph
-        example-users/dependency-graph
-        example-applications/dependency-graph
-        example-protection-spaces/dependency-graph
-        dependency-graph}}
+(comment
+  (with-fixtures
+    (with-resources
+      ^{:dependency-graphs
+        #{(resources/load-dependency-graph "juxt/site/session-scope.edn")
+          (resources/load-dependency-graph "juxt/site/user.edn")
+          (resources/load-dependency-graph "juxt/site/form-based-auth.edn")
+          (resources/load-dependency-graph "juxt/site/oauth.edn")
+          (resources/load-dependency-graph "juxt/site/protection-space.edn")
+          (resources/load-dependency-graph "juxt/site/example-users.edn")
+          (resources/load-dependency-graph "juxt/site/example-applications.edn")
+          (resources/load-dependency-graph "juxt/site/example-protection-spaces.edn")
+          dependency-graph}}
 
-    #{"https://example.org/user-identities/alice" ; Alice
-      "https://example.org/login"         ; a way Alice can identity herself
-      "https://example.org/applications/test-app" ; an app
-      ::oauth/authorization-server              ; a way of authorizing the app
-      "https://example.org/permissions/alice-can-authorize" ; which Alice can use
+      #{"https://example.org/user-identities/alice" ; Alice
+        "https://example.org/login"         ; a way Alice can identity herself
+        "https://example.org/applications/test-app" ; an app
+        :juxt.site.oauth/authorization-server              ; a way of authorizing the app
+        "https://example.org/permissions/alice-can-authorize" ; which Alice can use
 
-      "https://example.org/actions/install-graphql-type"
-      "https://example.org/permissions/alice/install-graphql-type"
+        "https://example.org/actions/install-graphql-type"
+        "https://example.org/permissions/alice/install-graphql-type"
 
-      "https://example.org/actions/delete-graphql-type"
-      "https://example.org/permissions/alice/delete-graphql-type"
+        "https://example.org/actions/delete-graphql-type"
+        "https://example.org/permissions/alice/delete-graphql-type"
 
-      "https://example.org/actions/get-graphql-type"
-      "https://example.org/permissions/alice/get-graphql-type"
+        "https://example.org/actions/get-graphql-type"
+        "https://example.org/permissions/alice/get-graphql-type"
 
-      "https://example.org/graphql/schema/"}
+        "https://example.org/graphql/schema/"}
 
-    (let [login-result
-          (form-based-auth/login-with-form!
-           *handler*
-           "username" "alice"
-           "password" "garden"
-           :juxt.site/uri "https://example.org/login")
+      (let [login-result
+            (login/login-with-form!
+             *handler*
+             "username" "alice"
+             "password" "garden"
+             :juxt.site/uri "https://example.org/login")
 
-          _ (assert (:juxt.site/session-token login-result))
+            _ (assert (:juxt.site/session-token login-result))
 
-          {access-token "access_token" :as authorize-response}
-          (with-session-token (:juxt.site/session-token login-result)
-            (oauth/authorize!
-             {"client_id" "test-app"}))]
+            {access-token "access_token" :as authorize-response}
+            (with-session-token (:juxt.site/session-token login-result)
+              (oauth/authorize!
+               {"client_id" "test-app"}))]
 
-      (when-not access-token
-        (throw
-         (ex-info
-          "Error on authorize"
-          {:authorize-response authorize-response})))
+        (when-not access-token
+          (throw
+           (ex-info
+            "Error on authorize"
+            {:authorize-response authorize-response})))
 
-      ;; To install a GraphQL schema, we POST to the schema resource. We can
-      ;; build up the schema incrementally, posting any type or types which will
-      ;; add to the schema. If we want to start over, we can DELETE the schema.
-      (with-bearer-token access-token
-        (let [response
-              (*handler*
-               (-> {:ring.request/method :post
-                    :ring.request/path "/graphql/schema/"}
-                   (assoc-request-payload
-                    "text/plain"
-                    "
+        ;; To install a GraphQL schema, we POST to the schema resource. We can
+        ;; build up the schema incrementally, posting any type or types which will
+        ;; add to the schema. If we want to start over, we can DELETE the schema.
+        (with-bearer-token access-token
+          (let [response
+                (*handler*
+                 (-> {:ring.request/method :post
+                      :ring.request/path "/graphql/schema/"}
+                     (assoc-request-payload
+                      "text/plain"
+                      "
 type Patient {
   name: String
   age: Int
@@ -311,39 +306,39 @@ type Patient {
 type MedicalRecord {
   description: String
 }")))]
-          (assert (= 201 (:ring.response/status response))))
+            (assert (= 201 (:ring.response/status response))))
 
-        ;; Second interaction, we fix one of the problems by adding another type
-        ;; (Query)
+          ;; Second interaction, we fix one of the problems by adding another type
+          ;; (Query)
 
-        ;; In this way, we allow an incremental approach to working with GraphQL
-        ;; schema. This could be used by a GraphQL schema builder tool.
+          ;; In this way, we allow an incremental approach to working with GraphQL
+          ;; schema. This could be used by a GraphQL schema builder tool.
 
-        (let [response
-              (*handler*
-               (-> {:ring.request/method :post
-                    :ring.request/path "/graphql/schema/"}
-                   (assoc-request-payload
-                    "text/plain"
-                    "type Query { patients: [Patient] }")))]
-          (assert (= 201 (:ring.response/status response)))))
+          (let [response
+                (*handler*
+                 (-> {:ring.request/method :post
+                      :ring.request/path "/graphql/schema/"}
+                     (assoc-request-payload
+                      "text/plain"
+                      "type Query { patients: [Patient] }")))]
+            (assert (= 201 (:ring.response/status response)))))
 
-      (repl/e "https://example.org/graphql/schema/compile-status")
+        (repl/e "https://example.org/graphql/schema/compile-status")
 
-      (with-bearer-token access-token
-        (*handler*
-         {:ring.request/method :delete
-          :ring.request/path "/graphql/schema/types/MedicalRecord"}))
+        (with-bearer-token access-token
+          (*handler*
+           {:ring.request/method :delete
+            :ring.request/path "/graphql/schema/types/MedicalRecord"}))
 
-      (repl/e "https://example.org/graphql/schema/compile-status")
-      ;;(repl/e "https://example.org/graphql/schema/types/Query")
+        (repl/e "https://example.org/graphql/schema/compile-status")
+        ;;(repl/e "https://example.org/graphql/schema/types/Query")
 
-      ;;(repl/ls)
+        ;;(repl/ls)
 
-      ;; Call an action to compile the schema?
-      ;; The compilation status is held in /graphql/schema-compilation-status
-      ;; The POST to the /graphql/schema-compilation-status causes the schema to be compiled, with gs/compile-schema over a vector of the types in /graphql/schema/*
-      )))
+        ;; Call an action to compile the schema?
+        ;; The compilation status is held in /graphql/schema-compilation-status
+        ;; The POST to the /graphql/schema-compilation-status causes the schema to be compiled, with gs/compile-schema over a vector of the types in /graphql/schema/*
+        ))))
 
 
 #_(juxt.grab.alpha.parser/parse

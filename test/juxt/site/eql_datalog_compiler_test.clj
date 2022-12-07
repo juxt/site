@@ -8,16 +8,12 @@
    [edn-query-language.core :as eql]
    [jsonista.core :as json]
    [juxt.site.init :as init]
-   [juxt.site.resources.example-users :as example-users]
+   [juxt.site.test-helpers.oauth :as oauth]
+   [juxt.site.test-helpers.login :as login]
    [juxt.grab.alpha.document :as grab.document]
    [juxt.grab.alpha.parser :as grab.parser]
    [juxt.grab.alpha.schema :as grab.schema]
-   [juxt.site.resources.form-based-auth :as form-based-auth]
-   [juxt.site.resources.oauth :as oauth]
-   [juxt.site.resources.protection-space :as protection-space]
-   [juxt.site.resources.example-protection-spaces :as example-protection-spaces]
-   [juxt.site.resources.session-scope :as session-scope]
-   [juxt.site.resources.user :as user]
+   [juxt.site.resources :as resources]
    [juxt.site.eql-datalog-compiler :as eqlc]
    [juxt.site.graphql-eql-compiler :refer [graphql->eql-ast]]
    [juxt.test.util :refer [with-system-xt with-fixtures with-resources with-handler *xt-node* *handler*] :as tutil]
@@ -671,13 +667,13 @@
     (with-resources
       (with-meta resources
         {:dependency-graphs
-         #{session-scope/dependency-graph
-           user/dependency-graph
-           protection-space/dependency-graph
-           form-based-auth/dependency-graph
-           example-users/dependency-graph
-           example-protection-spaces/dependency-graph
-           oauth/dependency-graph
+         #{(resources/load-dependency-graph "juxt/site/session-scope.edn")
+           (resources/load-dependency-graph "juxt/site/user.edn")
+           (resources/load-dependency-graph "juxt/site/protection-space.edn")
+           (resources/load-dependency-graph "juxt/site/form-based-auth.edn")
+           (resources/load-dependency-graph "juxt/site/example-users.edn")
+           (resources/load-dependency-graph "juxt/site/example-protection-spaces.edn")
+           (resources/load-dependency-graph "juxt/site/oauth.edn")
            dependency-graph}})
 
       ;; Create some measurements
@@ -722,7 +718,7 @@
                    "bloodPressure" "127/80"}}})
 
       (let [alice-session-token
-            (form-based-auth/login-with-form!
+            (login/login-with-form!
              *handler*
              :juxt.site/uri "https://example.org/login"
              "username" "alice"
@@ -738,7 +734,7 @@
             _ (is (nil? error) (format "OAuth2 grant error: %s" error))
 
             bob-session-token
-            (form-based-auth/login-with-form!
+            (login/login-with-form!
              *handler*
              :juxt.site/uri "https://example.org/login"
              "username" "bob"
@@ -1329,15 +1325,15 @@
     (with-resources
       (with-meta resources
         {:dependency-graphs
-         #{session-scope/dependency-graph
-           user/dependency-graph
-           form-based-auth/dependency-graph
-           example-users/dependency-graph
-           oauth/dependency-graph
+         #{(resources/load-dependency-graph "juxt/site/session-scope.edn")
+           (resources/load-dependency-graph "juxt/site/user.edn")
+           (resources/load-dependency-graph "juxt/site/form-based-auth.edn")
+           (resources/load-dependency-graph "juxt/site/example-users.edn")
+           (resources/load-dependency-graph "juxt/site/oauth.edn")
            dependency-graph}})
 
       (let [alice-session-token
-            (form-based-auth/login-with-form!
+            (login/login-with-form!
              *handler*
              :juxt.site/uri "https://example.org/login"
              "username" "alice"
@@ -1351,7 +1347,7 @@
                }))
 
             bob-session-token
-            (form-based-auth/login-with-form!
+            (login/login-with-form!
              *handler*
              :juxt.site/uri "https://example.org/login"
              "username" "bob"

@@ -4,15 +4,10 @@
   (:require
    [jsonista.core :as json]
    [clojure.test :refer [deftest is use-fixtures]]
-   [juxt.site.resources.oauth :as oauth]
-   [juxt.site.resources.session-scope :as session-scope]
-   [juxt.site.resources.user :as user]
    [juxt.site.repl :as repl]
-   [juxt.site.resources.form-based-auth :as form-based-auth]
-   [juxt.site.resources.protection-space :as protection-space]
-   [juxt.site.resources.example-users :as example-users]
-   [juxt.site.resources.example-applications :as example-applications]
-   [juxt.site.resources.example-protection-spaces :as example-protection-spaces]
+   [juxt.site.test-helpers.login :as login]
+   [juxt.site.test-helpers.oauth :as oauth]
+   [juxt.site.resources :as resources]
    [juxt.test.util :refer [with-system-xt with-resources with-fixtures *handler* with-resources with-handler]]))
 
 (use-fixtures :each with-system-xt with-handler)
@@ -121,15 +116,16 @@
 (deftest get-subject-test
   (with-resources
     ^{:dependency-graphs
-      #{session-scope/dependency-graph
-        user/dependency-graph
-        form-based-auth/dependency-graph
-        oauth/dependency-graph
-        protection-space/dependency-graph
-        example-users/dependency-graph
-        example-applications/dependency-graph
-        example-protection-spaces/dependency-graph
-        dependency-graph}}
+      #{(resources/load-dependency-graph "juxt/site/session-scope.edn")
+        (resources/load-dependency-graph "juxt/site/user.edn")
+        (resources/load-dependency-graph "juxt/site/form-based-auth.edn")
+        (resources/load-dependency-graph "juxt/site/oauth.edn")
+        (resources/load-dependency-graph "juxt/site/protection-space.edn")
+        (resources/load-dependency-graph "juxt/site/example-users.edn")
+        (resources/load-dependency-graph "juxt/site/example-applications.edn")
+        (resources/load-dependency-graph "juxt/site/example-protection-spaces.edn")
+        dependency-graph
+        }}
     #{"https://example.org/login"
       "https://example.org/user-identities/alice"
       "https://example.org/whoami"
@@ -137,11 +133,11 @@
       "https://example.org/whoami.html"
       "https://example.org/permissions/alice/whoami"
       "https://example.org/applications/test-app"
-      ::oauth/authorization-server
+      :juxt.site.oauth/authorization-server
       "https://example.org/permissions/alice-can-authorize"}
 
     (let [login-result
-          (form-based-auth/login-with-form!
+          (login/login-with-form!
            *handler*
            "username" "alice"
            "password" "garden"
