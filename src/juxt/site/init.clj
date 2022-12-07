@@ -75,17 +75,6 @@
          (make-repl-request-context
           subject action-id edn-arg))))))
 
-;; TODO: Can likely be deleted
-(def host-parser (rfc7230.decoders/host {}))
-
-;; TODO: Can likely be deleted
-(def base-uri-parser
-  (p/complete
-   (p/into {}
-    (p/sequence-group
-     (p/pattern-parser #"(?<scheme>https?)://" {:group {:juxt.reap.alpha.rfc7230/scheme "scheme"}})
-     host-parser))))
-
 (defn lookup [g id]
   (try
     (or
