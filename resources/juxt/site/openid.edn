@@ -833,7 +833,7 @@
   {:juxt.site/subject-id "https://example.org/subjects/system"
    :juxt.site/action-id "https://example.org/actions/install-openid-issuer"
    :juxt.site/input
-   {:xt/id "{{id}}"
+   {:xt/id "{{$id}}"
     :juxt.site/issuer "{{issuer}}"}}}
 
  "https://example.org/openid/auth0/client-configuration"
@@ -846,7 +846,7 @@
   {:juxt.site/subject-id "https://example.org/subjects/system"
    :juxt.site/action-id "https://example.org/actions/install-openid-client"
    :juxt.site/input
-   {:xt/id "{{id}}"
+   {:xt/id "{{$id}}"
     :juxt.site/issuer-configuration "https://example.org/openid/auth0/issuer"
     :juxt.site/client-id "{{client-id}}"
     :juxt.site/client-secret "{{client-secret}}"
@@ -860,7 +860,7 @@
   {:juxt.site/subject-id "https://example.org/subjects/system"
    :juxt.site/action-id "https://example.org/actions/install-openid-login-endpoint"
    :juxt.site/input
-   {:xt/id "{{id}}"
+   {:xt/id "{{$id}}"
     :juxt.site/openid-client-configuration "https://example.org/openid/auth0/client-configuration"
     :juxt.site/session-scope "https://example.org/session-scopes/openid"}}}
 
@@ -870,7 +870,7 @@
   {:juxt.site/subject-id "https://example.org/subjects/system"
    :juxt.site/action-id "https://example.org/actions/install-openid-callback-endpoint"
    :juxt.site/input
-   {:xt/id "{{id}}"
+   {:xt/id "{{$id}}"
     :juxt.site/openid-client-configuration "https://example.org/openid/auth0/client-configuration"}}}
 
  "https://example.org/session-scopes/openid"
@@ -879,7 +879,7 @@
   {:juxt.site/subject-id "https://example.org/subjects/system"
    :juxt.site/action-id "https://example.org/actions/put-session-scope"
    :juxt.site/input
-   {:xt/id "{{id}}"
+   {:xt/id "{{$id}}"
     :juxt.site/cookie-name "sid"
     :juxt.site/cookie-domain "https://example.org"
     :juxt.site/cookie-path "/"

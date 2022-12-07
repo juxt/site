@@ -145,7 +145,7 @@
                           (fn? (cond-> create (var? create) deref)) (assoc ::init-data (create v))
                           (map? create) (assoc
                                          ::init-data
-                                         (render-form-templates (:create v) (assoc params "id" id))
+                                         (render-form-templates (:create v) (assoc params "$id" id))
                                          )
                           (not create) (assoc :error "No creator function in dependency graph entry"))
                       base-uri (substitute-base-uri base-uri))))

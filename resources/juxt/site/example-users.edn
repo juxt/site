@@ -22,7 +22,7 @@
   :create {:juxt.site/subject-id "https://example.org/subjects/system"
            :juxt.site/action-id "https://example.org/actions/put-user"
            :juxt.site/input
-           {:xt/id "{{id}}"
+           {:xt/id "{{$id}}"
             :name "Alice"}}}
 
  "https://example.org/user-identities/alice"
@@ -34,7 +34,7 @@
   {:juxt.site/subject-id "https://example.org/subjects/system"
    :juxt.site/action-id "https://example.org/actions/put-user-identity"
    :juxt.site/input
-   {:xt/id "{{id}}"
+   {:xt/id "{{$id}}"
     :juxt.site/user "https://example.org/users/alice"
     :juxt.site/username "alice"
     :juxt.site/password "garden"}}}
@@ -46,7 +46,7 @@
   :create {:juxt.site/subject-id "https://example.org/subjects/system"
            :juxt.site/action-id "https://example.org/actions/put-user"
            :juxt.site/input
-           {:xt/id "{{id}}"
+           {:xt/id "{{$id}}"
             :name "Bob"}}}
 
  "https://example.org/user-identities/bob"
@@ -58,7 +58,7 @@
   {:juxt.site/subject-id "https://example.org/subjects/system"
    :juxt.site/action-id "https://example.org/actions/put-user-identity"
    :juxt.site/input
-   {:xt/id "{{id}}"
+   {:xt/id "{{$id}}"
     :juxt.site/user "https://example.org/users/bob"
     :juxt.site/username "bob"
     :juxt.site/password "walrus"}}}
@@ -70,7 +70,7 @@
   :create {:juxt.site/subject-id "https://example.org/subjects/system"
            :juxt.site/action-id "https://example.org/actions/put-user"
            :juxt.site/input
-           {:xt/id "{{id}}"
+           {:xt/id "{{$id}}"
             :name "Carlos"}}}
 
  "https://example.org/user-identities/carlos"
@@ -82,7 +82,7 @@
   {:juxt.site/subject-id "https://example.org/subjects/system"
    :juxt.site/action-id "https://example.org/actions/put-user-identity"
    :juxt.site/input
-   {:xt/id "{{id}}"
+   {:xt/id "{{$id}}"
     :juxt.site/user "https://example.org/users/carlos"
     :juxt.site/username "carlos"
     :juxt.site/password "jackal"}}}}
