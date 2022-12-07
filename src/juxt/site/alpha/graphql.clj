@@ -502,13 +502,12 @@
                                 {:site-args site-args})))
             related-ids (map first
                              (xt/q db {:find ['e]
-                                       :where [['e cascade-key id]]}))]
-        (log/warn "deleting" (conj (for [id related-ids]
-                                     (xt-delete id))
-                                   (xt-delete id)))
-        (await-tx xt-node (conj (for [id related-ids]
-                                  (xt-delete id))
-                                (xt-delete id)))
+                                       :where [['e cascade-key id]]}))
+            delete-ids (conj (for [id related-ids]
+                               (xt-delete id))
+                             (xt-delete id))]
+        (log/warn "deleting" delete-ids)
+        (await-tx xt-node delete-ids)
         ;; TODO: Allow an argument to correspond to valid-time, via
         ;; @site(a: "xtdb.api/valid-time").
         {:xt/id id})
@@ -520,13 +519,12 @@
                                 {:site-args site-args})))
             related-ids (map first
                              (xt/q db {:find ['e]
-                                       :where [['e cascade-key id]]}))]
-        (log/warn "evicting" (conj (for [id related-ids]
-                                     (xt-evict id))
-                                   (xt-evict id)))
-        (await-tx xt-node (conj (for [id related-ids]
-                                  (xt-evict id))
-                                (xt-evict id)))
+                                       :where [['e cascade-key id]]}))
+            evict-ids (conj (for [id related-ids]
+                              (xt-evict id))
+                            (xt-evict id))]
+        (log/warn "evicting" evict-ids)
+        (await-tx xt-node evict-ids)
         ;; TODO: Allow an argument to correspond to valid-time, via
         ;; @site(a: "xtdb.api/valid-time").
         {:xt/id id})
