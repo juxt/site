@@ -105,13 +105,20 @@
             [:map {:juxt.site/base-uri :string}]]
        [:set [:or :string :keyword]]]]]]])
 
+(defn substitute-base-uri [form base-uri]
+  (postwalk
+   (fn [s]
+     (cond-> s
+       (string? s) (str/replace "https://example.org" base-uri)))
+   form))
+
 (defn render-form-templates [form params]
   (postwalk (fn [x]
               (cond-> x
                 (string? x) (selmer/render params))) form)
   )
 
-(defn ids->nodes [ids graph]
+(defn ids->nodes [ids graph {:keys [base-uri] :as opts}]
   (->> ids
        (mapcat
         (fn [id]
@@ -133,13 +140,15 @@
        reverse distinct
        (reduce
         (fn [acc [id {:keys [create params] :as v}]]
-          (conj acc (cond-> {:id id}
-                      (fn? (cond-> create (var? create) deref)) (assoc ::init-data (create v))
-                      (map? create) (assoc
-                                     ::init-data
-                                     (render-form-templates (:create v) (assoc params "id" id))
-                                     )
-                      (not create) (assoc :error "No creator function in dependency graph entry"))))
+          (conj acc (cond->
+                        (cond-> {:id id}
+                          (fn? (cond-> create (var? create) deref)) (assoc ::init-data (create v))
+                          (map? create) (assoc
+                                         ::init-data
+                                         (render-form-templates (:create v) (assoc params "id" id))
+                                         )
+                          (not create) (assoc :error "No creator function in dependency graph entry"))
+                      base-uri (substitute-base-uri base-uri))))
         [])))
 
 (defn do-action! [xt-node init-data]
@@ -173,18 +182,11 @@
       (catch Exception cause
         (throw (ex-info "Failed to perform action" {:init-data init-data} cause))))))
 
-(defn substitute-base-uri [form base-uri]
-  (postwalk
-   (fn [s]
-     (cond-> s
-       (string? s) (str/replace "https://example.org" base-uri)))
-   form))
-
 (defn converge!
   "Given a set of resource ids and a dependency graph, create resources and their
   dependencies. A resource id that is a keyword is a proxy for a set of
   resources that are included together but where there is no common dependant."
-  [ids graph {:keys [dry-run? recreate? base-uri]}]
+  [ids graph {:keys [dry-run? recreate? base-uri] :as opts}]
   {:pre [(malli/validate [:or [:set [:or :string :keyword]] [:sequential [:or :string :keyword]]] ids)
          ;;(malli/validate dependency-graph-malli-schema graph)
          ]
@@ -203,14 +205,14 @@
        :explain (malli/explain dependency-graph-malli-schema graph)})))
 
   (let [xt-node (xt-node)]
-    (cond->> (ids->nodes ids graph)
+    (cond->> (ids->nodes ids graph opts)
       (not dry-run?)
       (mapv (fn [{id :id init-data :juxt.site.init/init-data}]
               (let [id (cond-> id base-uri (substitute-base-uri base-uri))]
                 (cond
                   ;; Direct put
                   (:put! init-data)
-                  (put! (:put! (cond-> init-data base-uri (substitute-base-uri base-uri))))
+                  (put! (:put! init-data))
 
                   #_(if (or (not (xt/entity db id)) recreate?)
                       acc)
@@ -220,7 +222,7 @@
                     (let [{:juxt.site/keys [puts] :as result}
                           (do-action!
                            xt-node
-                           (cond-> init-data base-uri (substitute-base-uri base-uri)))]
+                           init-data)]
                       (when (and puts (not (contains? (set puts) id)))
                         (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
                       {:id id :status :created :result result})
