@@ -1,0 +1,36 @@
+{:create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "https://example.org/actions/install-openid-client"
+
+   :juxt.site.malli/input-schema
+   [:map
+    [:xt/id [:re "https://example.org/.*"]]
+    [:juxt.site/issuer-configuration [:re "https://example.org/.*"]]
+    [:juxt.site/client-id [:string {:min 12}]]
+    [:juxt.site/client-secret [:string {:min 20}]]
+    [:juxt.site/redirect-uri [:re "https://example.org/.*"]]]
+
+   :juxt.site/prepare
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (do
+      (juxt.site.malli/validate-input)
+      *input*)}
+
+   :juxt.site/transact
+   {
+    :juxt.site.sci/program
+    #juxt.pprint
+    [[:xtdb.api/put *prepare*]]}
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [permission :juxt.site/subject subject]]
+
+    [(allowed? subject resource permission)
+     [subject :juxt.site/user-identity id]
+     [id :juxt.site/user user]
+     [permission :juxt.site/user user]]]}}}

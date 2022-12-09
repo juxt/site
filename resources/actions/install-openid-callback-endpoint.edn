@@ -1,0 +1,36 @@
+{:deps #{}
+ :create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "https://example.org/actions/install-openid-callback-endpoint"
+
+   :juxt.site.malli/input-schema
+   [:map
+    [:xt/id [:re "https://example.org/.*"]]
+    [:juxt.site/openid-client-configuration [:re "https://example.org/.*"]]]
+
+   :juxt.site/transact
+   {
+    :juxt.site.sci/program
+    #juxt.pprint
+    (do
+      (juxt.site.malli/validate-input)
+      [[:xtdb.api/put
+        (assoc
+         *input*
+         :juxt.site/methods
+         {:get
+          {:juxt.site/actions #{"https://example.org/actions/openid/exchange-code-for-id-token"}}}
+         :juxt.http/content-type "text/html;charset=utf-8"
+         :juxt.http/content "<p>This should redirect</p>")]])}
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [permission :juxt.site/subject subject]]
+
+    [(allowed? subject resource permission)
+     [subject :juxt.site/user-identity id]
+     [id :juxt.site/user user]
+     [permission :juxt.site/user user]]]}}}

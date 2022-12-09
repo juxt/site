@@ -80,7 +80,7 @@
     (or
      (when-let [v (get g id)] (assoc v :id id))
      (some (fn [[k v]]
-             ;;           (when-not (string? id) (throw (ex-info "DEBUG" {:id id})))
+             (when-not (string? id) (throw (ex-info "DEBUG" {:id id})))
              (when-let [matches (re-matches (to-regex k) id)]
                (assoc v
                       :id id
@@ -92,7 +92,7 @@
     (catch Exception e
       (throw (ex-info (format "Failed to lookup %s" id) {:id id} e)))))
 
-(def dependency-graph-malli-schema
+#_(def dependency-graph-malli-schema
   [:map-of [:or :string :keyword]
    [:map
     [:create {:optional true} :any]
@@ -115,8 +115,7 @@
 (defn render-form-templates [form params]
   (postwalk (fn [x]
               (cond-> x
-                (string? x) (selmer/render params))) form)
-  )
+                (string? x) (selmer/render params))) form))
 
 (defn ids->nodes [ids graph {:keys [base-uri] :as opts}]
   (->> ids
@@ -133,7 +132,7 @@
                                :else (throw (ex-info "Unexpected deps type" {:deps deps}))))))
                (keep (fn [id]
                        (when-let [v (lookup graph id)]
-                         (when-not (keyword? id) [id v])
+                         [id v]
                          ;; If we can't find the static dependency, that's ok, it may be a regex
                          ;;(throw (ex-info (format "No dependency graph entry for %s" id) {:id id}))
                          ))))))
@@ -145,51 +144,56 @@
                           (fn? (cond-> create (var? create) deref)) (assoc ::init-data (create v))
                           (map? create) (assoc
                                          ::init-data
-                                         (render-form-templates (:create v) (assoc params "$id" id))
-                                         )
+                                         (render-form-templates (:create v) (assoc params "$id" id)))
                           (not create) (assoc :error "No creator function in dependency graph entry"))
                       base-uri (substitute-base-uri base-uri))))
         [])))
 
-(defn do-action! [xt-node init-data]
-  (when-not init-data
-    (throw (ex-info "No init data" {})))
-  (let [subject-id (:juxt.site/subject-id init-data)
+(defn enact-create! [xt-node init-data]
+  (when-not init-data (throw (ex-info "No init data" {})))
+  (if-let [subject-id (:juxt.site/subject-id init-data)]
 
-        _ (when-not subject-id
-            (throw (ex-info "No subject-id in init-data" {:init-data init-data})))
+    (let [db (xt/db xt-node)
+          _ (assert (:juxt.site/subject-id init-data))
+          subject (when (:juxt.site/subject-id init-data)
+                    (xt/entity db (:juxt.site/subject-id init-data)))
 
-        db (xt/db xt-node)
-        _ (assert (:juxt.site/subject-id init-data))
-        subject (when (:juxt.site/subject-id init-data)
-                  (xt/entity db (:juxt.site/subject-id init-data)))
+          _ (when-not subject
+              (throw
+               (ex-info
+                (format "No subject found in database for %s" subject-id)
+                {:subject-id subject-id})))]
 
-        _ (when-not subject
-            (throw (ex-info (format "No subject for %s" subject-id) {:subject-id subject-id})))]
+      (try
+        (:juxt.site/action-result
+         (actions/do-action
+          (cond->
+              {:juxt.site/xt-node xt-node
+               :juxt.site/db db
+               :juxt.site/subject subject
+               :juxt.site/action (:juxt.site/action-id init-data)}
+              (:juxt.site/input init-data)
+              (merge {:juxt.site/received-representation
+                      {:juxt.http/content-type "application/edn"
+                       :juxt.http/body (.getBytes (pr-str (:juxt.site/input init-data)))}}))))
+        (catch Exception cause
+          (throw (ex-info "Failed to perform action" {:init-data init-data} cause)))))
 
-    (try
-      (:juxt.site/action-result
-       (actions/do-action
-        (cond->
-            {:juxt.site/xt-node xt-node
-             :juxt.site/db db
-             :juxt.site/subject subject
-             :juxt.site/action (:juxt.site/action-id init-data)}
-            (:juxt.site/input init-data)
-            (merge {:juxt.site/received-representation
-                    {:juxt.http/content-type "application/edn"
-                     :juxt.http/body (.getBytes (pr-str (:juxt.site/input init-data)))}}))))
-      (catch Exception cause
-        (throw (ex-info "Failed to perform action" {:init-data init-data} cause))))))
+    ;; Go direct!
+    (do
+      (assert (get-in init-data [:juxt.site/input :xt/id]))
+      (put! (:juxt.site/input init-data)))
+
+    ))
 
 (defn converge!
   "Given a set of resource ids and a dependency graph, create resources and their
   dependencies. A resource id that is a keyword is a proxy for a set of
   resources that are included together but where there is no common dependant."
   [ids graph {:keys [dry-run? recreate? base-uri] :as opts}]
-  {:pre [(malli/validate [:or [:set [:or :string :keyword]] [:sequential [:or :string :keyword]]] ids)
-         ;;(malli/validate dependency-graph-malli-schema graph)
-         ]
+  {#_:pre #_[(malli/validate [:or [:set [:or :string :keyword]] [:sequential [:or :string :keyword]]] ids)
+             ;;(malli/validate dependency-graph-malli-schema graph)
+             ]
    #_#_:post [(malli/validate
                [:sequential
                 [:map
@@ -197,36 +201,26 @@
                  [:status :keyword]
                  [:error {:optional true} :any]]] %)]}
 
-  (when-not (malli/validate dependency-graph-malli-schema graph)
-    (throw
-     (ex-info
-      "Graph failed to validate"
-      {:graph graph
-       :explain (malli/explain dependency-graph-malli-schema graph)})))
+  #_(when-not (malli/validate dependency-graph-malli-schema graph)
+      (throw
+       (ex-info
+        "Graph failed to validate"
+        {:graph graph
+         :explain (malli/explain dependency-graph-malli-schema graph)})))
 
   (let [xt-node (xt-node)]
     (cond->> (ids->nodes ids graph opts)
       (not dry-run?)
-      (mapv (fn [{id :id init-data :juxt.site.init/init-data}]
+      (mapv (fn [{id :id init-data :juxt.site.init/init-data error :error}]
+              (when error (throw (ex-info "Cannot proceed with error resource" {:id id :error error})))
               (let [id (cond-> id base-uri (substitute-base-uri base-uri))]
-                (cond
-                  ;; Direct put
-                  (:put! init-data)
-                  (put! (:put! init-data))
-
-                  #_(if (or (not (xt/entity db id)) recreate?)
-                      acc)
-
-                  :else
-                  (try
-                    (let [{:juxt.site/keys [puts] :as result}
-                          (do-action!
-                           xt-node
-                           init-data)]
-                      (when (and puts (not (contains? (set puts) id)))
-                        (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
-                      {:id id :status :created :result result})
-                    (catch Throwable cause
-                      (throw (ex-info (format "Failed to converge %s" id) {:id id} cause))
-                      ;;{:id id :status :error :error cause}
-                      )))))))))
+                (try
+                  (let [{:juxt.site/keys [puts] :as result}
+                        (enact-create! xt-node init-data)]
+                    (when (and puts (not (contains? (set puts) id)))
+                      (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
+                    {:id id :status :created :result result})
+                  (catch Throwable cause
+                    (throw (ex-info (format "Failed to converge %s" id) {:id id} cause))
+                    ;;{:id id :status :error :error cause}
+                    ))))))))

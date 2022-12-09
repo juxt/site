@@ -2,11 +2,15 @@
 
 (ns juxt.site.bootstrap
   (:require
+   [clojure.java.io :as io]
+   [clojure.set :as set]
+   [clojure.edn :as edn]
+   [juxt.site.resources :as resources]
    [juxt.site.init :as init :refer [converge!]]
    [juxt.site.actions :as actions]))
 
 (defn install-system-subject! [_]
-  {:put!
+  {:juxt.site/input
    ;; tag::install-system-subject![]
    {:xt/id "https://example.org/subjects/system"
     :juxt.site/description "The system subject"
@@ -15,7 +19,7 @@
    })
 
 (defn install-system-permissions! [_]
-  {:put!
+  {:juxt.site/input
    ;; tag::install-system-permissions![]
    {:xt/id "https://example.org/permissions/system/bootstrap"
     :juxt.site/type "https://meta.juxt.site/site/permission" ; <1>
@@ -28,7 +32,7 @@
    })
 
 (defn install-do-action-fn! [_]
-  {:put! (actions/install-do-action-fn)})
+  {:juxt.site/input (actions/install-do-action-fn)})
 
 (defn grant-permission-get-not-found! [_]
   {:juxt.site/subject-id "https://example.org/subjects/system"
@@ -37,47 +41,6 @@
    {:xt/id "https://example.org/permissions/get-not-found"
     :juxt.site/action "https://example.org/actions/get-not-found"
     :juxt.site/purpose nil}})
-
-(defn install-create-action! [_]
-  {:put!
-   {:xt/id "https://example.org/actions/create-action"
-    :juxt.site/description "The action to create all other actions"
-    :juxt.site/type "https://meta.juxt.site/site/action"
-
-    :juxt.site/rules
-    '[
-      ;; Creating actions should only be available to the most trusted
-      ;; subjects. Actions can write directly to the database, if they wish.
-      [(allowed? subject resource permission)
-       [permission :juxt.site/subject subject]]]
-
-    :juxt.site.malli/input-schema
-    [:map
-     [:xt/id [:re "https://example.org/actions/(.+)"]]
-     [:juxt.site/rules [:vector [:vector :any]]]]
-
-    :juxt.site/prepare
-    {:juxt.site.sci/program
-     (pr-str
-      '(let [content-type (-> *ctx*
-                              :juxt.site/received-representation
-                              :juxt.http/content-type)
-             body (-> *ctx*
-                      :juxt.site/received-representation
-                      :juxt.http/body)]
-         (case content-type
-           "application/edn"
-           (some->
-            body
-            (String.)
-            clojure.edn/read-string
-            juxt.site.malli/validate-input
-            (assoc :juxt.site/type "https://meta.juxt.site/site/action")))))}
-
-    :juxt.site/transact
-    {:juxt.site.sci/program
-     (pr-str
-      '[[:xtdb.api/put *prepare*]])}}})
 
 (defn create-grant-permission-action! [_]
   ;; tag::create-grant-permission-action![]
@@ -277,9 +240,6 @@
    "https://example.org/permissions/get-not-found"
    {:create grant-permission-get-not-found!}
 
-   "https://example.org/actions/create-action"
-   {:create install-create-action!}
-
    "https://example.org/actions/grant-permission"
    {:create create-grant-permission-action!
     :deps #{"https://meta.juxt.site/do-action"
@@ -311,40 +271,81 @@
             "https://example.org/subjects/system"
             "https://example.org/actions/install-not-found"}}
 
-   :juxt.site.init/system
-   {:deps #{"https://meta.juxt.site/do-action"
-            "https://example.org/_site/not-found"
-
-            "https://example.org/subjects/system"
-
-            "https://example.org/actions/create-action"
-            "https://example.org/actions/grant-permission"
-            "https://example.org/actions/install-not-found"
-            "https://example.org/actions/get-not-found"
-
-            "https://example.org/permissions/system/bootstrap"
-            "https://example.org/permissions/system/install-not-found"
-            "https://example.org/permissions/get-not-found"}}
-
    "https://example.org/actions/register-application"
-   {:create create-action-register-application!
-    :deps #{:juxt.site.init/system}}
+   {:create create-action-register-application!}
 
    "https://example.org/permissions/system/register-application"
-   {:create grant-permission-to-invoke-action-register-application!
-    :deps #{:juxt.site.init/system}}})
+   {:create grant-permission-to-invoke-action-register-application!}})
+
+(defn resource-file-resolver [dir]
+  (fn resource-file-resolver* [id]
+    (let [[_ path] (re-matches #"https://example.org/(.+)" id)
+          resource-file (io/file dir (str path ".edn"))]
+      (when
+        (.exists resource-file)
+        (-> (edn/read-string {:readers resources/READERS} (slurp resource-file))
+            (assoc :id id))))))
+
+(defn load-dependency-graph-from-filesystem [dir base-uri]
+  (let [root (io/file dir)]
+    (into {}
+          (for [f (file-seq root)
+                :let [path (.toPath f)
+                      relpath (.toString (.relativize (.toPath root) path))
+                      [_ urlpath] (re-matches #"(.+)\.edn" relpath)]
+                :when (.isFile f)
+                ]
+            [(str base-uri "/" urlpath)
+             (edn/read-string {:readers resources/READERS} (slurp f))]))))
+
+(def CORE_RESOURCE_SET
+  #{"https://meta.juxt.site/do-action"
+    "https://example.org/_site/not-found"
+
+    "https://example.org/subjects/system"
+
+    "https://example.org/actions/create-action"
+    "https://example.org/actions/grant-permission"
+    "https://example.org/actions/install-not-found"
+    "https://example.org/actions/get-not-found"
+
+    "https://example.org/permissions/system/bootstrap"
+    "https://example.org/permissions/system/install-not-found"
+    "https://example.org/permissions/get-not-found"})
+
+(defn add-implicit-dependencies
+  "For each entry in the given map, associate the core dependencies such that a
+  core dependency is always created before the entry."
+  [graph]
+  (->> graph
+       (map (fn update-deps [[k v]]
+              [k
+               (cond-> v
+                 (not (contains? CORE_RESOURCE_SET k))
+                 (update :deps (fn merge-core-resources [x]
+                                 (cond
+                                   ;; Wrap in middleware that adds the core resources
+                                   (fn? x) (fn [args] (set/union CORE_RESOURCE_SET (set (x args))))
+                                   :else
+                                   (set/union CORE_RESOURCE_SET (set x))))))]))
+       (into {})))
+
 
 (defn bootstrap-resources! [resources opts]
   (init/converge!
-   (conj resources :juxt.site.init/system)
-   (apply merge
-          dependency-graph
-          (:dependency-graphs (meta resources)))
+   (concat CORE_RESOURCE_SET resources)
+   (add-implicit-dependencies
+    (merge
+     dependency-graph
+     (load-dependency-graph-from-filesystem
+      "resources"
+      (or (:base-uri opts) "https://example.org"))
+     (:graph opts)))
    opts))
 
 (defn bootstrap* [opts]
-  (converge!
-   #{:juxt.site.init/system
+  (bootstrap-resources!
+   #{
 
      ;;"https://example.org/actions/put-user"
      ;;"https://example.org/actions/put-openid-user-identity"
@@ -355,13 +356,10 @@
      ;;:juxt.site.openid/default-permissions
      ;;(substitute-actual-base-uri "https://example.org/permissions/system/put-session-scope")
      }
-   (merge
-    dependency-graph
-    ;;    openid/dependency-graph
-    ;;    session-scope/dependency-graph
-    ;;    user/dependency-graph
-    )
+
    opts))
+
+;; TODO: After bootstrap, install openid 'resource pack'
 
 (defn bootstrap [base-uri]
   (bootstrap* {:dry-run? true :recreate? false :base-uri base-uri}))

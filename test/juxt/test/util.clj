@@ -14,6 +14,7 @@
 (def ^:dynamic ^IXtdb *xt-node*)
 (def ^:dynamic *handler*)
 (def ^:dynamic *db*)
+(def ^:dynamic *resource-dependency-graph* nil)
 
 (defn with-xt [f]
   (with-open [node (xt/start-node *opts*)]
@@ -73,11 +74,20 @@
   `((clojure.test/join-fixtures [with-system-xt with-handler])
     (fn [] ~@body)))
 
+(defmacro with-resource-graph [dependency-graph & body]
+  `(binding [*resource-dependency-graph* ~dependency-graph]
+     ~@body))
+
 (defmacro with-resources [resources & body]
   `(do
      (bootstrap/bootstrap-resources!
       ~resources
-      {:dry-run? false :recreate? false})
+      (merge
+       (cond-> {:dry-run? false
+                :recreate? false}
+         ;; Allows the caller to specify an additional custom dependency graph
+         *resource-dependency-graph* (assoc :graph *resource-dependency-graph*))
+       (meta ~resources)))
      ~@body))
 
 (defn lookup-session-details [session-token]

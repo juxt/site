@@ -1,0 +1,9 @@
+{:deps #{"https://example.org/actions/install-openid-login-endpoint"}
+ :create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/grant-permission"
+  :juxt.site/input
+  {:xt/id "https://example.org/permissions/system/install-openid-login-endpoint"
+   :juxt.site/subject "https://example.org/subjects/system"
+   :juxt.site/action "https://example.org/actions/install-openid-login-endpoint"
+   :juxt.site/purpose nil}}}

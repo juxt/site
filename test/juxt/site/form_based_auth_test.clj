@@ -5,18 +5,13 @@
    [clojure.test :refer [deftest is use-fixtures]]
    [malli.core :as malli]
    [juxt.site.test-helpers.login :as login]
-   [juxt.site.resources :as resources]
-   [juxt.test.util :refer [*handler* with-resources with-system-xt with-handler]]))
+   [juxt.test.util :refer [*handler* with-resources
+                           with-system-xt with-handler]]))
 
 (use-fixtures :each with-system-xt with-handler)
 
 (deftest login-with-form-test
   (with-resources
-    ^{:dependency-graphs
-      #{(resources/load-dependency-graph "juxt/site/session-scope.edn")
-        (resources/load-dependency-graph "juxt/site/user.edn")
-        (resources/load-dependency-graph "juxt/site/form-based-auth.edn")
-        (resources/load-dependency-graph "juxt/site/example-users.edn")}}
     #{"https://example.org/login"
       "https://example.org/session-scopes/default"
       "https://example.org/users/alice"

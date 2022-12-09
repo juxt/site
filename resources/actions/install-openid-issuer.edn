@@ -1,0 +1,57 @@
+{:deps #{}
+ :create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "https://example.org/actions/install-openid-issuer"
+
+   :juxt.site.malli/input-schema
+   [:map
+    [:xt/id [:re "https://example.org/.*"]]
+    [:juxt.site/issuer [:re "https://.*"]]]
+
+   :juxt.site/prepare
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (do
+      (juxt.site.malli/validate-input)
+      (let [config-uri
+            ;; See https://openid.net/specs/openid-connect-discovery-1_0.html#rfc.section.4.1
+            ;;
+            ;; "If the Issuer value contains a path component, any terminating / MUST be
+            ;; removed before appending /.well-known/openid-configuration."
+            ;;
+            ;; This uses a reluctant regex qualifier.
+            (str (second (re-matches (re-pattern "(.*?)/?") (:juxt.site/issuer *input*))) "/.well-known/openid-configuration")
+
+            _ (logf "Config uri %s" config-uri)
+
+            config-response
+            (java-http-clj.core/send
+             {:method :get
+              :uri config-uri
+              :headers {"Accept" "application/json"}
+              :connect-timeout (java.time.Duration/ofSeconds 2)}
+             {:as :byte-array})
+
+            _ (logf "Config response status %s" (:status config-response))
+
+            config (jsonista.core/read-value (:body config-response))]
+        {:xt/id (:xt/id *input*)
+         :juxt.site/issuer (:juxt.site/issuer *input*)
+         :juxt.site/openid-configuration config}))}
+
+   :juxt.site/transact
+   {:juxt.site.sci/program
+    #juxt.pprint
+    [[:xtdb.api/put *prepare*]]}
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [permission :juxt.site/subject subject]]
+
+    [(allowed? subject resource permission)
+     [subject :juxt.site/user-identity id]
+     [id :juxt.site/user user]
+     [permission :juxt.site/user user]]]}}}

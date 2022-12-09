@@ -1,0 +1,14 @@
+{:deps #{"https://example.org/openid/auth0/issuer"}
+ :parameters
+ [{:parameter "client-id"}
+  {:parameter "client-secret"}
+  {:parameter "redirect-uri"}]
+ :create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/install-openid-client"
+  :juxt.site/input
+  {:xt/id "{{$id}}"
+   :juxt.site/issuer-configuration "https://example.org/openid/auth0/issuer"
+   :juxt.site/client-id "{{client-id}}"
+   :juxt.site/client-secret "{{client-secret}}"
+   :juxt.site/redirect-uri "{{redirect-uri}}"}}}

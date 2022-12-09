@@ -1,0 +1,40 @@
+{:create
+ {:juxt.site/input
+  {:xt/id "https://example.org/actions/create-action"
+   :juxt.site/description "The action to create all other actions"
+   :juxt.site/type "https://meta.juxt.site/site/action"
+
+   :juxt.site/rules
+   [
+    ;; Creating actions should only be available to the most trusted
+    ;; subjects. Actions can write directly to the database, if they wish.
+    [(allowed? subject resource permission)
+     [permission :juxt.site/subject subject]]]
+
+   :juxt.site.malli/input-schema
+   [:map
+    [:xt/id [:re "https://example.org/actions/(.+)"]]
+    [:juxt.site/rules [:vector [:vector :any]]]]
+
+   :juxt.site/prepare
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (let [content-type (-> *ctx*
+                           :juxt.site/received-representation
+                           :juxt.http/content-type)
+          body (-> *ctx*
+                   :juxt.site/received-representation
+                   :juxt.http/body)]
+      (case content-type
+        "application/edn"
+        (some->
+         body
+         (String.)
+         clojure.edn/read-string
+         juxt.site.malli/validate-input
+         (assoc :juxt.site/type "https://meta.juxt.site/site/action"))))}
+
+   :juxt.site/transact
+   {:juxt.site.sci/program
+    #juxt.pprint
+    [[:xtdb.api/put *prepare*]]}}}}

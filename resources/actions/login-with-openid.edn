@@ -1,0 +1,156 @@
+{:deps #{}
+ ;; TODO: Rename https://example.org/actions/openid/login ?
+ :create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "https://example.org/actions/login-with-openid"
+
+   :juxt.site/prepare
+   {:juxt.site.sci/program
+    #juxt.pprint
+    {:state (juxt.site.util/make-nonce 8)
+     :nonce (juxt.site.util/make-nonce 12)
+     :session-id (str "https://example.org/sessions/" (juxt.site.util/make-nonce 16))
+     :session-token (juxt.site.util/make-nonce 16)}}
+
+   :juxt.site/transact
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (let [openid-client-configuration-id (:juxt.site/openid-client-configuration *resource*)
+          _ (when-not openid-client-configuration-id
+              (throw
+               (ex-info
+                "No :juxt.site/openid-client-configuration on resource"
+                {:resource *resource*})))
+
+          openid-client-configuration (xt/entity openid-client-configuration-id)
+          _ (when-not openid-client-configuration
+              (throw
+               (ex-info
+                "No openid-client-configuration doc in database"
+                {:openid-client-configuration openid-client-configuration-id})))
+
+          issuer-config (:juxt.site/issuer-configuration openid-client-configuration)
+          _ (when-not issuer-config
+              (throw
+               (ex-info
+                "No :juxt.site/issuer-configuration on client doc"
+                {:openid-client-configuration openid-client-configuration})))
+
+          issuer-config-doc (xt/entity issuer-config)
+          _ (when-not issuer-config-doc
+              (throw
+               (ex-info
+                (format "OpenID configuration document could not be found in database for issuer: %s" issuer-config)
+                {:issuer-config issuer-config})))
+
+          configuration (:juxt.site/openid-configuration issuer-config-doc)
+          _ (when-not configuration
+              (throw
+               (ex-info
+                "OpenID configuration document does not have a :juxt.site/openid-configuration entry"
+                {:issuer-config-document issuer-config-doc})))
+
+          authorization-endpoint (get configuration "authorization_endpoint")
+          _ (when-not authorization-endpoint
+              (throw (ex-info "No authorization_endpoint entry in OpenID configuration"
+                              {:issuer-config issuer-config
+                               :configuration-keys (keys configuration)})))
+
+          state (:state *prepare*)
+          _ (when-not state
+              (throw (ex-info "Prepare step should have prepared a random 'state' value" {})))
+
+          nonce (:nonce *prepare*)
+          _ (when-not nonce
+              (throw (ex-info "Prepare step should have prepared a random 'nonce' value" {})))
+
+          session-id (:session-id *prepare*)
+          _ (when-not session-id
+              (throw (ex-info "Prepare step should have prepared a random 'session-id' value" {})))
+
+          query-params (some-> *ctx* :ring.request/query ring.util.codec/form-decode)
+
+          return-to (get query-params "return-to")
+
+          session
+          (cond-> {:xt/id session-id
+                   :juxt.site/type "https://meta.juxt.site/site/session"
+                   :juxt.site/state state
+                   :juxt.site/nonce nonce}
+            return-to (assoc :juxt.site/return-to return-to))
+
+          session-token (:session-token *prepare*)
+          _ (when-not session-token
+              (throw (ex-info "Prepare step should have prepared a random 'session-token' value" {})))
+
+          session-token-id (str "https://example.org/session-tokens/" session-token)
+
+          session-token-doc
+          {:xt/id session-token-id
+           :juxt.site/type "https://meta.juxt.site/site/session-token"
+           :juxt.site/session-token session-token
+           :juxt.site/session (:xt/id session)}
+
+          client-id (:juxt.site/client-id openid-client-configuration)
+
+          redirect-uri (:juxt.site/redirect-uri openid-client-configuration)
+          _ (when-not redirect-uri
+              (throw
+               (ex-info
+                "Login resource should be configured with a :juxt.site/redirect-uri entry containing the URI of the callback resource."
+                {:resource *resource*})))
+
+          query-string
+          (ring.util.codec/form-encode
+           {"response_type" "code"
+            "scope" "openid name picture profile email" ; TODO: configure in the XT entity
+            "client_id" client-id
+            "redirect_uri" redirect-uri
+            "state" state
+            "nonce" nonce
+            "connection" "github"})
+
+          location (str authorization-endpoint "?" query-string)
+
+          session-scope (:juxt.site/session-scope *resource*)
+          _ (when-not session-scope
+              (throw
+               (ex-info "No :juxt.site/session-scope on resource"
+                        {:resource *resource*})))
+
+          session-scope-doc (xt/entity session-scope)
+          _ (when-not session-scope-doc
+              (throw
+               (ex-info
+                "No session-scope entity in database"
+                {:juxt.site/session-scope session-scope})))
+
+          cookie-name (:juxt.site/cookie-name session-scope-doc)
+          _ (when-not cookie-name
+              (throw
+               (ex-info
+                "No :juxt.site/cookie-name found in session-scope"
+                {:juxt.site/session-scope session-scope-doc})))
+
+          cookie-path (or (:juxt.site/cookie-path session-scope-doc) "/")]
+
+      ;; Pretty much all of this can be computed in the prepare phase,
+      ;; unless we decide to honor an existing session.
+
+      [[:xtdb.api/put session]
+       [:xtdb.api/put session-token-doc]
+       [:ring.response/status 303]
+       [:ring.response/headers
+        {"location" location
+         "set-cookie"
+         (format "%s=%s; Path=%s; Secure; HttpOnly; SameSite=Lax"
+                 cookie-name
+                 session-token
+                 cookie-path)}]])}
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [permission :xt/id]]]}}}

@@ -1,0 +1,10 @@
+{:deps
+  #{"https://example.org/actions/install-authorization-server"}
+  :create
+  {:juxt.site/subject-id "https://example.org/subjects/system"
+   :juxt.site/action-id "https://example.org/actions/grant-permission"
+   :juxt.site/input
+   {:xt/id "{{$id}}"
+    :juxt.site/subject "https://example.org/subjects/system"
+    :juxt.site/action "https://example.org/actions/install-authorization-server"
+    :juxt.site/purpose nil}}}

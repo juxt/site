@@ -1,0 +1,7 @@
+{:deps #{"https://example.org/session-scopes/openid"}
+ :create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/install-openid-callback-endpoint"
+  :juxt.site/input
+  {:xt/id "{{$id}}"
+   :juxt.site/openid-client-configuration "https://example.org/openid/auth0/client-configuration"}}}

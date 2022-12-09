@@ -655,6 +655,7 @@
   (when-not (xt/entity db action)
     (throw (ex-info "No action found"
                     {:action action
+                     :ctx (sanitize-ctx ctx)
                      :ls (->> (xt/q db '{:find [(pull e [:xt/id :juxt.site/type])]
                                       :where [[e :xt/id]]})
                               (map first)

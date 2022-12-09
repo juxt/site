@@ -1,0 +1,12 @@
+;; Copyright © 2022, JUXT LTD.
+
+{:deps #{"https://example.org/actions/register-application"
+         "https://example.org/permissions/system/register-application"}
+ :create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/register-application"
+  :juxt.site/input
+  {:juxt.site/client-id "{{client}}"
+   ;; TODO: What is this redirect-uri doing here?
+   :juxt.site/redirect-uri "https://example.org/terminal/{{client}}"}}
+ }
