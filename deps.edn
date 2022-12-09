@@ -74,6 +74,8 @@
 
         ;; Some resource loading uses templating
         selmer/selmer {:mvn/version "1.12.55"}
+
+        clj-commons/clj-yaml {:mvn/version "1.0.26"}
         }
 
  :aliases

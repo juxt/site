@@ -3,6 +3,7 @@
 (ns juxt.site.bootstrap
   (:require
    [clojure.java.io :as io]
+   [clj-yaml.core :as yaml]
    [clojure.set :as set]
    [clojure.edn :as edn]
    [juxt.site.resources :as resources]
@@ -293,8 +294,7 @@
                 :let [path (.toPath f)
                       relpath (.toString (.relativize (.toPath root) path))
                       [_ urlpath] (re-matches #"(.+)\.edn" relpath)]
-                :when (.isFile f)
-                ]
+                :when (and (.isFile f) urlpath)]
             [(str base-uri "/" urlpath)
              (edn/read-string {:readers resources/READERS} (slurp f))]))))
 
@@ -419,3 +419,21 @@
    :name "Malcolm Sparks"
    :juxt.site.jwt.claims/iss "https://juxt.eu.auth0.com/"
    :juxt.site.jwt.claims/nickname "malcolmsparks"))
+
+
+
+
+
+
+
+
+
+
+
+#_(spit "resources/login.yaml"
+      (yaml/generate-string
+       (edn/read-string (slurp (io/file "resources/login.edn")))
+       :dumper-options {:flow-style :block}
+       ))
+
+#_(yaml/parse-string (slurp (io/file "resources/login.yaml")))
