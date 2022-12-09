@@ -330,7 +330,6 @@
                                    (set/union CORE_RESOURCE_SET (set x))))))]))
        (into {})))
 
-
 (defn bootstrap-resources! [resources opts]
   (init/converge!
    (concat CORE_RESOURCE_SET resources)
@@ -339,36 +338,46 @@
      dependency-graph
      (load-dependency-graph-from-filesystem
       "resources"
-      (or (:base-uri opts) "https://example.org"))
+      ;; When bootstrapping, we treat every resource as
+      ;; https://example.org. This ensures the graph of dependencies is
+      ;; reliable. The init/converge! function is responsible for the final
+      ;; 'rendering' where example.org might be replaced by the Site admin's
+      ;; domain name.
+      "https://example.org")
      (:graph opts)))
    opts))
 
 (defn bootstrap* [opts]
   (bootstrap-resources!
    #{
-
      ;;"https://example.org/actions/put-user"
      ;;"https://example.org/actions/put-openid-user-identity"
      ;;"https://example.org/permissions/system/put-user"
      ;;"https://example.org/permissions/system/put-openid-user-identity"
-
      ;;:juxt.site.openid/all-actions
      ;;:juxt.site.openid/default-permissions
-     ;;(substitute-actual-base-uri "https://example.org/permissions/system/put-session-scope")
+     ;; "https://example.org/permissions/system/put-session-scope"
      }
-
    opts))
 
-;; TODO: After bootstrap, install openid 'resource pack'
+(defn bootstrap
+  ([] (bootstrap {}))
+  ([opts]
+   (bootstrap*
+    (merge
+     {:dry-run? true
+      :recreate? false
+      :base-uri "https://site.test"}
+     opts))))
 
-(defn bootstrap [base-uri]
-  (bootstrap* {:dry-run? true :recreate? false :base-uri base-uri}))
+(defn bootstrap!
+  ([] (bootstrap! nil))
+  ([opts]
+   (bootstrap (merge opts {:dry-run? false}))))
 
-(defn bootstrap! [base-uri]
-  (bootstrap* {:dry-run? false :recreate? false :base-uri base-uri}))
-
-(defn bootstrap!! [base-uri]
-  (bootstrap* {:dry-run? false :recreate? true :base-uri base-uri}))
+(defn bootstrap!!
+  ([] (bootstrap!! nil))
+  ([opts] (bootstrap! (merge opts {:recreate? true}))))
 
 ;; Install openid connect provider, must be in .config/site/openid-client.edn
 ;; Or rather, POST a document to the https://example.org/actions/install-openid-issuer
@@ -376,23 +385,23 @@
 ;; and https://example.org/actions/install-openid-login-endpoint
 
 #_(defn install-openid! []
-  (converge!
-   #{:juxt.site.init/system
-     :juxt.site.openid/all-actions
-     :juxt.site.openid/default-permissions
-     "https://example.org/openid/auth0/issuer"
-     "https://example.org/openid/auth0/client-configuration"
-     "https://example.org/openid/login"
-     ;;"https://example.org/openid/callback"
-     "https://example.org/session-scopes/openid"}
+    (converge!
+     #{:juxt.site.init/system
+       :juxt.site.openid/all-actions
+       :juxt.site.openid/default-permissions
+       "https://example.org/openid/auth0/issuer"
+       "https://example.org/openid/auth0/client-configuration"
+       "https://example.org/openid/login"
+       ;;"https://example.org/openid/callback"
+       "https://example.org/session-scopes/openid"}
 
-   (merge
-    dependency-graph
-    openid/dependency-graph
-    session-scope/dependency-graph
-    user/dependency-graph)
+     (merge
+      dependency-graph
+      openid/dependency-graph
+      session-scope/dependency-graph
+      user/dependency-graph)
 
-   {:dry-run? false :recreate? true}))
+     {:dry-run? false :recreate? true}))
 
 #_(defn install-openid-user!
   [& {:keys [name username]
