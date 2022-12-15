@@ -1,0 +1,12 @@
+{:create
+ {:juxt.site/input
+  ;; tag::install-system-permissions![]
+  {:xt/id "https://example.org/permissions/system/bootstrap"
+   :juxt.site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/action #{"https://example.org/actions/create-action"
+                       "https://example.org/actions/grant-permission"}
+   :juxt.site/purpose nil
+   :juxt.site/subject "https://example.org/subjects/system"
+   }
+  ;; end::install-system-permissions![]
+  }}

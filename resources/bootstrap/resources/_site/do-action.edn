@@ -1,0 +1,5 @@
+{:create
+ {:juxt.site/input
+  {:xt/id "{{$id}}"
+   :xt/fn (fn [xt-ctx ctx & args]
+            (juxt.site.actions/do-action-in-tx-fn xt-ctx ctx))}}}

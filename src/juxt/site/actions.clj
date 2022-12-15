@@ -592,7 +592,7 @@
                                    (cond-> ex-data
                                      (:env ex-data) (dissoc :env)#_(update :env dissoc :juxt.site/db :juxt.site/xt-node)))}}]])))))
 
-(defn install-do-action-fn []
+#_(defn install-do-action-fn []
   {:xt/id "https://meta.juxt.site/do-action"
    :xt/fn '(fn [xt-ctx ctx & args]
              (juxt.site.actions/do-action-in-tx-fn xt-ctx ctx))})
@@ -647,26 +647,28 @@
         (throw (ex-info "Failure during prepare" {:cause-ex-info (ex-data e)} e))))))
 
 (defn do-action
-  [;; TODO: Arguably action should passed as a map
+  [ ;; TODO: Arguably action should passed as a map
    {:juxt.site/keys [xt-node db resource subject action] :as ctx}]
   (assert (:juxt.site/xt-node ctx) "xt-node must be present")
   (assert (:juxt.site/db ctx) "db must be present")
 
   (when-not (xt/entity db action)
-    (throw (ex-info "No action found"
-                    {:action action
-                     :ctx (sanitize-ctx ctx)
-                     :ls (->> (xt/q db '{:find [(pull e [:xt/id :juxt.site/type])]
-                                      :where [[e :xt/id]]})
-                              (map first)
-                              (filter (fn [e]
-                                        (not (#{"Request"
-                                                "ActionLogEntry"
-                                                "Session"
-                                                "SessionToken"}
-                                              (:juxt.site/type e)))))
-                              (map :xt/id)
-                              (sort-by str))})))
+    (throw
+     (ex-info
+      "No action found"
+      {:action action
+       :ctx (sanitize-ctx ctx)
+       :ls (->> (xt/q db '{:find [(pull e [:xt/id :juxt.site/type])]
+                           :where [[e :xt/id]]})
+                (map first)
+                (filter (fn [e]
+                          (not (#{"Request"
+                                  "ActionLogEntry"
+                                  "Session"
+                                  "SessionToken"}
+                                (:juxt.site/type e)))))
+                (map :xt/id)
+                (sort-by str))})))
 
   (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
 
@@ -695,7 +697,7 @@
         _ (when-not action-doc
             (throw (ex-info (format "Action not found in the database: %s" action) {:action action})))
         prepare (do-prepare ctx action-doc)
-        tx-fn "https://meta.juxt.site/do-action"
+        tx-fn (:juxt.site/do-action-tx-fn action-doc)
         _ (assert (xt/entity db tx-fn) (format "do-action must exist in database: %s" tx-fn))
         tx-ctx (cond-> (sanitize-ctx ctx) prepare (assoc :juxt.site/prepare prepare))
         tx (xt/submit-tx xt-node [[::xt/fn tx-fn tx-ctx]])

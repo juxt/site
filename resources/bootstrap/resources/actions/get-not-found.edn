@@ -1,0 +1,18 @@
+{:deps
+ #{"https://example.org/_site/do-action"
+   "https://example.org/subjects/system"
+   "https://example.org/actions/create-action"}
+ :create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "https://example.org/actions/get-not-found"
+   #_:juxt.site/transact
+   #_{:juxt.site.sci/program
+      (pr-str
+       '(do
+          [[:ring.response/status 404]]))}
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [permission :xt/id]]]}}}

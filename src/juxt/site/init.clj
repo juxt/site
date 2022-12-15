@@ -4,10 +4,7 @@
   (:require
    [clojure.string :as str]
    [clojure.walk :refer [postwalk]]
-   [malli.core :as malli]
    [selmer.parser :as selmer]
-   [juxt.reap.alpha.combinators :as p]
-   [juxt.reap.alpha.decoders.rfc7230 :as rfc7230.decoders]
    [juxt.site.locator :refer [to-regex]]
    [juxt.site.actions :as actions]
    [juxt.site.main :as main]
@@ -117,24 +114,30 @@
               (cond-> x
                 (string? x) (selmer/render params))) form))
 
-(defn ids->nodes [ids graph {:keys [base-uri] :as opts}]
+(defn ids->nodes [ids graph {:keys [base-uri]}]
   (->> ids
        (mapcat
         (fn [id]
           (->> id
+               ;; From each id, find all descendants
                (tree-seq some?
                          (fn [id]
                            (let [{:keys [deps params]} (lookup graph id)]
                              (cond
                                (nil? deps) nil
                                (fn? deps) (deps {:params params})
-                               (set? deps) deps
+                               (set? deps) (->> deps
+                                                ;; Dependencies may be templates, with parameters
+                                                ;; that correspond to the uri-template pattern of
+                                                ;; the id.
+                                                (map #(selmer/render % params)))
                                :else (throw (ex-info "Unexpected deps type" {:deps deps}))))))
                (keep (fn [id]
-                       (when-let [v (lookup graph id)]
+                       (if-let [v (lookup graph id)]
                          [id v]
-                         ;; If we can't find the static dependency, that's ok, it may be a regex
-                         ;;(throw (ex-info (format "No dependency graph entry for %s" id) {:id id}))
+                         ;; Old comment: If we can't find the static dependency,
+                         ;; that's ok, it may be a pattern
+                         (throw (ex-info (format "No dependency graph entry for %s" id) {:id id}))
                          ))))))
        reverse distinct
        (reduce
@@ -146,7 +149,7 @@
                                          ::init-data
                                          (render-form-templates (:create v) (assoc params "$id" id)))
                           (not create) (assoc :error "No creator function in dependency graph entry"))
-                      base-uri (substitute-base-uri base-uri))))
+                        base-uri (substitute-base-uri base-uri))))
         [])))
 
 (defn enact-create! [xt-node init-data]

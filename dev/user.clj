@@ -85,11 +85,3 @@
   (println (ansi/yellow "Enter (help) for help"))
 
   :ready)
-
-
-
-(take 1
-      (for [f (.listFiles (io/file "resources.bak/juxt/site"))]
-        (clojure.edn/read-string (slurp f))
-
-        ))

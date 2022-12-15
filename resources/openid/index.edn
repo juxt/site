@@ -1,0 +1,11 @@
+{:xt/id "https://juxt.site/packages/openid"
+ :description "OpenID Connect"
+ :resources
+ #{"https://example.org/actions/install-openid-issuer"
+   "https://example.org/actions/install-openid-login-endpoint"
+   "https://example.org/actions/put-openid-user-identity"
+   "https://example.org/actions/login-with-openid"
+   "https://example.org/actions/install-openid-client"
+   "https://example.org/actions/install-openid-callback-endpoint"
+   "https://example.org/actions/openid/exchange-code-for-id-token"
+   "https://example.org/actions/openid/fetch-jwks"}}

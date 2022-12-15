@@ -1,0 +1,16 @@
+;; The /patients/ root
+{:create
+ {:juxt.site/input
+  {:xt/id "{{$id}}"
+   :juxt.site/methods
+   {:get
+    {:juxt.site/actions #{"https://example.org/hospital/actions/list-patients"}}}
+   :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}
+   :juxt.http/content-type "application/json"
+   :juxt.site/respond
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (let [content (jsonista.core/write-value-as-string *state*)]
+      (-> *ctx*
+          (assoc :ring.response/body content)
+          (update :ring.response/headers assoc "content-length" (count (.getBytes content)))))}}}}

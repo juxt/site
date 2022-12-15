@@ -4,23 +4,25 @@
   (:require
    [clojure.test :refer [deftest is use-fixtures]]
    [malli.core :as malli]
+   [juxt.site.repl :as repl]
    [juxt.site.test-helpers.login :as login]
-   [juxt.test.util :refer [*handler* with-resources
+   [juxt.site.resource-package :as pkg]
+   [juxt.test.util :refer [*handler*
+                           with-fixtures
+                           with-bootstrapped-resources
                            with-system-xt with-handler]]))
 
-(use-fixtures :each with-system-xt with-handler)
+(use-fixtures :each with-system-xt with-handler with-bootstrapped-resources)
 
 (deftest login-with-form-test
-  (with-resources
-    #{"https://example.org/login"
-      "https://example.org/session-scopes/default"
-      "https://example.org/users/alice"
-      "https://example.org/permissions/system/put-user-identity"
-      "https://example.org/user-identities/alice"}
+  (pkg/install-package! (pkg/load-package-from-filesystem "resources/core"))
+  (pkg/install-package! (pkg/load-package-from-filesystem "resources/example-users"))
+  (pkg/install-resources!
+   #{"https://example.org/login"})
 
-    (let [result (login/login-with-form!
-                  *handler*
-                  :juxt.site/uri "https://example.org/login"
-                  "username" "ALICE"
-                  "password" "garden")]
-      (is (malli/validate [:map [:juxt.site/session-token :string]] result)))))
+  (let [result (login/login-with-form!
+                *handler*
+                :juxt.site/uri "https://example.org/login"
+                "username" "ALICE"
+                "password" "garden")]
+    (is (malli/validate [:map [:juxt.site/session-token :string]] result))))

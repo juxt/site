@@ -4,6 +4,7 @@
   (:require
    [clojure.java.io :as io]
    [juxt.site.handler :as h]
+   [juxt.site.resource-package :as pkg]
    [juxt.site.main :as main]
    [juxt.site.bootstrap :as bootstrap]
    [xtdb.api :as xt])
@@ -62,33 +63,14 @@
     (binding [*db* db]
       (f))))
 
-;; Deprecated
-(def access-all-areas
-  {:xt/id "https://example.org/access-rule"
-   :juxt.site/description "A rule allowing access everything"
-   :juxt.site/type "Rule"
-   :juxt.site/target '[]
-   :juxt.site/effect :juxt.site/allow})
+(defn with-bootstrapped-resources [f]
+  (pkg/install-bootstrap-package! {})
+  (f))
 
-(defmacro with-fixtures [& body]
-  `((clojure.test/join-fixtures [with-system-xt with-handler])
+(defmacro
+  with-fixtures [& body]
+  `((clojure.test/join-fixtures [with-system-xt with-handler with-bootstrapped-resources])
     (fn [] ~@body)))
-
-(defmacro with-resource-graph [dependency-graph & body]
-  `(binding [*resource-dependency-graph* ~dependency-graph]
-     ~@body))
-
-(defmacro with-resources [resources & body]
-  `(do
-     (bootstrap/bootstrap-resources!
-      ~resources
-      (merge
-       (cond-> {:dry-run? false
-                :recreate? false}
-         ;; Allows the caller to specify an additional custom dependency graph
-         *resource-dependency-graph* (assoc :graph *resource-dependency-graph*))
-       (meta ~resources)))
-     ~@body))
 
 (defn lookup-session-details [session-token]
   (let [db (xt/db *xt-node*)]

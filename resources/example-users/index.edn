@@ -1,0 +1,13 @@
+{:xt/id "https://juxt.site/packages/example-users"
+ :description "Example users"
+ :dependencies #{"https://juxt.site/packages/core"}
+
+ :resources
+ #{"https://example.org/users/alice"
+   "https://example.org/user-identities/alice"
+
+   "https://example.org/users/bob"
+   "https://example.org/user-identities/bob"
+
+   "https://example.org/users/carlos"
+   "https://example.org/user-identities/carlos"}}

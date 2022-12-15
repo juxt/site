@@ -12,6 +12,7 @@
                         "juxt.site.form-based-auth-test"
                         "juxt.site.eql-datalog-compiler-test"
                         "juxt.site.whoami-test"
+                        "juxt.site.resource-package-test"
                         ]}]
 
  :reporter kaocha.report/documentation}

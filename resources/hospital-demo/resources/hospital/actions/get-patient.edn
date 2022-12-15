@@ -1,0 +1,30 @@
+{:create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "https://example.org/hospital/actions/get-patient"
+
+   :juxt.site/action-contexts
+   {"https://example.org/hospital/actions/get-doctor"
+    {:juxt.site/additional-where-clauses
+     [[ass :juxt.site/type "https://example.org/hospital/types/doctor-patient-assignment"]
+      [ass :patient e]
+      [ass :doctor parent]]}}
+
+   :juxt.site/rules
+   [
+    ;; TODO: Performance tweak: put [subject] to hint that subject is always
+    ;; bound - see @jdt for details
+    [(allowed? subject resource permission)
+     [subject :juxt.site/user-identity id]
+     [id :juxt.site/user user]
+     [permission :juxt.site/user user]
+     [resource :juxt.site/type "https://example.org/hospital/types/patient"]
+     [permission :patient :all]]
+
+    [(allowed? subject resource permission)
+     [subject :juxt.site/user-identity id]
+     [id :juxt.site/user user]
+     [permission :juxt.site/user user]
+     [resource :juxt.site/type "https://example.org/hospital/types/patient"]
+     [permission :patient resource]]]}}}

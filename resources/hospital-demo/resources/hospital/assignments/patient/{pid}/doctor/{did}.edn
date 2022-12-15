@@ -1,0 +1,7 @@
+{:deps #{"https://example.org/hospital/actions/assign-doctor-to-patient"
+         "https://example.org/hospital/permissions/system/assign-doctor-to-patient"}
+ :create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/hospital/actions/assign-doctor-to-patient"
+  :juxt.site/input {:patient "https://example.org/hospital/patients/{{pid}}"
+                    :doctor "https://example.org/hospital/doctors/{{did}}"}}}

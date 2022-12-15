@@ -409,3 +409,13 @@
 
 (defn encrypt-password [password]
   (password/encrypt password))
+
+;; Experimental
+
+(defn configure []
+  (print "Enter issuer: ")
+  (flush)
+  (let [issuer (read-line)]
+    (println)
+    (when issuer
+      (printf "Thanks, you entered %s\n" issuer))))

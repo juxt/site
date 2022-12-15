@@ -1,5 +1,5 @@
 {:deps #{"https://example.org/actions/oauth/authorize"
-         "https://example.org/users/{username}"}
+         "https://example.org/users/{{username}}"}
  :create
  {:juxt.site/subject-id "https://example.org/subjects/system"
   :juxt.site/action-id "https://example.org/actions/grant-permission"

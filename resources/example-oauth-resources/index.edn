@@ -1,0 +1,11 @@
+{:xt/id "https://juxt.site/packages/example-oauth-resources"
+ :description "Example OAuth2 resources"
+ :dependencies #{"https://juxt.site/packages/core"
+                 "https://juxt.site/packages/example-users"
+                 "https://juxt.site/packages/oauth2-auth-server"}
+ :resources
+ #{"https://example.org/permissions/alice-can-authorize"
+   "https://example.org/permissions/bob-can-authorize"
+   "https://example.org/permissions/carlos-can-authorize"
+
+   "https://example.org/applications/test-app"}}

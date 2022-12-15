@@ -1,0 +1,73 @@
+{:xt/id "https://juxt.site/packages/hospital-demo"
+ :dependencies #{"https://juxt.site/packages/core"
+                 "https://juxt.site/packages/example-users"
+                 "https://juxt.site/packages/oauth2-auth-server"
+                 "https://juxt.site/packages/example-oauth-resources"}
+ :description "Hospital demo resources"
+ :resources
+ #{"https://example.org/login"
+
+   "https://example.org/session-scopes/default"
+   "https://example.org/applications/local-terminal"
+
+   "https://example.org/protection-spaces/bearer"
+
+   "https://example.org/hospital/actions/get-patient"
+   "https://example.org/hospital/permissions/alice/get-any-patient"
+   "https://example.org/hospital/permissions/bob/get-patient/004"
+   "https://example.org/hospital/permissions/bob/get-patient/009"
+   "https://example.org/hospital/permissions/bob/get-patient/010"
+   "https://example.org/hospital/actions/list-patients"
+   "https://example.org/hospital/permissions/alice/list-patients"
+   "https://example.org/hospital/permissions/bob/list-patients"
+
+   "https://example.org/hospital/actions/register-patient-measurement"
+   "https://example.org/hospital/permissions/system/register-patient-measurement"
+
+   "https://example.org/hospital/actions/get-doctor"
+   "https://example.org/hospital/permissions/alice/get-doctor"
+   "https://example.org/hospital/permissions/bob/get-doctor"
+
+   "https://example.org/hospital/patients/"
+
+   "https://example.org/hospital/actions/read-any-measurement"
+   "https://example.org/hospital/permissions/alice/read-any-measurement"
+   "https://example.org/hospital/permissions/bob/read-any-measurement"
+
+   "https://example.org/hospital/doctors/001"
+   "https://example.org/hospital/doctors/002"
+   "https://example.org/hospital/doctors/003"
+   "https://example.org/hospital/doctors/004"
+
+   "https://example.org/hospital/patients/001"
+   "https://example.org/hospital/patients/002"
+   "https://example.org/hospital/patients/003"
+   "https://example.org/hospital/patients/004"
+   "https://example.org/hospital/patients/005"
+   "https://example.org/hospital/patients/006"
+   "https://example.org/hospital/patients/007"
+   "https://example.org/hospital/patients/008"
+   "https://example.org/hospital/patients/009"
+   "https://example.org/hospital/patients/010"
+   "https://example.org/hospital/patients/011"
+   "https://example.org/hospital/patients/012"
+   "https://example.org/hospital/patients/013"
+   "https://example.org/hospital/patients/014"
+   "https://example.org/hospital/patients/015"
+   "https://example.org/hospital/patients/016"
+   "https://example.org/hospital/patients/017"
+   "https://example.org/hospital/patients/018"
+   "https://example.org/hospital/patients/019"
+   "https://example.org/hospital/patients/020"
+
+   "https://example.org/hospital/assignments/patient/001/doctor/001"
+   "https://example.org/hospital/assignments/patient/002/doctor/001"
+   "https://example.org/hospital/assignments/patient/003/doctor/001"
+   "https://example.org/hospital/assignments/patient/004/doctor/002"
+   "https://example.org/hospital/assignments/patient/005/doctor/001"
+   "https://example.org/hospital/assignments/patient/005/doctor/002"
+   "https://example.org/hospital/assignments/patient/006/doctor/003"
+   "https://example.org/hospital/assignments/patient/010/doctor/003"
+
+
+   }}

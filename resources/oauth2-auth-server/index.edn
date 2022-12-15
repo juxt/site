@@ -1,0 +1,7 @@
+{:xt/id "https://juxt.site/packages/oauth2-auth-server"
+ :description "OAuth2 Authorization Server"
+ :dependencies #{"https://juxt.site/packages/core"}
+ :resources
+ #{"https://example.org/oauth/authorize"
+   "https://example.org/actions/oauth/authorize"
+   "https://example.org/actions/install-authorization-server"}}

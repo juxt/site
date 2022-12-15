@@ -24,7 +24,7 @@
                 :key :doctors
                 :params
                 {:search "jack"
-                 :juxt.site/action "https://example.org/actions/get-doctor"}
+                 :juxt.site/action "https://example.org/hospital/actions/get-doctor"}
                 :children [{:type :prop
                             :dispatch-key :xt/id
                             :key :xt/id}]}]}
@@ -44,7 +44,7 @@
                 :key :doctors
                 :params
                 {:search "jack"
-                 :juxt.site/action "https://example.org/actions/get-doctor"}
+                 :juxt.site/action "https://example.org/hospital/actions/get-doctor"}
                 :children
                 [{:type :prop :dispatch-key :xt/id :key :xt/id}
                  {:type :prop :dispatch-key :name :key :name}
@@ -52,7 +52,7 @@
                   :dispatch-key :patients
                   :key :patients
                   :params
-                  {:juxt.site/action "https://example.org/actions/get-patient"}
+                  {:juxt.site/action "https://example.org/hospital/actions/get-patient"}
                   :children
                   [{:type :prop :dispatch-key :xt/id :key :xt/id}
                    {:type :prop :dispatch-key :name :key :name}]}]}]}

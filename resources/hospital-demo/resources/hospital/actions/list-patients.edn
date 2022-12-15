@@ -1,0 +1,40 @@
+{:create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "https://example.org/hospital/actions/list-patients"
+
+   ;; What if this was the resource we will target with GET?
+   ;; The /patients is merely an alias.
+
+   ;; Are actions just resources with ACL rules?
+   ;; Actions are already resources.
+   ;; Maybe any resource can be an action?
+
+   ;; What are our other examples of targeting actions?
+   ;; POST /actions/install-graphql-endpoint
+   ;; (book_test line ~500, book line ~1197)
+
+   :juxt.site/state
+   {:juxt.site.sci/program
+    #juxt.pprint
+    ;; Perform a query, using the rules in get-patient. It would be a good
+    ;; idea to restrict the ability for actions to make general queries
+    ;; against the database. By only exposing API functions such as
+    ;; pull-allowed-resources to this SCI script, we can limit the power of
+    ;; actions thereby securing them. This is preferable to limiting the
+    ;; ability to deploy actions to a select group of highly authorized
+    ;; individuals.
+    ;;
+    ;; TODO: Go through the use-cases which already make general lookups
+    ;; and queries to XT and see if we can rewrite them to use a more
+    ;; restricted API.
+    (juxt.site/pull-allowed-resources
+     #{"https://example.org/hospital/actions/get-patient"})}
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [subject :juxt.site/user-identity id]
+     [id :juxt.site/user user]
+     [permission :juxt.site/user user]]]}}}

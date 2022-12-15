@@ -3,6 +3,7 @@
   {:xt/id "https://example.org/actions/create-action"
    :juxt.site/description "The action to create all other actions"
    :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/do-action-tx-fn "https://example.org/_site/do-action"
 
    :juxt.site/rules
    [
@@ -13,7 +14,7 @@
 
    :juxt.site.malli/input-schema
    [:map
-    [:xt/id [:re "https://example.org/actions/(.+)"]]
+    [:xt/id [:re "https://example.org/.*actions/(.+)"]]
     [:juxt.site/rules [:vector [:vector :any]]]]
 
    :juxt.site/prepare
@@ -32,7 +33,9 @@
          (String.)
          clojure.edn/read-string
          juxt.site.malli/validate-input
-         (assoc :juxt.site/type "https://meta.juxt.site/site/action"))))}
+         (assoc
+          :juxt.site/type "https://meta.juxt.site/site/action"
+          :juxt.site/do-action-tx-fn "https://example.org/_site/do-action"))))}
 
    :juxt.site/transact
    {:juxt.site.sci/program

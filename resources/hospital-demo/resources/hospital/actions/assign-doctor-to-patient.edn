@@ -1,0 +1,59 @@
+{:create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "https://example.org/hospital/actions/assign-doctor-to-patient"
+
+   ;; A POST to a patient URL?
+   ;; What if there are a number of actions one can perform on a patient?
+   ;; A PATCH to a patient????
+
+   :juxt.site.malli/input-schema
+   [:map
+    [:patient [:re "https://example.org/hospital/patients/.*"]]
+    [:doctor [:re "https://example.org/hospital/doctors/.*"]]]
+
+   :juxt.site/prepare
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (let [content-type (-> *ctx*
+                           :juxt.site/received-representation
+                           :juxt.http/content-type)
+          body (-> *ctx*
+                   :juxt.site/received-representation
+                   :juxt.http/body)]
+      (let [input
+            (case content-type
+              "application/edn"
+              (some->
+               body
+               (String.)
+               clojure.edn/read-string
+               juxt.site.malli/validate-input
+               ))]
+
+        (when-not input
+          (throw (ex-info "No input" {})))
+
+        (let [[_ patient-id] (re-matches (re-pattern "https://example.org/hospital/patients/(.*)") (:patient input))
+              [_ doctor-id] (re-matches (re-pattern "https://example.org/hospital/doctors/(.*)") (:doctor input))
+              id (format "https://example.org/hospital/assignments/patient/%s/doctor/%s" patient-id doctor-id)]
+          {:patient-id (:patient input)
+           :doctor-id (:doctor input)
+           :id id})))}
+
+   :juxt.site/transact
+   {
+    :juxt.site.sci/program
+    #juxt.pprint
+    (let [{:keys [id patient-id doctor-id]} *prepare*]
+      [[:xtdb.api/put
+        {:xt/id id
+         :patient patient-id
+         :doctor doctor-id
+         :juxt.site/type "https://example.org/hospital/types/doctor-patient-assignment"}]])}
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [permission :juxt.site/subject subject]]]}}}

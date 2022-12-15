@@ -1,0 +1,8 @@
+{:xt/id "https://juxt.site/packages/core"
+ :description "Core resources"
+ :resources
+ #{"https://example.org/actions/login"
+   "https://example.org/permissions/login"
+   "https://example.org/actions/create-login-resource"
+   "https://example.org/actions/put-protection-space"
+   "https://example.org/actions/put-session-scope"}}
