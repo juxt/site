@@ -8,7 +8,6 @@
    [clojure.tools.logging :as log]
    [clojure.java.io :as io]
    [juxt.site.repl :refer :all]
-   [juxt.site.resource-package :as pkg]
    [juxt.site.init :as init :refer [config base-uri xt-node system put!]]
    [integrant.core :as ig]
    [xtdb.api :as xt]
@@ -85,25 +84,3 @@
   (println (ansi/yellow "Enter (help) for help"))
 
   :ready)
-
-(defn bootstrap!
-  "Bootstrap the system based on the configuration in
-  $HOME/.config/site/config.edn. This is only one such example system that is
-  installed using the package installer functions in
-  juxt.site.resource-package."
-  []
-  (let [config (config)
-        opts {:base-uri (:juxt.site/base-uri config)
-              :dry-run? false}]
-    (pkg/install-package-from-filesystem! "bootstrap" opts)
-    (pkg/install-package-from-filesystem! "core" opts)
-    (pkg/install-package-from-filesystem!
-     "openid"
-     (merge
-      opts
-      {:parameters
-       {"issuer" (:juxt.site/issuer config)
-        "client-id" (:juxt.site/client-id config)
-        "client-secret" (:juxt.site/client-secret config)
-        "redirect-uri" (:juxt.site/redirect-uri config)}}))
-    (pkg/install-package-from-filesystem! "whoami" opts)))

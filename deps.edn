@@ -87,10 +87,7 @@
                                         :sha "c087ded910b3532a938b37e853df79fc3b9c48c1"}
                 org.eclipse.jetty/jetty-jmx {:mvn/version "9.4.44.v20210927"}
 
-                djblue/portal {:mvn/version "0.29.1"}
-
-
-                }
+                djblue/portal {:mvn/version "0.29.1"}}
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
               "-Dclojure.server.site={:port,50505,:accept,juxt.site.repl-server/repl}"
               "-Dclojure.spec.check-asserts=true"
@@ -101,8 +98,7 @@
    :extra-deps
    {lambdaisland/kaocha {:mvn/version "1.0.887"}
     lambdaisland/kaocha-junit-xml {:mvn/version "0.0.76"}
-    nrepl/nrepl {:mvn/version "0.9.0"}
-    }
+    nrepl/nrepl {:mvn/version "0.9.0"}}
    :jvm-opts ["--add-opens" "java.base/java.util.concurrent=ALL-UNNAMED"]}
 
   :coverage

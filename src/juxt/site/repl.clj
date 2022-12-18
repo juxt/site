@@ -10,6 +10,7 @@
    [io.aviso.ansi :as ansi]
    [juxt.site.actions :as actions]
    [juxt.site.cache :as cache]
+   [juxt.site.resource-package :as pkg]
    [juxt.site.init :as init :refer [config base-uri xt-node]]
    [juxt.site.util :as util]
    [xtdb.api :as xt]
@@ -25,14 +26,11 @@
   {'juxt.site/base64 base64-reader
    'regex #(re-pattern %)})
 
-(defn help []
-  (doseq [[_ v] (sort (ns-publics 'juxt.site.repl))
-          :let [m (meta v)]]
-    (println (format "%s %s: %s"
-                     (:name m) (:arglists m) (:doc m))))
-  :ok)
+(declare help)
 
-(defn db []
+(defn ^::public db
+  "Return the current XTDB database as a value"
+  []
   (xt/db (xt-node)))
 
 (defn e [id]
@@ -85,24 +83,14 @@
    first
    (xt/q (db) '{:find [e] :where [[e :type t]] :in [t]} t)))
 
-(defn types []
-  (->> (q '{:find [t]
-            :where [[_ :juxt.site/type t]]})
-       (map first)
-       (sort)))
-
 (defn ls
-  "List Site resources"
+  "Return all Site resources"
   ([]
    (->> (q '{:find [(pull e [:xt/id :juxt.site/type])]
              :where [[e :xt/id]]})
         (map first)
         (filter (fn [e]
-                  (not (#{"Request"
-                          "ActionLogEntry"
-                          "Session"
-                          "SessionToken"
-                          }
+                  (not (#{"https://meta.juxt.site/site/event"}
                         (:juxt.site/type e)))))
         (map :xt/id)
         (sort-by str)))
@@ -117,7 +105,16 @@
         (map first)
         (sort-by str))))
 
-(defn ls-type
+(defn ^::public types
+  "Return types"
+  []
+  (->> (q '{:find [t]
+            :where [[_ :juxt.site/type t]]})
+       (map first)
+       (sort)))
+
+(defn ^::public ls-type
+  "Return resources by type t. For example, (ls-type \"https://meta.juxt.site/site/action\")."
   [t]
   (->> (q '{:find [e]
             :where [[e :xt/id]
@@ -125,6 +122,24 @@
             :in [t]} t)
        (map first)
        (sort)))
+
+(defn ^::public actions
+  "Return installed actions"
+  []
+  (->> (q '{:find [(pull e [:xt/id :description])]
+            :where [[e :xt/id]
+                    [e :juxt.site/type "https://meta.juxt.site/types/action"]]})
+       (map clojure.core/first)
+       (sort-by :xt/id)))
+
+(defn ^::public packages
+  "Return installed packages"
+  []
+  (->> (q '{:find [(pull e [:xt/id :description])]
+            :where [[e :xt/id]
+                    [e :juxt.site/type "https://meta.juxt.site/site/package"]]})
+       (map clojure.core/first)
+       (sort-by :xt/id)))
 
 (defn now-id []
   (.format
@@ -409,6 +424,57 @@
 
 (defn encrypt-password [password]
   (password/encrypt password))
+
+(defn bootstrap!
+  "Bootstrap the system based on the configuration in
+  $HOME/.config/site/config.edn. This is only one such example system that is
+  installed using the package installer functions in
+  juxt.site.resource-package."
+  []
+  (let [config (config)
+        opts {:base-uri (:juxt.site/base-uri config)
+              :dry-run? false}]
+    (pkg/install-package-from-filesystem! "bootstrap" opts)
+    (pkg/install-package-from-filesystem! "core" opts)
+    (pkg/install-package-from-filesystem!
+     "openid"
+     (merge
+      opts
+      {:parameters
+       {"issuer" (:juxt.site/issuer config)
+        "client-id" (:juxt.site/client-id config)
+        "client-secret" (:juxt.site/client-secret config)
+        "redirect-uri" (:juxt.site/redirect-uri config)}}))
+    (pkg/install-package-from-filesystem! "whoami" opts)))
+
+(defn keyword-commands []
+  (letfn [(pad [s] (apply str (repeat (max 0 (- 52 (count (str s)))) ".")))]
+    {:help #'help
+     :types ^{:doc "Show types"}
+     (fn [] (doseq [t (types)]
+              (println t)))
+     :packages ^{:doc "Show installed packages"}
+     (fn [] (doseq [pkg (packages)
+                    :let [pad (pad (:xt/id pkg))]]
+              (println (:xt/id pkg) pad (:description pkg))))
+     :actions ^{:doc "Show installed actions"}
+     (fn [] (doseq [a (actions)]
+              (println (:xt/id a))))}))
+
+(defn help "Show this menu"
+  []
+  (doseq [[k v] (keyword-commands)
+          :let [pad (apply str (repeat (max 0 (- 20 (count (str k)))) "."))]]
+    (println k pad (:doc (meta v))))
+  (println "-----")
+  (doseq [[_ v] (sort (ns-publics 'juxt.site.repl))
+          :let [m (meta v)]
+          :when (::public m)]
+    (doseq [arglist (:arglists m)
+            :let [sig (format "(%s%s)" (:name m) (apply str (map (fn [arg] (str " " arg)) arglist)))
+                  pad (apply str (repeat (max 0 (- 20 (count sig))) "."))]]
+      (println sig pad (:doc m))))
+  :ok)
 
 ;; Experimental
 

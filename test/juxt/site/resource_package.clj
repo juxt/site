@@ -54,6 +54,9 @@
  (set (keys {"issuer" "foo"})))
 
 (defn install-package!
+  "Install a package. Not that installation of packages is NOT atomic. Any errors
+  that are reported during the installation of a package must be investigated
+  and repaired."
   ([pkg opts]
    (let [db (xt/db (init/xt-node))]
 
