@@ -37,27 +37,6 @@
      (assoc
       :dependency-graph (load-dependency-graph-from-filesystem (io/file root "resources"))))))
 
-(defn
-  ^{:deprecated true}
-  add-bootstrap-resources-as-implicit-dependencies
-  "For each entry in the given map, associate the core dependencies such that a
-  core dependency is always created before the entry."
-  [graph]
-  (let [bootstrap-resource-set (some-> (load-package-from-filesystem (io/file "resources/bootstrap")) :resources set)]
-    (into {}
-          (map
-           (fn update-deps [[k v]]
-             [k
-              (cond-> v
-                (not (contains? bootstrap-resource-set k))
-                (update :deps (fn merge-core-resources [x]
-                                (cond
-                                  ;; Wrap in middleware that adds the core resources
-                                  (fn? x) (fn [args] (set/union bootstrap-resource-set (set (x args))))
-                                  :else
-                                  (set/union bootstrap-resource-set (set x))))))])
-           graph))))
-
 (defn get-package-transitive-dependencies [db pkg]
   (let [dependencies (:dependencies pkg)]
     (mapcat (fn [depid]
@@ -65,6 +44,14 @@
                 (cons dep-pkg
                       (get-package-transitive-dependencies db dep-pkg))))
             dependencies)))
+
+(set/difference
+ (set (keys {"issuer" {:description "Issuer"}
+             "client-id" {:description "Client id"}
+             "client-secret" {:description "Client secret"}
+             "redirect-uri" {:description "Redirect URI"}
+             }))
+ (set (keys {"issuer" "foo"})))
 
 (defn install-package!
   ([pkg opts]
@@ -79,6 +66,17 @@
            {:package (:xt/id pkg)
             :dependency dep}))))
 
+     ;; Check all parameters required by the package are satisfied
+     (when-let [missing-parameters
+                (seq
+                 (set/difference
+                  (set (keys (:parameters pkg)))
+                  (set (keys (:parameters opts)))))]
+       (throw
+        (ex-info
+         "Required parameters not provided"
+         {:missing-parameters missing-parameters})))
+
      ;; Install the package
      (init/put! (assoc pkg :juxt.site/type "https://meta.juxt.site/site/package"))
 
@@ -92,12 +90,13 @@
   ([pkg]
    (install-package! pkg {})))
 
-(defn install-bootstrap-package!
-  ([opts]
+(defn install-package-from-filesystem!
+  ([name opts]
    (install-package!
-    (load-package-from-filesystem (io/file "resources/bootstrap"))
+    (load-package-from-filesystem (str "resources/" name))
     opts))
-  ([] (install-bootstrap-package! {})))
+  ([name]
+   (install-package-from-filesystem! name {})))
 
 (defn dependency-graph []
   (let [db (xt/db (init/xt-node))]

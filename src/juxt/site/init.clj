@@ -114,7 +114,7 @@
               (cond-> x
                 (string? x) (selmer/render params))) form))
 
-(defn ids->nodes [ids graph {:keys [base-uri]}]
+(defn ids->nodes [ids graph {:keys [base-uri parameters]}]
   (->> ids
        (mapcat
         (fn [id]
@@ -125,12 +125,12 @@
                            (let [{:keys [deps params]} (lookup graph id)]
                              (cond
                                (nil? deps) nil
-                               (fn? deps) (deps {:params params})
+                               (fn? deps) (deps {:params (merge parameters params)})
                                (set? deps) (->> deps
                                                 ;; Dependencies may be templates, with parameters
                                                 ;; that correspond to the uri-template pattern of
                                                 ;; the id.
-                                                (map #(selmer/render % params)))
+                                                (map #(selmer/render % (merge parameters params))))
                                :else (throw (ex-info "Unexpected deps type" {:deps deps}))))))
                (keep (fn [id]
                        (if-let [v (lookup graph id)]
@@ -147,7 +147,7 @@
                           (fn? (cond-> create (var? create) deref)) (assoc ::init-data (create v))
                           (map? create) (assoc
                                          ::init-data
-                                         (render-form-templates (:create v) (assoc params "$id" id)))
+                                         (render-form-templates (:create v) (assoc (merge parameters params) "$id" id)))
                           (not create) (assoc :error "No creator function in dependency graph entry"))
                         base-uri (substitute-base-uri base-uri))))
         [])))

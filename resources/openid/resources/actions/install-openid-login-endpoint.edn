@@ -1,4 +1,7 @@
-{:create
+{:deps
+ #{"https://example.org/actions/login-with-openid"
+   "https://example.org/permissions/login-with-openid"}
+ :create
  {:juxt.site/subject-id "https://example.org/subjects/system"
   :juxt.site/action-id "https://example.org/actions/create-action"
   :juxt.site/input
@@ -10,20 +13,35 @@
     [:juxt.site/session-scope [:re "https://example.org/.*"]]
     [:juxt.site/openid-client-configuration [:re "https://example.org/.*"]]]
 
-   :juxt.site/transact
+   :juxt.site/prepare
    {
     :juxt.site.sci/program
     #juxt.pprint
-    (do
-      (juxt.site.malli/validate-input)
-      [[:xtdb.api/put
-        (assoc
-         *input*
-         :juxt.site/methods
-         {:get
-          {:juxt.site/actions #{"https://example.org/actions/login-with-openid"}}}
-         :juxt.http/content-type "text/html;charset=utf-8"
-         :juxt.http/content "<p>This should redirect</p>")]])}
+    (let [content-type (-> *ctx*
+                           :juxt.site/received-representation
+                           :juxt.http/content-type)
+          body (-> *ctx*
+                   :juxt.site/received-representation
+                   :juxt.http/body)]
+
+      (case content-type
+        "application/edn"
+        (some->
+         body
+         (String.)
+         clojure.edn/read-string
+         juxt.site.malli/validate-input
+         (assoc
+          :juxt.site/methods
+          {:get
+           {:juxt.site/actions #{"https://example.org/actions/login-with-openid"}}}
+          :juxt.http/content-type "text/html;charset=utf-8"
+          :juxt.http/content "<p>This should redirect</p>"))))}
+
+   :juxt.site/transact
+   {:juxt.site.sci/program
+    #juxt.pprint
+    [[:xtdb.api/put *prepare*]]}
 
    :juxt.site/rules
    [

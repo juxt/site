@@ -5,14 +5,16 @@
 
  :tests [{:id :test
           :test-paths ["test"]
-          :ns-patterns ["juxt.site.authorization-test"
-                        "juxt.site.cors-test"
-                        "juxt.site.return-test"
-                        "juxt.site.graphql-compiler-test"
-                        "juxt.site.form-based-auth-test"
-                        "juxt.site.eql-datalog-compiler-test"
-                        "juxt.site.whoami-test"
-                        "juxt.site.resource-package-test"
-                        ]}]
+          :ns-patterns
+          ["juxt.site.authorization-test"
+           "juxt.site.cors-test"
+           "juxt.site.return-test"
+           "juxt.site.graphql-compiler-test"
+           "juxt.site.form-based-auth-test"
+           "juxt.site.eql-datalog-compiler-test"
+           "juxt.site.whoami-test"
+           "juxt.site.resource-package-test"
+           "juxt.site.openid-test"
+           ]}]
 
  :reporter kaocha.report/documentation}

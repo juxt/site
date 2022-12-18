@@ -5,4 +5,5 @@
   {:xt/id "{{$id}}"
    :juxt.site/methods
    {:get {:juxt.site/actions #{"https://example.org/actions/whoami"}}}
-   :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}}}}
+   :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}
+   :juxt.site/session-scope "https://site.test/session-scopes/openid"}}}

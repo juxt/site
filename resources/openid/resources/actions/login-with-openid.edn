@@ -78,7 +78,8 @@
           (cond-> {:xt/id session-id
                    :juxt.site/type "https://meta.juxt.site/site/session"
                    :juxt.site/state state
-                   :juxt.site/nonce nonce}
+                   :juxt.site/nonce nonce
+                   :juxt.site/session-scope (:juxt.site/session-scope *resource*)}
             return-to (assoc :juxt.site/return-to return-to))
 
           session-token (:session-token *prepare*)

@@ -338,7 +338,13 @@
     prepare :juxt.site/prepare
     :as ctx}]
   (let [db (xt/db xt-ctx)
-        tx (xt/indexing-tx xt-ctx)]
+        tx (xt/indexing-tx xt-ctx)
+        {:juxt.site/keys [scope] :as action-doc} (xt/entity db action)
+        _ (when-not action-doc
+            (throw
+             (ex-info
+              (format "Action '%s' not found in db" action)
+              {:action action})))]
     (try
       (assert (or (nil? subject) (map? subject)) "Subject to do-action-in-tx-fn expected to be a string, or null")
       (assert (or (nil? resource) (map? resource)) "Resource to do-action-in-tx-fn expected to be a string, or null")
@@ -346,13 +352,6 @@
       ;; Check that we /can/ call the action
       (let [check-permissions-result
             (check-permissions db #{action} ctx)
-
-            {:juxt.site/keys [scope] :as action-doc} (xt/entity db action)
-            _ (when-not action-doc
-                (throw
-                 (ex-info
-                  (format "Action '%s' not found in db" action)
-                  {:action action})))
 
             _ (when scope
                 (when-not access-token
@@ -533,7 +532,7 @@
                [:xtdb.api/put
                 (into
                  (cond->
-                     {:xt/id (format "https://example.org/_site/events/%s" (::xt/tx-id tx))
+                     {:xt/id (str (:juxt.site/events-base-uri action-doc) (::xt/tx-id tx))
                       :juxt.site/type "https://meta.juxt.site/site/event"
                       :juxt.site/subject-uri (:xt/id subject)
                       :juxt.site/action action
@@ -566,7 +565,7 @@
           result-fx))
 
       (catch Throwable e
-        (let [event-id (format "https://example.org/_site/events/%d" (::xt/tx-id tx))]
+        (let [event-id (str (:juxt.site/events-base-uri action-doc) (::xt/tx-id tx))]
           (log/errorf e "Error when performing action: %s %s" action event-id)
 
           [[::xt/put
@@ -702,7 +701,8 @@
         tx-ctx (cond-> (sanitize-ctx ctx) prepare (assoc :juxt.site/prepare prepare))
         tx (xt/submit-tx xt-node [[::xt/fn tx-fn tx-ctx]])
         {::xt/keys [tx-id] :as tx} (xt/await-tx xt-node tx)
-        ctx (assoc ctx :juxt.site/db (xt/db xt-node tx))]
+        ctx (assoc ctx :juxt.site/db (xt/db xt-node tx))
+        events-base-uri (:juxt.site/events-base-uri action-doc)]
 
     (when-not (xt/tx-committed? xt-node tx)
       (throw
@@ -715,7 +715,7 @@
     (let [result
           (xt/entity
            (xt/db xt-node)
-           (format "https://example.org/_site/events/%d" tx-id))]
+           (str events-base-uri tx-id))]
       (if-let [error (:juxt.site/error result)]
         (do
           (log/errorf "Transaction error: %s" error)

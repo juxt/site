@@ -4,6 +4,7 @@
    :juxt.site/description "The action to create all other actions"
    :juxt.site/type "https://meta.juxt.site/site/action"
    :juxt.site/do-action-tx-fn "https://example.org/_site/do-action"
+   :juxt.site/events-base-uri "https://example.org/_site/events/"
 
    :juxt.site/rules
    [
@@ -35,7 +36,8 @@
          juxt.site.malli/validate-input
          (assoc
           :juxt.site/type "https://meta.juxt.site/site/action"
-          :juxt.site/do-action-tx-fn "https://example.org/_site/do-action"))))}
+          :juxt.site/do-action-tx-fn "https://example.org/_site/do-action"
+          :juxt.site/events-base-uri "https://example.org/_site/events/"))))}
 
    :juxt.site/transact
    {:juxt.site.sci/program

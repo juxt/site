@@ -13,6 +13,6 @@
     (let [content (jsonista.core/write-value-as-string *state*)]
       (-> *ctx*
           (assoc :ring.response/body content)
-          (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
-          ))}
-   :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}}}}
+          (update :ring.response/headers assoc "content-length" (count (.getBytes content)))))}
+   :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}
+   :juxt.site/session-scope "https://site.test/session-scopes/openid"}}}

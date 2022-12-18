@@ -17,8 +17,8 @@
 (use-fixtures :each with-system-xt with-handler with-bootstrapped-resources)
 
 (deftest get-subject-test
-  (pkg/install-package! (pkg/load-package-from-filesystem "resources/core"))
-  (pkg/install-package! (pkg/load-package-from-filesystem "resources/example-users"))
+  (pkg/install-package-from-filesystem! "core")
+  (pkg/install-package-from-filesystem! "example-users")
   (pkg/install-package! (pkg/load-package-from-filesystem "resources/oauth2-auth-server"))
   (pkg/install-package! (pkg/load-package-from-filesystem "resources/example-oauth-resources"))
   (pkg/install-package! (pkg/load-package-from-filesystem "resources/whoami"))

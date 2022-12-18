@@ -126,10 +126,14 @@
           issuer-configuration (xt/entity issuer-config-id)
           openid-configuration (:juxt.site/openid-configuration issuer-configuration)
 
+          jwks (:juxt.site/jwks issuer-configuration)
+          _ (when-not jwks
+              (throw (ex-info "No JWKS in configuration, will not be able to verify JWTs" {})))
+
           id-token
           (juxt.site/decode-id-token
            {:id-token encoded-id-token
-            :jwks (:juxt.site/jwks issuer-configuration)
+            :jwks jwks
             :openid-configuration openid-configuration
             :client-id client-id})
 

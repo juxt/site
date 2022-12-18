@@ -6,7 +6,6 @@
    [juxt.site.handler :as h]
    [juxt.site.resource-package :as pkg]
    [juxt.site.main :as main]
-   [juxt.site.bootstrap :as bootstrap]
    [xtdb.api :as xt])
   (:import
    (xtdb.api IXtdb)))
@@ -64,25 +63,25 @@
       (f))))
 
 (defn with-bootstrapped-resources [f]
-  (pkg/install-bootstrap-package! {})
+  (pkg/install-package-from-filesystem! "bootstrap" {})
   (f))
 
-(defmacro
-  with-fixtures [& body]
-  `((clojure.test/join-fixtures [with-system-xt with-handler with-bootstrapped-resources])
+(defmacro with-fixtures [& body]
+  `((clojure.test/join-fixtures (-> *ns* meta :clojure.test/each-fixtures))
     (fn [] ~@body)))
 
 (defn lookup-session-details [session-token]
-  (let [db (xt/db *xt-node*)]
-    (first
-     (xt/q db '{:find [(pull session [*]) (pull scope [*])]
-                :keys [session scope]
-                :where [[e :juxt.site/type "https://meta.juxt.site/site/session-token"]
-                        [e :juxt.site/session-token session-token]
-                        [e :juxt.site/session session]
-                        [session :juxt.site/session-scope scope]]
-                :in [session-token]}
-           session-token))))
+  (when session-token
+    (let [db (xt/db *xt-node*)]
+      (first
+       (xt/q db '{:find [(pull session [*]) (pull scope [*])]
+                  :keys [session scope]
+                  :where [[e :juxt.site/type "https://meta.juxt.site/site/session-token"]
+                          [e :juxt.site/session-token session-token]
+                          [e :juxt.site/session session]
+                          [session :juxt.site/session-scope scope]]
+                  :in [session-token]}
+             session-token)))))
 
 (defn assoc-session-token [req session-token]
   (let [{:keys [scope]}

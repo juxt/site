@@ -1,5 +1,7 @@
-{:deps #{"https://example.org/openid/callback"
+{:deps #{"https://example.org/openid/auth0/issuer"
+         "https://example.org/openid/callback"
          "https://example.org/openid/auth0/client-configuration"
+         "https://example.org/actions/install-openid-login-endpoint"
          "https://example.org/permissions/system/install-openid-login-endpoint"}
  :create
  {:juxt.site/subject-id "https://example.org/subjects/system"

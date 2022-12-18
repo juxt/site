@@ -15,13 +15,23 @@
    :juxt.site/prepare
    {:juxt.site.sci/program
     #juxt.pprint
-    (do
-      (juxt.site.malli/validate-input)
-      *input*)}
+    (let [content-type (-> *ctx*
+                           :juxt.site/received-representation
+                           :juxt.http/content-type)
+          body (-> *ctx*
+                   :juxt.site/received-representation
+                   :juxt.http/body)]
+
+      (case content-type
+        "application/edn"
+        (some->
+         body
+         (String.)
+         clojure.edn/read-string
+         juxt.site.malli/validate-input)))}
 
    :juxt.site/transact
-   {
-    :juxt.site.sci/program
+   {:juxt.site.sci/program
     #juxt.pprint
     [[:xtdb.api/put *prepare*]]}
 

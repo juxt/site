@@ -15,7 +15,7 @@
 (deftest install-resource-packages-test []
   (is
    (with-fixtures
-     (pkg/install-bootstrap-package! {})
-     (pkg/install-package! (pkg/load-package-from-filesystem "resources/core"))
-     (pkg/install-package! (pkg/load-package-from-filesystem "resources/whoami"))
+     (pkg/install-package-from-filesystem! "bootstrap")
+     (pkg/install-package-from-filesystem! "core")
+     (pkg/install-package-from-filesystem! "whoami")
      (repl/ls))))
