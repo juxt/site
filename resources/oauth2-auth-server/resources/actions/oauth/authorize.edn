@@ -85,7 +85,7 @@
           access-token-doc
           (cond->
               {:xt/id (format "%s/access-tokens/%s" (:juxt.site/base-uri *ctx*) access-token)
-               :juxt.site/type "https://meta.juxt.site/site/access-token"
+               :juxt.site/type "https://meta.juxt.site/types/access-token"
                :juxt.site/subject subject
                :juxt.site/application (:xt/id application)
                :juxt.site/token access-token}

@@ -76,7 +76,7 @@
       (first
        (xt/q db '{:find [(pull session [*]) (pull scope [*])]
                   :keys [session scope]
-                  :where [[e :juxt.site/type "https://meta.juxt.site/site/session-token"]
+                  :where [[e :juxt.site/type "https://meta.juxt.site/types/session-token"]
                           [e :juxt.site/session-token session-token]
                           [e :juxt.site/session session]
                           [session :juxt.site/session-scope scope]]

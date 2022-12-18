@@ -29,7 +29,7 @@
               client-id (:juxt.site/client-id input)]
           (into
            {:xt/id (format "https://example.org/applications/%s" client-id)
-            :juxt.site/type "https://meta.juxt.site/site/application"}
+            :juxt.site/type "https://meta.juxt.site/types/application"}
            input))))}
 
    :juxt.site/transact

@@ -203,7 +203,7 @@
           (when user-identity
             (into
              {:xt/id (str "https://example.org/subjects/" subject-id)
-              :juxt.site/type "https://meta.juxt.site/site/subject"
+              :juxt.site/type "https://meta.juxt.site/types/subject"
               :juxt.site/id-token-claims (:claims id-token)
               :juxt.site/user-identity user-identity
               :juxt.site/issued-date issued-date
@@ -213,7 +213,7 @@
           new-session-token-doc
           (when subject
             {:xt/id (str "https://example.org/session-tokens/" new-session-token)
-             :juxt.site/type "https://meta.juxt.site/site/session-token"
+             :juxt.site/type "https://meta.juxt.site/types/session-token"
              :juxt.site/session-token new-session-token
              :juxt.site/session (:xt/id session)})]
 

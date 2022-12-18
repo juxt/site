@@ -18,9 +18,9 @@
             (xt/q db '{:find [(pull sub [*]) (pull at [*])]
                        :keys [subject access-token]
                        :where [[at :juxt.site/token tok]
-                               [at :juxt.site/type "https://meta.juxt.site/site/access-token"]
+                               [at :juxt.site/type "https://meta.juxt.site/types/access-token"]
                                [at :juxt.site/subject sub]
-                               [sub :juxt.site/type "https://meta.juxt.site/site/subject"]]
+                               [sub :juxt.site/type "https://meta.juxt.site/types/subject"]]
                        :in [tok]} token68))]
        (when subject (assoc req :juxt.site/subject subject :juxt.site/access-token access-token))))
    req))
@@ -32,7 +32,7 @@
   (assert (:juxt.site/base-uri req))
   (let [xt-node (:juxt.site/xt-node req)
         subject {:xt/id (format "%s/_site/subjects/%s" (:juxt.site/base-uri req) (random-uuid))
-                 :juxt.site/type "https://meta.juxt.site/site/subject"
+                 :juxt.site/type "https://meta.juxt.site/types/subject"
                  :juxt.site/user-identity (:xt/id user-identity)
                  :juxt.site/protection-space (:xt/id protection-space)}
         ;; TODO: Replace this with a Flip tx-fn to ensure database consistency
@@ -55,7 +55,7 @@
 
           query (cond-> '{:find [(pull e [*])]
                           :keys [identity]
-                          :where [[e :juxt.site/type "https://meta.juxt.site/site/user-identity"]
+                          :where [[e :juxt.site/type "https://meta.juxt.site/types/user-identity"]
                                   [e :juxt.site/canonical-root-uri canonical-root-uri]
                                   [e :juxt.site/username username]]
                           :in [username canonical-root-uri realm]}

@@ -82,7 +82,7 @@
                (into
                 [[:xtdb.api/put
                   {:xt/id compile-output-id
-                   :juxt.site/type "https://meta.juxt.site/site/graphql-compile-status"
+                   :juxt.site/type "https://meta.juxt.site/types/graphql-compile-status"
                    :juxt.site/graphql-schema schema-id
                    :juxt.grab/compile-status compile-output}]
                  [:xtdb.api/delete (:xt/id *resource*)]
@@ -124,7 +124,7 @@
                  (fn [typedef]
                    (let [type-name (:juxt.grab.alpha.graphql/name typedef)]
                      {:xt/id (str (:xt/id *resource*) "types/" type-name)
-                      :juxt.site/type "https://meta.juxt.site/site/graphql-type"
+                      :juxt.site/type "https://meta.juxt.site/types/graphql-type"
                       :juxt.site/methods
                       {:get {:juxt.site/actions #{"https://example.org/actions/get-graphql-type"}}
                        :delete {:juxt.site/actions #{"https://example.org/actions/delete-graphql-type"}}}
@@ -155,7 +155,7 @@
                (into
                 [[:xtdb.api/put
                   {:xt/id compile-output-id
-                   :juxt.site/type "https://meta.juxt.site/site/graphql-compile-status"
+                   :juxt.site/type "https://meta.juxt.site/types/graphql-compile-status"
                    :juxt.site/graphql-schema (:xt/id *resource*)
                    :juxt.grab/compile-status compile-output}]
                  [:ring.response/headers {"location" compile-output-id}]

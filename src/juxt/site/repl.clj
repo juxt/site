@@ -90,7 +90,7 @@
              :where [[e :xt/id]]})
         (map first)
         (filter (fn [e]
-                  (not (#{"https://meta.juxt.site/site/event"}
+                  (not (#{"https://meta.juxt.site/types/event"}
                         (:juxt.site/type e)))))
         (map :xt/id)
         (sort-by str)))
@@ -114,7 +114,7 @@
        (sort)))
 
 (defn ^::public ls-type
-  "Return resources by type t. For example, (ls-type \"https://meta.juxt.site/site/action\")."
+  "Return resources by type t. For example, (ls-type \"https://meta.juxt.site/types/action\")."
   [t]
   (->> (q '{:find [e]
             :where [[e :xt/id]
@@ -137,7 +137,7 @@
   []
   (->> (q '{:find [(pull e [:xt/id :description])]
             :where [[e :xt/id]
-                    [e :juxt.site/type "https://meta.juxt.site/site/package"]]})
+                    [e :juxt.site/type "https://meta.juxt.site/types/package"]]})
        (map clojure.core/first)
        (sort-by :xt/id)))
 
@@ -384,7 +384,7 @@
   (let [db (db)]
     (for [tok (->> (q '{:find [e]
                         :where [[e :xt/id]
-                                [e :juxt.site/type "https://meta.juxt.site/site/session"]]
+                                [e :juxt.site/type "https://meta.juxt.site/types/session"]]
                         :in [t]} t)
                    (map first)
                    )
@@ -404,8 +404,8 @@
     (->>
      (for [tok (->> (q '{:find [e]
                          :where [[e :xt/id]
-                                 [e :juxt.site/type #{"https://meta.juxt.site/site/session"
-                                                  "https://meta.juxt.site/site/session-token"}]]
+                                 [e :juxt.site/type #{"https://meta.juxt.site/types/session"
+                                                      "https://meta.juxt.site/types/session-token"}]]
                          :in [t]} t)
                     (map first)
                     )
@@ -466,7 +466,6 @@
   (doseq [[k v] (keyword-commands)
           :let [pad (apply str (repeat (max 0 (- 20 (count (str k)))) "."))]]
     (println k pad (:doc (meta v))))
-  (println "-----")
   (doseq [[_ v] (sort (ns-publics 'juxt.site.repl))
           :let [m (meta v)]
           :when (::public m)]

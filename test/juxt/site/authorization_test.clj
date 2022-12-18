@@ -124,7 +124,7 @@
 ;; action.
 (def GET_RESOURCE_ACTION
   {:xt/id "https://example.org/_site/actions/get-resource"
-   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/type "https://meta.juxt.site/types/action"
    :juxt.site/scope "read:resource"
    :juxt.site/rules
    '[
@@ -148,13 +148,13 @@
 
 (def ANYONE_CAN_READ_PUBLIC_RESOURCES
   {:xt/id "https://example.org/permissions/anyone-can-read-public-resources"
-   :juxt.site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/types/permission"
    :juxt.site/action (:xt/id GET_RESOURCE_ACTION)
    :juxt.site/purpose nil})
 
 (def ALICE_CAN_READ_INTERNAL_RESOURCES
   {:xt/id "https://example.org/permissions/alice-can-read-internal-resources"
-   :juxt.site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/types/permission"
    :juxt.site/action (:xt/id GET_RESOURCE_ACTION)
    :juxt.site/purpose nil
    ::person (:xt/id ALICE)})
@@ -228,7 +228,7 @@
 
 (def READ_USER_DIR_ACTION
   {:xt/id "https://example.org/actions/read-user-dir"
-   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/type "https://meta.juxt.site/types/action"
    :juxt.site/scope "read:resource"
    :juxt.site/rules
    '[[(allowed? subject resource permission)
@@ -243,7 +243,7 @@
 
 (def WRITE_USER_DIR_ACTION
   {:xt/id "https://example.org/actions/write-user-dir"
-   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/type "https://meta.juxt.site/types/action"
    :juxt.site/scope "write:resource"
    :juxt.site/rules
    '[[(allowed? subject resource permission)
@@ -257,7 +257,7 @@
 
 (def READ_SHARED_ACTION
   {:xt/id "https://example.org/actions/read-shared"
-   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/type "https://meta.juxt.site/types/action"
    :juxt.site/scope "read:resource"
    :juxt.site/rules
    '[[(allowed? subject resource permission)
@@ -269,7 +269,7 @@
 
 (def ALICE_CAN_READ
   {:xt/id "https://example.org/permissions/alice-can-read"
-   :juxt.site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/types/permission"
    ::person "https://example.org/people/alice"
    :juxt.site/action #{"https://example.org/actions/read-shared"
                    "https://example.org/actions/read-user-dir"}
@@ -277,14 +277,14 @@
 
 (def ALICE_CAN_WRITE_USER_DIR_CONTENT
   {:xt/id "https://example.org/permissions/alice-can-write-user-dir-content"
-   :juxt.site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/types/permission"
    ::person "https://example.org/people/alice"
    :juxt.site/action "https://example.org/actions/write-user-dir"
    :juxt.site/purpose nil})
 
 (def BOB_CAN_READ
   {:xt/id "https://example.org/permissions/bob-can-read"
-   :juxt.site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/types/permission"
    ::person "https://example.org/people/bob"
    :juxt.site/action #{"https://example.org/actions/read-shared"
                    "https://example.org/actions/read-user-dir"}
@@ -292,7 +292,7 @@
 
 (def ALICES_SHARES_FILE_WITH_BOB
   {:xt/id "https://example.org/permissions/alice-shares-file-with-bob"
-   :juxt.site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/types/permission"
    ::person "https://example.org/people/bob"
    :juxt.site/action "https://example.org/actions/read-shared"
    :juxt.site/purpose nil
@@ -300,7 +300,7 @@
 
 (def BOB_CAN_WRITE_USER_DIR_CONTENT
   {:xt/id "https://example.org/permissions/bob-can-write-user-dir-content"
-   :juxt.site/type "https://meta.juxt.site/site/permission"
+   :juxt.site/type "https://meta.juxt.site/types/permission"
    ::person "https://example.org/people/bob"
    :juxt.site/action "https://example.org/actions/write-user-dir"
    :juxt.site/purpose nil})
@@ -486,7 +486,7 @@
 (deftest constrained-pull-test
   (let [READ_USERNAME_ACTION
         {:xt/id "https://example.org/actions/read-username"
-         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/type "https://meta.juxt.site/types/action"
          :juxt.site/scope "read:user"
          :juxt.site/pull [::username]
          :juxt.site/rules
@@ -498,7 +498,7 @@
 
         READ_SECRETS_ACTION
         {:xt/id "https://example.org/actions/read-secrets"
-         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/type "https://meta.juxt.site/types/action"
          :juxt.site/scope "read:user"
          :juxt.site/pull [::secret]
          :juxt.site/rules
@@ -510,7 +510,7 @@
 
         BOB_CAN_READ_ALICE_USERNAME
         {:xt/id "https://example.org/permissions/bob-can-read-alice-username"
-         :juxt.site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/types/permission"
          ::person "https://example.org/people/bob"
          :juxt.site/action "https://example.org/actions/read-username"
          :juxt.site/purpose nil
@@ -518,7 +518,7 @@
 
         BOB_CAN_READ_ALICE_SECRETS
         {:xt/id "https://example.org/permissions/bob-can-read-alice-secrets"
-         :juxt.site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/types/permission"
          ::person "https://example.org/people/bob"
          :juxt.site/action "https://example.org/actions/read-secrets"
          :juxt.site/purpose nil
@@ -526,7 +526,7 @@
 
         CARLOS_CAN_READ_ALICE_USERNAME
         {:xt/id "https://example.org/permissions/carlos-can-read-alice-username"
-         :juxt.site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/types/permission"
          ::person "https://example.org/people/carlos"
          :juxt.site/action "https://example.org/actions/read-username"
          :juxt.site/purpose nil
@@ -591,7 +591,7 @@
 (deftest pull-allowed-resources-test
   (let [READ_MESSAGE_CONTENT_ACTION
         {:xt/id "https://example.org/actions/read-message-content"
-         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/type "https://meta.juxt.site/types/action"
          :juxt.site/scope "read:messages"
          :juxt.site/pull [::content]
          :juxt.site/rules
@@ -605,7 +605,7 @@
 
         READ_MESSAGE_METADATA_ACTION
         {:xt/id "https://example.org/actions/read-message-metadata"
-         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/type "https://meta.juxt.site/types/action"
          :juxt.site/scope "read:messages"
          :juxt.site/pull [::from ::to ::date]
          :juxt.site/rules
@@ -619,7 +619,7 @@
 
         ALICE_BELONGS_GROUP_A
         {:xt/id "https://example.org/group/a/alice"
-         :juxt.site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/types/permission"
          ::person (:xt/id ALICE)
          ::group :a
          :juxt.site/action #{(:xt/id READ_MESSAGE_CONTENT_ACTION)
@@ -628,7 +628,7 @@
 
         BOB_BELONGS_GROUP_A
         {:xt/id "https://example.org/group/a/bob"
-         :juxt.site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/types/permission"
          ::person (:xt/id BOB)
          ::group :a
          :juxt.site/action #{(:xt/id READ_MESSAGE_CONTENT_ACTION)
@@ -639,7 +639,7 @@
         ;; not the content of messages.
         FAYTHE_MONITORS_GROUP_A
         {:xt/id "https://example.org/group/a/faythe"
-         :juxt.site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/types/permission"
          ::person (:xt/id FAYTHE)
          ::group :a
          :juxt.site/action #{(:xt/id READ_MESSAGE_METADATA_ACTION)}
@@ -772,7 +772,7 @@
 (deftest purpose-with-distinct-actions-test
   (let [READ_MEDICAL_RECORD_ACTION
         {:xt/id "https://example.org/actions/read-medical-record"
-         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/type "https://meta.juxt.site/types/action"
          :juxt.site/scope "read:health"
          :juxt.site/pull ['*]
          :juxt.site/alert-log false
@@ -785,7 +785,7 @@
 
         EMERGENCY_READ_MEDICAL_RECORD_ACTION
         {:xt/id "https://example.org/actions/emergency-read-medical-record"
-         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/type "https://meta.juxt.site/types/action"
          :juxt.site/scope "read:health"
          :juxt.site/pull ['*]
          :juxt.site/alert-log true
@@ -813,7 +813,7 @@
       ;; Permissions
       [::xt/put
        {:xt/id "https://example.org/alice/medical-record/grants/oscar"
-        :juxt.site/type "https://meta.juxt.site/site/permission"
+        :juxt.site/type "https://meta.juxt.site/types/permission"
         ::person (:xt/id OSCAR)
         :juxt.site/action #{(:xt/id EMERGENCY_READ_MEDICAL_RECORD_ACTION)}
         :juxt.site/purpose nil}]
@@ -853,7 +853,7 @@
 (deftest purpose-test
   (let [READ_MEDICAL_RECORD_ACTION
         {:xt/id "https://example.org/actions/read-medical-record"
-         :juxt.site/type "https://meta.juxt.site/site/action"
+         :juxt.site/type "https://meta.juxt.site/types/action"
          :juxt.site/scope "read:health"
          :juxt.site/pull ['*]
          :juxt.site/rules
@@ -887,7 +887,7 @@
       ;; Permissions
       [::xt/put
        {:xt/id "https://example.org/alice/medical-record/grants/oscar"
-        :juxt.site/type "https://meta.juxt.site/site/permission"
+        :juxt.site/type "https://meta.juxt.site/types/permission"
         ::person (:xt/id OSCAR)
         :juxt.site/action (:xt/id READ_MEDICAL_RECORD_ACTION)
         :juxt.site/purpose "https://example.org/purposes/emergency"}]
@@ -950,7 +950,7 @@
 
 (def CREATE_PERSON_ACTION
   {:xt/id "https://example.org/actions/create-person"
-   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/type "https://meta.juxt.site/types/action"
    :juxt.site/scope "write:admin"
 
    :juxt.site.malli/args-schema
@@ -989,7 +989,7 @@
     ;; Permissions
     [::xt/put
      {:xt/id "https://example.org/permissions/sue/create-person"
-      :juxt.site/type "https://meta.juxt.site/site/permission"
+      :juxt.site/type "https://meta.juxt.site/types/permission"
       ::person (:xt/id SUE)
       :juxt.site/action (:xt/id CREATE_PERSON_ACTION)
       :juxt.site/purpose nil #_"https://example.org/purposes/bootsrapping-system"}]
@@ -1061,7 +1061,7 @@
 
     ;; Add an action that lists trades, pulling all attributes
     [::xt/put {:xt/id "https://example.org/actions/list-trades"
-               :juxt.site/type "https://meta.juxt.site/site/action"
+               :juxt.site/type "https://meta.juxt.site/types/action"
                :juxt.site/pull '[*]
                :juxt.site/rules
                '[
@@ -1085,7 +1085,7 @@
     ;; Add an action that lists trades, pulling only that trade attributes that
     ;; are accessible to a regulatory risk controller.
     [::xt/put {:xt/id "https://example.org/actions/control-list-trades"
-               :juxt.site/type "https://meta.juxt.site/site/action"
+               :juxt.site/type "https://meta.juxt.site/types/action"
                :juxt.site/pull '[::desk ::value :xt/id]
                :juxt.site/rules
                '[
@@ -1096,20 +1096,20 @@
                   ]]}]
 
     [::xt/put {:xt/id "https://example.org/actions/get-trader-personal-info"
-               :juxt.site/type "https://meta.juxt.site/site/action"
+               :juxt.site/type "https://meta.juxt.site/types/action"
                :juxt.site/pull '[*]
                :juxt.site/rules
                '[
                  [(allowed? head-of-desk trader role-membership)
 
                   ;; Subjects who have the head-of-desk role
-                  [role-membership :juxt.site/type "https://meta.juxt.site/site/permission"]
+                  [role-membership :juxt.site/type "https://meta.juxt.site/types/permission"]
                   [role-membership ::role "https://example.org/roles/head-of-desk"]
                   [role-membership ::person head-of-desk]
 
                   [trader ::type "Person"]
                   ;; Only for a trader that works on the same desk
-                  [trader-role-membership :juxt.site/type "https://meta.juxt.site/site/permission"]
+                  [trader-role-membership :juxt.site/type "https://meta.juxt.site/types/permission"]
                   [trader-role-membership ::person trader]
                   [trader-role-membership ::desk desk]
                   [role-membership ::desk desk]]]}]
@@ -1125,7 +1125,7 @@
     ;; trader. This document authorizes her, according to the rules of
     ;; (potentially various) actions.
     [::xt/put {:xt/id "https://example.org/people/sam/position"
-               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/type "https://meta.juxt.site/types/permission"
                :juxt.site/action #{"https://example.org/actions/list-trades"}
                :juxt.site/purpose "Trading"
                ::person "https://example.org/people/sam"
@@ -1139,7 +1139,7 @@
 
     ;; Steve is also a swaps trader
     [::xt/put {:xt/id "https://example.org/people/steve/position"
-               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/type "https://meta.juxt.site/types/permission"
                :juxt.site/action #{"https://example.org/actions/list-trades"}
                :juxt.site/purpose "Trading"
                ::person "https://example.org/people/steve"
@@ -1153,7 +1153,7 @@
 
     ;; Susie is the head of the swaps desk
     [::xt/put {:xt/id "https://example.org/people/susie/position"
-               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/type "https://meta.juxt.site/types/permission"
                :juxt.site/action #{"https://example.org/actions/list-trades" "https://example.org/actions/get-trader-personal-info"}
                :juxt.site/purpose #{"Trading" "LineManagement"}
                ::person "https://example.org/people/susie"
@@ -1166,7 +1166,7 @@
                ::name "Brian Tanner"}]
 
     [::xt/put {:xt/id "https://example.org/people/brian/position"
-               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/type "https://meta.juxt.site/types/permission"
                :juxt.site/action #{"https://example.org/actions/list-trades"}
                :juxt.site/purpose "Trading"
                ::person "https://example.org/people/brian"
@@ -1179,7 +1179,7 @@
                ::name "Betty Jacobs"}]
 
     [::xt/put {:xt/id "https://example.org/people/betty/position"
-               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/type "https://meta.juxt.site/types/permission"
                :juxt.site/action #{"https://example.org/actions/list-trades"}
                :juxt.site/purpose "Trading"
                ::person "https://example.org/people/betty"
@@ -1192,7 +1192,7 @@
                ::name "Boris Sokolov"}]
 
     [::xt/put {:xt/id "https://example.org/people/boris/position"
-               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/type "https://meta.juxt.site/types/permission"
                :juxt.site/action #{"https://example.org/actions/list-trades"}
                :juxt.site/purpose "Trading"
                ::person "https://example.org/people/boris"
@@ -1205,7 +1205,7 @@
                ::name "Bernadette Pulson"}]
 
     [::xt/put {:xt/id "https://example.org/people/bernie/position"
-               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/type "https://meta.juxt.site/types/permission"
                :juxt.site/action #{"https://example.org/actions/list-trades"  "https://example.org/actions/get-trader-personal-info"}
                :juxt.site/purpose #{"Trading" "LineManagement"}
                ::person "https://example.org/people/bernie"
@@ -1220,7 +1220,7 @@
                ::name "Cameron White"}]
 
     [::xt/put {:xt/id "https://example.org/people/cameron/position"
-               :juxt.site/type "https://meta.juxt.site/site/permission"
+               :juxt.site/type "https://meta.juxt.site/types/permission"
                :juxt.site/action #{"https://example.org/actions/control-list-trades"}
                :juxt.site/purpose "RiskReporting"
                ::person "https://example.org/people/cameron"
@@ -1382,7 +1382,7 @@
  (fn []
    (let [CREATE_ACCESS_TOKEN_ACTION
          {:xt/id "https://example.org/actions/create-access-token"
-          :juxt.site/type "https://meta.juxt.site/site/action"
+          :juxt.site/type "https://meta.juxt.site/types/action"
 
           :juxt.site.malli/args-schema
           [:tuple
@@ -1425,7 +1425,7 @@
        ;; Permissions
        [::xt/put
         {:xt/id "https://example.org/permissions/alice/create-access-token"
-         :juxt.site/type "https://meta.juxt.site/site/permission"
+         :juxt.site/type "https://meta.juxt.site/types/permission"
          ::person (:xt/id ALICE)
          :juxt.site/action (:xt/id CREATE_ACCESS_TOKEN_ACTION)
          :juxt.site/purpose nil}]
@@ -1458,7 +1458,7 @@
 (defn make-action
   [action-id]
   {:xt/id (str site-prefix "/actions/" action-id)
-   :juxt.site/type "https://meta.juxt.site/site/action"
+   :juxt.site/type "https://meta.juxt.site/types/action"
    :juxt.site/scope "read:resource"
    :juxt.site/rules
    [['(allowed? subject resource permission)

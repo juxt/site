@@ -81,7 +81,7 @@
          {:missing-parameters missing-parameters})))
 
      ;; Install the package
-     (init/put! (assoc pkg :juxt.site/type "https://meta.juxt.site/site/package"))
+     (init/put! (assoc pkg :juxt.site/type "https://meta.juxt.site/types/package"))
 
      ;; Install the package's resources
      (init/converge!
@@ -106,7 +106,7 @@
     (apply merge
            (map :dependency-graph
                 (map first (xt/q db '{:find [(pull e [:dependency-graph])]
-                                      :where [[e :juxt.site/type "https://meta.juxt.site/site/package"]]}))))))
+                                      :where [[e :juxt.site/type "https://meta.juxt.site/types/package"]]}))))))
 
 (defn install-resources!
   ([resources opts]

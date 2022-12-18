@@ -14,7 +14,7 @@
                     :keys [juxt.site/session-token
                            juxt.site/session]
                     :where
-                    [[session-token :juxt.site/type "https://meta.juxt.site/site/session-token"]
+                    [[session-token :juxt.site/type "https://meta.juxt.site/types/session-token"]
                      [session-token :juxt.site/session-token token-id]
                      [session-token :juxt.site/session session]]
                     :in [token-id]}

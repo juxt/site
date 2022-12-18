@@ -3,6 +3,6 @@
   ;; tag::install-system-subject![]
   {:xt/id "https://example.org/subjects/system"
    :juxt.site/description "The system subject"
-   :juxt.site/type "https://meta.juxt.site/site/subject"}
+   :juxt.site/type "https://meta.juxt.site/types/subject"}
   ;; end::install-system-subject![]
   }}

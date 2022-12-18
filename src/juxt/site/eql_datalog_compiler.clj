@@ -62,7 +62,7 @@
        :keys [~'root]
        :where
        ~(cond-> `[[~'action :xt/id ~action-id]
-                  ~'[permission :juxt.site/type "https://meta.juxt.site/site/permission"]
+                  ~'[permission :juxt.site/type "https://meta.juxt.site/types/permission"]
                   ~'[permission :juxt.site/action action]
                   ~'[permission :juxt.site/purpose purpose]
                   ;; We must rename 'allowed?' here because we

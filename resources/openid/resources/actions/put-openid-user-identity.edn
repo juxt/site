@@ -20,8 +20,8 @@
     (do
       (juxt.site.malli/validate-input)
       (assoc *input*
-             :juxt.site/type #{"https://meta.juxt.site/site/user-identity"
-                               "https://meta.juxt.site/site/openid-user-identity"}
+             :juxt.site/type #{"https://meta.juxt.site/types/user-identity"
+                               "https://meta.juxt.site/types/openid-user-identity"}
              :juxt.site/methods
              {:get {:juxt.site/actions #{"https://example.org/actions/get-user-identity"}}
               :head {:juxt.site/actions #{"https://example.org/actions/get-user-identity"}}

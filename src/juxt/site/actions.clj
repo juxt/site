@@ -44,13 +44,13 @@
                :keys '[juxt.site/permission juxt.site/action]
                :where
                '[
-                 [action :juxt.site/type "https://meta.juxt.site/site/action"]
+                 [action :juxt.site/type "https://meta.juxt.site/types/action"]
 
                  ;; Only consider given actions
                  [(contains? actions action)]
 
                  ;; Only consider a permitted action
-                 [permission :juxt.site/type "https://meta.juxt.site/site/permission"]
+                 [permission :juxt.site/type "https://meta.juxt.site/types/permission"]
                  [permission :juxt.site/action action]
                  (allowed? subject resource permission)
 
@@ -111,13 +111,13 @@
         query {:find '[resource]
                :where
                '[
-                 [action :juxt.site/type "https://meta.juxt.site/site/action"]
+                 [action :juxt.site/type "https://meta.juxt.site/types/action"]
 
                  ;; Only consider given actions
                  [(contains? actions action)]
 
                  ;; Only consider a permitted action
-                 [permission :juxt.site/type "https://meta.juxt.site/site/permission"]
+                 [permission :juxt.site/type "https://meta.juxt.site/types/permission"]
                  [permission :juxt.site/action action]
                  (allowed? subject resource permission)
 
@@ -166,13 +166,13 @@
            :keys '[subject action]
            :where
            '[
-             [action :juxt.site/type "https://meta.juxt.site/site/action"]
+             [action :juxt.site/type "https://meta.juxt.site/types/action"]
 
              ;; Only consider given actions
              [(contains? actions action)]
 
              ;; Only consider a permitted action
-             [permission :juxt.site/type "https://meta.juxt.site/site/permission"]
+             [permission :juxt.site/type "https://meta.juxt.site/types/permission"]
              [permission :juxt.site/action action]
              (allowed? subject resource permission)
 
@@ -230,11 +230,11 @@
           :where
           (cond-> '[
                     ;; Only consider given actions
-                    [action :juxt.site/type "https://meta.juxt.site/site/action"]
+                    [action :juxt.site/type "https://meta.juxt.site/types/action"]
                     [(contains? actions action)]
 
                     ;; Only consider allowed permssions
-                    [permission :juxt.site/type "https://meta.juxt.site/site/permission"]
+                    [permission :juxt.site/type "https://meta.juxt.site/types/permission"]
                     [permission :juxt.site/action action]
                     (allowed? subject resource permission)
 
@@ -402,7 +402,7 @@
                          (ffirst
                           (xt/q db {:find ['id]
                                     :where (into
-                                            [['id :juxt.site/type "https://meta.juxt.site/site/user-identity"]]
+                                            [['id :juxt.site/type "https://meta.juxt.site/types/user-identity"]]
                                             (for [[k v] m] ['id k v] ))})))
 
                        'match-identity-with-password
@@ -410,7 +410,7 @@
                          (ffirst
                           (xt/q db {:find ['id]
                                     :where (into
-                                            [['id :juxt.site/type "https://meta.juxt.site/site/user-identity"]
+                                            [['id :juxt.site/type "https://meta.juxt.site/types/user-identity"]
                                              ['id password-hash-key 'password-hash]
                                              ['(crypto.password.bcrypt/check password password-hash)]
                                              ]
@@ -422,7 +422,7 @@
                          (let [results (xt/q
                                         db
                                         '{:find [(pull e [*])]
-                                          :where [[e :juxt.site/type "https://meta.juxt.site/site/application"]
+                                          :where [[e :juxt.site/type "https://meta.juxt.site/types/application"]
                                                   [e :juxt.site/client-id client-id]]
                                           :in [client-id]} client-id)]
                            (if (= 1 (count results))
@@ -443,7 +443,7 @@
                          (let [results (xt/q
                                         db
                                         '{:find [(pull e [*])]
-                                          :where [[e :juxt.site/type "https://meta.juxt.site/site/oauth-scope"]]})]
+                                          :where [[e :juxt.site/type "https://meta.juxt.site/types/oauth-scope"]]})]
 
                            (if (= 1 (count results))
                              (ffirst results)
@@ -464,7 +464,7 @@
                          (map :juxt.grab/type-definition
                               (map first
                                    (xt/q db '{:find [(pull e [:juxt.grab/type-definition])]
-                                              :where [[e :juxt.site/type "https://meta.juxt.site/site/graphql-type"]
+                                              :where [[e :juxt.site/type "https://meta.juxt.site/types/graphql-type"]
                                                       [e :juxt.site/graphql-schema schema-id]]
                                               :in [schema-id]}
                                          schema-id))))}}
@@ -533,7 +533,7 @@
                 (into
                  (cond->
                      {:xt/id (str (:juxt.site/events-base-uri action-doc) (::xt/tx-id tx))
-                      :juxt.site/type "https://meta.juxt.site/site/event"
+                      :juxt.site/type "https://meta.juxt.site/types/event"
                       :juxt.site/subject-uri (:xt/id subject)
                       :juxt.site/action action
                       :juxt.site/purpose purpose
@@ -570,7 +570,7 @@
 
           [[::xt/put
             {:xt/id event-id
-             :juxt.site/type "https://meta.juxt.site/site/event"
+             :juxt.site/type "https://meta.juxt.site/types/event"
              :juxt.site/subject subject
              :juxt.site/action action
              :juxt.site/resource resource

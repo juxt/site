@@ -32,9 +32,9 @@
                                        (set action-ids)
                                        action-ids)
         where-clause [entity-selection-clause
-                      ['action :juxt.site/type "https://meta.juxt.site/site/action"]
+                      ['action :juxt.site/type "https://meta.juxt.site/types/action"]
                       ['action :xt/id actions-ids-as-single-or-set]
-                      ['permission :juxt.site/type "https://meta.juxt.site/site/permission"]
+                      ['permission :juxt.site/type "https://meta.juxt.site/types/permission"]
                       ['permission :juxt.site/action actions-ids-as-single-or-set]
                       '[permission :juxt.site/purpose purpose]
                       '(allowed? permission subject action e)

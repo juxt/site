@@ -35,7 +35,7 @@
     #juxt.pprint
     (let [user-identity
           (juxt.site/match-identity-with-password
-           {:juxt.site/type "https://meta.juxt.site/site/basic-user-identity"
+           {:juxt.site/type "https://meta.juxt.site/types/basic-user-identity"
             :juxt.site/username (clojure.string/lower-case (get-in *prepare* [:form "username"]))}
            (get-in *prepare* [:form "password"])
            :juxt.site/password-hash)
@@ -43,7 +43,7 @@
           subject
           (when user-identity
             {:xt/id (str "https://example.org/subjects/" (get *prepare* :subject-id))
-             :juxt.site/type "https://meta.juxt.site/site/subject"
+             :juxt.site/type "https://meta.juxt.site/types/subject"
              :juxt.site/user-identity user-identity})
 
           _ (assert subject)
@@ -61,7 +61,7 @@
           session
           (when subject
             {:xt/id (str "https://example.org/sessions/" session-id)
-             :juxt.site/type "https://meta.juxt.site/site/session"
+             :juxt.site/type "https://meta.juxt.site/types/session"
              :juxt.site/subject (:xt/id subject)
              :juxt.site/session-scope session-scope-id})
 
@@ -71,7 +71,7 @@
           session-token-doc
           (when session
             {:xt/id (str "https://example.org/session-tokens/" session-token)
-             :juxt.site/type "https://meta.juxt.site/site/session-token"
+             :juxt.site/type "https://meta.juxt.site/types/session-token"
              :juxt.site/session-token session-token
              :juxt.site/session (:xt/id session)})
 

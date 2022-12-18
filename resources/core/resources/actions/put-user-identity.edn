@@ -35,8 +35,8 @@
                clojure.edn/read-string
                juxt.site.malli/validate-input
                (assoc
-                :juxt.site/type #{"https://meta.juxt.site/site/user-identity"
-                                  "https://meta.juxt.site/site/basic-user-identity"}
+                :juxt.site/type #{"https://meta.juxt.site/types/user-identity"
+                                  "https://meta.juxt.site/types/basic-user-identity"}
                 :juxt.site/methods
                 {:get {:juxt.site/actions #{"https://example.org/actions/get-user-identity"}}
                  :head {:juxt.site/actions #{"https://example.org/actions/get-user-identity"}}
