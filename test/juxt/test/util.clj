@@ -63,7 +63,7 @@
       (f))))
 
 (defn with-bootstrapped-resources [f]
-  (pkg/install-package-from-filesystem! "bootstrap" {})
+  (pkg/install-package-from-filesystem! "resources/bootstrap" {})
   (f))
 
 (defmacro with-fixtures [& body]

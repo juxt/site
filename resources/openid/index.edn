@@ -1,11 +1,38 @@
 {:xt/id "https://juxt.site/packages/openid"
  :description "OpenID Connect"
  :dependencies ["https://juxt.site/packages/core"]
- :parameters
- {"issuer" {:description "Issuer"}
-  "client-id" {:description "Client id"}
-  "client-secret" {:description "Client secret"}
-  "redirect-uri" {:description "Redirect URI"}}
+
  :resources
- ["https://example.org/openid/login"
-  "https://example.org/openid/callback"]}
+ ["https://example.org/actions/openid/exchange-code-for-id-token"
+  "https://example.org/actions/register-openid-issuer"
+  "https://example.org/actions/register-openid-client"
+  "https://example.org/permissions/system/register-openid-issuer"
+  "https://example.org/permissions/system/register-openid-client"]
+
+ :commands
+ {:openid/register-issuer
+  {:description "Register an OpenID issuer"
+   :arguments [["iss" {:description "Issuer URL" :default [:juxt.site/issuer]}]]
+   :juxt.site.sci/program
+   #juxt.pprint
+   (converge! [(format "https://example.org/openid/issuers/%s" (ring.util.codec/url-encode (get *args* "iss")))])}
+
+  :openid/register-client
+  {:description "Register an OpenID client"
+   :arguments
+   [["iss" {:description "Issuer URL" :default [:juxt.site/issuer]}]
+    ["client-id" {:description "Client id" :default [:juxt.site/client-id]}]
+    ["client-secret" {:description "Client secret" :default [:juxt.site/client-secret]}]]
+
+   :juxt.site.sci/program
+   #juxt.pprint
+   (converge!
+    [(format "https://example.org/openid/clients/%s" (ring.util.codec/url-encode (get *args* "client-id")))
+     "https://example.org/openid/login"
+     "https://example.org/openid/callback"]
+    {:parameters
+     (assoc *args*
+            "issuer-configuration"
+            (format "https://example.org/openid/issuers/%s" (ring.util.codec/url-encode (get *args* "iss")))
+            "client-configuration"
+            (format "https://example.org/openid/clients/%s" (get *args* "client-id")))})}}}

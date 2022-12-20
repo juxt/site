@@ -399,11 +399,13 @@
                       'juxt.site
                       {'match-identity
                        (fn [m]
-                         (ffirst
-                          (xt/q db {:find ['id]
-                                    :where (into
-                                            [['id :juxt.site/type "https://meta.juxt.site/types/user-identity"]]
-                                            (for [[k v] m] ['id k v] ))})))
+                         (let [q {:find ['id]
+                                  :where (into
+                                          [['id :juxt.site/type "https://meta.juxt.site/types/user-identity"]]
+                                          (for [[k v] m] ['id k v] ))}]
+                           (log/infof "Query used: %s" (pr-str q))
+                           (ffirst
+                            (xt/q db q))))
 
                        'match-identity-with-password
                        (fn [m password password-hash-key]
@@ -590,11 +592,6 @@
                                #_(let [ex-data (ex-data e)]
                                    (cond-> ex-data
                                      (:env ex-data) (dissoc :env)#_(update :env dissoc :juxt.site/db :juxt.site/xt-node)))}}]])))))
-
-#_(defn install-do-action-fn []
-  {:xt/id "https://meta.juxt.site/do-action"
-   :xt/fn '(fn [xt-ctx ctx & args]
-             (juxt.site.actions/do-action-in-tx-fn xt-ctx ctx))})
 
 ;; Remove anything in the ctx that will upset nippy. However, in the future
 ;; we'll definitely want to record all inputs to actions, so this is an

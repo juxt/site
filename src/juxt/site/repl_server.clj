@@ -2,7 +2,6 @@
 
 (ns juxt.site.repl-server
   (:require
-   [clojure.core.server :as s]
    [clojure.main :as m]
    [juxt.site.repl :as repl]
    [puget.printer :as puget]))
@@ -13,7 +12,7 @@
   (require 'juxt.site.repl)
   (in-ns 'juxt.site.repl)
   (apply require clojure.main/repl-requires)
-  (println "Site by JUXT. Copyright (c) 2021, JUXT LTD.")
+  (println "Site by JUXT. Copyright (c) 2020-2022, JUXT LTD.")
   (println "Type :quit to exit, :help for help.")
   (let [f (requiring-resolve 'juxt.site.repl/steps)
         steps (f)]
@@ -22,7 +21,7 @@
         (g steps)))))
 
 (defn- handle-input [input]
-  (if-let [v (get (repl/keyword-commands) input)]
+  (if-let [v (get (into {} (repl/keyword-commands)) input)]
     (v)
     input))
 

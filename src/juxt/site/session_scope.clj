@@ -57,4 +57,5 @@
 
       (h (cond-> req
            scope (assoc :juxt.site/session-scope scope)
+           session-token-id! (assoc :juxt.site/session-token-id! session-token-id!)
            session-details (into session-details))))))

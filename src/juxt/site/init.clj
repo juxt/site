@@ -8,7 +8,8 @@
    [juxt.site.locator :refer [to-regex]]
    [juxt.site.actions :as actions]
    [juxt.site.main :as main]
-   [xtdb.api :as xt]))
+   [xtdb.api :as xt]
+   [ring.util.codec :as codec]))
 
 (defn system [] main/*system*)
 
@@ -30,48 +31,6 @@
 (defn base-uri []
   (:juxt.site/base-uri (config)))
 
-#_(defn make-repl-request-context [subject action edn-arg]
-  (let [xt-node (xt-node)]
-    (cond->
-        {:juxt.site/xt-node xt-node
-         :juxt.site/db (xt/db xt-node)
-         :juxt.site/subject subject
-         :juxt.site/action action
-         ;;:juxt.site/base-uri (base-uri)
-         }
-      edn-arg (merge {:juxt.site/received-representation
-                      {:juxt.http/content-type "application/edn"
-                       :juxt.http/body (.getBytes (pr-str edn-arg))}}))))
-
-;; TODO: Rename this to do-action! ?
-#_(defn do-action!
-  ([subject-id action-id]
-   (do-action! subject-id action-id nil))
-  ([subject-id action-id edn-arg]
-
-   (throw (ex-info "DEPRECATED - inline instead" {}))
-
-   (assert (or (nil? subject-id) (string? subject-id)) "Subject must a string or nil")
-
-   (cond->
-       {:juxt.site/subject-id subject-id
-        :juxt.site/action-id action-id}
-       edn-arg (merge {:juxt.site/received-representation
-                       {:juxt.http/content-type "application/edn"
-                        :juxt.http/body (.getBytes (pr-str edn-arg))}}))
-
-
-   ;;
-   #_(let [subject-id subject-id
-           action-id action-id
-           xt-node (xt-node)
-           db (xt/db xt-node)
-           subject (when subject-id (xt/entity db subject-id))]
-       (:juxt.site/action-result
-        (actions/do-action
-         (make-repl-request-context
-          subject action-id edn-arg))))))
-
 (defn lookup [g id]
   (try
     (or
@@ -84,25 +43,12 @@
                       :params
                       (zipmap
                        (map second (re-seq #"\{(\p{Alpha}+)\}" k))
-                       (next matches)))))
+                       (map codec/url-decode (next matches))))))
            g))
     (catch Exception e
       (throw (ex-info (format "Failed to lookup %s" id) {:id id} e)))))
 
-#_(def dependency-graph-malli-schema
-  [:map-of [:or :string :keyword]
-   [:map
-    [:create {:optional true} :any]
-    [:deps {:optional true}
-     ;; :deps can be a set, but also, where necessary a function.
-     [:or
-      [:set [:or :string :keyword]]
-      [:=> [:cat
-            [:map-of :string :string]
-            [:map {:juxt.site/base-uri :string}]]
-       [:set [:or :string :keyword]]]]]]])
-
-(defn substitute-base-uri [form base-uri]
+(defn- substitute-base-uri [form base-uri]
   (postwalk
    (fn [s]
      (cond-> s
@@ -135,8 +81,6 @@
                (keep (fn [id]
                        (if-let [v (lookup graph id)]
                          [id v]
-                         ;; Old comment: If we can't find the static dependency,
-                         ;; that's ok, it may be a pattern
                          (throw (ex-info (format "No dependency graph entry for %s" id) {:id id}))
                          ))))))
        reverse distinct
@@ -185,32 +129,13 @@
     ;; Go direct!
     (do
       (assert (get-in init-data [:juxt.site/input :xt/id]))
-      (put! (:juxt.site/input init-data)))
-
-    ))
+      (put! (:juxt.site/input init-data)))))
 
 (defn converge!
   "Given a set of resource ids and a dependency graph, create resources and their
   dependencies. A resource id that is a keyword is a proxy for a set of
   resources that are included together but where there is no common dependant."
   [ids graph {:keys [dry-run? recreate? base-uri] :as opts}]
-  {#_:pre #_[(malli/validate [:or [:set [:or :string :keyword]] [:sequential [:or :string :keyword]]] ids)
-             ;;(malli/validate dependency-graph-malli-schema graph)
-             ]
-   #_#_:post [(malli/validate
-               [:sequential
-                [:map
-                 [:id :string]
-                 [:status :keyword]
-                 [:error {:optional true} :any]]] %)]}
-
-  #_(when-not (malli/validate dependency-graph-malli-schema graph)
-      (throw
-       (ex-info
-        "Graph failed to validate"
-        {:graph graph
-         :explain (malli/explain dependency-graph-malli-schema graph)})))
-
   (let [xt-node (xt-node)]
     (cond->> (ids->nodes ids graph opts)
       (not dry-run?)

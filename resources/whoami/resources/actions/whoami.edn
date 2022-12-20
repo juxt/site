@@ -16,7 +16,7 @@
    :juxt.site/state
    {:juxt.site.sci/program
     #juxt.pprint
-    {:subject
+    {:juxt.site/subject
      (xt/pull
       '[* {:juxt.site/user-identity [* {:juxt.site/user [*]}]}]
       (:xt/id (:juxt.site/subject *ctx*)))}}
@@ -25,5 +25,4 @@
    [
     [(allowed? subject resource permission)
      [subject :juxt.site/user-identity id]
-     [id :juxt.site/user user]
-     [permission :juxt.site/user user]]]}}}
+     [permission :xt/id]]]}}}

@@ -2,6 +2,7 @@
 
 (ns juxt.site.repl
   (:require
+   [clojure.pprint :refer [pprint]]
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.string :as str]
@@ -13,6 +14,8 @@
    [juxt.site.resource-package :as pkg]
    [juxt.site.init :as init :refer [config base-uri xt-node]]
    [juxt.site.util :as util]
+   [ring.util.codec :as codec]
+   [sci.core :as sci]
    [xtdb.api :as xt]
    [juxt.site.repl :as repl])
   (:import (java.util Date)))
@@ -26,7 +29,7 @@
   {'juxt.site/base64 base64-reader
    'regex #(re-pattern %)})
 
-(declare help)
+(declare help*)
 
 (defn ^::public db
   "Return the current XTDB database as a value"
@@ -129,7 +132,7 @@
   (->> (q '{:find [(pull e [:xt/id :description])]
             :where [[e :xt/id]
                     [e :juxt.site/type "https://meta.juxt.site/types/action"]]})
-       (map clojure.core/first)
+       (map first)
        (sort-by :xt/id)))
 
 (defn ^::public packages
@@ -138,7 +141,16 @@
   (->> (q '{:find [(pull e [:xt/id :description])]
             :where [[e :xt/id]
                     [e :juxt.site/type "https://meta.juxt.site/types/package"]]})
-       (map clojure.core/first)
+       (map first)
+       (sort-by :xt/id)))
+
+(defn ^::public users
+  "Return installed users"
+  []
+  (->> (q '{:find [(pull e [*])]
+            :where [[e :xt/id]
+                    [e :juxt.site/type "https://meta.juxt.site/types/user"]]})
+       (map first)
        (sort-by :xt/id)))
 
 (defn now-id []
@@ -277,34 +289,6 @@
        (println "Evicting" (count batch) "records")
        (println (apply evict! batch))))))
 
-#_(defn sessions []
-  (authn/expire-sessions! (java.util.Date.))
-  (deref authn/sessions-by-access-token))
-
-#_(defn clear-sessions []
-  (reset! authn/sessions-by-access-token {}))
-
-#_(defn superusers
-  ([] (superusers (config)))
-  ([{:juxt.site/keys [base-uri]}]
-   (map first
-        (xt/q (db) '{:find [user]
-                     :where [[user :juxt.site/type "User"]
-                             [mapping :juxt.site/type "UserRoleMapping"]
-                             [mapping :juxt.site/assignee user]
-                             [mapping :juxt.site/role superuser]]
-                     :in [superuser]}
-              (str base-uri "/_site/roles/superuser")))))
-
-#_(defn admin-access-tokens
-  ([] (admin-access-tokens (db) (base-uri)))
-  ([db base-uri]
-   (map
-    first
-    (xt/q db {:find '[e]
-              :where [['e :juxt.site/client (str base-uri "/_site/apps/admin")]
-                      ['e :juxt.site/type "AccessToken"]]}))))
-
 (defn steps
   ([] (steps (config)))
   ([opts]
@@ -381,23 +365,10 @@
                      (map :xt/id))))
 
 (defn sessions []
-  (let [db (db)]
-    (for [tok (->> (q '{:find [e]
-                        :where [[e :xt/id]
-                                [e :juxt.site/type "https://meta.juxt.site/types/session"]]
-                        :in [t]} t)
-                   (map first)
-                   )
-          :let [session-id (:juxt.site/session (xt/entity db tok))
-                session (xt/entity db session-id)
-                subject-id (:juxt.site/subject session)
-                subject (xt/entity db subject-id)]]
-      {:session-token tok
-       :session session
-       :subject subject})))
-
-(defn evict-session! [token-id]
-  (evict! (format "%s/session-tokens/%s" (base-uri) token-id)))
+  (mapv first
+        (q '{:find [(pull e [* {:juxt.site/session [* {:juxt.site/subject [* {:juxt.site/user-identity [* {:juxt.site/user [*]}]}]}]}])]
+             :where [[e :xt/id]
+                     [e :juxt.site/type "https://meta.juxt.site/types/session-token"]]})))
 
 (defn evict-all-sessions! []
   (let [db (db)]
@@ -425,62 +396,152 @@
 (defn encrypt-password [password]
   (password/encrypt password))
 
-(defn bootstrap!
-  "Bootstrap the system based on the configuration in
-  $HOME/.config/site/config.edn. This is only one such example system that is
-  installed using the package installer functions in
-  juxt.site.resource-package."
-  []
+(defn install!
+  "Install local package from filesystem"
+  [dir]
   (let [config (config)
         opts {:base-uri (:juxt.site/base-uri config)
               :dry-run? false}]
-    (pkg/install-package-from-filesystem! "bootstrap" opts)
-    (pkg/install-package-from-filesystem! "core" opts)
-    (pkg/install-package-from-filesystem!
-     "openid"
-     (merge
-      opts
-      {:parameters
-       {"issuer" (:juxt.site/issuer config)
-        "client-id" (:juxt.site/client-id config)
-        "client-secret" (:juxt.site/client-secret config)
-        "redirect-uri" (:juxt.site/redirect-uri config)}}))
-    (pkg/install-package-from-filesystem! "whoami" opts)))
+    (pkg/install-package-from-filesystem! dir opts)))
+
+(defn keyword-commands-from-packages []
+  (for [[k vs]
+        (->>
+         (q '{:find [(pull e [:xt/id :description :commands])]
+              :where [[e :xt/id]
+                      [e :juxt.site/type "https://meta.juxt.site/types/package"]]})
+         (map first)
+         (mapcat :commands)
+         (group-by first))
+        :when (= (count vs) 1)
+        :let [[_ v] (first vs)]]
+    [k v]))
+
+(defn grab-input! [args prompt]
+  (let [config (config)]
+    (println prompt)
+    (reduce
+     (fn [acc [k {:keys [description default type] :as v}]]
+       (let [default (cond (vector? default) (get-in config default) :else default)]
+         (print (if (some? default)
+                  (format "%s [%s] (%s): " description k default)
+                  (format "%s [%s]: " description k)))
+         (flush)
+         (let [v (read-line)
+               v (cond (str/blank? v) default :else v)
+               v (case type
+                   :dir (let [dir (io/file v)]
+                          (when-not (.isDirectory dir)
+                            (throw (ex-info (format "%s should be a directory" dir) {})))
+                          dir)
+                   v)]
+           (assoc acc k v))))
+     {}
+     args)))
+
+(defn confirm! [m prompt]
+  (println)
+  (println prompt)
+  (pprint m)
+  (println)
+  (print "Confirm? (y/n) ")
+  (flush)
+  (let [input (read-line)]
+    (when (contains? #{"y" "yes"} (str/lower-case input))
+      m)))
 
 (defn keyword-commands []
-  (letfn [(pad [s] (apply str (repeat (max 0 (- 52 (count (str s)))) ".")))]
-    {:help #'help
-     :types ^{:doc "Show types"}
-     (fn [] (doseq [t (types)]
-              (println t)))
-     :packages ^{:doc "Show installed packages"}
-     (fn [] (doseq [pkg (packages)
-                    :let [pad (pad (:xt/id pkg))]]
-              (println (:xt/id pkg) pad (:description pkg))))
-     :actions ^{:doc "Show installed actions"}
-     (fn [] (doseq [a (actions)]
-              (println (:xt/id a))))}))
+  (let [pad (fn [s] (apply str (repeat (max 0 (- 52 (count (str s)))) ".")))]
+    (concat
+     [[:help
+       ^{:doc "Show this menu"}
+       (fn [] (help* {:include-keyword-commands? true}))]
 
-(defn help "Show this menu"
-  []
-  (doseq [[k v] (keyword-commands)
-          :let [pad (apply str (repeat (max 0 (- 20 (count (str k)))) "."))]]
-    (println k pad (:doc (meta v))))
-  (doseq [[_ v] (sort (ns-publics 'juxt.site.repl))
-          :let [m (meta v)]
-          :when (::public m)]
-    (doseq [arglist (:arglists m)
-            :let [sig (format "(%s%s)" (:name m) (apply str (map (fn [arg] (str " " arg)) arglist)))
-                  pad (apply str (repeat (max 0 (- 20 (count sig))) "."))]]
-      (println sig pad (:doc m))))
-  :ok)
+      [:status ^{:doc "Show status"} (fn [] (status))]
 
-;; Experimental
+      [:quit ^{:doc "Disconnect"} (fn [] nil)]
 
-(defn configure []
-  (print "Enter issuer: ")
-  (flush)
-  (let [issuer (read-line)]
-    (println)
-    (when issuer
-      (printf "Thanks, you entered %s\n" issuer))))
+      [:init ^{:doc "Initialize system by bootstrapping resources"}
+       (fn []
+         (install! "resources/bootstrap")
+         (install! "resources/core"))]
+
+      [:types ^{:doc "Show types"}
+       (fn [] (doseq [t (types)]
+                (println t)))]
+
+      [:packages ^{:doc "Show installed packages"}
+       (fn [] (doseq [pkg (packages)
+                      :let [pad (pad (:xt/id pkg))]]
+                (println (:xt/id pkg) pad (:description pkg))))]
+
+      [:users ^{:doc "Show all users"}
+       (fn [] (doseq [user (users)]
+                (println (:xt/id user))))]
+
+      [:actions ^{:doc "Show installed actions"}
+       (fn [] (doseq [a (actions)]
+                (println (:xt/id a))))]]
+
+     (reduce
+      (fn [acc [k v]]
+        (conj
+         acc [k
+              ^{:doc (:description v)}
+              (fn []
+                (cond
+                  (:juxt.site.sci/program v)
+                  (when-let [args (some-> (:arguments v)
+                                          (grab-input! (:description v))
+                                          (confirm! (:description v)))]
+                    (try
+                      (sci/eval-string
+                       (:juxt.site.sci/program v)
+                       {:namespaces
+                        {'user
+                         {'*args* args
+                          'converge!
+                          (fn converge!
+                            ([resources] (converge! resources {}))
+                            ([resources opts]
+                             (init/converge!
+                              resources
+                              (pkg/dependency-graph) ;; (pkg/dependency-graph pkg)
+                              (merge
+                               {:dry-run? false
+                                :base-uri (init/base-uri)
+                                :parameters args}
+                               opts)
+                              )))
+                          'q (fn [& args] (apply q args))
+                          'install! (fn [dir] (install! dir))}
+                         'ring.util.codec
+                         {'form-encode codec/form-encode
+                          'form-decode codec/form-decode
+                          'url-encode codec/url-encode
+                          'url-decode codec/url-decode}}})
+                      (catch clojure.lang.ExceptionInfo e
+                        (println (.getMessage e))
+                        (println (.getCause e))
+                        (throw (ex-info (.getMessage e) (or (ex-data (.getCause e)) {}) (.getCause e))))))
+
+                  :else (throw (ex-info "Cannot execute command" {:command v}))))]))
+      []
+      (keyword-commands-from-packages)))))
+
+(defn help*
+  ([{:keys [include-keyword-commands?]}]
+   (let [tab 30]
+     (when include-keyword-commands?
+       (doseq [[k v] (keyword-commands)
+               :let [pad (apply str (repeat (max 0 (- tab (count (str k)))) "."))]]
+         (println k pad (:doc (meta v)))))
+     (doseq [[_ v] (sort (ns-publics 'juxt.site.repl))
+             :let [m (meta v)]
+             :when (::public m)]
+       (doseq [arglist (:arglists m)
+               :let [sig (format "(%s%s)" (:name m) (apply str (map (fn [arg] (str " " arg)) arglist)))
+                     pad (apply str (repeat (max 0 (- tab (count sig))) "."))]]
+         (println sig pad (:doc m)))))
+   :ok)
+  ([] (help* {})))

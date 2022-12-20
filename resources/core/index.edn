@@ -1,5 +1,22 @@
 {:xt/id "https://juxt.site/packages/core"
  :description "Core resources"
+
+ :commands
+ {:hello
+  {:description "A simple test command"
+   :arguments [["aud" {:description "Audience"}]]
+   :juxt.site.sci/program
+   #juxt.pprint
+   (format "Hello %s!" (get *args* "aud"))}
+
+  :install
+  {:description "Install a local package"
+   :arguments [["dir" {:description "Package directory"
+                       :type :dir}]]
+   :juxt.site.sci/program
+   #juxt.pprint
+   (install! (get *args* "dir"))}}
+
  :resources
  #{"https://example.org/actions/login"
    "https://example.org/permissions/login"

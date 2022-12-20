@@ -1,15 +1,9 @@
 {:xt/id "https://juxt.site/packages/whoami"
  :description "whoami resources"
- :dependencies #{"https://juxt.site/packages/core"}
+ :dependencies
+ ["https://juxt.site/packages/core"]
  :resources
- ;; There are some resources here that are in the core resource-pack
- #{#_"https://example.org/login"
-   #_"https://example.org/user-identities/alice"
-   #_"https://example.org/permissions/alice/whoami"
-   #_"https://example.org/applications/test-app"
-   #_"https://example.org/oauth/authorize"
-   #_"https://example.org/permissions/alice-can-authorize"
-
+ ["https://example.org/permissions/whoami"
    "https://example.org/whoami"
    "https://example.org/whoami.json"
-   "https://example.org/whoami.html"}}
+   "https://example.org/whoami.html"]}

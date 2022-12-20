@@ -17,11 +17,11 @@
 (use-fixtures :each with-system-xt with-handler with-bootstrapped-resources)
 
 (deftest get-subject-test
-  (pkg/install-package-from-filesystem! "core")
-  (pkg/install-package-from-filesystem! "example-users")
-  (pkg/install-package! (pkg/load-package-from-filesystem "resources/oauth2-auth-server"))
-  (pkg/install-package! (pkg/load-package-from-filesystem "resources/example-oauth-resources"))
-  (pkg/install-package! (pkg/load-package-from-filesystem "resources/whoami"))
+  (pkg/install-package-from-filesystem! "resources/core")
+  (pkg/install-package-from-filesystem! "resources/example-users")
+  (pkg/install-package-from-filesystem! "resources/oauth2-auth-server")
+  (pkg/install-package-from-filesystem! "resources/example-oauth-resources")
+  (pkg/install-package-from-filesystem! "resources/whoami")
   (pkg/install-resources!
    #{"https://example.org/login"
      "https://example.org/permissions/alice/whoami"})
@@ -44,6 +44,8 @@
 
     (assert access-token)
 
+    access-token
+
     (with-bearer-token access-token
       (let [{:ring.response/keys [headers body]}
             (*handler*
@@ -55,10 +57,11 @@
         (is (= "Alice"
                (-> body
                    json/read-value
-                   (get-in ["subject"
+                   (get-in ["juxt.site/subject"
                             "juxt.site/user-identity"
                             "juxt.site/user"
-                            "name"]))))
+                            "name"
+                            ]))))
         (is (= "application/json" (get headers "content-type")))
         (is (= "https://example.org/whoami.json" (get headers "content-location"))))
 

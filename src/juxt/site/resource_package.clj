@@ -3,7 +3,6 @@
 (ns juxt.site.resource-package
   (:require
    [clojure.edn :as edn]
-   [clojure.set :as set]
    [clojure.java.io :as io]
    [juxt.site.init :as init]
    [clojure.pprint :refer [pprint]]
@@ -32,8 +31,9 @@
 
 (defn load-package-from-filesystem [dir]
   (let [root (io/file dir)]
+    (assert (.isDirectory root))
     (->
-     (edn/read-string (slurp (io/file root "index.edn")))
+     (edn/read-string {:readers READERS} (slurp (io/file root "index.edn")))
      (assoc
       :dependency-graph (load-dependency-graph-from-filesystem (io/file root "resources"))))))
 
@@ -44,14 +44,6 @@
                 (cons dep-pkg
                       (get-package-transitive-dependencies db dep-pkg))))
             dependencies)))
-
-(set/difference
- (set (keys {"issuer" {:description "Issuer"}
-             "client-id" {:description "Client id"}
-             "client-secret" {:description "Client secret"}
-             "redirect-uri" {:description "Redirect URI"}
-             }))
- (set (keys {"issuer" "foo"})))
 
 (defn install-package!
   "Install a package. Not that installation of packages is NOT atomic. Any errors
@@ -70,7 +62,8 @@
             :dependency dep}))))
 
      ;; Check all parameters required by the package are satisfied
-     (when-let [missing-parameters
+     ;; (commented out because we don't have package-level parameters, they are only at the resource level)
+     #_(when-let [missing-parameters
                 (seq
                  (set/difference
                   (set (keys (:parameters pkg)))
@@ -94,19 +87,25 @@
    (install-package! pkg {})))
 
 (defn install-package-from-filesystem!
-  ([name opts]
+  ([dir opts]
    (install-package!
-    (load-package-from-filesystem (str "resources/" name))
+    (load-package-from-filesystem dir)
     opts))
-  ([name]
-   (install-package-from-filesystem! name {})))
+  ([dir]
+   (install-package-from-filesystem! dir {})))
 
-(defn dependency-graph []
-  (let [db (xt/db (init/xt-node))]
-    (apply merge
-           (map :dependency-graph
-                (map first (xt/q db '{:find [(pull e [:dependency-graph])]
-                                      :where [[e :juxt.site/type "https://meta.juxt.site/types/package"]]}))))))
+(defn dependency-graph
+  ([pkg]
+   (let [db (xt/db (init/xt-node))]
+     (apply merge
+            (:dependency-graph pkg)
+            (map :dependency-graph (get-package-transitive-dependencies db pkg)))))
+  ([]
+   (let [db (xt/db (init/xt-node))]
+     (apply merge
+            (map :dependency-graph
+                 (map first (xt/q db '{:find [(pull e [:dependency-graph])]
+                                       :where [[e :juxt.site/type "https://meta.juxt.site/types/package"]]})))))))
 
 (defn install-resources!
   ([resources opts]

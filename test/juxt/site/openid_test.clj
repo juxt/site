@@ -28,15 +28,15 @@
            "redirect-uri" "https://example.org/openid/callback"}]
 
       (pkg/install-package-from-filesystem!
-       "bootstrap"
+       "resources/bootstrap"
        {:base-uri "https://site.test"})
 
       (pkg/install-package-from-filesystem!
-       "core"
+       "resources/core"
        {:base-uri "https://site.test"})
 
       (pkg/install-package-from-filesystem!
-       "openid"
+       "resources/openid"
        {:base-uri "https://site.test"
         :parameters parameters})
 

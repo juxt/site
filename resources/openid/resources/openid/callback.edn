@@ -2,7 +2,7 @@
  #{"https://example.org/actions/install-openid-callback-endpoint"
    "https://example.org/permissions/system/install-openid-callback-endpoint"
    "https://example.org/session-scopes/openid"
-   "https://example.org/openid/auth0/client-configuration"
+   "{{client-configuration}}"
    ;; Having established this callback, allow all callers to initiate the action
    ;; associated with the GET method.
    "https://example.org/permissions/openid/exchange-code-for-id-token"}
@@ -11,5 +11,5 @@
   :juxt.site/action-id "https://example.org/actions/install-openid-callback-endpoint"
   :juxt.site/input
   {:xt/id "{{$id}}"
-   :juxt.site/openid-client-configuration "https://example.org/openid/auth0/client-configuration"
+   :juxt.site/openid-client-configuration "{{client-configuration}}"
    :juxt.site/session-scope "https://site.test/session-scopes/openid"}}}

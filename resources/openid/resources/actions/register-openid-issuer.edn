@@ -3,7 +3,7 @@
  {:juxt.site/subject-id "https://example.org/subjects/system"
   :juxt.site/action-id "https://example.org/actions/create-action"
   :juxt.site/input
-  {:xt/id "https://example.org/actions/install-openid-issuer"
+  {:xt/id "{{$id}}"
 
    :juxt.site.malli/input-schema
    [:map
@@ -70,6 +70,7 @@
             jwks (jsonista.core/read-value (:body get-jwks-response))]
 
         {:xt/id id
+         :juxt.site/type "https://meta.juxt.site/types/openid/issuer-configuration"
          :juxt.site/issuer issuer
          :juxt.site/openid-configuration openid-configuration
          :juxt.site/jwks jwks}))}

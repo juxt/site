@@ -22,6 +22,7 @@
    [juxt.site.response :as response]
    [juxt.site.session-scope :as session-scope]
    [juxt.site.util :as util]
+   [ring.util.codec :as codec]
    [sci.core :as sci]
    [xtdb.api :as xt])
   (:import (java.net URI)))
@@ -211,86 +212,103 @@
         ;; results of every permitted action? TODO: resolve this
         permitted-action (:juxt.site/action (first (:juxt.site/permitted-actions req)))]
 
+    (log/infof "Permitted action is %s" permitted-action)
+
     (cond
 
       ;; It's rare but sometimes a GET will involve a transaction. For example,
       ;; the Authorization Request (RFC 6749 Section 4.2.1).
       (and permitted-action (-> permitted-action :juxt.site/transact))
-      (actions/do-action
-       (cond-> req
-         permitted-action (assoc :juxt.site/action (:xt/id permitted-action))
-         ;; A java.io.BufferedInputStream in the request can cause this error:
-         ;; "invalid tx-op: Unfreezable type: class
-         ;; java.io.BufferedInputStream".
-         (:ring.request/body req) (dissoc :ring.request/body)))
+      (do
+        (log/infof "Permitted action is transactable")
+        (actions/do-action
+         (cond-> req
+           permitted-action (assoc :juxt.site/action (:xt/id permitted-action))
+           ;; A java.io.BufferedInputStream in the request can cause this error:
+           ;; "invalid tx-op: Unfreezable type: class
+           ;; java.io.BufferedInputStream".
+           (:ring.request/body req) (dissoc :ring.request/body))))
 
       (-> resource :juxt.site/respond :juxt.site.sci/program)
-      (let [state
-            (when-let [program (-> permitted-action :juxt.site/state :juxt.site.sci/program)]
-              (sci/eval-string
-               program
-               {:namespaces
-                (merge
-                 {'user {'*action* permitted-action
-                         '*resource* (:juxt.site/resource req)
-                         '*ctx* (dissoc req :juxt.site/xt-node)
-                         'logf (fn [& args] (eval `(log/debugf ~@args)))
-                         'log (fn [& args] (eval `(log/debug ~@args)))}
-                  'xt
-                  {'entity
-                   (fn [id] (xt/entity (:juxt.site/db req) id))
-                   'pull
-                   (fn [query eid]
-                     (xt/pull (:juxt.site/db req) query eid))
-                   }
-
-                  'juxt.site
-                  {'pull-allowed-resources
-                   (fn [m]
-                     (actions/pull-allowed-resources
-                      (:juxt.site/db req)
-                      m
-                      {:juxt.site/subject subject
-                       ;; TODO: Don't forget purpose
-                       }))}})
-
-                :classes
-                {'java.util.Date java.util.Date
-                 'java.time.Instant java.time.Instant
-                 'java.time.Duration java.time.Duration}}))
-
-            respond-program
-            (-> resource :juxt.site/respond :juxt.site.sci/program)
-
-            response
-            (sci/eval-string
-             respond-program
-             {:namespaces
-              (merge
-               {'user (cond->
-                          {'*action* permitted-action
+      (do
+        (log/infof "Resource is respondable: %s" resource)
+        (let [state
+              (when-let [program (-> permitted-action :juxt.site/state :juxt.site.sci/program)]
+                (sci/eval-string
+                 program
+                 {:namespaces
+                  (merge
+                   {'user {'*action* permitted-action
                            '*resource* (:juxt.site/resource req)
                            '*ctx* (dissoc req :juxt.site/xt-node)
                            'logf (fn [& args] (eval `(log/debugf ~@args)))
                            'log (fn [& args] (eval `(log/debug ~@args)))}
-                          state (assoc '*state* state))
+                    'xt
+                    {'entity
+                     (fn [id] (xt/entity (:juxt.site/db req) id))
+                     'pull
+                     (fn [query eid]
+                       (xt/pull (:juxt.site/db req) query eid))
+                     }
 
-                'jsonista.core
-                {'write-value-as-string json/write-value-as-string
-                 'read-value json/read-value}
+                    'juxt.site
+                    {'pull-allowed-resources
+                     (fn [m]
+                       (actions/pull-allowed-resources
+                        (:juxt.site/db req)
+                        m
+                        {:juxt.site/subject subject
+                         ;; TODO: Don't forget purpose
+                         }))}})
 
-                'xt
-                { ;; Unsafe due to violation of strict serializability, hence marked as
-                 ;; entity*
-                 'entity*
-                 (fn [id] (xt/entity (:juxt.site/db req) id))}})})
+                  :classes
+                  {'java.util.Date java.util.Date
+                   'java.time.Instant java.time.Instant
+                   'java.time.Duration java.time.Duration}}))
 
-            _ (assert (:juxt.site/start-date response)"Rerpresentation response script must return a request context")]
+              respond-program
+              (-> resource :juxt.site/respond :juxt.site.sci/program)
 
-        response)
+              response
+              (sci/eval-string
+               respond-program
+               {:namespaces
+                (merge
+                 {'user (cond->
+                            {'*action* permitted-action
+                             '*resource* (:juxt.site/resource req)
+                             '*ctx* (dissoc req :juxt.site/xt-node)
+                             'logf (fn [& args] (eval `(log/debugf ~@args)))
+                             'log (fn [& args] (eval `(log/debug ~@args)))}
+                            state (assoc '*state* state))
+
+                  'jsonista.core
+                  {'write-value-as-string json/write-value-as-string
+                   'read-value json/read-value}
+
+                  'ring.util.codec
+                  {'form-encode codec/form-encode
+                   'form-decode codec/form-decode
+                   'url-encode codec/url-encode
+                   'url-decode codec/url-decode}
+
+                  'xt
+                  { ;; Unsafe due to violation of strict serializability, hence marked as
+                   ;; entity*
+                   'entity*
+                   (fn [id] (xt/entity (:juxt.site/db req) id))}})})
+
+              _ (assert
+                 (:juxt.site/start-date response)
+                 "Representation response script must return a request context")]
+
+          (log/infof "Response is: %s" (pr-str (select-keys response [:ring.response/status :ring.response/headers :ring.response/body])))
+          response))
 
       :else
-      (response/add-payload req))))
+      (do
+        (log/infof "HERE")
+        (response/add-payload req)))))
 
 (defn perform-unsafe-method [{:keys [ring.request/method] :as req}]
   (let [req (cond-> req

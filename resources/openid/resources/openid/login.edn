@@ -1,6 +1,6 @@
-{:deps #{"https://example.org/openid/auth0/issuer"
+{:deps #{"{{issuer-configuration}}"
+         "{{client-configuration}}"
          "https://example.org/openid/callback"
-         "https://example.org/openid/auth0/client-configuration"
          "https://example.org/actions/install-openid-login-endpoint"
          "https://example.org/permissions/system/install-openid-login-endpoint"}
  :create
@@ -8,5 +8,5 @@
   :juxt.site/action-id "https://example.org/actions/install-openid-login-endpoint"
   :juxt.site/input
   {:xt/id "{{$id}}"
-   :juxt.site/openid-client-configuration "https://example.org/openid/auth0/client-configuration"
+   :juxt.site/openid-client-configuration "{{client-configuration}}"
    :juxt.site/session-scope "https://example.org/session-scopes/openid"}}}

@@ -4,6 +4,11 @@
   :juxt.site/input
   {:xt/id "https://example.org/actions/openid/exchange-code-for-id-token"
 
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [permission :xt/id]]]
+
    ;; We can process the request outside of the transaction, since the query
    ;; parameters are indepedent of the database.
    :juxt.site/prepare
@@ -67,7 +72,6 @@
           _ (when-not token-endpoint*
               (throw (ex-info "No token_endpoint found in configuration" {})))
 
-          ;; TODO: Promote this, e.g. (juxt.site/get-token {:uri token-endpoint :grant-type "authorization_code" ...}) => id-token
           token-response
           (java-http-clj.core/send
            {:method :post
@@ -191,77 +195,83 @@
 
           claims (extract-standard-claims (:claims id-token))
 
+          ;; Claims are known to add a forward-slash to the returned issuer. We
+          ;; must normalize it otherwise it won't match.
+          normalize-issuer (fn [iss] (second (re-matches (re-pattern "(.*?)/?") iss)))
+
           user-identity
           (juxt.site/match-identity
-           {:juxt.site.jwt.claims/iss (get claims :juxt.site.jwt.claims/iss)
-            :juxt.site.jwt.claims/nickname (get claims :juxt.site.jwt.claims/nickname)})
+           {:juxt.site.jwt.claims/iss (normalize-issuer (get claims :juxt.site.jwt.claims/iss))
+            :juxt.site.jwt.claims/sub (get claims :juxt.site.jwt.claims/sub)})
 
           issued-date (get-in id-token [:claims "iat"])
           expiry-date (get-in id-token [:claims "exp"]) ;;(java.util.Date/from (.plusSeconds (java.time.Instant/now) 30)) ;;
 
           subject
-          (when user-identity
-            (into
-             {:xt/id (str "https://example.org/subjects/" subject-id)
-              :juxt.site/type "https://meta.juxt.site/types/subject"
-              :juxt.site/id-token-claims (:claims id-token)
-              :juxt.site/user-identity user-identity
-              :juxt.site/issued-date issued-date
-              :juxt.site/expiry-date expiry-date}
-             claims))
+          (cond-> {:xt/id (str "https://example.org/subjects/" subject-id)
+                   :juxt.site/type "https://meta.juxt.site/types/subject"
+                   :juxt.site/id-token-claims (:claims id-token)
+                   :juxt.site/issued-date issued-date
+                   :juxt.site/expiry-date expiry-date}
+            claims (into claims)
+            user-identity (assoc :juxt.site/user-identity user-identity))
 
           new-session-token-doc
-          (when subject
-            {:xt/id (str "https://example.org/session-tokens/" new-session-token)
-             :juxt.site/type "https://meta.juxt.site/types/session-token"
-             :juxt.site/session-token new-session-token
-             :juxt.site/session (:xt/id session)})]
+          {:xt/id (str "https://example.org/session-tokens/" new-session-token)
+           :juxt.site/type "https://meta.juxt.site/types/session-token"
+           :juxt.site/session-token new-session-token
+           :juxt.site/session (:xt/id session)}]
 
-      (cond-> []
-        subject
-        (conj
-         [:xtdb.api/put subject
-          (get-in subject [:juxt.site/id-token-claims "iat"])
-          ;; TODO: Expire the subject in the bitemporal timeline according
-          ;; to the 'exp' (expiry) in the claims. This has the added
-          ;; desirable effect of keeping the database free from clutter.
-          (get-in subject [:juxt.site/id-token-claims "exp"])]
+      (remove
+       nil?
+       [[:xtdb.api/put subject
+         (get-in subject [:juxt.site/id-token-claims "iat"])
+         ;; Expire the subject in the bitemporal timeline according to the 'exp'
+         ;; (expiry) in the claims. This has the added desirable effect of
+         ;; keeping the database free from clutter.
+         (get-in subject [:juxt.site/id-token-claims "exp"])]
 
-         ;; Update session with subject
-         [:xtdb.api/put (assoc session :juxt.site/subject (:xt/id subject))]
+        ;; Update session with subject
+        [:xtdb.api/put
+         (cond-> session
+           subject (assoc :juxt.site/subject (:xt/id subject))
+           (:juxt.site/return-to session) (dissoc :juxt.site/return-to))]
 
-         ;; Escalate session (as recommended by OWASP as this session has
-         ;; been promoted)
-         [:xtdb.api/put new-session-token-doc]
+        ;; Escalate session (as recommended by OWASP as this session has
+        ;; been promoted)
+        [:xtdb.api/put new-session-token-doc]
 
-         ;; TODO: Original return-to query param should be in session -
-         ;; use it here.
-         ;; [:ring.response/status 303]
+        (when-let [old-session-token (:juxt.site/session-token-id! *ctx*)]
+          [:xtdb.api/delete old-session-token])
 
-         [:ring.response/headers
-          (let [session-scope (:juxt.site/session-scope *ctx*)
-                _ (when-not session-scope
-                    (throw
-                     (ex-info
-                      "No :juxt.site/session-scope attached to context"
-                      {})))
+        [:ring.response/status (if (:juxt.site/return-to session) 303 200)]
 
-                cookie-name (:juxt.site/cookie-name session-scope)
-                _ (when-not cookie-name
-                    (throw
-                     (ex-info
-                      "No :juxt.site/cookie-name found in session-scope"
-                      {:juxt.site/session-scope session-scope})))
+        [:ring.response/headers
+         (let [session-scope (:juxt.site/session-scope *ctx*)
+               _ (when-not session-scope
+                   (throw
+                    (ex-info
+                     "No :juxt.site/session-scope attached to context"
+                     {})))
 
-                cookie-path (or (:juxt.site/cookie-path session-scope) "/")]
-            { ;;"location" return-to
-             "set-cookie"
-             (format "%s=%s; Path=%s; Secure; HttpOnly; SameSite=Lax"
-                     cookie-name
-                     new-session-token
-                     cookie-path)})])))}
+               cookie-name (:juxt.site/cookie-name session-scope)
+               _ (when-not cookie-name
+                   (throw
+                    (ex-info
+                     "No :juxt.site/cookie-name found in session-scope"
+                     {:juxt.site/session-scope session-scope})))
 
-   :juxt.site/rules
-   [
-    [(allowed? subject resource permission)
-     [permission :xt/id]]]}}}
+               cookie-path (or (:juxt.site/cookie-path session-scope) "/")]
+           (cond-> {}
+             true (assoc "set-cookie"
+                         (format "%s=%s; Path=%s; Secure; HttpOnly; SameSite=Lax"
+                                 cookie-name
+                                 new-session-token
+                                 cookie-path))
+             (:juxt.site/return-to session)
+             (assoc "location" (:juxt.site/return-to session))
+
+             (not (:juxt.site/return-to session))
+             (assoc "content-type" "text/plain")))]
+
+        [:ring.response/body (str "TODO: Subject established, user identity matched: " (pr-str user-identity))]]))}}}}

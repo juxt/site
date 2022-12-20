@@ -2,7 +2,7 @@
  {:juxt.site/subject-id "https://example.org/subjects/system"
   :juxt.site/action-id "https://example.org/actions/create-action"
   :juxt.site/input
-  {:xt/id "https://example.org/actions/install-openid-client"
+  {:xt/id "{{$id}}"
 
    :juxt.site.malli/input-schema
    [:map
@@ -28,7 +28,8 @@
          body
          (String.)
          clojure.edn/read-string
-         juxt.site.malli/validate-input)))}
+         juxt.site.malli/validate-input
+         (assoc :juxt.site/type "https://meta.juxt.site/types/openid/client-configuration"))))}
 
    :juxt.site/transact
    {:juxt.site.sci/program

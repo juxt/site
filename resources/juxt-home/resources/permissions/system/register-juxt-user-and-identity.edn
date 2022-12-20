@@ -1,8 +1,9 @@
-{:create
+{:deps #{"https://example.org/actions/register-juxt-user-and-identity"}
+ :create
  {:juxt.site/subject-id "https://example.org/subjects/system"
   :juxt.site/action-id "https://example.org/actions/grant-permission"
   :juxt.site/input
-  {:xt/id "https://example.org/permissions/system/install-openid-issuer"
+  {:xt/id "{{$id}}"
    :juxt.site/subject "https://example.org/subjects/system"
-   :juxt.site/action "https://example.org/actions/install-openid-issuer"
+   :juxt.site/action "https://example.org/actions/register-juxt-user-and-identity"
    :juxt.site/purpose nil}}}

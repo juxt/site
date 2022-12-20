@@ -1,0 +1,19 @@
+{:xt/id "https://home.juxt.site/packages/juxt-home"
+ :description "JUXT Home"
+ :dependencies ["https://juxt.site/packages/core"]
+
+ :resources
+ ["https://example.org/actions/register-juxt-user-and-identity"
+  "https://example.org/permissions/system/register-juxt-user-and-identity"]
+
+ :commands
+ {:home/register-user
+  {:description "Register a JUXT employee or associate"
+   :arguments [["fullname" {:description "Full name"}]
+               ["juxtcode" {:description "JUXT code (three letters)"}]
+               ["iss" {:description "Identity issuer"
+                       :default "https://juxt.eu.auth0.com"}]
+               ["sub" {:description "Issuer subject"}]]
+   :juxt.site.sci/program
+   #juxt.pprint
+   (converge! [(format "https://example.org/~%s" (get *args* "juxtcode"))])}}}

@@ -10,9 +10,9 @@
    :juxt.site/respond
    {:juxt.site.sci/program
     #juxt.pprint
-    (let [content (format "<h1>Hello World! state is %s</h1>\n" (pr-str *state*))]
+    (let [content (format "<body><h1>Who am I?</h1><p>%s</p></h1></body>\n" (pr-str *state*))]
       (-> *ctx*
           (assoc :ring.response/body content)
-          (update :ring.response/headers assoc "content-length" (count (.getBytes content)))
+          (update :ring.response/headers assoc "content-length" (str (count (.getBytes content))))
           ))}
    :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}}}}
