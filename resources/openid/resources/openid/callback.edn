@@ -12,4 +12,4 @@
   :juxt.site/input
   {:xt/id "{{$id}}"
    :juxt.site/openid-client-configuration "{{client-configuration}}"
-   :juxt.site/session-scope "https://site.test/session-scopes/openid"}}}
+   :juxt.site/session-scope "https://example.org/session-scopes/openid"}}}
