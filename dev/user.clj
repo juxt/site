@@ -8,16 +8,13 @@
    [clojure.tools.logging :as log]
    [clojure.java.io :as io]
    [juxt.site.repl :refer :all]
-   [juxt.site.init :as init :refer [config xt-node system put!]]
    [integrant.core :as ig]
-   [xtdb.api :as xt]
    malli.dev.pretty
    [malli.dev :as md]
    juxt.site.schema
    xtdb.query
    fipp.ednize
-   [juxt.clojars-mirrors.nippy.v3v1v1.taoensso.nippy :as nippy]
-   ))
+   [juxt.clojars-mirrors.nippy.v3v1v1.taoensso.nippy :as nippy]))
 
 (nippy/extend-freeze
  clojure.lang.Atom :juxt.site.nippy/atom [x data-output]

@@ -25,9 +25,6 @@
         [:xtdb.api/put (dissoc m :xtdb.api/valid-time) vt])))
    (xt/await-tx (xt-node))))
 
-(defn config []
-  (main/config))
-
 (defn lookup [id graph]
   (or
    (when-let [v (get graph id)] (assoc v :id id))
