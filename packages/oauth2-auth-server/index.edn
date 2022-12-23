@@ -5,9 +5,10 @@
  [["https://example.org" {:description "Host of the authorization server"}]
   ["https://core.example.org" {:description "Host of the Site core actions"}]]
 
- :dependencies [
-                ;; Must have sessions support on this host
-                "https://example.org/packages/sessions"]
+ :dependencies
+ [
+  ;; Must have sessions support on this host
+  "https://example.org/packages/sessions"]
 
  :resources
  #{"https://example.org/oauth/authorize"
