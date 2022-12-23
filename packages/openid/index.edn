@@ -5,7 +5,8 @@
  [["https://example.org" {:description "Host of the OpenID client"}]
   ["https://core.example.org" {:description "Host of the Site core actions"}]]
 
- :dependencies ["https://core.example.org/packages/core"]
+ :dependencies
+ []
 
  :resources
  ["https://example.org/actions/openid/exchange-code-for-id-token"
