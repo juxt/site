@@ -512,32 +512,30 @@
            (factory-reset!)
 
            (install!
-            "resources/bootstrap"
-            {"https://example.org" "https://data.site.test"})
+            "packages/bootstrap"
+            {"https://example.org" "https://auth.site.test"})
 
            (install!
-            "resources/core"
-            {"https://example.org" "https://data.site.test"})
+            "packages/sessions"
+            {"https://example.org" "https://auth.site.test"
+             "https://core.example.org" "https://auth.site.test"})
 
-           ;; TODO: Actually, install authorisation server here!!
+           (install!
+            "packages/oauth2-auth-server"
+            {"https://example.org" "https://auth.site.test"
+             "https://core.example.org" "https://auth.site.test"})
 
            ;; The authorisation server will need to authenticate users
            (install!
-            "resources/openid"
-            {"https://core.example.org" "https://data.site.test"
-             "https://example.org" "https://auth.site.test"})
+            "packages/openid"
+            {"https://example.org" "https://auth.site.test"
+             "https://core.example.org" "https://auth.site.test"})
 
            (call-command
             :openid/register-client
             {"iss" "https://juxt.eu.auth0.com"
              "client-id" "d8X0TfEIcTl5oaltA4oy9ToEPdn5nFUK"
              "client-secret" "gvk-mNdDmyaFsJwN_xVKHPH4pfrInYqJE1r8lRrn0gmoKI4us0Q5Eb7ULdruYZjD"})
-
-           ;; TODO: Install authorisation server
-           (install!
-            "resources/oauth2-auth-server"
-            {"https://core.example.org" "https://data.site.test"
-             "https://example.org" "https://auth.site.test"})
 
            (catch Exception e
              (pprint e)
