@@ -543,6 +543,13 @@
              (pprint e)
              (def e e))))]
 
+      [:ls ^{:doc "List all resources"}
+       (fn []
+         (let [resources (ls)]
+           (doseq [id resources]
+             (println id))
+           (printf "%d resources\n" (count resources))))]
+
       [:reset ^{:doc "Reset entire database"}
        (fn [] (factory-reset!))]
 
