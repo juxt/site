@@ -21,45 +21,45 @@
   ;; Build the authorization server (https://auth.example.test)
 
   (pkg/install-package-from-filesystem!
-   "resources/bootstrap"
+   "packages/bootstrap"
    {"https://example.org" "https://auth.example.test"})
 
   ;; TODO: Question: shouldn't the system subject be installed on
   ;; auth.example.test, and therefore the whole bootstrap?
 
   (pkg/install-package-from-filesystem!
-   "resources/sessions"
+   "packages/sessions"
    {#{"https://example.org" "https://core.example.org"} "https://auth.example.test"})
 
   (pkg/install-package-from-filesystem!
-   "resources/oauth2-auth-server"
+   "packages/oauth2-auth-server"
    {#{"https://example.org" "https://core.example.org"} "https://auth.example.test"})
 
   ;; Now we need some mechanism to authenticate with the authorization server in
   ;; order to authorize applications and acquire tokens.
 
   (pkg/install-package-from-filesystem!
-   "resources/login-form"
+   "packages/login-form"
    {#{"https://example.org" "https://core.example.org"} "https://auth.example.test"})
 
   (pkg/install-package-from-filesystem!
-   "resources/user-database"
+   "packages/user-database"
    {#{"https://example.org" "https://core.example.org"} "https://auth.example.test"})
 
   (pkg/install-package-from-filesystem!
-   "resources/example-users"
+   "packages/example-users"
    {#{"https://example.org" "https://core.example.org"} "https://auth.example.test"})
 
   (pkg/install-package-from-filesystem!
-   "resources/example-oauth-resources"
+   "packages/example-oauth-resources"
    {#{"https://auth.example.org" "https://core.example.org"} "https://auth.example.test"})
 
   (pkg/install-package-from-filesystem!
-   "resources/protection-spaces"
+   "packages/protection-spaces"
    {#{"https://auth.example.org" "https://core.example.org"} "https://auth.example.test"})
 
   (pkg/install-package-from-filesystem!
-   "resources/whoami"
+   "packages/whoami"
    {"https://example.org" "https://example.test"
     #{"https://auth.example.org" "https://core.example.org"} "https://auth.example.test"})
 

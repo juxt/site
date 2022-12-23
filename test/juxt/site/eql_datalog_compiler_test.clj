@@ -23,43 +23,43 @@
 
 (defn install-hospital! []
   (pkg/install-package-from-filesystem!
-   "resources/bootstrap"
+   "packages/bootstrap"
    {"https://example.org" "https://auth.hospital.com"})
 
   (pkg/install-package-from-filesystem!
-   "resources/user-database"
+   "packages/user-database"
    {#{"https://core.example.org" "https://example.org"} "https://auth.hospital.com"})
 
   (pkg/install-package-from-filesystem!
-   "resources/example-users"
+   "packages/example-users"
    {#{"https://core.example.org" "https://example.org"} "https://auth.hospital.com"})
 
   (pkg/install-package-from-filesystem!
-   "resources/sessions"
+   "packages/sessions"
    {#{"https://core.example.org" "https://example.org"} "https://auth.hospital.com"})
 
   (pkg/install-package-from-filesystem!
-   "resources/login-form"
+   "packages/login-form"
    {#{"https://core.example.org" "https://example.org"} "https://auth.hospital.com"})
 
   (pkg/install-package-from-filesystem!
-   "resources/oauth2-auth-server"
+   "packages/oauth2-auth-server"
    {#{"https://core.example.org" "https://example.org"} "https://auth.hospital.com"})
 
   (pkg/install-package-from-filesystem!
-   "resources/example-oauth-resources"
+   "packages/example-oauth-resources"
    {#{"https://core.example.org" "https://auth.example.org"} "https://auth.hospital.com"})
 
   (pkg/install-package-from-filesystem!
-   "resources/protection-spaces"
+   "packages/protection-spaces"
    {#{"https://core.example.org" "https://auth.example.org"} "https://auth.hospital.com"})
 
   (pkg/install-package-from-filesystem!
-   "resources/protection-spaces"
+   "packages/protection-spaces"
    {#{"https://core.example.org" "https://auth.example.org"} "https://auth.hospital.com"})
 
   (pkg/install-package-from-filesystem!
-   "resources/hospital-demo"
+   "packages/hospital-demo"
    {"https://example.org" "https://hospital.com"
     #{"https://core.example.org" "https://auth.example.org"} "https://auth.hospital.com"}))
 

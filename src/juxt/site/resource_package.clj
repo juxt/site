@@ -129,7 +129,7 @@
       (install-package! {})))
 
 (comment
-  (-> (io/file "resources/core")
+  (-> (io/file "packages/core")
       load-package-from-filesystem
       (apply-uri-map {"https://example.org" "https://site.test"})))
 

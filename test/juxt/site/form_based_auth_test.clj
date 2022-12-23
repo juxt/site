@@ -22,11 +22,11 @@
                     path
                     common-uri-map))]
 
-    (install! "resources/bootstrap")
-    (install! "resources/sessions")
-    (install! "resources/login-form")
-    (install! "resources/user-database")
-    (install! "resources/example-users")
+    (install! "packages/bootstrap")
+    (install! "packages/sessions")
+    (install! "packages/login-form")
+    (install! "packages/user-database")
+    (install! "packages/example-users")
 
     (let [result (login/login-with-form!
                   *handler*

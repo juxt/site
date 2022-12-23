@@ -14,5 +14,5 @@
       clojure.lang.ExceptionInfo
       #"uri-map is missing some required keys"
       (pkg/apply-uri-map
-       (edn/read-string (slurp "resources/whoami/index.edn"))
+       (edn/read-string (slurp "packages/whoami/index.edn"))
        {"https://example.org" "https://example.test"})))))
