@@ -71,7 +71,7 @@
 
 (deftest eql-with-acl-test
   ;; Create some measurements
-  (init/enact-create!
+  (init/install!
    *xt-node*
    {:juxt.site/subject-id "https://auth.hospital.com/subjects/system"
     :juxt.site/action-id "https://auth.hospital.com/actions/register-patient-measurement"
@@ -81,7 +81,7 @@
      :reading {"heartRate" "120"
                "bloodPressure" "137/80"}}})
 
-  (init/enact-create!
+  (init/install!
    *xt-node*
    {:juxt.site/subject-id "https://auth.hospital.com/subjects/system"
     :juxt.site/action-id "https://auth.hospital.com/actions/register-patient-measurement"
@@ -91,7 +91,7 @@
      :reading {"heartRate" "82"
                "bloodPressure" "198/160"}}})
 
-  (init/enact-create!
+  (init/install!
    *xt-node*
    {:juxt.site/subject-id "https://auth.hospital.com/subjects/system"
     :juxt.site/action-id "https://auth.hospital.com/actions/register-patient-measurement"
@@ -101,7 +101,7 @@
      :reading {"heartRate" "85"
                "bloodPressure" "120/80"}}})
 
-  (init/enact-create!
+  (init/install!
    *xt-node*
    {:juxt.site/subject-id "https://auth.hospital.com/subjects/system"
     :juxt.site/action-id "https://auth.hospital.com/actions/register-patient-measurement"

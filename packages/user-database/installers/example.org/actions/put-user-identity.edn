@@ -1,0 +1,68 @@
+{:install
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://core.example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "{{$id}}"
+
+   :juxt.site.malli/input-schema
+   [:map
+    [:xt/id [:re "https://example.org/.*"]]
+    [:juxt.site/user [:re "https://example.org/.+"]]
+
+    ;; Required by basic-user-identity
+    [:juxt.site/username [:re "[A-Za-z0-9]{2,}"]]
+    ;; NOTE: Can put in some password rules here
+    [:juxt.site/password [:string {:min 6}]]
+    ;;[:juxt.site.jwt.claims/iss {:optional true} [:re "https://.+"]]
+    ;;[:juxt.site.jwt.claims/sub {:optional true} [:string {:min 1}]]
+    ]
+
+   :juxt.site/prepare
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (let [content-type (-> *ctx*
+                           :juxt.site/received-representation
+                           :juxt.http/content-type)
+          body (-> *ctx*
+                   :juxt.site/received-representation
+                   :juxt.http/body)]
+      (case content-type
+        "application/edn"
+        (let [input
+              (some->
+               body
+               (String.)
+               clojure.edn/read-string
+               juxt.site.malli/validate-input
+               (assoc
+                :juxt.site/type #{"https://meta.juxt.site/types/user-identity"
+                                  "https://meta.juxt.site/types/basic-user-identity"}
+                :juxt.site/methods
+                {:get {:juxt.site/actions #{"https://example.org/actions/get-user-identity"}}
+                 :head {:juxt.site/actions #{"https://example.org/actions/get-user-identity"}}
+                 :options {}}))]
+          (-> input
+              ;; We want usernames to be case-insensitive, as per OWASP
+              ;; guidelines.
+              (update :juxt.site/username clojure.string/lower-case)
+              ;; Hash the password
+              (assoc :juxt.site/password-hash (crypto.password.bcrypt/encrypt (:juxt.site/password input)))
+              ;; Remove clear-text password from input, so it doesn't go into
+              ;; the database.
+              (dissoc :juxt.site/password)))))}
+
+   :juxt.site/transact
+   {:juxt.site.sci/program
+    #juxt.pprint
+    [[:xtdb.api/put *prepare*]]}
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [permission :juxt.site/subject subject]]
+
+    [(allowed? subject resource permission)
+     [subject :juxt.site/user-identity id]
+     [id :juxt.site/user user]
+     [user :role role]
+     [permission :role role]]]}}}

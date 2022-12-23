@@ -1,0 +1,8 @@
+{:install
+ {:juxt.site/input
+  ;; tag::install-system-subject![]
+  {:xt/id "{{$id}}"
+   :juxt.site/description "The system subject"
+   :juxt.site/type "https://meta.juxt.site/types/subject"}
+  ;; end::install-system-subject![]
+  }}

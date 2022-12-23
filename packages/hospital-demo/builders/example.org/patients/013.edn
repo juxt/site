@@ -1,9 +1,0 @@
-{:deps
- #{"https://auth.example.org/actions/register-patient"
-   "https://auth.example.org/permissions/system/register-patient"}
- :create
- {:juxt.site/subject-id "https://core.example.org/subjects/system"
-  :juxt.site/action-id "https://auth.example.org/actions/register-patient"
-  :juxt.site/input
-  {:xt/id "{{$id}}"
-   :name "Hazel Huynh"}}}

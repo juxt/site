@@ -1,0 +1,10 @@
+{:deps
+ ["https://example.org/actions/register-application"
+  "https://example.org/permissions/system/register-application"]
+ :install
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/register-application"
+  :juxt.site/input
+  {:juxt.site/client-id "{{client}}"
+   ;; TODO: What is this redirect-uri doing here?
+   :juxt.site/redirect-uri "https://example.org/terminal/{{client}}"}}}

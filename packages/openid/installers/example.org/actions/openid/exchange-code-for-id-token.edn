@@ -1,0 +1,277 @@
+{:install
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://core.example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "{{$id}}"
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [permission :xt/id]]]
+
+   ;; We can process the request outside of the transaction, since the query
+   ;; parameters are indepedent of the database.
+   :juxt.site/prepare
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (let [query-params (some-> *ctx* :ring.request/query (ring.util.codec/form-decode "US-ASCII"))
+          _ (when-not query-params
+              (throw (ex-info "No query params" {})))
+
+          received-state (when (map? query-params) (get query-params "state"))
+          _ (when-not received-state
+              (throw
+               (ex-info
+                "No state in query params"
+                {})))
+
+          code (when (map? query-params) (get query-params "code"))
+          _ (when-not code
+              (throw
+               (ex-info "No code in query params" {})))
+
+          openid-client-configuration-id (:juxt.site/openid-client-configuration *resource*)
+          _ (when-not openid-client-configuration-id
+              (throw
+               (ex-info
+                "Resource does not have a non-nil :juxt.site/openid-client entry"
+                {:resource *resource*})))
+
+          ;; The use of the asterisk as a suffix is meant to indicate that
+          ;; this data may be stale, and shouldn't be used to make
+          ;; decisions. However, in this case, we need to make an HTTP
+          ;; request and this cannot be done in a transaction
+          ;; function. The returned ID_TOKEN will be checked and verified
+          ;; in the transaction function.
+          {:juxt.site/keys [client-id client-secret redirect-uri]
+           :as openid-client-configuration*}
+          (xt/entity* openid-client-configuration-id)
+          _ (when-not openid-client-configuration*
+              (throw
+               (ex-info
+                "OpenID client document not found in database"
+                {:openid-client-configuration-id openid-client-configuration-id})))
+
+          issuer-config-id* (:juxt.site/issuer-configuration openid-client-configuration*)
+          _ (when-not issuer-config-id*
+              (throw (ex-info "No issuer config in client" {})))
+
+          issuer-configuration* (xt/entity* issuer-config-id*)
+          _ (when-not issuer-configuration*
+              (throw (ex-info "Issuer configuation document not found in database"
+                              {:issuer-config-id issuer-config-id*})))
+
+          openid-configuration* (:juxt.site/openid-configuration issuer-configuration*)
+          _ (when-not openid-configuration*
+              (throw
+               (ex-info
+                "OpenID configuration has not yet been fetched"
+                {:issuer-configuration issuer-configuration*})))
+
+          token-endpoint* (get openid-configuration* "token_endpoint")
+          _ (when-not token-endpoint*
+              (throw (ex-info "No token_endpoint found in configuration" {})))
+
+          token-response
+          (java-http-clj.core/send
+           {:method :post
+            :uri token-endpoint*
+            :headers {"Content-Type" "application/json" #_"application/x-www-form-urlencoded"
+                      "Accept" "application/json"}
+            :body (jsonista.core/write-value-as-string
+                   {"grant_type" "authorization_code"
+                    "client_id" client-id
+                    "client_secret" client-secret
+                    "code" code
+                    "redirect_uri" redirect-uri})}
+           {:as :byte-array})
+
+          ;; The id_token is a JWT embedded in the JSON object returned in
+          ;; the response body .
+          json (jsonista.core/read-value (:body token-response))
+          encoded-id-token (get json "id_token")
+
+          _ (when-not encoded-id-token
+              (throw (ex-info "ID_TOKEN not returned in JSON response" {:json-response json})))
+
+          ;; The subject-id will be randomized, so we can't generate this
+          ;; in the transaction function (since different nodes would
+          ;; almost certainly generate different values!)
+          subject-id (juxt.site.util/make-nonce 10)]
+
+      ;; We send the issuer and the encoded-id-token. Although the client
+      ;; configuration may still change prior to this transaction reaching
+      ;; the head of the queue, the id token is still valid with respect
+      ;; to the issuer. We include the issuer to allow the transaction to
+      ;; check it hasn't changed (if it has, the id-token must be
+      ;; reacquired from the new issuer). Note that while this might
+      ;; appear to be an unreasonable about of caution to preserve strict
+      ;; serializability of data.
+      {:issuer (:juxt.site/issuer issuer-configuration*)
+       :encoded-id-token encoded-id-token
+       :received-state received-state
+       :subject-id subject-id
+       :new-session-token (juxt.site.util/make-nonce 16)})}
+
+   :juxt.site/transact
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (let [{issuer :issuer
+           encoded-id-token :encoded-id-token
+           received-state :received-state
+           subject-id :subject-id
+           new-session-token :new-session-token}
+          *prepare*
+
+          openid-client-configuration-id (:juxt.site/openid-client-configuration *resource*)
+          openid-client-configuration (xt/entity openid-client-configuration-id)
+          client-id (:juxt.site/client-id openid-client-configuration)
+          issuer-config-id (:juxt.site/issuer-configuration openid-client-configuration)
+          issuer-configuration (xt/entity issuer-config-id)
+          openid-configuration (:juxt.site/openid-configuration issuer-configuration)
+
+          jwks (:juxt.site/jwks issuer-configuration)
+          _ (when-not jwks
+              (throw (ex-info "No JWKS in configuration, will not be able to verify JWTs" {})))
+
+          id-token
+          (juxt.site/decode-id-token
+           {:id-token encoded-id-token
+            :jwks jwks
+            :openid-configuration openid-configuration
+            :client-id client-id})
+
+          ;; Arguably do the nonce check below in the validation of the
+          ;; ID_TOKEN.  Pass in the session if necessary.
+
+          session (:juxt.site/session *ctx*)
+          _ (when-not session
+              (throw (ex-info "No session in request context" {})))
+
+          expected-state (:juxt.site/state session)
+          _ (when-not expected-state
+              (throw (ex-info "No state stored in session" {})))
+
+          ;; Check the states match
+          _ (when-not (= expected-state received-state)
+              ;; This could be a CSRF attack, we should log an alert
+              (throw
+               (ex-info
+                (format "State mismatch (received: %s, expected: %s, session: %s)" received-state expected-state (pr-str session))
+                {:received-state received-state
+                 :expected-state expected-state})))
+
+          session-nonce (:juxt.site/nonce session)
+          _ (when-not session-nonce
+              (throw (ex-info "Expected to find nonce in session" {:session session})))
+
+          claimed-nonce (get-in id-token [:claims "nonce"])
+          _ (when-not claimed-nonce
+              (throw (ex-info "Expected to find nonce claim in ID_TOKEN" {})))
+
+          ;; TODO: This really ought to be promoted to library code
+          _ (when-not (= claimed-nonce session-nonce)
+              ;; TODO: This is possibly an attack, we should log an alert
+              (throw
+               (ex-info
+                "Nonce received in ID_TOKEN claims does not match the original one sent!"
+                {:claimed-nonce claimed-nonce
+                 :session-nonce session-nonce})))
+
+          extract-standard-claims
+          (fn [claims]
+            (let [standard-claims
+                  ["iss" "sub" "aud" "exp" "iat" "auth_time" "nonce" "acr" "amr" "azp"
+                   "name" "given_name" "family_name" "middle_name" "nickname" "preferred_username"
+                   "profile" "picture" "website" "email" "email_verified" "gender" "birthdate"
+                   "zoneinfo" "locale" "phone_number" "phone_number_verified" "address" "updated_at"]]
+              (->>
+               (for [c standard-claims
+                     :let [v (get claims c)]
+                     :when v]
+                 ;; See https://www.rfc-editor.org/rfc/rfc7519#section-4
+                 [(keyword "juxt.site.jwt.claims" (clojure.string/replace c "_" "-")) v])
+               (into {}))))
+
+          claims (extract-standard-claims (:claims id-token))
+
+          ;; Claims are known to add a forward-slash to the returned issuer. We
+          ;; must normalize it otherwise it won't match.
+          normalize-issuer (fn [iss] (second (re-matches (re-pattern "(.*?)/?") iss)))
+
+          user-identity
+          (juxt.site/match-identity
+           {:juxt.site.jwt.claims/iss (normalize-issuer (get claims :juxt.site.jwt.claims/iss))
+            :juxt.site.jwt.claims/sub (get claims :juxt.site.jwt.claims/sub)})
+
+          issued-date (get-in id-token [:claims "iat"])
+          expiry-date (get-in id-token [:claims "exp"]) ;;(java.util.Date/from (.plusSeconds (java.time.Instant/now) 30)) ;;
+
+          subject
+          (cond-> {:xt/id (str "https://example.org/subjects/" subject-id)
+                   :juxt.site/type "https://meta.juxt.site/types/subject"
+                   :juxt.site/id-token-claims (:claims id-token)
+                   :juxt.site/issued-date issued-date
+                   :juxt.site/expiry-date expiry-date}
+            claims (into claims)
+            user-identity (assoc :juxt.site/user-identity user-identity))
+
+          new-session-token-doc
+          {:xt/id (str "https://example.org/session-tokens/" new-session-token)
+           :juxt.site/type "https://meta.juxt.site/types/session-token"
+           :juxt.site/session-token new-session-token
+           :juxt.site/session (:xt/id session)}]
+
+      (remove
+       nil?
+       [[:xtdb.api/put subject
+         (get-in subject [:juxt.site/id-token-claims "iat"])
+         ;; Expire the subject in the bitemporal timeline according to the 'exp'
+         ;; (expiry) in the claims. This has the added desirable effect of
+         ;; keeping the database free from clutter.
+         (get-in subject [:juxt.site/id-token-claims "exp"])]
+
+        ;; Update session with subject
+        [:xtdb.api/put
+         (cond-> session
+           subject (assoc :juxt.site/subject (:xt/id subject))
+           (:juxt.site/return-to session) (dissoc :juxt.site/return-to))]
+
+        ;; Escalate session (as recommended by OWASP as this session has
+        ;; been promoted)
+        [:xtdb.api/put new-session-token-doc]
+
+        (when-let [old-session-token (:juxt.site/session-token-id! *ctx*)]
+          [:xtdb.api/delete old-session-token])
+
+        [:ring.response/status (if (:juxt.site/return-to session) 303 200)]
+
+        [:ring.response/headers
+         (let [session-scope (:juxt.site/session-scope *ctx*)
+               _ (when-not session-scope
+                   (throw
+                    (ex-info
+                     "No :juxt.site/session-scope attached to context"
+                     {})))
+
+               cookie-name (:juxt.site/cookie-name session-scope)
+               _ (when-not cookie-name
+                   (throw
+                    (ex-info
+                     "No :juxt.site/cookie-name found in session-scope"
+                     {:juxt.site/session-scope session-scope})))
+
+               cookie-path (or (:juxt.site/cookie-path session-scope) "/")]
+           (cond-> {}
+             true (assoc "set-cookie"
+                         (format "%s=%s; Path=%s; Secure; HttpOnly; SameSite=Lax"
+                                 cookie-name
+                                 new-session-token
+                                 cookie-path))
+             (:juxt.site/return-to session)
+             (assoc "location" (:juxt.site/return-to session))
+
+             (not (:juxt.site/return-to session))
+             (assoc "content-type" "text/plain")))]
+
+        [:ring.response/body (str "TODO: Subject established, user identity matched: " (pr-str user-identity))]]))}}}}

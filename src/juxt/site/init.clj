@@ -93,12 +93,12 @@
        ;; (perf: note the reduce is done after the distinct to avoid duplicating
        ;; work)
        (reduce
-        (fn [acc {:keys [id create params] :as node}]
-          (let [init-data (render-form-templates create (assoc (merge parameter-map params) "$id" id))]
+        (fn [acc {:keys [id install params] :as node}]
+          (let [init-data (render-form-templates install (assoc (merge parameter-map params) "$id" id))]
             (conj acc (-> node (assoc ::init-data init-data)))))
         [])))
 
-(defn enact-create! [xt-node init-data]
+(defn install! [xt-node init-data]
   (when-not init-data (throw (ex-info "No init data" {})))
   (if-let [subject-id (:juxt.site/subject-id init-data)]
 
@@ -160,10 +160,10 @@
             (when error (throw (ex-info "Cannot proceed with error resource" {:id id :error error})))
             (try
               (let [{:juxt.site/keys [puts] :as result}
-                    (enact-create! xt-node init-data)]
+                    (install! xt-node init-data)]
                 (when (and puts (not (contains? (set puts) id)))
                   (throw (ex-info "Puts does not contain id" {:id id :puts puts})))
-                {:id id :status :created :result result})
+                {:id id :status :installed :result result})
               (catch Throwable cause
                 (throw (ex-info (format "Failed to converge id: '%s'" id) {:id id} cause))
                 ;;{:id id :status :error :error cause}

@@ -1,9 +1,0 @@
-{:deps ["https://example.org/actions/register-application"]
- :create
- {:juxt.site/subject-id "https://core.example.org/subjects/system"
-  :juxt.site/action-id "https://core.example.org/actions/grant-permission"
-  :juxt.site/input
-  {:xt/id "{{$id}}"
-   :juxt.site/subject "https://core.example.org/subjects/system"
-   :juxt.site/action "https://example.org/actions/register-application"
-   :juxt.site/purpose nil}}}

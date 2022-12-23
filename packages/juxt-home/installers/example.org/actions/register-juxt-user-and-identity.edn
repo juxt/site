@@ -1,0 +1,59 @@
+{:install
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "{{$id}}"
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [permission :juxt.site/subject subject]]
+
+    [(allowed? subject resource permission)
+     [subject :juxt.site/user-identity id]
+     [id :juxt.site/user user]
+     [permission :role role]
+     [user :role role]]]
+
+   :juxt.site.malli/input-schema
+   [:map
+    [:xt/id [:re "https://example.org/\\~[a-z]{3}"]]
+    [:juxt.home/juxtcode [:re "[a-z]{3}"]]
+    [:juxt.home/fullname [:re ".{3,}"]]
+    [:juxt.site.jwt.claims/iss [:re "https://.+"]]
+    [:juxt.site.jwt.claims/sub [:re "github\\|[0-9]+"]]]
+
+   :juxt.site/prepare
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (let [content-type (-> *ctx*
+                           :juxt.site/received-representation
+                           :juxt.http/content-type)
+          body (-> *ctx*
+                   :juxt.site/received-representation
+                   :juxt.http/body)]
+
+      (let [input
+            (case content-type
+              "application/edn"
+              (some->
+               body
+               (String.)
+               clojure.edn/read-string
+               juxt.site.malli/validate-input))]
+        {:user
+         (merge
+          (select-keys input [:xt/id :juxt.home/fullname :juxt.home/juxtcode])
+          {:juxt.site/type "https://meta.juxt.site/types/user"})
+         :user-identity
+         (merge
+          {:xt/id (format "https://example.org/user-identities/%s" (:juxt.home/juxtcode input))
+           :juxt.site/user (:xt/id input)
+           :juxt.site/type "https://meta.juxt.site/types/user-identity"}
+          (select-keys input [:juxt.site.jwt.claims/iss :juxt.site.jwt.claims/sub]))}))}
+
+   :juxt.site/transact
+   {:juxt.site.sci/program
+    #juxt.pprint
+    [[:xtdb.api/put (:user *prepare*)]
+     [:xtdb.api/put (:user-identity *prepare*)]]}}}}

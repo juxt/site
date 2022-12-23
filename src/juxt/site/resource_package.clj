@@ -76,7 +76,7 @@
     (->
      (edn/read-string {:readers READERS} (slurp (io/file root "index.edn")))
      (assoc
-      :dependency-graph (load-dependency-graph-from-filesystem (io/file root "builders"))))))
+      :dependency-graph (load-dependency-graph-from-filesystem (io/file root "installers"))))))
 
 (defn get-package-transitive-dependencies [db pkg]
   (let [dependencies (:dependencies pkg)]

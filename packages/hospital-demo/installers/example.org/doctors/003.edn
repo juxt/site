@@ -1,0 +1,9 @@
+{:deps
+ ["https://auth.example.org/actions/register-doctor"
+  "https://auth.example.org/permissions/system/register-doctor"]
+ :install
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://auth.example.org/actions/register-doctor"
+  :juxt.site/input
+  {:xt/id "{{$id}}"
+   :name "Dr. Jackson"}}}

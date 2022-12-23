@@ -1,8 +1,0 @@
-{:deps #{"https://auth.example.org/actions/put-protection-space"
-         "https://auth.example.org/permissions/system/put-protection-space"}
- :create
- {:juxt.site/subject-id "https://core.example.org/subjects/system"
-  :juxt.site/action-id "https://auth.example.org/actions/put-protection-space"
-  :juxt.site/input
-  {:xt/id "https://auth.example.org/protection-spaces/bearer"
-   :juxt.site/auth-scheme "Bearer"}}}

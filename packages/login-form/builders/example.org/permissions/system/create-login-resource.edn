@@ -1,8 +1,0 @@
-{:create
- {:juxt.site/subject-id "https://core.example.org/subjects/system"
-  :juxt.site/action-id "https://core.example.org/actions/grant-permission"
-  :juxt.site/input
-  {:xt/id "https://example.org/permissions/system/create-login-resource"
-   :juxt.site/subject "https://core.example.org/subjects/system"
-   :juxt.site/action "https://example.org/actions/create-login-resource"
-   :juxt.site/purpose nil}}}
