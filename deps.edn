@@ -27,14 +27,14 @@
 
         ;; Content negotiation
         juxt/pick
-        #_{:git/url "https://github.com/juxt/pick.git"
-         :sha "e4b314cb9e94121fe8005c5628f7f33d28cdefd4"}
-        {:local/root "/home/mal/src/github.com/juxt/pick"}
+        {:git/url "https://github.com/juxt/pick.git"
+         :sha "166c8a3788c42dabc3cddbd46b44213082098101"}
+        ;;:local/root "/home/mal/src/github.com/juxt/pick"
 
         juxt/grab
-        {;;:git/url "https://github.com/juxt/grab.git"
-         ;;:sha "63ca3fd6542705151ff6ef7127a79478cae12b2b"
-         :local/root "/home/mal/src/github.com/juxt/grab"
+        {:git/url "https://github.com/juxt/grab.git"
+         :sha "6722e5885039f31e28a14d2bd23f956dd3c1dde4"
+         ;;:local/root "/home/mal/src/github.com/juxt/grab"
          }
 
         ;; JSON Schema support functions
