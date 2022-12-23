@@ -606,5 +606,7 @@
    :ok)
   ([] (help* {})))
 
-(defn ^::public help []
+(defn ^::public help
+  "Show available REPL functions"
+  []
   (help* {:include-keyword-commands? false}))
