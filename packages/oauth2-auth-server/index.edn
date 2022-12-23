@@ -1,8 +1,9 @@
 {:xt/id "https://example.org/packages/oauth2-auth-server"
  :description "OAuth2 Authorization Server"
 
- :uri-map [["https://example.org" {:description "Host of the authorization server"}]
-           ["https://core.example.org" {:description "Host of the Site core actions"}]]
+ :uri-map
+ [["https://example.org" {:description "Host of the authorization server"}]
+  ["https://core.example.org" {:description "Host of the Site core actions"}]]
 
  :dependencies [
                 ;; Must have sessions support on this host
