@@ -1,0 +1,17 @@
+{:xt/id "https://example.org/packages/login-form"
+ :description "Login form"
+
+ ;; TODO: Don't really like uri-map as a word - anything better? what's the
+ ;; scheme/authority pair known as?
+ :uri-map
+ [["https://example.org" {:description "Host serving the login form and creating sessions"}]
+  ["https://core.example.org" {:description "Host of the Site core actions"}]]
+
+ :dependencies
+ ["https://example.org/packages/sessions"]
+
+ :resources
+ ["https://example.org/actions/login"
+  "https://example.org/permissions/login"
+  "https://example.org/actions/create-login-resource"
+  "https://example.org/login"]}

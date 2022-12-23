@@ -11,13 +11,14 @@
 
 (defn authorize-response!
   "Authorize response"
-  [{:juxt.site/keys [session-token]
+  [uri
+   {:juxt.site/keys [session-token]
     client-id "client_id"
     scope "scope"}]
   (let [state (make-nonce 10)
         request
         {:ring.request/method :get
-         :juxt.site/uri "https://example.org/oauth/authorize"
+         :juxt.site/uri uri
          :ring.request/headers {"cookie" (format "id=%s" session-token)}
          :ring.request/query
          (codec/form-encode
@@ -31,6 +32,7 @@
 (malli/=>
  authorize-response!
  [:=> [:cat
+       [:string]
        [:map
         ["client_id" :string]
         ["scope" {:optional true} [:sequential :string]]]]
@@ -40,8 +42,8 @@
 
 (defn authorize!
   "Authorize an application, and return decoded fragment parameters as a string->string map"
-  [args]
-  (let [response (authorize-response! args)
+  [uri args]
+  (let [response (authorize-response! uri args)
         _ (case (:ring.response/status response)
             (302 303) :ok
             400 (throw (ex-info "Client error" (assoc args :response response)))
@@ -61,6 +63,7 @@
 (malli/=>
  authorize!
  [:=> [:cat
+       [:string]
        [:map
 ;;        ^{:doc "to authenticate with authorization server"} [:juxt.site/session-token :string]
         ["client_id" :string]

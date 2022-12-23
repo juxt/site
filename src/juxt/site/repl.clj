@@ -12,13 +12,40 @@
    [juxt.site.actions :as actions]
    [juxt.site.cache :as cache]
    [juxt.site.resource-package :as pkg]
-   [juxt.site.init :as init :refer [config base-uri xt-node]]
+   [juxt.site.init :as init :refer [xt-node]]
    [juxt.site.util :as util]
    [ring.util.codec :as codec]
    [sci.core :as sci]
    [xtdb.api :as xt]
    [juxt.site.repl :as repl])
   (:import (java.util Date)))
+
+(defn grab-input! [args]
+  (reduce
+   (fn [acc [k {:keys [description default type] :as v}]]
+     (print (if (some? default)
+              (format "%s [%s] (%s): " description k default)
+              (format "%s [%s]: " description k)))
+     (flush)
+     (let [v (read-line)
+           v (cond (str/blank? v) default :else v)
+           v (case type
+               ;; TODO: could use a multimethod here
+               :dir (let [dir (io/file v)]
+                      (when-not (.isDirectory dir)
+                        (throw (ex-info (format "%s should be a directory" dir) {})))
+                      dir)
+               v)]
+       (assoc acc k v)))
+   {}
+   args))
+
+(defn confirm! [m]
+  (print "Confirm? (y/n) ")
+  (flush)
+  (let [input (read-line)]
+    (when (contains? #{"y" "yes"} (str/lower-case input))
+      m)))
 
 (defn base64-reader [form]
   {:pre [(string? form)]}
@@ -289,7 +316,7 @@
        (println "Evicting" (count batch) "records")
        (println (apply evict! batch))))))
 
-(defn steps
+#_(defn steps
   ([] (steps (config)))
   ([opts]
    (let [{:juxt.site/keys [base-uri]} opts
@@ -338,7 +365,7 @@
 
       ])))
 
-(defn status
+#_(defn status
   ([] (status (steps (config))))
   ([steps]
    (println)
@@ -398,11 +425,8 @@
 
 (defn install!
   "Install local package from filesystem"
-  [dir]
-  (let [config (config)
-        opts {:base-uri (:juxt.site/base-uri config)
-              :dry-run? false}]
-    (pkg/install-package-from-filesystem! dir opts)))
+  [dir uri-map]
+  (pkg/install-package-from-filesystem! dir uri-map))
 
 (defn keyword-commands-from-packages []
   (for [[k vs]
@@ -417,38 +441,54 @@
         :let [[_ v] (first vs)]]
     [k v]))
 
-(defn grab-input! [args prompt]
-  (let [config (config)]
-    (println prompt)
-    (reduce
-     (fn [acc [k {:keys [description default type] :as v}]]
-       (let [default (cond (vector? default) (get-in config default) :else default)]
-         (print (if (some? default)
-                  (format "%s [%s] (%s): " description k default)
-                  (format "%s [%s]: " description k)))
-         (flush)
-         (let [v (read-line)
-               v (cond (str/blank? v) default :else v)
-               v (case type
-                   :dir (let [dir (io/file v)]
-                          (when-not (.isDirectory dir)
-                            (throw (ex-info (format "%s should be a directory" dir) {})))
-                          dir)
-                   v)]
-           (assoc acc k v))))
-     {}
-     args)))
+(defn create-command-fn [program args]
+  (assert program)
+  (assert (map? args))
+  (fn []
+    (try
+      (sci/eval-string
+       program
+       {:namespaces
+        {'user
+         {'*args* args
+          'converge!
+          (fn converge!
+            [resources parameters]
+            (init/converge!
+             resources
+             (pkg/dependency-graph) ;; (pkg/dependency-graph pkg)
+             parameters
+             ))
+          'q (fn [& args] (apply q args))
+          ;; TODO: Need to think about uri-map arg here
+          ;;'install! (fn [dir] (install! dir {}))
+          }
+         'ring.util.codec
+         {'form-encode codec/form-encode
+          'form-decode codec/form-decode
+          'url-encode codec/url-encode
+          'url-decode codec/url-decode}}})
+      (catch clojure.lang.ExceptionInfo e
+        (println (.getMessage e))
+        (pprint (ex-data e))
+        (println (.getMessage (.getCause e)))
+        (pprint (ex-data (.getCause e)))
+        (throw (ex-info (.getMessage e) (or (ex-data (.getCause e)) {}) (.getCause e)))))))
 
-(defn confirm! [m prompt]
-  (println)
-  (println prompt)
-  (pprint m)
-  (println)
-  (print "Confirm? (y/n) ")
-  (flush)
-  (let [input (read-line)]
-    (when (contains? #{"y" "yes"} (str/lower-case input))
-      m)))
+;;(-> e (.getCause) (.getCause) (.getCause) (.getCause) ex-data )
+;;(-> e )
+
+(defn call-command
+  ([command-k args]
+   (let [command (get (into {} (keyword-commands-from-packages)) command-k)
+         ;; TODO: Check args match, else throw error
+         f (create-command-fn
+            (:juxt.site.sci/program command)
+            args)]
+     (f)))
+  ([command-k] (call-command command-k {})))
+
+;;(-> e (.getCause) (.getCause)  (.getCause) (.getCause) (.getCause) ex-data)
 
 (defn keyword-commands []
   (let [pad (fn [s] (apply str (repeat (max 0 (- 52 (count (str s)))) ".")))]
@@ -457,14 +497,63 @@
        ^{:doc "Show this menu"}
        (fn [] (help* {:include-keyword-commands? true}))]
 
-      [:status ^{:doc "Show status"} (fn [] (status))]
+      ;;[:status ^{:doc "Show status"} (fn [] (status))]
 
       [:quit ^{:doc "Disconnect"} (fn [] nil)]
 
-      [:init ^{:doc "Initialize system by bootstrapping resources"}
+      #_[:init ^{:doc "Initialize system by bootstrapping resources"}
+         (fn []
+           (install! "resources/bootstrap")
+           (install! "resources/core"))]
+
+      [:test ^{:doc "Run test script"}
        (fn []
-         (install! "resources/bootstrap")
-         (install! "resources/core"))]
+         (try
+           (factory-reset!)
+
+           (install!
+            "resources/bootstrap"
+            {"https://example.org" "https://data.site.test"})
+
+           (install!
+            "resources/core"
+            {"https://example.org" "https://data.site.test"})
+
+           ;; TODO: Actually, install authorisation server here!!
+
+           ;; The authorisation server will need to authenticate users
+           (install!
+            "resources/openid"
+            {"https://core.example.org" "https://data.site.test"
+             "https://example.org" "https://auth.site.test"})
+
+           (call-command
+            :openid/register-client
+            {"iss" "https://juxt.eu.auth0.com"
+             "client-id" "d8X0TfEIcTl5oaltA4oy9ToEPdn5nFUK"
+             "client-secret" "gvk-mNdDmyaFsJwN_xVKHPH4pfrInYqJE1r8lRrn0gmoKI4us0Q5Eb7ULdruYZjD"})
+
+           ;; TODO: Install authorisation server
+           (install!
+            "resources/oauth2-auth-server"
+            {"https://core.example.org" "https://data.site.test"
+             "https://example.org" "https://auth.site.test"})
+
+           (catch Exception e
+             (pprint e)
+             (def e e))))]
+
+      [:reset ^{:doc "Reset entire database"}
+       (fn [] (factory-reset!))]
+
+      [:install ^{:doc "Install a local package"}
+       (fn []
+         (println "Install local package")
+         (let [args (some-> [["dir" {:description "Package directory"
+                                     :type :dir}]
+                             ["host" {:description "Host"}]]
+                            (grab-input!))]
+           (install! (get args "dir") {"https://example.org" (str "https://" (get args "host"))})))]
 
       [:types ^{:doc "Show types"}
        (fn [] (doseq [t (types)]
@@ -487,45 +576,16 @@
       (fn [acc [k v]]
         (conj
          acc [k
-              ^{:doc (:description v)}
-              (fn []
-                (cond
-                  (:juxt.site.sci/program v)
-                  (when-let [args (some-> (:arguments v)
-                                          (grab-input! (:description v))
-                                          (confirm! (:description v)))]
-                    (try
-                      (sci/eval-string
-                       (:juxt.site.sci/program v)
-                       {:namespaces
-                        {'user
-                         {'*args* args
-                          'converge!
-                          (fn converge!
-                            ([resources] (converge! resources {}))
-                            ([resources opts]
-                             (init/converge!
-                              resources
-                              (pkg/dependency-graph) ;; (pkg/dependency-graph pkg)
-                              (merge
-                               {:dry-run? false
-                                :base-uri (init/base-uri)
-                                :parameters args}
-                               opts)
-                              )))
-                          'q (fn [& args] (apply q args))
-                          'install! (fn [dir] (install! dir))}
-                         'ring.util.codec
-                         {'form-encode codec/form-encode
-                          'form-decode codec/form-decode
-                          'url-encode codec/url-encode
-                          'url-decode codec/url-decode}}})
-                      (catch clojure.lang.ExceptionInfo e
-                        (println (.getMessage e))
-                        (println (.getCause e))
-                        (throw (ex-info (.getMessage e) (or (ex-data (.getCause e)) {}) (.getCause e))))))
-
-                  :else (throw (ex-info "Cannot execute command" {:command v}))))]))
+              (let [{:keys [juxt.site.sci/program] :as command} v]
+                ^{:doc (:description v)}
+                (fn []
+                  (cond
+                    program
+                    (when-let [args (some-> (:arguments command)
+                                            (grab-input!)
+                                            (confirm!))]
+                      (create-command-fn program args))
+                    :else (throw (ex-info "Cannot execute command" {:command command})))))]))
       []
       (keyword-commands-from-packages)))))
 
@@ -545,3 +605,6 @@
          (println sig pad (:doc m)))))
    :ok)
   ([] (help* {})))
+
+(defn ^::public help []
+  (help* {:include-keyword-commands? false}))

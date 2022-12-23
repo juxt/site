@@ -1,0 +1,8 @@
+{:deps ["https://example.org/actions/put-user"
+        "https://example.org/permissions/system/put-user"]
+ :create
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/put-user"
+  :juxt.site/input
+  {:xt/id "{{$id}}"
+   :name "Carlos"}}}

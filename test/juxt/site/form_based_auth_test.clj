@@ -9,20 +9,28 @@
    [juxt.site.resource-package :as pkg]
    [juxt.test.util :refer [*handler*
                            with-fixtures
-                           with-bootstrapped-resources
                            with-system-xt with-handler]]))
 
-(use-fixtures :each with-system-xt with-handler with-bootstrapped-resources)
+(use-fixtures :each with-system-xt with-handler)
 
 (deftest login-with-form-test
-  (pkg/install-package! (pkg/load-package-from-filesystem "resources/core"))
-  (pkg/install-package! (pkg/load-package-from-filesystem "resources/example-users"))
-  (pkg/install-resources!
-   #{"https://example.org/login"})
+  (let [common-uri-map
+        {"https://example.org" "https://example.test"
+         "https://core.example.org" "https://example.test"}
+        install! (fn [path]
+                   (pkg/install-package-from-filesystem!
+                    path
+                    common-uri-map))]
 
-  (let [result (login/login-with-form!
-                *handler*
-                :juxt.site/uri "https://example.org/login"
-                "username" "ALICE"
-                "password" "garden")]
-    (is (malli/validate [:map [:juxt.site/session-token :string]] result))))
+    (install! "resources/bootstrap")
+    (install! "resources/sessions")
+    (install! "resources/login-form")
+    (install! "resources/user-database")
+    (install! "resources/example-users")
+
+    (let [result (login/login-with-form!
+                  *handler*
+                  :juxt.site/uri "https://example.test/login"
+                  "username" "ALICE"
+                  "password" "garden")]
+      (is (malli/validate [:map [:juxt.site/session-token :string]] result)))))

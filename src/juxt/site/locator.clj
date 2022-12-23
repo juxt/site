@@ -54,10 +54,9 @@
 (defn locate-resource
   "Call each locate-resource defmethod, in a particular order, ending
   in :default."
-  [{:juxt.site/keys [db uri base-uri]}]
+  [{:juxt.site/keys [db uri]}]
 
   (assert uri)
-  (assert base-uri)
   (assert db)
   (or
    ;; Deprecated. Will be replaced with simple resources that contain enough
@@ -76,7 +75,8 @@
 
    ;; This can be put into the database to override the ::default-empty-resource
    ;; default.
-   (xt/entity db (str base-uri "/_site/not-found"))
+   ;; TODO: Locate this relative to the uri being located
+   (xt/entity db "https://example.org/_site/not-found")
 
    {:juxt.site/resource-provider ::default-empty-resource
     :juxt.site/methods {:get {} :head {} :options {} :put {} :post {}}}))

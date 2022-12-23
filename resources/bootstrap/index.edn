@@ -1,18 +1,20 @@
-{:xt/id "https://juxt.site/packages/bootstrap"
+{:xt/id "https://example.org/packages/bootstrap"
  :description "Bootstrap resources"
+
+ :uri-map
+ [["https://example.org" {:description "Base URI of data host"}]]
 
  ;; These are always added on package installation
  :resources
- #{"https://example.org/_site/do-action"
-   "https://example.org/_site/not-found"
+ ["https://example.org/_site/do-action"
+  "https://example.org/subjects/system"
+  "https://example.org/actions/create-action"
+  "https://example.org/actions/grant-permission"
+  "https://example.org/permissions/system/bootstrap"
 
-   "https://example.org/subjects/system"
-
-   "https://example.org/actions/create-action"
-   "https://example.org/actions/grant-permission"
-   "https://example.org/actions/install-not-found"
-   "https://example.org/actions/get-not-found"
-
-   "https://example.org/permissions/system/bootstrap"
-   "https://example.org/permissions/system/install-not-found"
-   "https://example.org/permissions/get-not-found"}}
+  "https://example.org/actions/install-not-found"
+  ;;"https://example.org/permissions/system/install-not-found"
+  ;;"https://example.org/_site/not-found"
+  ;;"https://example.org/actions/get-not-found"
+  ;;"https://example.org/permissions/get-not-found"
+  ]}

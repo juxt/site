@@ -1,0 +1,46 @@
+{:deps
+ #{"https://example.org/_site/do-action"
+   "https://example.org/subjects/system"
+   "https://example.org/actions/create-action"
+   "https://example.org/permissions/system/bootstrap"}
+ :create
+ {:juxt.site/subject-id "https://example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "https://example.org/actions/install-not-found"
+
+   :juxt.site.malli/input-schema
+   [:map
+    [:xt/id [:re "https://example.org/.*"]]]
+
+   :juxt.site/prepare
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (let [content-type (-> *ctx*
+                           :juxt.site/received-representation
+                           :juxt.http/content-type)
+          body (-> *ctx*
+                   :juxt.site/received-representation
+                   :juxt.http/body)]
+      (case content-type
+        "application/edn"
+        (some->
+         body
+         (String.)
+         clojure.edn/read-string
+         juxt.site.malli/validate-input
+         (assoc
+          :juxt.site/type "https://meta.juxt.site/types/not-found"
+          :juxt.site/methods
+          {:get {:juxt.site/actions #{"https://example.org/actions/get-not-found"}}
+           :head {:juxt.site/actions #{"https://example.org/actions/get-not-found"}}}))))}
+
+   :juxt.site/transact
+   {:juxt.site.sci/program
+    #juxt.pprint
+    [[:xtdb.api/put *prepare*]]}
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [permission :juxt.site/subject subject]]]}}}

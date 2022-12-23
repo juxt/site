@@ -1,7 +1,16 @@
-{:xt/id "https://juxt.site/packages/oauth2-auth-server"
+{:xt/id "https://example.org/packages/oauth2-auth-server"
  :description "OAuth2 Authorization Server"
- :dependencies #{"https://juxt.site/packages/core"}
+
+ :uri-map [["https://example.org" {:description "Host of the authorization server"}]
+           ["https://core.example.org" {:description "Host of the Site core actions"}]]
+
+ :dependencies [
+                ;; Must have sessions support on this host
+                "https://example.org/packages/sessions"]
+
  :resources
  #{"https://example.org/oauth/authorize"
    "https://example.org/actions/oauth/authorize"
-   "https://example.org/actions/install-authorization-server"}}
+   "https://example.org/actions/install-authorization-server"
+   "https://example.org/permissions/system/install-authorization-server"
+   "https://example.org/permissions/system/register-application"}}

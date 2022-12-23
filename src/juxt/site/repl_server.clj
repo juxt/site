@@ -14,7 +14,7 @@
   (apply require clojure.main/repl-requires)
   (println "Site by JUXT. Copyright (c) 2020-2022, JUXT LTD.")
   (println "Type :quit to exit, :help for help.")
-  (let [f (requiring-resolve 'juxt.site.repl/steps)
+  #_(let [f (requiring-resolve 'juxt.site.repl/steps)
         steps (f)]
     (when-not (every? :complete? steps)
       (let [g (requiring-resolve 'juxt.site.repl/status)]

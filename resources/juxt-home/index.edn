@@ -1,6 +1,6 @@
-{:xt/id "https://home.juxt.site/packages/juxt-home"
+{:xt/id "https://example.org/packages/juxt-home"
  :description "JUXT Home"
- :dependencies ["https://juxt.site/packages/core"]
+ :dependencies ["https://example.org/packages/core"]
 
  :resources
  ["https://example.org/actions/register-juxt-user-and-identity"

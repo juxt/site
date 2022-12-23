@@ -2,20 +2,17 @@
 
 (ns juxt.site.resource-package-test
   (:require
-   [clojure.test :refer [deftest is are use-fixtures]]
+   [clojure.edn :as edn]
+   [clojure.test :refer [deftest is are testing]]
    [juxt.site.resource-package :as pkg]
-   [juxt.site.repl :as repl]
-   [juxt.test.util
-    :refer [with-system-xt
-            with-fixtures with-handler
-            with-bootstrapped-resources]]))
+   [juxt.site.repl :as repl]))
 
-(use-fixtures :each with-system-xt with-handler with-bootstrapped-resources)
-
-(deftest install-resource-packages-test []
-  (is
-   (with-fixtures
-     (pkg/install-package-from-filesystem! "resources/bootstrap")
-     (pkg/install-package-from-filesystem! "resources/core")
-     (pkg/install-package-from-filesystem! "resources/whoami")
-     (repl/ls))))
+(deftest apply-uri-map-test
+  (testing "Fail when uri-map not satisfied"
+    (is
+     (thrown-with-msg?
+      clojure.lang.ExceptionInfo
+      #"uri-map is missing some required keys"
+      (pkg/apply-uri-map
+       (edn/read-string (slurp "resources/whoami/index.edn"))
+       {"https://example.org" "https://example.test"})))))

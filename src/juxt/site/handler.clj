@@ -586,13 +586,7 @@
                 assoc "date" (format-http-date start-date))
 
         request-id
-        (update :ring.response/headers
-                assoc "site-request-id"
-                (cond-> request-id
-                  ;; Not sure I like this shortening, it's inconvenient to have
-                  ;; to prepend the base-uri each time
-                  #_(.startsWith request-id base-uri)
-                  #_(subs (count base-uri))))
+        (update :ring.response/headers assoc "site-request-id" request-id)
 
         resource
         (update :ring.response/headers
@@ -928,8 +922,8 @@
     (catch Exception e
       (throw (ex-info "Illegal host format" {:host host} e)))))
 
-(defn new-request-id [base-uri]
-  (str base-uri "/_site/requests/"
+(defn new-request-id []
+  (str "https://example.org/_site/requests/"
        (subs (util/hexdigest
               (.getBytes (str (java.util.UUID/randomUUID)) "US-ASCII")) 0 24)))
 
@@ -961,18 +955,15 @@
 
 (defn wrap-initialize-request
   "Initialize request state."
-  [h {:juxt.site/keys [xt-node base-uri uri-prefix] :as opts}]
+  [h {:juxt.site/keys [xt-node uri-prefix] :as opts}]
   (assert xt-node)
-  (assert base-uri)
   (fn [{:ring.request/keys [scheme path]
         :juxt.site/keys [uri] :as req}]
 
     (assert (not (and uri path)))
 
     (let [db (xt/db xt-node)
-          req-id (new-request-id base-uri)
-
-          ;; TODO: Infer path if necessary: uri = base-uri + path
+          req-id (new-request-id)
 
           uri (or uri
                   (let [host (or
@@ -991,7 +982,7 @@
                                       "://" host))
                                (str/lower-case) ; See Section 6.2.2.1 of RFC 3986
                                (http-scheme-normalize scheme)))
-                            base-uri)]
+                            (throw (ex-info "Failed to resolve uri-prefix" {:ctx :req})))]
 
                     ;; The scheme+authority is already normalized (by transforming to
                     ;; lower-case). The path, however, needs to be normalized here.

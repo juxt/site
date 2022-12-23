@@ -8,7 +8,7 @@
    [clojure.tools.logging :as log]
    [clojure.java.io :as io]
    [juxt.site.repl :refer :all]
-   [juxt.site.init :as init :refer [config base-uri xt-node system put!]]
+   [juxt.site.init :as init :refer [config xt-node system put!]]
    [integrant.core :as ig]
    [xtdb.api :as xt]
    malli.dev.pretty

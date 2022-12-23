@@ -3,23 +3,23 @@ schema {
 }
 
 type Query {
-  doctors: [Doctor] @site(action: "https://example.org/hospital/actions/get-doctor")
-  patients: [Patient] @site(action: "https://example.org/hospital/actions/get-patient")
+  doctors: [Doctor] @site(action: "https://auth.hospital.com/actions/get-doctor")
+  patients: [Patient] @site(action: "https://auth.hospital.com/actions/get-patient")
 }
 
 type Doctor {
   id: ID
   _type: String
   name: String
-  patients: [Patient] @site(action: "https://example.org/hospital/actions/get-patient")
+  patients: [Patient] @site(action: "https://auth.hospital.com/actions/get-patient")
 }
 
 type Patient {
   id: ID
   _type: String
   name: String
-  doctors: [Doctor] @site(action: "https://example.org/hospital/actions/get-doctor")
-  readings: [Reading] @site(action: "https://example.org/hospital/actions/read-any-measurement")
+  doctors: [Doctor] @site(action: "https://auth.hospital.com/actions/get-doctor")
+  readings: [Reading] @site(action: "https://auth.hospital.com/actions/read-any-measurement")
 }
 
 type Reading {

@@ -41,9 +41,7 @@
    identity))
 
 (defn with-handler [f]
-  (binding [*handler* (make-handler
-                       {:juxt.site/xt-node *xt-node*
-                        :juxt.site/base-uri "https://example.org"})]
+  (binding [*handler* (make-handler {:juxt.site/xt-node *xt-node*})]
     (f)))
 
 (defn with-timing [f]
@@ -62,7 +60,7 @@
     (binding [*db* db]
       (f))))
 
-(defn with-bootstrapped-resources [f]
+(defn ^:deprecated with-bootstrapped-resources [f]
   (pkg/install-package-from-filesystem! "resources/bootstrap" {})
   (f))
 

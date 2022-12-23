@@ -1,9 +1,17 @@
-{:xt/id "https://juxt.site/packages/whoami"
+{:xt/id "https://example.org/packages/whoami"
  :description "whoami resources"
+
+ :uri-map
+ [["https://example.org" {:description "Host of the server hosting these whoami resources"}]
+  ["https://auth.example.org" {:description "Authorization server"}]
+  ["https://core.example.org" {:description "Core Site actions"}]]
+
  :dependencies
- ["https://juxt.site/packages/core"]
+ ["https://auth.example.org/packages/bootstrap"
+  "https://auth.example.org/packages/protection-spaces"]
+
  :resources
- ["https://example.org/permissions/whoami"
-   "https://example.org/whoami"
-   "https://example.org/whoami.json"
-   "https://example.org/whoami.html"]}
+ ["https://auth.example.org/permissions/whoami"
+  "https://example.org/whoami"
+  "https://example.org/whoami.json"
+  "https://example.org/whoami.html"]}

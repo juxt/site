@@ -1,11 +1,20 @@
-{:xt/id "https://juxt.site/packages/example-oauth-resources"
+{:xt/id "https://auth.example.org/packages/example-oauth-resources"
  :description "Example OAuth2 resources"
- :dependencies #{"https://juxt.site/packages/core"
-                 "https://juxt.site/packages/example-users"
-                 "https://juxt.site/packages/oauth2-auth-server"}
- :resources
- #{"https://example.org/permissions/alice-can-authorize"
-   "https://example.org/permissions/bob-can-authorize"
-   "https://example.org/permissions/carlos-can-authorize"
 
-   "https://example.org/applications/test-app"}}
+ :uri-map
+ [["https://auth.example.org"
+   {:description "Host of the server hosting the user database, sessions and applications"}]
+  ["https://core.example.org"
+   {:description "Host of the Site core actions"}]]
+
+ :dependencies
+ ["https://core.example.org/packages/bootstrap"
+  "https://auth.example.org/packages/example-users"
+  "https://auth.example.org/packages/oauth2-auth-server"]
+
+ :resources
+ ["https://auth.example.org/permissions/alice-can-authorize"
+  "https://auth.example.org/permissions/bob-can-authorize"
+  "https://auth.example.org/permissions/carlos-can-authorize"
+  "https://auth.example.org/applications/test-app"
+  ]}

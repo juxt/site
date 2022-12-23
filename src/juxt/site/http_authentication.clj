@@ -29,9 +29,8 @@
 ;; the bearer token is more difficult to use if intercepted.
 
 (defn find-or-create-basic-auth-subject [req user-identity protection-space]
-  (assert (:juxt.site/base-uri req))
   (let [xt-node (:juxt.site/xt-node req)
-        subject {:xt/id (format "%s/_site/subjects/%s" (:juxt.site/base-uri req) (random-uuid))
+        subject {:xt/id (format "https://example.org/_site/subjects/%s" (random-uuid))
                  :juxt.site/type "https://meta.juxt.site/types/subject"
                  :juxt.site/user-identity (:xt/id user-identity)
                  :juxt.site/protection-space (:xt/id protection-space)}

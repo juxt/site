@@ -1,0 +1,9 @@
+{:deps ["https://auth.example.org/actions/whoami"]
+ :create
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://core.example.org/actions/grant-permission"
+  :juxt.site/input
+  {:xt/id "{{$id}}"
+   :juxt.site/action "https://auth.example.org/actions/whoami"
+   :juxt.site/purpose nil
+   :juxt.site/user "https://auth.example.org/users/{{username}}"}}}

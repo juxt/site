@@ -1,8 +1,0 @@
-{:create
- {:juxt.site/subject-id "https://example.org/subjects/system"
-  :juxt.site/action-id "https://example.org/actions/grant-permission"
-  :juxt.site/input
-  {:xt/id "https://example.org/hospital/permissions/system/assign-doctor-to-patient"
-   :juxt.site/subject "https://example.org/subjects/system"
-   :juxt.site/action "https://example.org/hospital/actions/assign-doctor-to-patient"
-   :juxt.site/purpose nil}}}

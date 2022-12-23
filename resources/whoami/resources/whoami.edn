@@ -1,9 +1,0 @@
-{:deps #{"https://example.org/actions/whoami"
-         "https://example.org/protection-spaces/bearer"}
- :create
- {:juxt.site/input
-  {:xt/id "{{$id}}"
-   :juxt.site/methods
-   {:get {:juxt.site/actions #{"https://example.org/actions/whoami"}}}
-   :juxt.site/protection-spaces #{"https://example.org/protection-spaces/bearer"}
-   :juxt.site/session-scope "https://example.org/session-scopes/openid"}}}

@@ -1,0 +1,28 @@
+{:create
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://core.example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "{{$id}}"
+
+   ;; NOTE: This means: Use the action to extract part of the
+   ;; resource's state.  Actions are used to extract
+   ;; protected data, particularly part of the state of a
+   ;; resource.
+   ;;
+   ;; NOTE: Actions emit DATA, not form. It is the data that
+   ;; an action is protecting and managing, not a particular
+   ;; view of it.
+
+   :juxt.site/state
+   {:juxt.site.sci/program
+    #juxt.pprint
+    {:juxt.site/subject
+     (xt/pull
+      '[* {:juxt.site/user-identity [* {:juxt.site/user [*]}]}]
+      (:xt/id (:juxt.site/subject *ctx*)))}}
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [subject :juxt.site/user-identity id]
+     [permission :xt/id]]]}}}

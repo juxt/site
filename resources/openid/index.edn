@@ -1,6 +1,10 @@
-{:xt/id "https://juxt.site/packages/openid"
+{:xt/id "https://example.org/packages/openid"
  :description "OpenID Connect"
- :dependencies ["https://juxt.site/packages/core"]
+
+ :uri-map [["https://example.org" {:description "Host of the OpenID client"}]
+           ["https://core.example.org" {:description "Host of the Site core actions"}]]
+
+ :dependencies ["https://core.example.org/packages/core"]
 
  :resources
  ["https://example.org/actions/openid/exchange-code-for-id-token"
@@ -20,19 +24,22 @@
   :openid/register-client
   {:description "Register an OpenID client"
    :arguments
-   [["iss" {:description "Issuer URL" :default [:juxt.site/issuer]}]
-    ["client-id" {:description "Client id" :default [:juxt.site/client-id]}]
-    ["client-secret" {:description "Client secret" :default [:juxt.site/client-secret]}]]
+   [["iss" {:description "Issuer URL"}]
+    ["client-id" {:description "Client id"}]
+    ["client-secret" {:description "Client secret"}]]
 
    :juxt.site.sci/program
    #juxt.pprint
-   (converge!
-    [(format "https://example.org/openid/clients/%s" (ring.util.codec/url-encode (get *args* "client-id")))
-     "https://example.org/openid/login"
-     "https://example.org/openid/callback"]
-    {:parameters
-     (assoc *args*
-            "issuer-configuration"
-            (format "https://example.org/openid/issuers/%s" (ring.util.codec/url-encode (get *args* "iss")))
-            "client-configuration"
-            (format "https://example.org/openid/clients/%s" (get *args* "client-id")))})}}}
+   (do
+     (assert (get *args* "iss") "iss (issuer) not given")
+     (assert (get *args* "client-id") "client-id not given")
+     (assert (get *args* "client-secret") "client-secret not given")
+     (converge!
+      [(format "https://example.org/openid/clients/%s" (ring.util.codec/url-encode (get *args* "client-id")))
+       "https://example.org/openid/login"
+       "https://example.org/openid/callback"]
+      (assoc *args*
+             "issuer-configuration"
+             (format "https://example.org/openid/issuers/%s" (ring.util.codec/url-encode (get *args* "iss")))
+             "client-configuration"
+             (format "https://example.org/openid/clients/%s" (get *args* "client-id")))))}}}

@@ -1,0 +1,48 @@
+;; Install an action to register an application
+{:create
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://core.example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "https://example.org/actions/register-application"
+
+   :juxt.site.malli/input-schema
+   [:map
+    [:juxt.site/client-id [:re "[a-z-]{3,}"]]
+    [:juxt.site/redirect-uri [:re "https://"]]]
+
+   :juxt.site/prepare
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (let [content-type (-> *ctx*
+                           :juxt.site/received-representation
+                           :juxt.http/content-type)
+          body (-> *ctx*
+                   :juxt.site/received-representation
+                   :juxt.http/body)]
+      (case content-type
+        "application/edn"
+        (let [input (some->
+                     body
+                     (String.)
+                     clojure.edn/read-string
+                     juxt.site.malli/validate-input)
+              client-id (:juxt.site/client-id input)]
+          (into
+           {:xt/id (format "https://example.org/applications/%s" client-id)
+            :juxt.site/type "https://meta.juxt.site/types/application"}
+           input))))}
+
+   :juxt.site/transact
+   {:juxt.site.sci/program
+    #juxt.pprint
+    [[:xtdb.api/put *prepare*]]}
+
+   :juxt.site/rules
+   [[(allowed? subject resource permission)
+     [permission :juxt.site/subject subject]]
+
+    [(allowed? subject resource permission)
+     [id :juxt.site/user user]
+     [subject :juxt.site/user-identity id]
+     [user :role role]
+     [permission :role role]]]}}}

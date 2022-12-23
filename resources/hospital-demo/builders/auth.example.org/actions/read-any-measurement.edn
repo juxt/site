@@ -1,0 +1,22 @@
+;; Warning, this is an overly broad action! TODO: Narrow this action.
+;; It permits grantees access to ALL measurements!!
+{:create
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://core.example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "https://auth.example.org/actions/read-any-measurement"
+
+   :juxt.site/action-contexts
+   {"https://auth.example.org/actions/get-patient"
+    {:juxt.site/additional-where-clauses
+     [[e :patient parent]
+      [e :juxt.site/type "https://example.org/types/measurement"]]}}
+
+   :juxt.site/rules
+   [
+    [(allowed? subject resource permission)
+     [subject :juxt.site/user-identity id]
+     [id :juxt.site/user user]
+     [permission :juxt.site/user user]
+     ;;[resource :juxt.site/type "https://example.org/types/measurement"]
+     ]]}}}

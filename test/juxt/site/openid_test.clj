@@ -27,18 +27,9 @@
            "client-secret" "REDACTED"
            "redirect-uri" "https://example.org/openid/callback"}]
 
-      (pkg/install-package-from-filesystem!
-       "resources/bootstrap"
-       {:base-uri "https://site.test"})
-
-      (pkg/install-package-from-filesystem!
-       "resources/core"
-       {:base-uri "https://site.test"})
-
-      (pkg/install-package-from-filesystem!
-       "resources/openid"
-       {:base-uri "https://site.test"
-        :parameters parameters})
+      (pkg/install-package-from-filesystem! "resources/bootstrap" {})
+      (pkg/install-package-from-filesystem! "resources/core" {})
+      (pkg/install-package-from-filesystem! "resources/openid" {})
 
       (repl/ls)
       (repl/e "https://site.test/openid/login")

@@ -1,73 +1,85 @@
-{:xt/id "https://juxt.site/packages/hospital-demo"
- :dependencies #{"https://juxt.site/packages/core"
-                 "https://juxt.site/packages/example-users"
-                 "https://juxt.site/packages/oauth2-auth-server"
-                 "https://juxt.site/packages/example-oauth-resources"}
+{:xt/id "https://auth.example.org/packages/hospital-demo"
+
  :description "Hospital demo resources"
+
+ :uri-map
+ [["https://core.example.org"
+   {:description "Host of the Site rules"}]
+  ["https://auth.example.org"
+   {:description "Host of the hospital authentication data (users, session, applications, access-tokens)"}]
+  ["https://example.org"
+   {:description "Host of the patient data"}]]
+
+ :dependencies
+ ["https://auth.example.org/packages/example-users"
+  "https://auth.example.org/packages/login-form"
+  "https://auth.example.org/packages/oauth2-auth-server"
+  "https://auth.example.org/packages/example-oauth-resources"
+  "https://auth.example.org/packages/protection-spaces"]
+
  :resources
- #{"https://example.org/login"
+ #{
+   ;; Auth resources
+   "https://auth.example.org/session-scopes/default"
+   "https://auth.example.org/applications/local-terminal"
 
-   "https://example.org/session-scopes/default"
-   "https://example.org/applications/local-terminal"
+   "https://auth.example.org/protection-spaces/bearer"
 
-   "https://example.org/protection-spaces/bearer"
+   "https://auth.example.org/actions/get-patient"
+   "https://auth.example.org/permissions/alice/get-any-patient"
+   "https://auth.example.org/permissions/bob/get-patient/004"
+   "https://auth.example.org/permissions/bob/get-patient/009"
+   "https://auth.example.org/permissions/bob/get-patient/010"
+   "https://auth.example.org/actions/list-patients"
+   "https://auth.example.org/permissions/alice/list-patients"
+   "https://auth.example.org/permissions/bob/list-patients"
 
-   "https://example.org/hospital/actions/get-patient"
-   "https://example.org/hospital/permissions/alice/get-any-patient"
-   "https://example.org/hospital/permissions/bob/get-patient/004"
-   "https://example.org/hospital/permissions/bob/get-patient/009"
-   "https://example.org/hospital/permissions/bob/get-patient/010"
-   "https://example.org/hospital/actions/list-patients"
-   "https://example.org/hospital/permissions/alice/list-patients"
-   "https://example.org/hospital/permissions/bob/list-patients"
+   "https://auth.example.org/actions/register-patient-measurement"
+   "https://auth.example.org/permissions/system/register-patient-measurement"
 
-   "https://example.org/hospital/actions/register-patient-measurement"
-   "https://example.org/hospital/permissions/system/register-patient-measurement"
+   "https://auth.example.org/actions/get-doctor"
+   "https://auth.example.org/permissions/alice/get-doctor"
+   "https://auth.example.org/permissions/bob/get-doctor"
 
-   "https://example.org/hospital/actions/get-doctor"
-   "https://example.org/hospital/permissions/alice/get-doctor"
-   "https://example.org/hospital/permissions/bob/get-doctor"
+   "https://auth.example.org/actions/read-any-measurement"
+   "https://auth.example.org/permissions/alice/read-any-measurement"
+   "https://auth.example.org/permissions/bob/read-any-measurement"
 
-   "https://example.org/hospital/patients/"
+   ;; Hospital data
 
-   "https://example.org/hospital/actions/read-any-measurement"
-   "https://example.org/hospital/permissions/alice/read-any-measurement"
-   "https://example.org/hospital/permissions/bob/read-any-measurement"
+   "https://example.org/patients/"
 
-   "https://example.org/hospital/doctors/001"
-   "https://example.org/hospital/doctors/002"
-   "https://example.org/hospital/doctors/003"
-   "https://example.org/hospital/doctors/004"
+   "https://example.org/doctors/001"
+   "https://example.org/doctors/002"
+   "https://example.org/doctors/003"
+   "https://example.org/doctors/004"
 
-   "https://example.org/hospital/patients/001"
-   "https://example.org/hospital/patients/002"
-   "https://example.org/hospital/patients/003"
-   "https://example.org/hospital/patients/004"
-   "https://example.org/hospital/patients/005"
-   "https://example.org/hospital/patients/006"
-   "https://example.org/hospital/patients/007"
-   "https://example.org/hospital/patients/008"
-   "https://example.org/hospital/patients/009"
-   "https://example.org/hospital/patients/010"
-   "https://example.org/hospital/patients/011"
-   "https://example.org/hospital/patients/012"
-   "https://example.org/hospital/patients/013"
-   "https://example.org/hospital/patients/014"
-   "https://example.org/hospital/patients/015"
-   "https://example.org/hospital/patients/016"
-   "https://example.org/hospital/patients/017"
-   "https://example.org/hospital/patients/018"
-   "https://example.org/hospital/patients/019"
-   "https://example.org/hospital/patients/020"
+   "https://example.org/patients/001"
+   "https://example.org/patients/002"
+   "https://example.org/patients/003"
+   "https://example.org/patients/004"
+   "https://example.org/patients/005"
+   "https://example.org/patients/006"
+   "https://example.org/patients/007"
+   "https://example.org/patients/008"
+   "https://example.org/patients/009"
+   "https://example.org/patients/010"
+   "https://example.org/patients/011"
+   "https://example.org/patients/012"
+   "https://example.org/patients/013"
+   "https://example.org/patients/014"
+   "https://example.org/patients/015"
+   "https://example.org/patients/016"
+   "https://example.org/patients/017"
+   "https://example.org/patients/018"
+   "https://example.org/patients/019"
+   "https://example.org/patients/020"
 
-   "https://example.org/hospital/assignments/patient/001/doctor/001"
-   "https://example.org/hospital/assignments/patient/002/doctor/001"
-   "https://example.org/hospital/assignments/patient/003/doctor/001"
-   "https://example.org/hospital/assignments/patient/004/doctor/002"
-   "https://example.org/hospital/assignments/patient/005/doctor/001"
-   "https://example.org/hospital/assignments/patient/005/doctor/002"
-   "https://example.org/hospital/assignments/patient/006/doctor/003"
-   "https://example.org/hospital/assignments/patient/010/doctor/003"
-
-
-   }}
+   "https://example.org/assignments/patient/001/doctor/001"
+   "https://example.org/assignments/patient/002/doctor/001"
+   "https://example.org/assignments/patient/003/doctor/001"
+   "https://example.org/assignments/patient/004/doctor/002"
+   "https://example.org/assignments/patient/005/doctor/001"
+   "https://example.org/assignments/patient/005/doctor/002"
+   "https://example.org/assignments/patient/006/doctor/003"
+   "https://example.org/assignments/patient/010/doctor/003"}}

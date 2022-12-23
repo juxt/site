@@ -28,7 +28,7 @@
     (when-not id
       (throw
        (ex-info
-        "Login failed"
+        (format "Login failed: %s" (String. (:ring.response/body response)))
         {:args args
          :response response})))
     {:juxt.site/session-token id}))

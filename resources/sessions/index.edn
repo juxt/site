@@ -1,0 +1,13 @@
+{:xt/id "https://example.org/packages/sessions"
+ :description "Sessions"
+
+ :uri-map
+ [["https://example.org" {:description "Host of the server hosting sessions"}]
+  ["https://core.example.org" {:description "Host of the Site core actions"}]]
+
+ :dependencies
+ ["https://core.example.org/packages/bootstrap"]
+
+ :resources
+ ["https://example.org/actions/put-session-scope"
+  "https://example.org/permissions/system/put-session-scope"]}
