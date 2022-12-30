@@ -9,14 +9,20 @@
 
  :dependencies
  ["https://core.example.org/packages/bootstrap"
-  "https://example.org/packages/user-database"]
+  "https://example.org/packages/user-model"
+  "https://example.org/packages/password-based-user-identity"
+  ;; Provides the 'can-authorize' permission installer
+  "https://example.org/packages/oauth-authorization-server"]
 
  :resources
  ["https://example.org/users/alice"
   "https://example.org/user-identities/alice"
+  "https://example.org/permissions/alice-can-authorize"
 
   "https://example.org/users/bob"
   "https://example.org/user-identities/bob"
+  "https://example.org/permissions/bob-can-authorize"
 
   "https://example.org/users/carlos"
-  "https://example.org/user-identities/carlos"]}
+  "https://example.org/user-identities/carlos"
+  "https://example.org/permissions/carlos-can-authorize"]}

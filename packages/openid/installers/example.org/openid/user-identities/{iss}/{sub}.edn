@@ -1,0 +1,12 @@
+{:deps
+ ["https://example.org/actions/register-openid-user-identity"
+  "https://example.org/permissions/system/register-openid-user-identity"]
+ :install
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/actions/register-openid-user-identity"
+  :juxt.site/input
+  {:xt/id "{{$id}}"
+   :fullname "{{fullname}}"
+   :juxt.site/user "{{user}}"
+   :juxt.site.jwt.claims/iss "{{iss}}"
+   :juxt.site.jwt.claims/sub "{{sub}}"}}}

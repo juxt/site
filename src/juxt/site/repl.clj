@@ -9,20 +9,22 @@
    [clojure.walk :refer [postwalk]]
    [crypto.password.bcrypt :as password]
    [io.aviso.ansi :as ansi]
+   [juxt.site.main :as main]
    [juxt.site.actions :as actions]
    [juxt.site.cache :as cache]
-   [juxt.site.resource-package :as pkg]
-   [juxt.site.init :as init :refer [xt-node]]
+   [juxt.site.package :as pkg]
    [juxt.site.util :as util]
-   [ring.util.codec :as codec]
-   [sci.core :as sci]
-   [xtdb.api :as xt]
-   [juxt.site.repl :as repl])
+   [xtdb.api :as xt])
   (:import (java.util Date)))
+
+(defn system [] main/*system*)
+
+(defn xt-node []
+  (:juxt.site.db/xt-node (system)))
 
 (defn grab-input! [args]
   (reduce
-   (fn [acc [k {:keys [description default type] :as v}]]
+   (fn [acc [k {:keys [description default type]}]]
      (print (if (some? default)
               (format "%s [%s] (%s): " description k default)
               (format "%s [%s]: " description k)))
@@ -423,10 +425,12 @@
 (defn encrypt-password [password]
   (password/encrypt password))
 
-(defn install!
+(defn install-package!
   "Install local package from filesystem"
   [dir uri-map]
-  (pkg/install-package-from-filesystem! dir uri-map))
+  (printf "Installing package %s\n" dir)
+  (pkg/install-package-from-filesystem! dir (xt-node) uri-map)
+  :ok)
 
 (defn keyword-commands-from-packages []
   (for [[k vs]
@@ -441,158 +445,141 @@
         :let [[_ v] (first vs)]]
     [k v]))
 
-(defn create-command-fn [program args]
-  (assert program)
-  (assert (map? args))
-  (fn []
-    (try
-      (sci/eval-string
-       program
-       {:namespaces
-        {'user
-         {'*args* args
-          'converge!
-          (fn converge!
-            [resources parameters]
-            (init/converge!
-             resources
-             (pkg/dependency-graph) ;; (pkg/dependency-graph pkg)
-             parameters
-             ))
-          'q (fn [& args] (apply q args))
-          ;; TODO: Need to think about uri-map arg here
-          ;;'install! (fn [dir] (install! dir {}))
-          }
-         'ring.util.codec
-         {'form-encode codec/form-encode
-          'form-decode codec/form-decode
-          'url-encode codec/url-encode
-          'url-decode codec/url-decode}}})
-      (catch clojure.lang.ExceptionInfo e
-        (println (.getMessage e))
-        (pprint (ex-data e))
-        (println (.getMessage (.getCause e)))
-        (pprint (ex-data (.getCause e)))
-        (throw (ex-info (.getMessage e) (or (ex-data (.getCause e)) {}) (.getCause e)))))))
-
-;;(-> e (.getCause) (.getCause) (.getCause) (.getCause) ex-data )
-;;(-> e )
-
-(defn call-command
+(defn call-command!
   ([command-k args]
+   (printf "Calling command %s\n" command-k)
    (let [command (get (into {} (keyword-commands-from-packages)) command-k)
          ;; TODO: Check args match, else throw error
-         f (create-command-fn
+         f (pkg/create-command-fn
             (:juxt.site.sci/program command)
             args)]
-     (f)))
-  ([command-k] (call-command command-k {})))
-
-;;(-> e (.getCause) (.getCause)  (.getCause) (.getCause) (.getCause) ex-data)
+     (f (xt-node)))
+   :ok)
+  ([command-k] (call-command! command-k {})))
 
 (defn keyword-commands []
-  (let [pad (fn [s] (apply str (repeat (max 0 (- 52 (count (str s)))) ".")))]
-    (concat
-     [[:help
-       ^{:doc "Show this menu"}
-       (fn [] (help* {:include-keyword-commands? true}))]
+  (concat
+   [[:help
+     ^{:doc "Show this menu"}
+     (fn [] (help* {:include-keyword-commands? true}))]
 
-      ;;[:status ^{:doc "Show status"} (fn [] (status))]
+    ;;[:status ^{:doc "Show status"} (fn [] (status))]
 
-      [:quit ^{:doc "Disconnect"} (fn [] nil)]
+    [:quit ^{:doc "Disconnect"} (fn [] nil)]
 
-      #_[:init ^{:doc "Initialize system by bootstrapping resources"}
-         (fn []
-           (install! "resources/bootstrap")
-           (install! "resources/core"))]
+    [:test ^{:doc "Run test script"}
+     (fn []
+       (try
+         (factory-reset!)
 
-      [:test ^{:doc "Run test script"}
-       (fn []
-         (try
-           (factory-reset!)
+         (install-package!
+          "packages/bootstrap"
+          {"https://example.org" "https://auth.site.test"})
 
-           (install!
-            "packages/bootstrap"
-            {"https://example.org" "https://auth.site.test"})
+         (install-package!
+          "packages/sessions"
+          {"https://example.org" "https://auth.site.test"
+           "https://core.example.org" "https://auth.site.test"})
 
-           (install!
-            "packages/sessions"
-            {"https://example.org" "https://auth.site.test"
-             "https://core.example.org" "https://auth.site.test"})
+         (install-package!
+          "packages/oauth-authorization-server"
+          {"https://example.org" "https://auth.site.test"
+           "https://core.example.org" "https://auth.site.test"})
 
-           (install!
-            "packages/oauth2-auth-server"
-            {"https://example.org" "https://auth.site.test"
-             "https://core.example.org" "https://auth.site.test"})
+         (install-package!
+          "packages/user-model"
+          {"https://example.org" "https://auth.site.test"
+           "https://core.example.org" "https://auth.site.test"})
 
-           ;; The authorisation server will need to authenticate users
-           (install!
-            "packages/openid"
-            {"https://example.org" "https://auth.site.test"
-             "https://core.example.org" "https://auth.site.test"})
+         (install-package!
+          "packages/openid"
+          {"https://example.org" "https://auth.site.test"
+           "https://core.example.org" "https://auth.site.test"})
 
-           (call-command
-            :openid/register-client
-            {"iss" "https://juxt.eu.auth0.com"
-             "client-id" "d8X0TfEIcTl5oaltA4oy9ToEPdn5nFUK"
-             "client-secret" "gvk-mNdDmyaFsJwN_xVKHPH4pfrInYqJE1r8lRrn0gmoKI4us0Q5Eb7ULdruYZjD"})
+         (install-package!
+          "packages/bootstrap"
+          {"https://example.org" "https://data.site.test"})
 
-           (catch Exception e
-             (pprint e)
-             (def e e))))]
+         (install-package!
+          "packages/swagger"
+          {"https://example.org" "https://data.site.test"
+           "https://auth.example.org" "https://auth.site.test"
+           "https://core.example.org" "https://auth.site.test"})
 
-      [:ls ^{:doc "List all resources"}
-       (fn []
-         (let [resources (ls)]
-           (doseq [id resources]
-             (println id))
-           (printf "%d resources\n" (count resources))))]
+         (call-command!
+          :openid/register-client
+          {"iss" "https://juxt.eu.auth0.com"
+           "client-id" "d8X0TfEIcTl5oaltA4oy9ToEPdn5nFUK"
+           "client-secret" "gvk-mNdDmyaFsJwN_xVKHPH4pfrInYqJE1r8lRrn0gmoKI4us0Q5Eb7ULdruYZjD"})
 
-      [:reset ^{:doc "Reset entire database"}
-       (fn [] (factory-reset!))]
+         (call-command!
+          :openid/register-user
+          {"username" "mal"
+           "fullname" "Malcolm Sparks"
+           "iss" "https://juxt.eu.auth0.com"
+           "sub" "github|163131"})
 
-      [:install ^{:doc "Install a local package"}
-       (fn []
-         (println "Install local package")
-         (let [args (some-> [["dir" {:description "Package directory"
-                                     :type :dir}]
-                             ["host" {:description "Host"}]]
-                            (grab-input!))]
-           (install! (get args "dir") {"https://example.org" (str "https://" (get args "host"))})))]
+         (call-command!
+          :oauth/register-client
+          {"client-id" "swagger-ui"
+           "client-type" #_"public" "confidential"
+           "redirect-uri" "https://swagger-ui.site.test/oauth2-redirect.html"})
 
-      [:types ^{:doc "Show types"}
-       (fn [] (doseq [t (types)]
-                (println t)))]
+         (catch Exception exception
+           (pprint exception))))]
 
-      [:packages ^{:doc "Show installed packages"}
-       (fn [] (doseq [pkg (packages)
-                      :let [pad (pad (:xt/id pkg))]]
-                (println (:xt/id pkg) pad (:description pkg))))]
+    [:ls ^{:doc "List all resources"}
+     (fn []
+       (let [resources (ls)]
+         (doseq [id resources]
+           (println id))
+         (printf "%d resources\n" (count resources))))]
 
-      [:users ^{:doc "Show all users"}
-       (fn [] (doseq [user (users)]
-                (println (:xt/id user))))]
+    [:reset ^{:doc "Reset entire database"}
+     (fn [] (factory-reset!))]
 
-      [:actions ^{:doc "Show installed actions"}
-       (fn [] (doseq [a (actions)]
-                (println (:xt/id a))))]]
+    [:install ^{:doc "Install a local package"}
+     (fn []
+       (println "Install local package")
+       (let [args (some-> [["dir" {:description "Package directory"
+                                   :type :dir}]
+                           ["host" {:description "Host"}]]
+                          (grab-input!))]
+         (install-package! (get args "dir") {"https://example.org" (str "https://" (get args "host"))})))]
 
-     (reduce
-      (fn [acc [k v]]
-        (conj
-         acc [k
-              (let [{:keys [juxt.site.sci/program] :as command} v]
-                ^{:doc (:description v)}
-                (fn []
-                  (cond
-                    program
-                    (when-let [args (some-> (:arguments command)
-                                            (grab-input!)
-                                            (confirm!))]
-                      (create-command-fn program args))
-                    :else (throw (ex-info "Cannot execute command" {:command command})))))]))
-      []
-      (keyword-commands-from-packages)))))
+    [:types ^{:doc "Show types"}
+     (fn [] (doseq [t (types)]
+              (println t)))]
+
+    [:packages ^{:doc "Show installed packages"}
+     (fn [] (doseq [pkg (packages)]
+              (printf "%s|%s\n" (:xt/id pkg) (:description pkg))))]
+
+    [:users ^{:doc "Show all users"}
+     (fn [] (doseq [user (users)]
+              (println (:xt/id user))))]
+
+    [:actions ^{:doc "Show installed actions"}
+     (fn [] (doseq [a (actions)]
+              (println (:xt/id a))))]]
+
+   (reduce
+    (fn [acc [k v]]
+      (conj
+       acc [k
+            (let [{:keys [juxt.site.sci/program] :as command} v]
+              ^{:doc (:description v)}
+              (fn []
+                (cond
+                  program
+                  (when-let [args (some-> (:arguments command)
+                                          (grab-input!)
+                                          (confirm!))]
+                    (let [f (pkg/create-command-fn program args)]
+                      (f (xt-node))))
+                  :else (throw (ex-info "Cannot execute command" {:command command})))))]))
+    []
+    (keyword-commands-from-packages))))
 
 (defn help*
   ([{:keys [include-keyword-commands?]}]

@@ -1,0 +1,12 @@
+{:xt/id "https://example.org/packages/user-model"
+ :description "Actions to establish users upon a common model"
+
+ :uri-map
+ [["https://example.org" {:description "The server hosting the user database"}]
+  ["https://core.example.org" {:description "Host of the Site core actions"}]]
+
+ :dependencies
+ ["https://core.example.org/packages/bootstrap"]
+
+ :resources
+ ["https://example.org/permissions/system/put-user"]}

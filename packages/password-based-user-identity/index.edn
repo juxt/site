@@ -1,0 +1,12 @@
+{:xt/id "https://example.org/packages/password-based-user-identity"
+ :description "Password based user identities"
+
+ :uri-map
+ [["https://example.org" {:description "The server hosting the user database"}]
+  ["https://core.example.org" {:description "Host of the Site core actions"}]]
+
+ :dependencies
+ ["https://example.org/packages/user-model"]
+
+ :resources
+ ["https://example.org/permissions/system/register-password-based-user-identity"]}

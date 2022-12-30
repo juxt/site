@@ -1,7 +1,7 @@
 {:deps
  ["https://example.org/actions/install-openid-callback-endpoint"
   "https://example.org/permissions/system/install-openid-callback-endpoint"
-  "https://example.org/session-scopes/openid"
+  "https://example.org/session-scopes/default"
   "{{client-configuration}}"
   ;; Having established this callback, allow all callers to initiate the action
   ;; associated with the GET method.
@@ -12,4 +12,4 @@
   :juxt.site/input
   {:xt/id "{{$id}}"
    :juxt.site/openid-client-configuration "{{client-configuration}}"
-   :juxt.site/session-scope "https://example.org/session-scopes/openid"}}}
+   :juxt.site/session-scope "https://example.org/session-scopes/default"}}}

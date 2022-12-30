@@ -1,10 +1,19 @@
 {:xt/id "https://example.org/packages/juxt-home"
  :description "JUXT Home"
- :dependencies ["https://example.org/packages/core"]
+
+ :uri-map
+ [["https://example.org"
+   ;; We usually store actions and permissions in the authorization server, but
+   ;; I'm beginning to think they don't belong there. Let's try storing them on
+   ;; the main server.
+   {:description "Host where the JUXT Home content will be served, also hosting actions and permissions"}]
+  ["https://core.example.org" {:description "Host of the Site core actions"}]]
+
+ :dependencies
+ []
 
  :resources
- ["https://example.org/actions/register-juxt-user-and-identity"
-  "https://example.org/permissions/system/register-juxt-user-and-identity"]
+ ["https://example.org/index.html"]
 
  :commands
  {:home/register-user

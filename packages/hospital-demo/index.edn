@@ -13,15 +13,14 @@
  :dependencies
  ["https://auth.example.org/packages/example-users"
   "https://auth.example.org/packages/login-form"
-  "https://auth.example.org/packages/oauth2-auth-server"
-  "https://auth.example.org/packages/example-oauth-resources"
+  "https://auth.example.org/packages/oauth-authorization-server"
   "https://auth.example.org/packages/protection-spaces"]
 
  :resources
  #{
    ;; Auth resources
+   ;; TODO: is this required? test without it
    "https://auth.example.org/session-scopes/default"
-   "https://auth.example.org/applications/local-terminal"
 
    "https://auth.example.org/protection-spaces/bearer"
 

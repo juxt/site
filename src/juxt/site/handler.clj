@@ -221,7 +221,7 @@
       (and permitted-action (-> permitted-action :juxt.site/transact))
       (do
         (log/infof "Permitted action is transactable")
-        (actions/do-action
+        (actions/do-action!
          (cond-> req
            permitted-action (assoc :juxt.site/action (:xt/id permitted-action))
            ;; A java.io.BufferedInputStream in the request can cause this error:
@@ -306,9 +306,9 @@
           response))
 
       :else
-      (do
-        (log/infof "HERE")
-        (response/add-payload req)))))
+      (cond-> req
+        (= (:ring.request/method req) :get)
+        response/add-payload))))
 
 (defn perform-unsafe-method [{:keys [ring.request/method] :as req}]
   (let [req (cond-> req
@@ -318,7 +318,7 @@
         ;; Default response status
         req (assoc req :ring.response/status 200)]
 
-    (actions/do-action
+    (actions/do-action!
      (-> req
          (assoc :juxt.site/action (:xt/id permitted-action))
          ;; A java.io.BufferedInputStream in the request can provoke this
@@ -398,19 +398,6 @@
     (let [res (locator/locate-resource req)]
       (log/debugf "Resource provider: %s" (:juxt.site/resource-provider res))
       (h (assoc req :juxt.site/resource res)))))
-
-(defn wrap-redirect [h]
-  (fn [{:juxt.site/keys [resource] :ring.request/keys [method] :as req}]
-    (when (= (:juxt.site/type resource) "Redirect")
-      (let [status (case method (:get :head) 302 307)]
-        (throw
-         (ex-info
-          "Redirect"
-          {:ring.response/status status
-           :ring.response/headers {"location" (:juxt.site/location resource)}
-           :location (:juxt.site/location resource)
-           :juxt.site/request-context req}))))
-    (h req)))
 
 (defn wrap-find-current-representations
   [h]
@@ -501,33 +488,72 @@
     (let [res (h req)]
       (cond-> res
         ;; Don't allow Google to track your site visitors. Disable FLoC.
-        true (assoc-in [:ring.response/headers "permissions-policy"] "interest-cohort=()")))))
+        true (assoc-in [:ring.response/headers "Permissions-Policy"] "interest-cohort=()")))))
 
-;; TODO: Just use a ring.response/headers entry in the resource
-(defn representation-headers [acc rep body]
-  (letfn [(assoc-when-some [m k v]
-            (cond-> m v (assoc k v)))]
-    (-> acc
-        (assoc-when-some "content-type"
-                         (some-> rep :juxt.http/content-type))
-        (assoc-when-some "content-encoding"
-                         (some-> rep :juxt.http/content-encoding))
-        (assoc-when-some "content-language"
-                         (some-> rep :juxt.http/content-language))
-        (assoc-when-some "content-location"
-                         (some-> rep :juxt.http/content-location str))
-        (assoc-when-some "last-modified"
-                         (some-> rep :juxt.http/last-modified format-http-date))
-        (assoc-when-some "etag" (some-> rep :juxt.http/etag))
-        (assoc-when-some "vary" (some-> rep :juxt.http/vary))
-        (assoc-when-some "content-length"
-                         (or
-                          (some-> rep :juxt.http/content-length str)
-                          (when (counted? body)
-                            (some-> body count str))))
-        (assoc-when-some "content-range" (:juxt.http/content-range rep))
-        (assoc-when-some "trailer" (:juxt.http/trailer rep))
-        (assoc-when-some "transfer-encoding" (:juxt.http/transfer-encoding rep)))))
+(defn- titlecase-response-headers [headers]
+  (reduce-kv
+   (fn [acc k v]
+     (assoc acc (str/replace k #"(?<=^|-)[a-z]" str/upper-case) v))
+   {}
+   headers))
+
+(defn add-headers [acc resource body]
+  (cond-> acc
+    (:juxt.http/content-length resource)
+    (assoc "content-length" (or
+                             (some-> resource :juxt.http/content-length str)
+                             (when (counted? body) (some-> body count str))))
+
+    ;; Some of these are marked as deprecated.  Entries in
+    ;; ring.response/headers must be fully processed strings and
+    ;; cannot support collections to be automatically comma separated
+    ;; by Site. (e.g. access-control-allow-methods). So we'll keep
+    ;; some of them, but anything that can be included in
+    ;; ring.response/headers should be deprecated/removed.
+
+    ;; Deprecated
+    (:juxt.http/content-type resource)
+    (assoc "content-type" (:juxt.http/content-type resource))
+
+    ;; Deprecated
+    (:juxt.http/content-encoding resource)
+    (assoc "content-encoding" (:juxt.http/content-encoding resource))
+
+    ;; Deprecated
+    (:juxt.http/content-language resource)
+    (assoc "content-language" (:juxt.http/content-language resource))
+
+    ;; Deprecated
+    (:juxt.http/content-location resource)
+    (assoc "content-location" (:juxt.http/content-location resource))
+
+    ;; Deprecated
+    (:juxt.http/last-modified resource)
+    (assoc "last-modified" (:juxt.http/last-modified resource))
+
+    ;; Deprecated
+    (:juxt.http/etag resource)
+    (assoc "etag" (:juxt.http/etag resource))
+
+    ;; Deprecated
+    (:juxt.http/vary resource)
+    (assoc "vary" (:juxt.http/vary resource))
+
+    ;; Deprecated
+    (:juxt.http/content-range resource)
+    (assoc "content-range" (:juxt.http/content-range resource))
+
+    ;; Deprecated
+    (:juxt.http/trailer resource)
+    (assoc "trailer" (:juxt.http/trailer resource))
+
+    ;; Deprecated
+    (:juxt.http/transfer-encoding resource)
+    (assoc "transfer-encoding" (:juxt.http/transfer-encoding resource))
+
+    ;; Keep
+    (:ring.response/headers resource)
+    (merge (titlecase-response-headers (:ring.response/headers resource)))))
 
 (defn redact [req]
   (-> req
@@ -586,11 +612,10 @@
                 assoc "date" (format-http-date start-date))
 
         request-id
-        (update :ring.response/headers assoc "site-request-id" request-id)
+        (update :ring.response/headers assoc "Site-Request-Id" request-id)
 
         resource
-        (update :ring.response/headers
-                representation-headers resource body)
+        (update :ring.response/headers add-headers resource body)
 
         (= method :head) (dissoc :ring.response/body))))
 
@@ -1137,8 +1162,6 @@
    ;; Authenticate, some clues will be on the resource
    session-scope/wrap-session-scope
    wrap-http-authenticate
-
-   wrap-redirect
 
    ;; 405
    wrap-method-not-allowed?

@@ -20,6 +20,7 @@
                     :in [token-id]}
                session-token-id!))
         subject (some-> session-details :juxt.site/session :juxt.site/subject)]
+
     (cond-> session-details
       ;; Since subject is common and special, we promote it to the top-level
       ;; context. However, it is possible to have a session without having

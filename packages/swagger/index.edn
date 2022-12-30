@@ -1,0 +1,16 @@
+{:xt/id "https://example.org/packages/swagger"
+ :description "Swagger"
+
+ :uri-map
+ [["https://example.org"
+   {:description "Host where the Swagger descriptor will be served from"}]
+  ["https://auth.example.org" {:description "Host of actions/permissions"}]
+  ["https://core.example.org" {:description "Host of the Site core actions"}]]
+
+ :dependencies
+ []
+
+ :resources
+ ["https://example.org/_site/swagger.json"
+  "https://auth.example.org/actions/get-openapi-document"
+  "https://auth.example.org/permissions/get-openapi-document"]}

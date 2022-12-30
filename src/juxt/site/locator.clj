@@ -2,6 +2,7 @@
 
 (ns juxt.site.locator
   (:require
+   [clojure.tools.logging :as log]
    [clojure.string :as str]
    [xtdb.api :as xt]))
 
@@ -73,10 +74,12 @@
     (match-uri-templated-uris db uri)
     (assoc :juxt.site/resource-provider ::db))
 
-   ;; This can be put into the database to override the ::default-empty-resource
-   ;; default.
-   ;; TODO: Locate this relative to the uri being located
-   (xt/entity db "https://example.org/_site/not-found")
+   ;; This is put into each host at bootstrap but can be overridden if
+   ;; a custom 404 page is required.
+   (xt/entity db (str (.resolve (java.net.URI. uri) "/_site/not-found")))
 
-   {:juxt.site/resource-provider ::default-empty-resource
-    :juxt.site/methods {:get {} :head {} :options {} :put {} :post {}}}))
+   (throw
+    (let [uri (str (.resolve (java.net.URI. uri) "/_site/not-found"))]
+      (ex-info
+       (format "The not-found resource has not been installed: %s" uri)
+       {:uri uri})))))

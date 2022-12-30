@@ -6,17 +6,21 @@
   ["https://core.example.org" {:description "Host of the Site core actions"}]]
 
  :dependencies
- []
+ ["https://example.org/packages/user-model"]
 
  :resources
  ["https://example.org/actions/openid/exchange-code-for-id-token"
   "https://example.org/actions/register-openid-issuer"
   "https://example.org/actions/register-openid-client"
+  "https://example.org/actions/register-openid-user-identity"
   "https://example.org/permissions/system/register-openid-issuer"
-  "https://example.org/permissions/system/register-openid-client"]
+  "https://example.org/permissions/system/register-openid-client"
+  "https://example.org/permissions/system/register-openid-user-identity"]
 
  :commands
- {:openid/register-issuer
+ {
+  ;; TODO: Deprecate this? Is it used?
+  :openid/register-issuer
   {:description "Register an OpenID issuer"
    :arguments [["iss" {:description "Issuer URL" :default [:juxt.site/issuer]}]]
    :juxt.site.sci/program
@@ -38,10 +42,38 @@
      (assert (get *args* "client-secret") "client-secret not given")
      (converge!
       [(format "https://example.org/openid/clients/%s" (ring.util.codec/url-encode (get *args* "client-id")))
-       "https://example.org/openid/login"
+       "https://example.org/login"
        "https://example.org/openid/callback"]
       (assoc *args*
              "issuer-configuration"
              (format "https://example.org/openid/issuers/%s" (ring.util.codec/url-encode (get *args* "iss")))
              "client-configuration"
-             (format "https://example.org/openid/clients/%s" (get *args* "client-id")))))}}}
+             (format "https://example.org/openid/clients/%s" (get *args* "client-id")))))}
+
+  :openid/register-user
+  {:description "Register a user's identity"
+   :arguments
+   [["username" {:description "Username"}]
+    ["fullname" {:description "User's full name"}]
+    ["iss" {:description "Issuer URL"}]
+    ["sub" {:description "Issuer's subject id"}]]
+   :juxt.site.sci/program
+   #juxt.pprint
+   (do
+     (assert (get *args* "iss") "iss (issuer) not given")
+     (assert (get *args* "sub") "subject not given")
+     (let [user (format "https://example.org/users/%s" (ring.util.codec/url-encode (get *args* "username")))]
+       (converge!
+        [user
+         (format "https://example.org/openid/user-identities/%s/%s"
+                 (ring.util.codec/url-encode (get *args* "iss"))
+                 (ring.util.codec/url-encode (get *args* "sub")))
+
+         ;; TODO: The grant-permission action should not here, rather,
+         ;; create a new action called 'permit-user-to-authorize'
+         ;; which can take the actual user, and this action can be
+         ;; permitted to others without granting them the all-powerful
+         ;; grant-permission permission.
+         (format "https://example.org/permissions/%s-can-authorize" (get *args* "username"))]
+
+        (merge *args* {"user" user}))))}}}

@@ -12,9 +12,9 @@
            "juxt.site.graphql-compiler-test"
            "juxt.site.form-based-auth-test"
            "juxt.site.eql-datalog-compiler-test"
-           "juxt.site.whoami-test"
-           "juxt.site.resource-package-test"
+           "juxt.site.oauth-test"
            "juxt.site.openid-test"
+           "juxt.site.package-test"
            ]}]
 
  :reporter kaocha.report/documentation}

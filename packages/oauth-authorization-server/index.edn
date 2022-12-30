@@ -1,0 +1,53 @@
+{:xt/id "https://example.org/packages/oauth-authorization-server"
+ :description "OAuth2 Authorization Server"
+
+ :uri-map
+ [["https://example.org" {:description "Host of the authorization server"}]
+  ["https://core.example.org" {:description "Host of the Site core actions"}]]
+
+ :dependencies
+ [
+  ;; Must have sessions support on this host, see
+  ;; https://example.org/oauth/authorize
+  "https://example.org/packages/sessions"]
+
+ :resources
+ [
+  ;; This sets a session-scope of https://example.org/session-scopes/default
+  "https://example.org/oauth/authorize"
+
+  "https://example.org/actions/oauth/authorize"
+  "https://example.org/actions/install-authorization-server"
+  "https://example.org/permissions/system/install-authorization-server"
+  "https://example.org/permissions/system/register-client"]
+
+ :commands
+ {:oauth/register-client
+  {:description "Register an OAuth2 client against this authorization server"
+   :arguments
+   [["client-id" {:description "Client id"}]
+    ;; TODO: Give a choice between public and confidential
+    ["client-type" {:description "Client type"}]
+    ["redirect-uri" {:description "Redirect-URI"}]]
+
+   :juxt.site.sci/program
+   #juxt.pprint
+   (do
+     (assert (get *args* "client-id") "client-id not given")
+     (assert (get *args* "client-type") "client-type not given")
+     (assert (get *args* "redirect-uri") "redirect-uri")
+
+     ;; TODO: Get the Malli schema of the register-client action,
+     ;; generate a form with it and use it for validation.
+
+     (let [client-id (get *args* "client-id")]
+       (install-resource-with-action!
+        {:juxt.site/subject-id "https://core.example.org/subjects/system"
+         :juxt.site/action-id "https://example.org/actions/register-client"
+         :juxt.site/input
+         (cond-> {:juxt.site/client-type (get *args* "client-type")
+                  ;; TODO: Pluralize this to :juxt.site/redirect-uris and allow
+                  ;; a space separated list of URIs
+                  :juxt.site/redirect-uri (get *args* "redirect-uri")}
+           (not (clojure.string/blank? client-id))
+           (assoc :juxt.site/client-id client-id))})))}}}

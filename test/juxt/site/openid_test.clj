@@ -3,15 +3,11 @@
 (ns juxt.site.openid-test
   (:require
    [clojure.test :refer [deftest is use-fixtures]]
-   [java-http-clj.core :as hc]
-   [juxt.site.resource-package :as pkg]
    [juxt.site.repl :as repl]
    [ring.util.codec :as codec]
-   [juxt.test.util :refer [*handler*
-                           with-system-xt
-                           with-fixtures
-                           with-handler
-                           lookup-session-details]]))
+   [juxt.test.util
+    :refer [*handler* with-system-xt with-fixtures
+            with-handler lookup-session-details install-package!]]))
 
 (use-fixtures :each with-system-xt with-handler)
 
@@ -27,17 +23,17 @@
            "client-secret" "REDACTED"
            "redirect-uri" "https://example.org/openid/callback"}]
 
-      (pkg/install-package-from-filesystem! "resources/bootstrap" {})
-      (pkg/install-package-from-filesystem! "resources/core" {})
-      (pkg/install-package-from-filesystem! "resources/openid" {})
+      (install-package! "bootstrap" {})
+      (install-package! "core" {})
+      (install-package! "openid" {})
 
       (repl/ls)
-      (repl/e "https://site.test/openid/login")
+      (repl/e "https://site.test/login")
 
       ;; TODO: Add the login
       (let [login-request
             {:ring.request/method :get
-             :juxt.site/uri "https://site.test/openid/login"
+             :juxt.site/uri "https://site.test/login"
              :ring.request/query (codec/form-encode {"return-to" "/index.html"})}
             login-response (*handler* login-request)
             status (:ring.response/status login-response)
@@ -79,7 +75,7 @@
         ;; Now we go to the location
         #_(let [authorize-request
                 {:ring.request/method :get
-                 :juxt.site/uri "https://site.test/openid/login"
+                 :juxt.site/uri "https://site.test/login"
                  :ring.request/query (codec/form-encode {"code" "1234" "state" query-param-state})
                  :ring.request/headers {"cookie" cookie-header-value}}])
         ;;login-response

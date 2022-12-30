@@ -5,6 +5,7 @@
    [juxt.grab.alpha.parser :as graphql.parser]
    [juxt.grab.alpha.schema :as graphql.schema]
    [clojure.tools.logging :as log]
+   [clojure.string :as str]
    [crypto.password.bcrypt :as bcrypt]
    [java-http-clj.core :as hc]
    [jsonista.core :as json]
@@ -96,7 +97,7 @@
  check-permissions
  [:=> [:cat
        :any
-       [:set :string]
+       [:or [:set :string] [:sequential :string]]
        [:map
         [:juxt.site/subject {:optional true}]
         [:juxt.site/resource {:optional true}]
@@ -146,8 +147,9 @@
  allowed-resources
  [:=> [:cat
        :any
-       [:set {:min 0} :string]
-       ;;[:set :string]
+       [:or
+        [:set {:min 0} :string]
+        [:sequential {:min 0} :string]]
        [:map
         [:juxt.site/subject {:optional true}]
         [:juxt.site/purpose {:optional true}]]]
@@ -288,7 +290,7 @@
 (defn common-sci-namespaces [action-doc]
   {
    'com.auth0.jwt.JWT
-   {'decode (fn [x] (com.auth0.jwt.JWT/decode x))}
+   {'decode (fn decode [x] (com.auth0.jwt.JWT/decode x))}
 
    'crypto.password.bcrypt {'encrypt bcrypt/encrypt}
 
@@ -303,10 +305,10 @@
    {'decode-id-token juxt.site.openid-connect/decode-id-token}
 
    'juxt.site.malli
-   {'validate (fn [schema value] (malli/validate schema value))
-    'explain (fn [schema value] (malli/explain schema value))
+   {'validate (fn validate [schema value] (malli/validate schema value))
+    'explain (fn explain [schema value] (malli/explain schema value))
     'validate-input
-    (fn [input]
+    (fn validate-input [input]
       (let [schema (get-in action-doc [:juxt.site.malli/input-schema])
             valid? (malli/validate schema input)]
         (when-not valid?
@@ -399,6 +401,7 @@
                       'juxt.site
                       {'match-identity
                        (fn [m]
+                         (log/infof "Matching identity: %s" m)
                          (let [q {:find ['id]
                                   :where (into
                                           [['id :juxt.site/type "https://meta.juxt.site/types/user-identity"]]
@@ -419,12 +422,12 @@
                                             (for [[k v] m] ['id k v]))
                                     :in ['password]} password)))
 
-                       'lookup-application
+                       'lookup-client
                        (fn [client-id]
                          (let [results (xt/q
                                         db
                                         '{:find [(pull e [*])]
-                                          :where [[e :juxt.site/type "https://meta.juxt.site/types/application"]
+                                          :where [[e :juxt.site/type "https://meta.juxt.site/types/client"]
                                                   [e :juxt.site/client-id client-id]]
                                           :in [client-id]} client-id)]
                            (if (= 1 (count results))
@@ -432,12 +435,12 @@
                              (if (seq results)
                                (throw
                                 (ex-info
-                                 (format "Too many applications for client-id: %s" client-id)
+                                 (format "Too many clients for client-id: %s" client-id)
                                  {:client-id client-id
-                                  :applications results}))
+                                  :clients results}))
                                (throw
                                 (ex-info
-                                 (format "No application with client-id: %s" client-id)
+                                 (format "No client with client-id: %s" client-id)
                                  {:client-id client-id}))))))
 
                        'lookup-scope
@@ -624,8 +627,8 @@
          {'user {'*action* action-doc
                  '*resource* resource
                  '*ctx* (sanitize-ctx ctx)
-                 'logf (fn [& args] (eval `(log/debugf ~@args)))
-                 'log (fn [& args] (eval `(log/debug ~@args)))}
+                 'logf (fn [& args] (eval `(log/infof ~@args)))
+                 'log (fn [& args] (eval `(log/info ~@args)))}
 
           'xt
           { ;; Unsafe due to violation of strict serializability, hence marked as
@@ -642,29 +645,14 @@
       (catch clojure.lang.ExceptionInfo e
         (throw (ex-info "Failure during prepare" {:cause-ex-info (ex-data e)} e))))))
 
-(defn do-action
+(defn do-action!
   [ ;; TODO: Arguably action should passed as a map
    {:juxt.site/keys [xt-node db resource subject action] :as ctx}]
   (assert (:juxt.site/xt-node ctx) "xt-node must be present")
   (assert (:juxt.site/db ctx) "db must be present")
 
   (when-not (xt/entity db action)
-    (throw
-     (ex-info
-      "No action found"
-      {:action action
-       :ctx (sanitize-ctx ctx)
-       :ls (->> (xt/q db '{:find [(pull e [:xt/id :juxt.site/type])]
-                           :where [[e :xt/id]]})
-                (map first)
-                (filter (fn [e]
-                          (not (#{"Request"
-                                  "ActionLogEntry"
-                                  "Session"
-                                  "SessionToken"}
-                                (:juxt.site/type e)))))
-                (map :xt/id)
-                (sort-by str))})))
+    (throw (ex-info "No action found" {:action action})))
 
   (assert (xt/entity db action) (format "Action '%s' must exist in database" action))
 
@@ -724,12 +712,13 @@
                action
                (:message error)
                (if status (format "(status: %s)" status) ""))
-              (into
-               (cond-> {:juxt.site/request-context ctx}
-                 status (assoc :ring.response/status status))
-               (merge
-                (dissoc result :juxt.site/type :xt/id :juxt.site/error)
-                (:ex-data error)))))))
+              (:ex-data error)
+              #_(into
+                 (cond-> {:juxt.site/request-context ctx}
+                   status (assoc :ring.response/status status))
+                 (merge
+                  (dissoc result :juxt.site/type :xt/id :juxt.site/error)
+                  (:ex-data error)))))))
 
         (cond-> ctx
           result (assoc :juxt.site/action-result result)
@@ -818,8 +807,15 @@
 
             (if-let [session-scope (:juxt.site/session-scope req)]
               (let [login-uri (:juxt.site/login-uri session-scope)
-                    redirect (str login-uri "?return-to=" (codec/url-encode uri))]
+                    redirect (str
+                              login-uri
+                              "?return-to="
+                              (codec/url-encode
+                               (cond-> uri
+                                 (not (str/blank? (:ring.request/query req)))
+                                 (str "?" (:ring.request/query req)))))]
                 ;; If we are in a session-scope that contains a login-uri, let's redirect to that
+;;                (def req req)
                 (throw
                  (ex-info
                   (format "No anonymous permission for actions (try logging in!): %s" (pr-str actions))

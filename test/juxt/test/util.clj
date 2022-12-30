@@ -4,7 +4,7 @@
   (:require
    [clojure.java.io :as io]
    [juxt.site.handler :as h]
-   [juxt.site.resource-package :as pkg]
+   [juxt.site.package :as pkg]
    [juxt.site.main :as main]
    [xtdb.api :as xt])
   (:import
@@ -59,10 +59,6 @@
   (with-open [db (xt/open-db *xt-node*)]
     (binding [*db* db]
       (f))))
-
-(defn ^:deprecated with-bootstrapped-resources [f]
-  (pkg/install-package-from-filesystem! "resources/bootstrap" {})
-  (f))
 
 (defmacro with-fixtures [& body]
   `((clojure.test/join-fixtures (-> *ns* meta :clojure.test/each-fixtures))
@@ -138,3 +134,12 @@
                  "content-type" content-type
                  "content-length" (str (count body-bytes)))
          (assoc :ring.request/body (io/input-stream body-bytes))))))
+
+(defn install-package! [name uri-map]
+  (pkg/install-package-from-filesystem!
+   (str "packages/" name)
+   *xt-node*
+   uri-map))
+
+(defn install-resource-with-action! [init-data]
+  (pkg/call-action-with-init-data! *xt-node* init-data))

@@ -41,7 +41,7 @@
    ["error" {:optional true} :string]]])
 
 (defn authorize!
-  "Authorize an application, and return decoded fragment parameters as a string->string map"
+  "Authorize a client, and return decoded fragment parameters as a string->string map"
   [uri args]
   (let [response (authorize-response! uri args)
         _ (case (:ring.response/status response)

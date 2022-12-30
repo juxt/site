@@ -13,8 +13,8 @@
   "https://example.org/permissions/system/bootstrap"
 
   "https://example.org/actions/install-not-found"
-  ;;"https://example.org/permissions/system/install-not-found"
-  ;;"https://example.org/_site/not-found"
-  ;;"https://example.org/actions/get-not-found"
-  ;;"https://example.org/permissions/get-not-found"
+  "https://example.org/permissions/system/install-not-found"
+  "https://example.org/_site/not-found"
+  "https://example.org/actions/get-not-found"
+  "https://example.org/permissions/get-not-found"
   ]}

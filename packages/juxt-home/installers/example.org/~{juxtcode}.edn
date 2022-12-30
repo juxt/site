@@ -1,9 +1,9 @@
 {:deps
- ["https://example.org/actions/register-juxt-user-and-identity"
-  "https://example.org/permissions/system/register-juxt-user-and-identity"]
+ ["https://example.org/_site/actions/register-juxt-user-and-identity"
+  "https://example.org/_site/permissions/system/register-juxt-user-and-identity"]
  :install
- {:juxt.site/subject-id "https://example.org/subjects/system"
-  :juxt.site/action-id "https://example.org/actions/register-juxt-user-and-identity"
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://example.org/_site/actions/register-juxt-user-and-identity"
   :juxt.site/input
   {:xt/id "{{$id}}"
    :juxt.home/juxtcode "{{juxtcode}}"

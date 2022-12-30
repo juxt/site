@@ -1,10 +1,10 @@
 {:deps
  ["https://example.org/users/alice"
-  "https://example.org/actions/put-user-identity"
-  "https://example.org/permissions/system/put-user-identity"]
+  "https://example.org/actions/register-password-based-user-identity"
+  "https://example.org/permissions/system/register-password-based-user-identity"]
  :install
  {:juxt.site/subject-id "https://core.example.org/subjects/system"
-  :juxt.site/action-id "https://example.org/actions/put-user-identity"
+  :juxt.site/action-id "https://example.org/actions/register-password-based-user-identity"
   :juxt.site/input
   {:xt/id "{{$id}}"
    :juxt.site/user "https://example.org/users/alice"

@@ -1,0 +1,72 @@
+;; Install an action to register an application
+;; See https://www.rfc-editor.org/rfc/rfc6749#section-2
+{:install
+ {:juxt.site/subject-id "https://core.example.org/subjects/system"
+  :juxt.site/action-id "https://core.example.org/actions/create-action"
+  :juxt.site/input
+  {:xt/id "{{$id}}"
+
+   :juxt.site.malli/input-schema
+   [:map
+    [:juxt.site/client-id
+     ;; Optional, but if unspecified one will be generated.  This
+     ;; strategy allows us to choose meaningful and memorable client
+     ;; ids, simplifies testing and makes testing more readable.
+     {:optional true}
+     [:re "[a-z-]{3,}"]]
+
+    [:juxt.site/client-type [:enum "confidential" "public"]]
+    [:juxt.site/redirect-uri [:re "http[s]?://"]]]
+
+   :juxt.site/prepare
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (let [content-type (-> *ctx*
+                           :juxt.site/received-representation
+                           :juxt.http/content-type)
+          body (-> *ctx*
+                   :juxt.site/received-representation
+                   :juxt.http/body)]
+      (case content-type
+        "application/edn"
+        (let [input
+              (some->
+               body
+               (String.)
+               clojure.edn/read-string
+               juxt.site.malli/validate-input)
+
+              client-id
+              (or
+               (:juxt.site/client-id input)
+               (juxt.site.util/make-nonce 10))
+
+              client-secret
+              (when (= (:juxt.site/client-type input) "confidential")
+                (juxt.site.util/make-nonce 20))]
+
+          (into
+           input
+           (cond-> {:xt/id (format "https://example.org/clients/%s" client-id)
+                    :juxt.site/type "https://meta.juxt.site/types/client"
+                    :juxt.site/client-id client-id}
+             client-secret (assoc :juxt.site/client-secret client-secret)
+             ;; In case the client-secret has been provided in the input
+             (not client-secret) (dissoc :juxt.site/client-secret))))))}
+
+   :juxt.site/transact
+   {:juxt.site.sci/program
+    #juxt.pprint
+    (if-let [existing (xt/entity (:xt/id *prepare*))]
+      (throw (ex-info "Cannot overwrite an existing client" {:id (:xt/id *prepare*)}))
+      [[:xtdb.api/put *prepare*]])}
+
+   :juxt.site/rules
+   [[(allowed? subject resource permission)
+     [permission :juxt.site/subject subject]]
+
+    [(allowed? subject resource permission)
+     [id :juxt.site/user user]
+     [subject :juxt.site/user-identity id]
+     [user :role role]
+     [permission :role role]]]}}}
