@@ -1,72 +1,52 @@
-= Site
+= Site (2.0)
 
-image:https://circleci.com/gh/juxt/site/tree/master.svg?style=svg["CircleCI", link="https://circleci.com/gh/juxt/site/tree/master"]
+Site is a standards-compliant web server, fulfilling the roles of an https://www.rfc-editor.org/rfc/rfc6749[OAuth2] resource server and authorization server.
 
-Site is a project from https://juxt.pro[JUXT] to build an OAuth2 Resource Server
-around our open-source https://xtdb.com[XTDB] database.
+[quote,https://www.rfc-editor.org/rfc/rfc6749#section-1.1]
+--
+resource server:: The server hosting the protected resources, capable of accepting and responding to protected resource requests using access tokens.
+--
 
-Site supports web content, https://www.openapis.org/[OpenAPI] and GraphQL. You
-can use Site as a versioned
-https://en.wikipedia.org/wiki/Content_management_system[Content Management
-System].
+Resources are documents which represent a resource's identity (URI), configuration and current state (which might be some data, image or other media).
+Site stores resources in a database.
 
-An official (work in progress) documentation website can be found
-https://juxtsite.netlify.app/[here].
+A resource request is a standard web request to a URI (as part of an API, such as https://www.openapis.org/[OpenAPI]) or https://graphql.org/[GraphQL] request.
 
-== What is Site?
+Requests contain an access-token, acquired from an authorization server:
 
-Site is a Resource Server, built on JUXT's https://xtdb.com[XTDB] database.
+[quote,https://www.rfc-editor.org/rfc/rfc6749#section-1.1]
+--
+authorization server:: The server issuing access tokens to the client
+after successfully authenticating the resource owner and obtaining
+authorization.
+--
 
-You can put things into Site with (HTTP) PUT requests. When you do this, Site
-will put (the representation of) your thing (document, image, video, data…) into
-the database. You can get these later with a (HTTP) GET request with the same
-URI. In this way, Site behaves like a web server, with an immutable bitemporal
-content store.
+Currently, the only supported database is JUXT's immutable https://xtdb.com[XTDB] database.
+XTDB is a good fit for Site, since many of its features (such as document ids and references) map cleanly onto web concepts (such as URIs and links).
 
-=== APIs
+== Features
 
-If you PUT a JSON document with a `Content-Type` of
-`application/vnd.oai.openapi+json;version=3.0.2`, Site will treat this as an
-https://www.openapis.org/[OpenAPI] API definition, and serve that API for
-you. This OpenAPI API definition will contain the API endpoints, and provide
-schemas for the data transferred by the API. This tells the server how to
-validate data coming in to the API, and how to construct data on the way out.
+=== Resource Server
 
-APIs served from Site are good web citizens. They implement HTTP method
-semantics properly, with support for content negotiation, conditional requests,
-range requests and authentication.
+* Content Negotiation
+* Conditional Requests
+* GraphQL
 
-APIs are also able to benefit from Site's authorization module, Pass, providing
-Policy-Based Access Control.
+=== Authorization Server
 
-== Installation
-
-Follow the link:InstallationGuide.adoc[installation guide].
+* Client Registration
+* User Authentication (Basic, Login form, OpenID)
+* OAuth2 access token grants
 
 == Status
 
-Site is deployed in production on a number of JUXT client projects but future
-versions are still in the development stages.
+The previous 1.0 generation of Site is maintained at https://github.com/juxt/site.
 
-You should expect Site's current design and APIs to change and be prepared to
-make changes to any system that uses Site.
+This 2.0 generation is in development. Please do not use until further notice.
 
-Contact info@juxt.pro if you would like help, we can provide professional
-consulting services for Site and XTDB.
+== Consulting
 
-== Configuration
-
-For testing:
-
-`~/.config/site/openid-client.edn`
-
-[source,clojure]
-----
-{:juxt.site/issuer "https://juxt.eu.auth0.com"
- :juxt.site/client-id "d8X0TfEIcTl5oaltA4oy9ToEPdn5nFUK"
- :juxt.site/client-secret "XXXX"
- :juxt.site/redirect-uri "https://site.test/openid/callback"}
-----
+Contact info@juxt.pro if you would like help, we can provide professional consulting services for Site and/or XTDB.
 
 == License
 
