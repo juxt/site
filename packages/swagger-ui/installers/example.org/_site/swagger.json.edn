@@ -460,8 +460,8 @@
        "flows"
        {"implicit"
         {"scopes"
-         {"write:pets" "modify pets in your account"
-          "read:pets" "read your pets"}
+         {#_#_"write:pets" "modify pets in your account"
+          #_#_"read:pets" "read your pets"}
          "authorizationUrl"
          "https://auth.site.test/oauth/authorize"}}}}
      "schemas"

@@ -500,12 +500,6 @@
           "packages/bootstrap"
           {"https://example.org" "https://data.site.test"})
 
-         (install-package!
-          "packages/swagger"
-          {"https://example.org" "https://data.site.test"
-           "https://auth.example.org" "https://auth.site.test"
-           "https://core.example.org" "https://auth.site.test"})
-
          (call-command!
           :openid/register-client
           {"iss" "https://juxt.eu.auth0.com"
@@ -518,6 +512,14 @@
            "fullname" "Malcolm Sparks"
            "iss" "https://juxt.eu.auth0.com"
            "sub" "github|163131"})
+
+         ;; Swagger UI
+
+         (install-package!
+          "packages/swagger-ui"
+          {"https://example.org" "https://data.site.test"
+           "https://auth.example.org" "https://auth.site.test"
+           "https://core.example.org" "https://auth.site.test"})
 
          (call-command!
           :oauth/register-client

@@ -1,4 +1,4 @@
-{:xt/id "https://example.org/packages/swagger"
+{:xt/id "https://example.org/packages/swagger-ui"
  :description "Swagger"
 
  :uri-map
