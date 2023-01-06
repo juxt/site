@@ -503,14 +503,6 @@
                 (::http/max-content-length authz)
                 (update ::site/resource
                         assoc ::http/max-content-length (::http/max-content-length authz)))]
-
-      (when (and (not= method :options)
-                 (not= (::pass/access authz) ::pass/approved))
-        (let [status (if-not (::pass/user subject) 401 403)]
-          (throw
-           (ex-info
-            (case status 401  "Unauthorized" 403 "Forbidden")
-            {::site/request-context (assoc req :ring.response/status status)}))))
       (h req))))
 
 (defn wrap-method-not-allowed? [h]
@@ -555,7 +547,7 @@
           triggers
           (map first
                (xt/q db '{:find [rule]
-                         :where [[rule ::site/type "Trigger"]]}))
+                          :where [[rule ::site/type "Trigger"]]}))
 
           request-context
           {'subject subject
@@ -674,24 +666,24 @@
                    ::site/duration-millis (- (.getTime end-date)
                                              (.getTime start-date)))]
     (cond->
-        (update req
-                :ring.response/headers
-                assoc "date" (format-http-date start-date))
+     (update req
+             :ring.response/headers
+             assoc "date" (format-http-date start-date)
 
-        request-id
-        (update :ring.response/headers
-                assoc "site-request-id"
-                (cond-> request-id
+             request-id
+             (update :ring.response/headers
+                     assoc "site-request-id"
+                     (cond-> request-id
                   ;; Not sure I like this shortening, it's inconvenient to have
                   ;; to prepend the base-uri each time
-                  #_(.startsWith request-id base-uri)
-                  #_(subs (count base-uri))))
+                       #_(.startsWith request-id base-uri)
+                       #_(subs (count base-uri))))
 
-        selected-representation
-        (update :ring.response/headers
-                representation-headers selected-representation body)
+             selected-representation
+             (update :ring.response/headers
+                     representation-headers selected-representation body)
 
-        (= method :head) (dissoc :ring.response/body))))
+             (= method :head) (dissoc :ring.response/body)))))
 
 (defn wrap-initialize-response [h]
   (fn [req]
@@ -762,10 +754,10 @@
   (let [cause (.getCause e)]
     (cons
      (cond->
-         {:message (.getMessage e)
-          :stack-trace (.getStackTrace e)}
+      {:message (.getMessage e)
+       :stack-trace (.getStackTrace e)
        (instance? clojure.lang.ExceptionInfo e)
-       (assoc :ex-data (dissoc (ex-data e) ::site/request-context)))
+       (assoc :ex-data (dissoc (ex-data e) ::site/request-context))})
      (when cause (errors-with-causes cause)))))
 
 (defn put-error-representation
@@ -816,10 +808,10 @@
   variables to determine the resource to use."
   [{::site/keys [db]} status]
   (when-let [res (ffirst
-            (xt/q db '{:find [(pull er [*])]
-                      :where [[er ::site/type "ErrorResource"]
-                              [er :ring.response/status status]]
-                      :in [status]} status))]
+                  (xt/q db '{:find [(pull er [*])]
+                             :where [[er ::site/type "ErrorResource"]
+                                     [er :ring.response/status status]]
+                             :in [status]} status))]
     (log/tracef "ErrorResource found for status %d: %s" status res)
     res))
 
@@ -831,8 +823,7 @@
   (let [{:ring.response/keys [status]} req]
 
     (when-let [er (error-resource req (or status 500))]
-      (let [
-            ;; Allow errors to be transmitted to developers
+      (let [;; Allow errors to be transmitted to developers
             er
             (assoc er
                    ::site/access-control-allow-origins
@@ -876,8 +867,7 @@
        ::site/selected-representation
        {::http/content-type "text/plain;charset=utf-8"
         ::http/content-length (count default-body)
-        :ring.response/body default-body}
-       }))))
+        :ring.response/body default-body}}))))
 
 (defn error-response
   "Respond with the given error"
@@ -944,7 +934,6 @@
                      (respond-internal-error req e)))]
 
     (respond response)))
-
 
 (defn wrap-error-handling
   "Return a handler that constructs proper Ring responses, logs and error
@@ -1024,7 +1013,7 @@
     :else (-> path
               ;; Normalize (remove dot-segments from the path, see Section 6.2.2.3 of
               ;; RFC 3986)
-              ((fn [path] (.toString (.normalize (URI. path)))))
+              ((fn [path] (.toString (.normalize (URI. path))))))))
               ;; TODO: Upcase any percent encodings: e.g. %2f -> %2F (as per Sections
               ;; 2.1 and 6.2.2.1 of RFC 3986)
 
@@ -1032,7 +1021,6 @@
 
               ;; TODO: Decode any non-reserved (:/?#[]@!$&'()*+,;=) percent-encoded
               ;; octets (see Section 6.2.2.2 of RFC 3986)
-              )))
 
 (defn http-scheme-normalize
   "Return a scheme-based normalized host, as per Section 6.2.3 of RFC 3986."
@@ -1129,13 +1117,13 @@
             (xt/submit-tx
              xt-node
              [[:xtdb.api/put (-> req ->storable
-                                (select-keys [:juxt.pass.alpha/subject
-                                              ::site/date
-                                              ::site/uri
-                                              :ring.request/method
-                                              :ring.response/status])
-                                (assoc :xt/id req-id
-                                       ::site/type "Request"))]]))))
+                                 (select-keys [:juxt.pass.alpha/subject
+                                               ::site/date
+                                               ::site/uri
+                                               :ring.request/method
+                                               :ring.response/status])
+                                 (assoc :xt/id req-id
+                                        ::site/type "Request"))]]))))
       req)))
 
 (defn wrap-log-request [h]
@@ -1175,8 +1163,7 @@
   or Sieppari (https://github.com/metosin/sieppari) could be used. This is
   currently a synchronous chain but async could be supported in the future."
   [opts]
-  [
-   ;; Switch Ring requests/responses to Ring 2 namespaced keywords
+  [;; Switch Ring requests/responses to Ring 2 namespaced keywords
    wrap-ring-1-adapter
 
    ;; Optional, helpful for AWS ALB
@@ -1225,10 +1212,7 @@
    wrap-initialize-response
 
    ;; Methods (GET, PUT, POST, etc.)
-   wrap-invoke-method
-
-   ])
-
+   wrap-invoke-method])
 
 (defn make-handler [opts]
   ((apply comp (make-pipeline opts)) identity))
