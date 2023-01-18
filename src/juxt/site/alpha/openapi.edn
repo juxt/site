@@ -26,18 +26,15 @@
     {200
      {:juxt.site.alpha/query
       #juxt.site.alpha/as-str
-      {:find [id username name email (distinct role) auth-scheme]
-       :strs [id username name email roles auth-scheme]
-       :where [[:subject :juxt.pass.alpha/user user]
-               [:subject :juxt.pass.alpha/auth-scheme auth-scheme]
-               [user :crux.db/id id]
-               [user :juxt.pass.alpha/username username]
-               [user :name name]
-               [user :email email]
-               [mapping :juxt.site.alpha/type "UserRoleMapping"]
-               [mapping :juxt.pass.alpha/assignee user]
-               [mapping :juxt.pass.alpha/role role]]
+      {:find [(pull user [(:juxt.pass.alpha/username {:as :username})
+                           :name
+                           :email
+                           {(:juxt.pass.alpha/_assignee {:as :roles})
+                            [(:juxt.pass.alpha/role {:as :id})]}])]
+       :strs [user]
+       :where [[:subject :juxt.pass.alpha/user user]]
        :limit 1}
+      :juxt.site.alpha/extract-entry "user"
       :juxt.site.alpha/singular-result? true
 
       :content
