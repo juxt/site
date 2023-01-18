@@ -277,6 +277,11 @@
         crux-node (crux-node)]
     (init/allow-public-access-to-public-resources! crux-node config)))
 
+(defn allow-authenticated-users-access-to-user-info! []
+  (let [config (config)
+        crux-node (crux-node)]
+    (init/allow-authenticated-users-access-to-user-info! crux-node config)))
+
 (defn put-site-txfns! []
   (let [config (config)
         crux-node (crux-node)]

@@ -92,6 +92,21 @@
                     [resource ::pass/classification "PUBLIC"]]
     ::pass/effect ::pass/allow}))
 
+(defn allow-authenticated-users-access-to-user-info!
+  "Authenticated users should be able to access their own user details"
+  [crux-node {::site/keys [base-uri]}]
+  (put!
+   crux-node
+   {:crux.db/id (str base-uri "/_site/rules/any-authenticated-allow-user-info")
+    ::site/type "Rule"
+    ::site/description "Allow authenticated users to get their user details"
+    ::pass/target '[[subject ::pass/user user]
+                    [user ::site/type "User"]
+                    [request :ring.request/method #{:get :options}]
+                    [request :ring.request/path "/_site/user"]]
+    ::pass/effect ::pass/allow
+    ::http/max-content-length (Math/pow 2 40)}))
+
 (defn restict-access-to-restricted-resources!
   "Resources classified as RESTRICTED should never be accessed, unless another
   policy explicitly authorizes access."
