@@ -21,4 +21,5 @@ clojure -J-Djava.awt.headless=true \
 				       \"$SITE_SUPERUSER_EMAIL\") \
                   (repl/put-auth-resources!) \
                   (repl/allow-public-access-to-public-resources!) \
+                  (repl/allow-authenticated-users-access-to-user-info!) \
                   @main-thread))"

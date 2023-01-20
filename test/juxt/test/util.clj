@@ -2,8 +2,10 @@
 
 (ns juxt.test.util
   (:require
+   [crux.api :as x]
+   [juxt.pass.alpha.authentication :as auth]
    [juxt.site.alpha.handler :as h]
-   [crux.api :as x])
+   [juxt.site.alpha.init :as site-init])
   (:import
    (crux.api ICruxAPI)))
 
@@ -11,6 +13,7 @@
 (def ^:dynamic ^ICruxAPI *crux-node*)
 (def ^:dynamic *handler*)
 (def ^:dynamic *db*)
+(def ^:dynamic *sessions*)
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -60,6 +63,10 @@
     (binding [*db* db]
       (f))))
 
+(defn with-sessions [f]
+  (binding [*sessions* auth/sessions-by-access-token]
+    (f)))
+
 (def access-all-areas
   {:crux.db/id "https://example.org/access-rule"
    ::site/description "A rule allowing access everything"
@@ -73,3 +80,15 @@
    ::site/type "Rule"
    ::pass/target '[[resource ::site/resource-provider ::apex/openapi-path]]
    ::pass/effect ::pass/allow})
+
+(defn allow-access-to-public-resources!
+  [f]
+  (site-init/allow-public-access-to-public-resources!
+   *crux-node*
+   {::site/base-uri "https://example.org"})
+  (f))
+
+(defn reset-sessions!
+  [f]
+  (reset! auth/sessions-by-access-token {})
+  (f))

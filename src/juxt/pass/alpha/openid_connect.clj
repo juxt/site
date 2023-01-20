@@ -69,7 +69,7 @@
            session-token-id!
            (cond-> {::pass/state state ::pass/nonce nonce}
              return-to (assoc ::pass/return-to return-to))
-             (.plusSeconds (.toInstant start-date) expires-in))
+           (.plusSeconds (.toInstant start-date) expires-in))
 
         query-string
         (codec/form-encode
@@ -91,6 +91,15 @@
   (when kid
     (some (fn [m] (when (= kid (get m "kid")) m)) (get jwks "keys"))))
 
+(defn jwt-verifier
+  [algorithm issuer]
+  (.. (JWT/require algorithm)
+      (withIssuer issuer)
+      ;; 9. The current time MUST be before the time
+      ;; represented by the exp Claim.
+      (acceptLeeway 1)
+      (build)))
+
 (defn decode-id-token [req jwt jwks openid-configuration oauth-client-id]
   (when jwt
     (let [decoded-jwt (JWT/decode jwt)
@@ -101,7 +110,8 @@
                        (for [[k v] (.getClaims decoded-jwt)]
                          [k (case k
                               "email_verified" (.asBoolean v)
-                              ("iat" "exp" "nbf") (.asDate v)
+                              ("iat" "exp" "nbf" "auth_time") (.asDate v)
+                              "cognito:groups" (vec (.asArray v java.lang.String))
                               (.asString v))]))]
 
       ;; https://openid.net/specs/openid-connect-core-1_0.html Section 3.1.3.7
@@ -149,12 +159,7 @@
         "RS256"                         ; https://github.com/auth0/jwks-rsa-java
         (let [public-key (.getPublicKey (Jwk/fromValues ky))
               algorithm (Algorithm/RSA256 public-key nil)
-              verifier (.. (JWT/require algorithm)
-                           (withIssuer issuer)
-                           ;; 9. The current time MUST be before the time
-                           ;; represented by the exp Claim.
-                           (acceptLeeway 1)
-                           (build))]
+              verifier (jwt-verifier algorithm issuer)]
           (try
             (let [verification (.verify verifier jwt)]
               (log/tracef "JWT successfully verified: %s" verification))
@@ -227,9 +232,30 @@
 
       :else nil)))
 
+(defn match-all-roles [db user-id]
+  (map first
+       (crux/q db '{:find [user-role-id]
+                    :where [[ur :crux.db/id user-role-id]
+                            [ur :juxt.site.alpha/type "UserRoleMapping"]
+                            [ur :juxt.pass.alpha/assignee user-id]]
+                    :in [user-id]}
+               user-id)))
+
+(defn put-if-different [db entity]
+  (when-not (= entity (crux/entity db (:crux.db/id entity)))
+    [:crux.tx/put entity]))
+
+(defn put-if-missing [db entity]
+  (when-not (crux/entity db (:crux.db/id entity))
+    [:crux.tx/put entity]))
+
+(defn put-if-exists [db id entity]
+  (when (crux/entity db id)
+    [:crux.tx/put entity]))
+
 (defn callback
   "OAuth2 callback"
-  [{::site/keys [resource db crux-node]
+  [{::site/keys [resource db crux-node base-uri]
     ::pass/keys [session session-token-id!]
     :ring.request/keys [query]
     :as req}]
@@ -284,7 +310,7 @@
           _ (when-not jwks
               (return req 500 "No JWKS found" {}))
 
-          {:keys [status headers body] :as response}
+          {:keys [status body] :as response}
           (dh/with-retry
             {:retry-on Exception
              :max-retries 2
@@ -309,7 +335,6 @@
           json-body (json/read-value body)
 
           id-token (decode-id-token req (get json-body "id_token") jwks openid-configuration oauth-client-id)
-          _ (def id-token id-token)
 
           original-nonce (::pass/nonce session)
           claimed-nonce (get-in id-token [:claims "nonce"])
@@ -321,20 +346,55 @@
               ;; This is possibly an attack, we should log an alert
               (return req 500 "Nonce received does not match expected" {}))
 
-          ;; Does the id-token match any identities in our database?
-          matched-identity (match-identity db (:claims id-token))
-          iss-sub (pr-str (select-keys (:claims id-token) ["iss" "sub"]))]
+          {:strs [name email iss sub] username "cognito:username" groups "cognito:groups"}
+          (select-keys
+           (:claims id-token)
+           ["cognito:username" "name" "email" "cognito:groups" "iss" "sub"])
+          user-id (str base-uri "/_site/users/" username)
+          role-id (str base-uri "/_site/roles/%s")
+          user-role-id (str role-id "/users/" username)]
+      (->> (concat
+            [(put-if-different
+              db
+              {:crux.db/id user-id
+               ::site/type "User"
+               ::pass/username username
+               :name name
+               :email email})
+             (put-if-missing
+              db
+              {:crux.db/id (str user-id "/oauth-credentials")
+               ::site/type "OAuthCredentials"
+               ::pass/user user-id
+               :juxt.pass.jwt/iss iss
+               :juxt.pass.jwt/sub sub})]
+            (for [user-role-id (match-all-roles db user-id)]
+              [:crux.tx/delete user-role-id])
+            (for [group groups]
+              (let [role-id (format role-id group)]
+                (prn "checking for " role-id)
+                (put-if-exists
+                 db
+                 role-id
+                 {:crux.db/id (format user-role-id group)
+                  ::site/type "UserRoleMapping"
+                  ::pass/assignee user-id
+                  ::pass/role role-id}))))
+           (remove nil?)
+           vec
+           (crux/submit-tx crux-node)
+           (crux/await-tx crux-node))
 
-      (when-not matched-identity
-        (return req 500 "No known identity match for claims %s" {} iss-sub))
-
-      ;; If iss and sub match identity put the ID_TOKEN into the session and cycle the session id
-      ;; Always redirect to the redirect_uri stored in the session but only include code query
-      ;; parameter if matched identity was found to indicate success
-      (log/warnf "Successful login! %s matched claims %s" matched-identity iss-sub)
-      (-> req
-          (redirect 303 (get session ::pass/return-to "/"))
-          (session/escalate-session matched-identity)))
+      ;; Does the id-token match any identities in our database?
+      (if-let [matched-identity (match-identity (crux/db crux-node) (:claims id-token))]
+        (do (log/warnf "Successful login! %s matched claims %s" matched-identity [iss sub])
+            ;; If iss and sub match identity put the ID_TOKEN into the session and cycle the session id
+            ;; Always redirect to the redirect_uri stored in the session but only include code query
+            ;; parameter if matched identity was found to indicate success
+            (-> req
+                (redirect 303 (get session ::pass/return-to "/"))
+                (session/escalate-session matched-identity)))
+        (throw (ex-info "Failed to match user with claims" (:claims id-token)))))
     (catch Exception e
       (do
         (log/warnf "Unsuccessful login: %s" e)
