@@ -213,9 +213,81 @@ type Person { name: String @site(a: \"name\")}"
    stored-query
    )
 
+(defn stored-query-edn []
+  (let [query "query { personsByKey(name: \"Bob\", key: \"name\") { name }}"]
+
+    (submit-and-await!
+     [[:xtdb.api/put access-all-areas]
+
+      [:xtdb.api/put
+       {:xt/id "https://example.org/alice"
+        :type "Person"
+        :name "Alice"}]
+
+      [:xtdb.api/put
+       {:xt/id "https://example.org/bob"
+        :type "Person"
+        :name "Bob"}]
+
+      [:xtdb.api/put
+       {:xt/id "https://example.org/graphql"
+        :doc "A GraphQL endpoint"
+        :juxt.http.alpha/methods #{:post :put :options}
+        :juxt.http.alpha/acceptable "application/graphql"
+        :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/put-handler
+        :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/post-handler}]
+
+      [:xtdb.api/put
+       {:xt/id "https://example.org/get-persons"
+        :doc "A GraphQL stored query"
+        :juxt.http.alpha/methods #{:put :post}
+        :juxt.http.alpha/acceptable #{"application/graphql" "application/json"}
+        :juxt.site.alpha/graphql-schema "https://example.org/graphql"
+        :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/stored-document-put-handler
+        :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/stored-document-post-handler}]
+
+       ;; Install variants to have CSV output
+      ])
+
+    ;; Install a GraphQL schema at /graphql
+    (let [schema "
+type Query { personsByKey(name: String, key: String): [Person] @site(q: {edn: \"\"\"{:find [e] :where [[e :type \"Person\"] [e :{{args.key}} \"{{args.name}}\"]]}\"\"\"})}
+type Person { name: String @site(a: \"name\")}"
+          response (*handler*
+                    (-> {:ring.request/method :put
+                         :ring.request/path "/graphql"}
+                        (add-body schema "application/graphql")))]
+      (is (= 204 (:ring.response/status response))))
+
+    ;; POST a query to that schema
+    (let [response
+          (*handler*
+           (-> {:ring.request/method :post
+                :ring.request/path "/graphql"}
+               (add-body query "application/graphql")))
+          body (json/read-value (:ring.response/body response))]
+
+      (is (= 200 (:ring.response/status response)))
+      (is (= {"data" {"personsByKey" [{"name" "Bob"}]}} body)))
+
+    ;; PUT a stored query
+    (*handler*
+     (-> {:ring.request/method :put
+          :ring.request/path "/get-persons"}
+         (add-body query "application/graphql")))
+
+    ;; POST to a stored query
+    #_(*handler*
+       (-> {:ring.request/method :post
+            :ring.request/path "/get-persons"}
+           (add-body (json/write-value-as-string {}) "application/json")))))
+
 (deftest stored-query-test
   (stored-query))
 
+
+(deftest stored-query-edn-test
+  (stored-query-edn))
 
 ;; For CSV output
 (comment
