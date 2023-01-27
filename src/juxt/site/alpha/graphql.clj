@@ -678,7 +678,7 @@
                        object-id (concat ['object]))
                   q (assoc
                      (to-xt-query opts)
-                     :in (if (second in) [in] (vec in)))
+                     :in (if (second in) [(vec in)] (vec in)))
 
                   query-args (cond->> (vals argument-values)
                                object-id (concat [object-id]))
