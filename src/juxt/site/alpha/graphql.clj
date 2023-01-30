@@ -217,31 +217,32 @@
 
              (cond
                arg-type                 ; not a LIST
-               (let [value (let [v ((keyword arg-name) args)]
+               (let [value (let [v (or (get args arg-name)
+                                       (key args))]
                              (if (boolean? v) ;; Fixes issue with mutation of false booleans
                                v
                                (or
-                                 ;; If provided we use it
+                                ;; If provided we use it
                                 v
-                                 ;; Else we try to generate it
+                                ;; Else we try to generate it
                                 (generate-value generator-args args))))
                      value
                      (cond-> value
-                        ;; We don't want symbols in XT entities, because this leaks the
-                        ;; form-plane into the data-plane!
+                       ;; We don't want symbols in XT entities, because this leaks the
+                       ;; form-plane into the data-plane!
                        (symbol? value) str
 
-                        ;; Replace base-uri in string-template, only for an ID
-                        ;; since we should be careful not to tamper with other
-                        ;; values.
+                       ;; Replace base-uri in string-template, only for an ID
+                       ;; since we should be careful not to tamper with other
+                       ;; values.
                        (and (string? value) (= arg-type "ID"))
                        (selmer/render {"base-uri" base-uri})
 
-                        ;; Transform value
+                       ;; Transform value
                        transform transform)]
 
                  (cond
-                    ;; Fixes issue with mutation of false booleans
+                   ;; Fixes issue with mutation of false booleans
                    (boolean? value)
                    (assoc acc key value)
 
@@ -251,11 +252,11 @@
                    :else
                    (try
                      (merge acc (keywordize-keys value))
-                      ;; TODO if we need to assoc, like if someone wants to nest
-                      ;; a map inside an entity to prevent it being indexed, then
-                      ;; that needs to happen here. probably with a directive to
-                      ;; differentiate from the default which is to merge (which
-                      ;; is needed to support input types)
+                     ;; TODO if we need to assoc, like if someone wants to nest
+                     ;; a map inside an entity to prevent it being indexed, then
+                     ;; that needs to happen here. probably with a directive to
+                     ;; differentiate from the default which is to merge (which
+                     ;; is needed to support input types)
                      (catch Exception e
                        (throw
                         (ex-info
@@ -265,15 +266,15 @@
                           :value value}
                          e))))))
 
-                ;; Is it a list? Then put in as a vector
+               ;; Is it a list? Then put in as a vector
                (list-type? type-ref)
                (let [val (or (get args (name key))
-                              ;; TODO: default value?
+                             ;; TODO: default value?
                              (generate-value generator-args args))
-                      ;; Change a symbol value into a string
+                     ;; Change a symbol value into a string
 
-                      ;; We don't want symbols in XT entities, because this leaks the
-                      ;; form-plane into the data-plane!
+                     ;; We don't want symbols in XT entities, because this leaks the
+                     ;; form-plane into the data-plane!
                      val (cond-> val (symbol? val) str)
 
                      list-type (field->type arg-def)]

@@ -210,7 +210,8 @@ type Person { name: String @site(a: \"name\")}"
    stored-query)
 
 (defn stored-query-edn []
-  (let [query "query { personsByKey(name: \"Bob\", key: \"name\") { name }}"]
+  (let [query "query { personsByKey(name: \"Bob\", key: \"name\") { name }}"
+        bulk-mutation "mutation { createPersons(data: [{id: \"a\"}, {id: \"b\"}]) { name }}"]
 
     (submit-and-await!
      [[:xtdb.api/put access-all-areas]
@@ -242,12 +243,14 @@ type Person { name: String @site(a: \"name\")}"
         :juxt.site.alpha/put-fn 'juxt.site.alpha.graphql/stored-document-put-handler
         :juxt.site.alpha/post-fn 'juxt.site.alpha.graphql/stored-document-post-handler}]
 
-       ;; Install variants to have CSV output
+      ;; Install variants to have CSV output
       ])
 
     ;; Install a GraphQL schema at /graphql
     (let [schema "
 type Query { personsByKey(name: String, key: String): [Person] @site(q: {edn: \"\"\"{:find [e] :where [[e :type \"Person\"] [e :{{args.key}} \"{{args.name}}\"]]}\"\"\"})}
+type Mutation {createPersons(data: [PersonInput]): Person}
+input PersonInput { nam: String }
 type Person { name: String @site(a: \"name\")}"
           response (*handler*
                     (-> {:ring.request/method :put
@@ -265,6 +268,15 @@ type Person { name: String @site(a: \"name\")}"
 
       (is (= 200 (:ring.response/status response)))
       (is (= {"data" {"personsByKey" [{"name" "Bob"}]}} body)))
+
+    (let [response
+          (*handler*
+           (-> {:ring.request/method :post
+                :ring.request/path "/graphql"}
+               (add-body bulk-mutation "application/graphql")))
+          body (json/read-value (:ring-response/body response))]
+      (is (= 200 (:ring.response/status response)))
+      (is (= {"data" 'a} body)))
 
     ;; PUT a stored query
     (*handler*
@@ -426,8 +438,8 @@ type Mutation {
    ;; expected-response
    {"data"
     {"addPerson"
-     {:id "https://example.org/persons/mal"
-      :name "Malcolm Sparks"}}}))
+     {"id" "https://example.org/persons/mal"
+      "name" "Malcolm Sparks"}}}))
 
 (deftest mutation-with-validation-directive-test
   (mutation-base
@@ -441,8 +453,8 @@ type Mutation {
    ;; expected-response
    {"data"
     {"addPerson"
-     {:id "https://example.org/persons/mal"
-      :name "Malcolm Sparks"}}}))
+     {"id" "https://example.org/persons/mal"
+      "name" "Malcolm Sparks"}}}))
 
 (defn invalid-mutation-with-validation-directive []
   (let [schema invalid-mutation-schema
