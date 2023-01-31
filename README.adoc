@@ -12,6 +12,8 @@ System].
 
 An official (work in progress) documentation website can be found https://juxtsite.netlify.app/[here].
 
+NOTE: A new version of Site is being developed here: https://github.com/juxt-site/site
+
 == What is Site?
 
 Site is a Resource Server, built on the XTDB database.
