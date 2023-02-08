@@ -36,34 +36,34 @@
 (defn field->type
   [field]
   (or
-    (-> field
-        ::g/type-ref
-        ::g/non-null-type
-        ::g/list-type
-        ::g/name)
-    (-> field
-        ::g/type-ref
-        ::g/non-null-type
-        ::g/list-type
-        ::g/non-null-type
-        ::g/name)
-    (-> field
-        ::g/type-ref
-        ::g/list-type
-        ::g/name)
-    (-> field
-        ::g/type-ref
-        ::g/name)
-    (-> field
-        ::g/type-ref
-        ::g/non-null-type
-        ::g/name)))
+   (-> field
+       ::g/type-ref
+       ::g/non-null-type
+       ::g/list-type
+       ::g/name)
+   (-> field
+       ::g/type-ref
+       ::g/non-null-type
+       ::g/list-type
+       ::g/non-null-type
+       ::g/name)
+   (-> field
+       ::g/type-ref
+       ::g/list-type
+       ::g/name)
+   (-> field
+       ::g/type-ref
+       ::g/name)
+   (-> field
+       ::g/type-ref
+       ::g/non-null-type
+       ::g/name)))
 
 (defn list-type?
   [type-ref]
   (or
-    (-> type-ref ::g/non-null-type ::g/list-type)
-    (::g/list-type type-ref)))
+   (-> type-ref ::g/non-null-type ::g/list-type)
+   (::g/list-type type-ref)))
 
 (defn default-query
   [field-or-type type-k]
@@ -78,30 +78,30 @@
            site-args] :as opts}]
   (let [values argument-values
         field-or-type (or
-                        (get site-args "type")
-                        field)
+                       (get site-args "type")
+                       field)
         query (or
-                custom-xt-query
-                (get site-args "q")
-                (default-query field-or-type type-k))
+               custom-xt-query
+               (get site-args "q")
+               (default-query field-or-type type-k))
         result
         (postwalk
-          (fn [x]
-            (try
-              (cond-> x
-                (and (map? x) (:keyword x))
-                (-> (get :keyword) keyword)
-                (and (map? x) (:set x))
-                (-> (get :set) set)
-                (and (map? x) (:edn x))
-                (-> (get :edn)
-                    (selmer/render (selmer-args opts))
-                    edn/read-string)
-                (= 'type x)
-                ((constantly type-k)))
-              (catch Exception e
-                (throw (ex-info "Error in q site arg" {:x x} e)))))
-          query)
+         (fn [x]
+           (try
+             (cond-> x
+               (and (map? x) (:keyword x))
+               (-> (get :keyword) keyword)
+               (and (map? x) (:set x))
+               (-> (get :set) set)
+               (and (map? x) (:edn x))
+               (-> (get :edn)
+                   (selmer/render (selmer-args opts))
+                   edn/read-string)
+               (= 'type x)
+               ((constantly type-k)))
+             (catch Exception e
+               (throw (ex-info "Error in q site arg" {:x x} e)))))
+         query)
         limit (get values "limit")
         offset (get values "offset")
         order (keyword (get values "order"))
@@ -124,20 +124,20 @@
                        limit :desc
                        :else nil)
         result (assoc-some
-                 result
-                 :find (and search? '[e v s])
-                 :order-by (cond
-                             search?
-                             '[[s :desc]]
-                             order-by-dir
-                             [['_siteCreatedAt order-by-dir]]
-                             :else
-                             nil)
-                 :where (and search-where-clauses
-                             (vec (concat (:where result) search-where-clauses)))
-                 :limit limit
-                 :offset (when (pos-int? offset)
-                           offset))]
+                result
+                :find (and search? '[e v s])
+                :order-by (cond
+                            search?
+                            '[[s :desc]]
+                            order-by-dir
+                            [['_siteCreatedAt order-by-dir]]
+                            :else
+                            nil)
+                :where (and search-where-clauses
+                            (vec (concat (:where result) search-where-clauses)))
+                :limit limit
+                :offset (when (pos-int? offset)
+                          offset))]
     result))
 
 (defn generate-value [{:keys [type pathPrefix template] :as gen-args} args]
@@ -165,13 +165,13 @@
                             (throw (ex-info "Couldn't infer type" {:field field})))]
     (cond-> entity
       true (assoc
-             :xt/id (or
-                      (:xt/id entity)
-                      (:id entity)
-                      (generate-value
-                        {:type "UUID"
-                         :pathPrefix type}
-                        {})))
+            :xt/id (or
+                    (:xt/id entity)
+                    (:id entity)
+                    (generate-value
+                     {:type "UUID"
+                      :pathPrefix type}
+                     {})))
       ;; this should use a clock component that keeps the same time for
       ;; everything in a single graphql transcation
       (nil? (:_siteCreatedAt entity)) (assoc :_siteCreatedAt (str (t/now)))
@@ -195,107 +195,107 @@
              (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
         entity
         (reduce
-          (fn [acc arg-def]
-            (let [site-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments])
-                  generator-args (get site-args "gen")
-                  transform-sym (some-> site-args (get "transform") symbol)
-                  transform (when transform-sym (requiring-resolve transform-sym))
-                  kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])
-                  arg-name (::g/name arg-def)
-                  key (keyword (or kw arg-name))
-                  type-ref (::g/type-ref arg-def)
-                  arg-type (or
-                             (get-in site-args "objectType")
-                             (::g/name type-ref)
-                             (-> type-ref ::g/non-null-type ::g/name))]
+         (fn [acc arg-def]
+           (let [site-args (get-in arg-def [::schema/directives-by-name "site" ::g/arguments])
+                 generator-args (get site-args "gen")
+                 transform-sym (some-> site-args (get "transform") symbol)
+                 transform (when transform-sym (requiring-resolve transform-sym))
+                 kw (get-in arg-def [::schema/directives-by-name "site" ::g/arguments "a"])
+                 arg-name (::g/name arg-def)
+                 key (keyword (or kw arg-name))
+                 type-ref (::g/type-ref arg-def)
+                 arg-type (or
+                           (get-in site-args "objectType")
+                           (::g/name type-ref)
+                           (-> type-ref ::g/non-null-type ::g/name))]
 
-              (when (and transform-sym (not transform))
-                (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
+             (when (and transform-sym (not transform))
+               (throw (ex-info "Failed to resolve transform fn" {:transform transform-sym})))
 
-              (when transform
-                (log/tracef "transform is %s" transform))
+             (when transform
+               (log/tracef "transform is %s" transform))
 
-              (cond
-                arg-type                 ; not a LIST
-                (let [value (let [v (get args arg-name)]
-                              (if (boolean? v) ;; Fixes issue with mutation of false booleans
+             (cond
+               arg-type                 ; not a LIST
+               (let [value (let [v (or (get args arg-name)
+                                       (key args))]
+                             (if (boolean? v) ;; Fixes issue with mutation of false booleans
+                               v
+                               (or
+                                ;; If provided we use it
                                 v
-                                (or
-                                 ;; If provided we use it
-                                 v
-                                 ;; Else we try to generate it
-                                 (generate-value generator-args args)
-                                 )))
-                      value
-                      (cond-> value
-                        ;; We don't want symbols in XT entities, because this leaks the
-                        ;; form-plane into the data-plane!
-                        (symbol? value) str
+                                ;; Else we try to generate it
+                                (generate-value generator-args args))))
+                     value
+                     (cond-> value
+                       ;; We don't want symbols in XT entities, because this leaks the
+                       ;; form-plane into the data-plane!
+                       (symbol? value) str
 
-                        ;; Replace base-uri in string-template, only for an ID
-                        ;; since we should be careful not to tamper with other
-                        ;; values.
-                        (and (string? value) (= arg-type "ID"))
-                        (selmer/render {"base-uri" base-uri})
+                       ;; Replace base-uri in string-template, only for an ID
+                       ;; since we should be careful not to tamper with other
+                       ;; values.
+                       (and (string? value) (= arg-type "ID"))
+                       (selmer/render {"base-uri" base-uri})
 
-                        ;; Transform value
-                        transform transform)]
+                       ;; Transform value
+                       transform transform)]
 
-                  (cond
-                    ;; Fixes issue with mutation of false booleans
-                    (boolean? value)
-                    (assoc acc key value)
+                 (cond
+                   ;; Fixes issue with mutation of false booleans
+                   (boolean? value)
+                   (assoc acc key value)
 
-                    (or kw (scalar? arg-type types-by-name) (enum? arg-type types-by-name))
-                    (assoc-some acc key value)
+                   (or kw (scalar? arg-type types-by-name) (enum? arg-type types-by-name))
+                   (assoc-some acc key value)
 
-                    :else
-                    (try
-                      (merge acc (keywordize-keys value))
-                      ;; TODO if we need to assoc, like if someone wants to nest
-                      ;; a map inside an entity to prevent it being indexed, then
-                      ;; that needs to happen here. probably with a directive to
-                      ;; differentiate from the default which is to merge (which
-                      ;; is needed to support input types)
-                      (catch Exception e
-                        (throw
-                          (ex-info
-                            "Cannot merge value into acc"
-                            {:acc acc
-                             :arg-type arg-type
-                             :value value}
-                            e))))))
+                   :else
+                   (try
+                     (merge acc (keywordize-keys value))
+                     ;; TODO if we need to assoc, like if someone wants to nest
+                     ;; a map inside an entity to prevent it being indexed, then
+                     ;; that needs to happen here. probably with a directive to
+                     ;; differentiate from the default which is to merge (which
+                     ;; is needed to support input types)
+                     (catch Exception e
+                       (throw
+                        (ex-info
+                         "Cannot merge value into acc"
+                         {:acc acc
+                          :arg-type arg-type
+                          :value value}
+                         e))))))
 
-                ;; Is it a list? Then put in as a vector
-                (list-type? type-ref)
-                (let [val (or (get args (name key))
-                              ;; TODO: default value?
-                              (generate-value generator-args args))
-                      ;; Change a symbol value into a string
+               ;; Is it a list? Then put in as a vector
+               (list-type? type-ref)
+               (let [val (or (get args (name key))
+                             ;; TODO: default value?
+                             (generate-value generator-args args))
+                     ;; Change a symbol value into a string
 
-                      ;; We don't want symbols in XT entities, because this leaks the
-                      ;; form-plane into the data-plane!
-                      val (cond-> val (symbol? val) str)
+                     ;; We don't want symbols in XT entities, because this leaks the
+                     ;; form-plane into the data-plane!
+                     val (cond-> val (symbol? val) str)
 
-                      list-type (field->type arg-def)]
-                  (cond
-                    (or (enum? list-type types-by-name)
-                        (scalar? list-type types-by-name))
-                    (assoc-some acc key val)
-                    :else
-                    (throw (ex-info "Unsupported list-type" {:arg-def arg-def
-                                                             :list-type list-type}))))
+                     list-type (field->type arg-def)]
+                 (cond
+                   (or (enum? list-type types-by-name)
+                       (scalar? list-type types-by-name))
+                   (assoc-some acc key val)
+                   :else
+                   (throw (ex-info "Unsupported list-type" {:arg-def arg-def
+                                                            :list-type list-type}))))
 
-                :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
-          {}
-          (::g/arguments-definition field))]
+               :else (throw (ex-info "Unsupported arg-def" {:arg-def arg-def})))))
+         {}
+         (::g/arguments-definition field))]
     (prepare-mutation-entity opts entity transform)))
 
 (defn args-to-entities
   [{:keys [argument-values field types-by-name] :as opts}]
   (let [args (and
-               (= 1 (count argument-values))
-               (first (vals argument-values)))]
+              (= 1 (count argument-values))
+              (first (vals argument-values)))]
     (when-not args
       (throw (ex-info "Mutations that insert multiple entities must take a single InputType as their only argument"
                       argument-values)))
@@ -325,10 +325,10 @@
 (defn await-tx
   [xt-node txes]
   (xt/await-tx
+   xt-node
+   (xt/submit-tx
     xt-node
-    (xt/submit-tx
-      xt-node
-      txes)))
+    txes)))
 
 (defn xt-delete
   [id]
@@ -392,22 +392,21 @@
     (if-let [ent-ns (::pass/namespace ent)]
       (let [rules (some-> ent-ns lookup ::pass/rules)
             acls (->>
-                   (xt/q
-                     db
-                     {:find ['(pull ?acl [*])]
-                      :where '[[?acl ::pass/type "ACL"]
-                               (check ?acl ?subject ?e)]
-                      :rules rules
-                      :in '[?subject ?e]}
-                     subject e)
-                   (map first))]
+                  (xt/q
+                   db
+                   {:find ['(pull ?acl [*])]
+                    :where '[[?acl ::pass/type "ACL"]
+                             (check ?acl ?subject ?e)]
+                    :rules rules
+                    :in '[?subject ?e]}
+                   subject e)
+                  (map first))]
         (when (seq acls)
           ;; TODO: Also use the ACL to infer when/whether to select-keys
           ;;(select-keys ent (apply concat (map :keys acls)))
-          ent
-          ))
+          ent))
 
-      ;; Return unprotected ent
+;; Return unprotected ent
       ent)))
 
 (defn limit-results
@@ -436,10 +435,10 @@
   (if (seq atts)
     (let [next-object-value
           (get
-            (cond-> object-value
-              (string? object-value)
-              (protected-lookup subject db xt-node))
-            (keyword (first atts)))]
+           (cond-> object-value
+             (string? object-value)
+             (protected-lookup subject db xt-node))
+           (keyword (first atts)))]
       (traverse next-object-value
                 (rest atts)
                 subject db xt-node))
@@ -476,8 +475,6 @@
               (when invalid?
                 (me/humanize (m/explain validation-schema v))))))
          (remove nil?))))
-
-
 
 (defn perform-mutation!
   [{:keys [argument-values site-args xt-node db lookup-entity field-kind pass/subject] :as opts}]
@@ -528,7 +525,7 @@
         ;; TODO: Allow an argument to correspond to valid-time, via
         ;; @site(a: "xtdb.api/valid-time").
         {:xt/id id})
-        "put"
+      "put"
       (if-let [validation-report (seq (invalid-arguments? opts))]
         (throw (Exception. (pr-str validation-report)))
         (if bulk-mutation
@@ -551,7 +548,7 @@
                         (-> as-of t/inst)
                         (-> as-of
                             (t/parse-date-time
-                              (t/formatter :iso-local-date-time))
+                             (t/formatter :iso-local-date-time))
                             t/inst)))
                     (catch Exception e
                       (throw (ex-info "rollback mutations need a valid asOf argument"
@@ -572,52 +569,52 @@
               :as req}]
   (let [type-k
         (or
-          (some-> schema :juxt.grab.alpha.schema/directives (get "site") ::g/arguments (get "type") keyword)
+         (some-> schema :juxt.grab.alpha.schema/directives (get "site") ::g/arguments (get "type") keyword)
           ;; Deprecated, please don't rely on this, but rather add a directive to
           ;; your schema: schema @site(type: "juxt.site/type")
-          :juxt.site/type)]
+         :juxt.site/type)]
     (execute-request
-      {:schema schema
-       :document document
-       :operation-name operation-name
-       :variable-values variable-values
-       :abstract-type-resolver
-       (fn [{:keys [object-value]}]
-         (get object-value type-k))
-       :field-resolver
-       (fn [{:keys [object-type object-value field-name argument-values]
-             :as field-resolver-args}]
+     {:schema schema
+      :document document
+      :operation-name operation-name
+      :variable-values variable-values
+      :abstract-type-resolver
+      (fn [{:keys [object-value]}]
+        (get object-value type-k))
+      :field-resolver
+      (fn [{:keys [object-type object-value field-name argument-values]
+            :as field-resolver-args}]
 
-         #_(when (= "SiteError" (get-in object-type [::g/name]))
-             (def object-value object-value))
+        #_(when (= "SiteError" (get-in object-type [::g/name]))
+            (def object-value object-value))
 
-         (let [types-by-name (::schema/types-by-name schema)
-               field (get-in object-type [::schema/fields-by-name field-name])
-               site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
-               field-kind (or
-                            (-> field ::g/type-ref ::g/name types-by-name ::g/kind)
-                            (when (-> field ::g/type-ref ::g/list-type) 'LIST)
-                            (when (-> field ::g/type-ref ::g/non-null-type) 'NON_NULL))
-               mutation? (=
-                           (get-in schema [::schema/root-operation-type-names :mutation])
-                           (::g/name object-type))
-               db (try
-                    (cond
-                      (and (not mutation?)
-                           (get argument-values "asOf"))
-                      (xt/db xt-node (-> argument-values
-                                         (get "asOf")
-                                         t/instant
-                                         t/inst))
-                      (and
-                        (get variable-values "historicalDb")
-                        (:_siteValidTime object-value))
-                       (do
-                         (xt/db xt-node (-> object-value
-                                            :_siteValidTime
-                                            t/inst)))
-                       :else
-                       db)
+        (let [types-by-name (::schema/types-by-name schema)
+              field (get-in object-type [::schema/fields-by-name field-name])
+              site-args (get-in field [::schema/directives-by-name "site" ::g/arguments])
+              field-kind (or
+                          (-> field ::g/type-ref ::g/name types-by-name ::g/kind)
+                          (when (-> field ::g/type-ref ::g/list-type) 'LIST)
+                          (when (-> field ::g/type-ref ::g/non-null-type) 'NON_NULL))
+              mutation? (=
+                         (get-in schema [::schema/root-operation-type-names :mutation])
+                         (::g/name object-type))
+              db (try
+                   (cond
+                     (and (not mutation?)
+                          (get argument-values "asOf"))
+                     (xt/db xt-node (-> argument-values
+                                        (get "asOf")
+                                        t/instant
+                                        t/inst))
+                     (and
+                      (get variable-values "historicalDb")
+                      (:_siteValidTime object-value))
+                     (do
+                       (xt/db xt-node (-> object-value
+                                          :_siteValidTime
+                                          t/inst)))
+                     :else
+                     db)
                    (catch Exception _ db))
               object-id (:xt/id object-value)
               lookup-entity (fn [id] (protected-lookup id subject db xt-node))
@@ -696,12 +693,11 @@
                                       e))))
                   limited-results (limit-results argument-values results)
                   result-entities (cond->>
-                                      (pull-entities db xt-node subject limited-results q)
-                                      (get site-args "a")
-                                      (map (keyword (get site-args "a")))
+                                   (pull-entities db xt-node subject limited-results q)
+                                    (get site-args "a")
+                                    (map (keyword (get site-args "a"))))]
 
-                                      )]
-              ;;(log/tracef "GraphQL results is %s" (seq result-entities))
+;;(log/tracef "GraphQL results is %s" (seq result-entities))
 
               (process-xt-results field result-entities))
 
@@ -725,8 +721,7 @@
                         (traverse object-value att subject db xt-node)
                         (get object-value (keyword att)))
                   transform-sym (some-> site-args (get "transform") symbol)
-                  transform (when transform-sym (requiring-resolve transform-sym))
-                  ]
+                  transform (when transform-sym (requiring-resolve transform-sym))]
               (if (= field-kind 'OBJECT)
                 (protected-lookup val subject db xt-node)
                 ;; TODO: check for lists
@@ -876,9 +871,9 @@
         _validate-schema (and (nil? schema)
                               (let [msg (str "Schema does not exist at " uri ". Are you deploying it correctly?")]
                                 (throw (ex-info
-                                         msg
-                                         {::site/errors [msg] ;; TODO
-                                          ::site/request-context (assoc req :ring.response/status 400)}))))
+                                        msg
+                                        {::site/errors [msg] ;; TODO
+                                         ::site/request-context (assoc req :ring.response/status 400)}))))
         body (some-> req ::site/received-representation ::http/body (String.))
 
         {query "query"
@@ -888,23 +883,23 @@
           "application/json" (try (some-> body json/read-value)
                                   (catch Exception e
                                     (throw
-                                      (let [msg "Error parsing JSON body"]
-                                        (ex-info
-                                          msg
-                                          {::site/errors [msg]
-                                           ::site/request-context (assoc req :ring.response/status 400)})))))
+                                     (let [msg "Error parsing JSON body"]
+                                       (ex-info
+                                        msg
+                                        {::site/errors [msg]
+                                         ::site/request-context (assoc req :ring.response/status 400)})))))
           "application/graphql" {"query" body}
 
           (throw
-            (ex-info
-              (format "Unknown content type for GraphQL request: %s" (some-> req ::site/received-representation ::http/content-type))
-              {::site/request-context req})))
+           (ex-info
+            (format "Unknown content type for GraphQL request: %s" (some-> req ::site/received-representation ::http/content-type))
+            {::site/request-context req})))
 
         _ (when (nil? query)
             (throw
-              (ex-info
-                "Nil GraphQL query"
-                {::site/request-context req})))
+             (ex-info
+              "Nil GraphQL query"
+              {::site/request-context req})))
 
         parsed-query
         (try
@@ -912,10 +907,10 @@
           (catch Exception e
             (log/error e "Error parsing GraphQL query")
             (throw
-              (ex-info
-                "Failed to parse query"
-                {::site/request-context req}
-                e))))
+             (ex-info
+              "Failed to parse query"
+              {::site/request-context req}
+              e))))
 
         compiled-query
         (try
@@ -925,24 +920,24 @@
             (let [errors (:errors (ex-data e))]
               (log/errorf "Errors %s" (pr-str errors))
               (throw
-                (ex-info
-                  "Error parsing or compiling GraphQL query"
-                  (cond-> {::site/request-context (assoc req :ring.response/status 400)}
-                    (seq errors) (assoc ::grab/errors errors)))))))
+               (ex-info
+                "Error parsing or compiling GraphQL query"
+                (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                  (seq errors) (assoc ::grab/errors errors)))))))
 
         variables (into
-                    (common-variables req)
-                    variables)
+                   (common-variables req)
+                   variables)
 
         results
         (juxt.site.alpha.graphql/query
-          schema compiled-query operation-name variables req)]
+         schema compiled-query operation-name variables req)]
 
     (-> req
         (assoc
-          :ring.response/status 200
-          :ring.response/body
-          (json/write-value-as-string results))
+         :ring.response/status 200
+         :ring.response/body
+         (json/write-value-as-string results))
         (update :ring.response/headers assoc "content-type" "application/json"))))
 
 (defn schema-resource [resource schema-str]
@@ -951,28 +946,28 @@
 
 (defn put-schema [xt-node resource schema-str]
   (xt/await-tx
+   xt-node
+   (xt/submit-tx
     xt-node
-    (xt/submit-tx
-      xt-node
-      [[:xtdb.api/put (schema-resource resource schema-str)]])))
+    [[:xtdb.api/put (schema-resource resource schema-str)]])))
 
 (defn put-handler [{::site/keys [uri db xt-node] :as req}]
   (let [schema-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
         _ (when-not schema-str
             (throw
-              (ex-info
-                "No schema in request"
-                {::site/request-context {:ring.response/status 400}})))
+             (ex-info
+              "No schema in request"
+              {::site/request-context {:ring.response/status 400}})))
 
         resource (xt/entity db uri)]
 
     (when (nil? resource)
       (throw
-        (ex-info
-          "GraphQL resource not configured"
-          {:uri uri
-           ::site/request-context (assoc req :ring.response/status 400)})))
+       (ex-info
+        "GraphQL resource not configured"
+        {:uri uri
+         ::site/request-context (assoc req :ring.response/status 400)})))
 
     (try
       (put-schema xt-node resource schema-str)
@@ -981,65 +976,65 @@
         (let [errors (:errors (ex-data e))]
           (if (seq errors)
             (throw
-              (ex-info
-                "Errors in schema"
-                (cond-> {::site/request-context (assoc req :ring.response/status 400)}
-                  (seq errors) (assoc ::grab/errors errors))))
+             (ex-info
+              "Errors in schema"
+              (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                (seq errors) (assoc ::grab/errors errors))))
             (throw
-              (ex-info
-                "Failed to put schema"
-                {::site/request-context (assoc req :ring.response/status 500)}
-                e))))))))
+             (ex-info
+              "Failed to put schema"
+              {::site/request-context (assoc req :ring.response/status 500)}
+              e))))))))
 
 (defn plain-text-error-message [error]
   (let [line (some-> error :location :line inc)]
     (str
-      (when line (format "%4d: " line))
-      (:message error)
-      " [" (->> (dissoc error :message)
-                sort
-                (map (fn [[k v]] (format "%s=%s" (name k) v)))
-                (str/join ", ")) "]")))
+     (when line (format "%4d: " line))
+     (:message error)
+     " [" (->> (dissoc error :message)
+               sort
+               (map (fn [[k v]] (format "%s=%s" (name k) v)))
+               (str/join ", ")) "]")))
 
 (defn put-error-text-body [req]
   (cond
     (::site/errors req)
     (->>
-      (for [error (::site/errors req)]
-        (cond-> (str \tab (plain-text-error-message error))
+     (for [error (::site/errors req)]
+       (cond-> (str \tab (plain-text-error-message error))
           ;;(:location error) (str " (line " (-> error :location :line) ")")
-          ))
-      (into ["Schema compilation errors"])
-      (str/join (System/lineSeparator)))
+         ))
+     (into ["Schema compilation errors"])
+     (str/join (System/lineSeparator)))
     (:ring.response/body req) (:ring.response/body req)
     :else "Unknown error, check stack trace"))
 
 (defn put-error-json-body [req]
   (json/write-value-as-string
-    {:message "Schema compilation errors"
-     :errors (::site/errors req)}))
+   {:message "Schema compilation errors"
+    :errors (::site/errors req)}))
 
 (defn post-error-text-body [req]
   (->>
-    (for [error (::site/errors req)]
-      (cond-> (str \tab (:error error))
-        (:location error) (str " (line " (-> error :location :row inc) ")")))
-    (into ["Query errors"])
-    (str/join (System/lineSeparator))))
+   (for [error (::site/errors req)]
+     (cond-> (str \tab (:error error))
+       (:location error) (str " (line " (-> error :location :row inc) ")")))
+   (into ["Query errors"])
+   (str/join (System/lineSeparator))))
 
 (defn post-error-json-body [req]
   (json/write-value-as-string
-    {:errors
-     (for [error (::site/errors req)
-           :let [location (:location error)]]
-       (cond-> error
-         location (assoc :location location)))}))
+   {:errors
+    (for [error (::site/errors req)
+          :let [location (:location error)]]
+      (cond-> error
+        location (assoc :location location)))}))
 
 (defn stored-document-resource-map [document-str schema]
   (try
     (let [document (document/compile-document
-                     (parser/parse document-str)
-                     schema)]
+                    (parser/parse document-str)
+                    schema)]
 
       {::site/graphql-compiled-query document
        ::http/body (.getBytes document-str)
@@ -1049,58 +1044,58 @@
       (let [errors (:errors (ex-data e))]
         (if (seq errors)
           (throw
-            (ex-info
-              "Errors in GraphQL document"
-              {::grab/errors errors}))
+           (ex-info
+            "Errors in GraphQL document"
+            {::grab/errors errors}))
           (throw
-            (ex-info
-              "Failed to store GraphQL document due to error"
-              {}
-              e)))))))
+           (ex-info
+            "Failed to store GraphQL document due to error"
+            {}
+            e)))))))
 
 (defn stored-document-put-handler [{::site/keys [uri db xt-node] :as req}]
   (let [document-str (some-> req :juxt.site.alpha/received-representation :juxt.http.alpha/body (String.))
 
         _ (when-not document-str
             (throw
-              (ex-info
-                "No document in request"
-                {::site/request-context (assoc req :ring.response/status 400)})))
+             (ex-info
+              "No document in request"
+              {::site/request-context (assoc req :ring.response/status 400)})))
 
         resource (xt/entity db uri)]
 
     (when (nil? resource)
       (throw
-        (ex-info
-          "GraphQL stored-document resource not configured"
-          {:uri uri
-           ::site/request-context (assoc req :ring.response/status 400)})))
+       (ex-info
+        "GraphQL stored-document resource not configured"
+        {:uri uri
+         ::site/request-context (assoc req :ring.response/status 400)})))
 
     ;; Validate resource
     (when-not (::site/graphql-schema resource)
       (throw
-        (ex-info
-          "Resource should have a :juxt.site.alpha/graphql-schema key"
-          {::site/resource resource
-           ::site/request-context (assoc req :ring.response/status 500)})))
+       (ex-info
+        "Resource should have a :juxt.site.alpha/graphql-schema key"
+        {::site/resource resource
+         ::site/request-context (assoc req :ring.response/status 500)})))
 
     (let [schema-id (::site/graphql-schema resource)
           schema (some-> db (xt/entity schema-id) ::site/graphql-compiled-schema)]
 
       (when-not schema
         (throw
-          (ex-info
-            "Cannot store a GraphQL document when the schema hasn't been added"
-            {::site/graph-schema schema-id
-             ::site/request-context (assoc req :ring.response/status 500)})))
+         (ex-info
+          "Cannot store a GraphQL document when the schema hasn't been added"
+          {::site/graph-schema schema-id
+           ::site/request-context (assoc req :ring.response/status 500)})))
 
       (try
         (let [m (stored-document-resource-map document-str schema)]
           (xt/await-tx
+           xt-node
+           (xt/submit-tx
             xt-node
-            (xt/submit-tx
-              xt-node
-              [[:xtdb.api/put (into resource m)]])))
+            [[:xtdb.api/put (into resource m)]])))
 
         (assoc req :ring.response/status 204)
 
@@ -1109,15 +1104,15 @@
             (throw
               ;; Throw but ignore the cause (since we pull out the key
               ;; information from it)
-              (ex-info
-                "Errors in GraphQL document"
-                (cond-> {::site/request-context (assoc req :ring.response/status 400)}
-                  (seq errors) (assoc ::grab/errors errors))))
+             (ex-info
+              "Errors in GraphQL document"
+              (cond-> {::site/request-context (assoc req :ring.response/status 400)}
+                (seq errors) (assoc ::grab/errors errors))))
             (throw
-              (ex-info
-                "Failed to store GraphQL document due to error"
-                {::site/request-context (assoc req :ring.response/status 500)}
-                e))))))))
+             (ex-info
+              "Failed to store GraphQL document due to error"
+              {::site/request-context (assoc req :ring.response/status 500)}
+              e))))))))
 
 (defn graphql-query [{::site/keys [db] :as req} stored-query-id operation-name variables]
   (assert stored-query-id)
@@ -1125,10 +1120,10 @@
   (let [resource (xt/entity db stored-query-id)
         _ (when-not resource
             (throw
-              (ex-info
-                "GraphQL stored query not found"
-                {:stored-query-id stored-query-id
-                 ::site/request-context (assoc req :ring.response/status 500)})))
+             (ex-info
+              "GraphQL stored query not found"
+              {:stored-query-id stored-query-id
+               ::site/request-context (assoc req :ring.response/status 500)})))
 
         schema-id (::site/graphql-schema resource)
 
