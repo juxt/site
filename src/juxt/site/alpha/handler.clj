@@ -66,8 +66,13 @@
          vary ::pick/vary}
         (when (seq current-representations)
           ;; TODO: Pick must upgrade to ring 2 headers
-          (pick (assoc request :headers (:ring.request/headers request))
-                current-representations {::pick/vary? true}))]
+          (try
+            (pick (assoc request :headers (:ring.request/headers request))
+                  current-representations {::pick/vary? true})
+            (catch Exception e
+              (if (= "Extraneous input" (.getMessage e))
+                (throw (ex-info (.getMessage e) (assoc (.getData e) :ring.response/status 400) e))
+                (throw e)))))]
 
     #_(when (contains? #{:get :head} (:ring.request/method request))
         (when-not selected-representation
@@ -1162,7 +1167,10 @@
                  {::site/selected-representation representation})))))))
 
       (catch Throwable e
-        (log/error e (.getMessage e))
+        (let [message (.getMessage e)]
+          (cond
+            (= "Query timed out." message) (log/warn e message)
+            :else (log/error e message)))
         ;; TODO: We should allow an ErrorResource for 500 errors
         (let [default-body "Internal Error\r\n"]
           (respond
