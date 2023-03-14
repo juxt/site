@@ -45,9 +45,7 @@
   (apply println (apply str ansi/bold-green-font "site:" ansi/reset-font) msg))
 
 (def default-config-file
-  (case (System/getProperty "os.name")
-    "Linux" (str (System/getProperty "user.home") "/.config/site/config.edn")
-    (error-and-exit! 1 "Unsupported OS")))
+  (str (System/getProperty "user.home") "/.config/site/config.edn"))
 
 (defn parse-config
   [path]
