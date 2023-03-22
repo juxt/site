@@ -7,6 +7,7 @@
    [integrant.core :as ig]
    [juxt.site.alpha.triggers :as triggers]
    [crux.api :as x]
+   [crux.query :as cruxq]
    [clojure.tools.logging :as log]
    [clojure.string :as str]))
 
@@ -46,20 +47,20 @@
         (log/error e)))))
 
 (defn send-mail! [ses-client from to subject html-body text-body]
+  (let [to (vec (flatten [to]))]
+    (log/infof "Sending email to %s with subject %s" to subject)
+    (log/debugf "Email body %s" html-body)
 
-  (log/infof "Sending email to %s with subject %s" to subject)
-  (log/debugf "Email body %s" html-body)
-
-  (future
-    (try
-      (ses-client
-       :destination {:to-addresses [to]}
-       :source from
-       :message {:subject subject
-                 :body {:html html-body
-                        :text text-body}})
-      (catch Exception e
-        (log/error e)))))
+    (future
+      (try
+        (ses-client
+         :destination {:to-addresses to}
+         :source from
+         :message {:subject subject
+                   :body {:html html-body
+                          :text text-body}})
+        (catch Exception e
+          (log/error e))))))
 
 (defn mail-merge [template data]
   (str/replace
@@ -100,3 +101,15 @@
          from-sms-name phone-number
          (mail-merge subject data)
          (mail-merge text-template data))))))
+
+(defmethod cruxq/aggregate 'distinct-string-list [_]
+  (fn
+    ([] #{})
+    ([acc] (str/join "&" acc))
+    ([acc x] (conj acc x))))
+
+(defmethod cruxq/aggregate 'merge-with-flatten [_]
+  (fn
+    ([] nil)
+    ([acc] acc)
+    ([acc x] (merge-with #(flatten [%1 %2]) acc x))))
