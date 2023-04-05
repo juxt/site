@@ -281,15 +281,17 @@
         _ (log/info "Loading OpenID configuration from" config-uri)
         config (json/read-value (slurp config-uri))
         auth-uri (new java.net.URI (get config "authorization_endpoint"))
-        app-tld (-> (InternetDomainName/from (.getHost auth-uri))
-                    (.topPrivateDomain)
-                    (.toString))
-        config (cond-> config
-                 (= app-tld "amazoncognito.com")
-                 (assoc "authorization_endpoint"
-                        (-> (new URIBuilder auth-uri)
-                            (.setPath "/logout")
-                            (.toString))))]
+        config (try
+                 (cond-> config
+                   (= (-> (InternetDomainName/from (.getHost auth-uri))
+                          (.topPrivateDomain)
+                          (.toString)) "amazoncognito.com")
+                   (assoc "authorization_endpoint"
+                          (-> (new URIBuilder auth-uri)
+                              (.setPath "/logout")
+                              (.toString))))
+                 (catch IllegalArgumentException _ config)
+                 (catch IllegalStateException _ config))]
     (log/info "Issuer added:" (get config "issuer"))
     (put!
      crux-node

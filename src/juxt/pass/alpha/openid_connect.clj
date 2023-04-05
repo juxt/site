@@ -111,7 +111,7 @@
                          [k (case k
                               "email_verified" (.asBoolean v)
                               ("iat" "exp" "nbf" "auth_time") (.asDate v)
-                              "cognito:groups" (vec (.asArray v java.lang.String))
+                              ("groups" "cognito:groups") (vec (.asArray v java.lang.String))
                               (.asString v))]))]
 
       ;; https://openid.net/specs/openid-connect-core-1_0.html Section 3.1.3.7
@@ -346,10 +346,12 @@
               ;; This is possibly an attack, we should log an alert
               (return req 500 "Nonce received does not match expected" {}))
 
-          {:strs [name email iss sub] username "cognito:username" groups "cognito:groups"}
+          {:strs [name email iss sub cognito:username preferred_username groups cognito:groups]}
           (select-keys
            (:claims id-token)
-           ["cognito:username" "name" "email" "cognito:groups" "iss" "sub"])
+           ["groups" "preferred_username" "cognito:username" "name" "email" "cognito:groups" "iss" "sub"])
+          username (or cognito:username preferred_username)
+          groups (or cognito:groups groups)
           user-id (str base-uri "/_site/users/" username)
           role-id (str base-uri "/_site/roles/%s")
           user-role-id (str role-id "/users/" username)]
