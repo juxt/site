@@ -112,4 +112,4 @@
   (fn
     ([] nil)
     ([acc] acc)
-    ([acc x] (merge-with #(flatten [%1 %2]) acc x))))
+    ([acc x] (merge-with #(-> [%1 %2] flatten distinct) acc x))))
