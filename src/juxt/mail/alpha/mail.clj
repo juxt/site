@@ -66,13 +66,14 @@
   (str/replace
    template #"\{\{([^\}]*)\}\}"
    (fn [[_ grp]]
-     (get-in
-      data
-      (for [mtch (re-seq #"[\p{Alnum}\.:/_-]+" grp)]
-        (cond (.startsWith mtch ":") (keyword (subs mtch 1))
-              ;(re-matches #"\"([\"]*)\"" (string))
-              :else  mtch))
-      "<blank>"))))
+     (-> (get-in
+          data
+          (for [mtch (re-seq #"[\p{Alnum}\.:/_-]+" grp)]
+            (cond (.startsWith mtch ":") (keyword (subs mtch 1))
+                  ;(re-matches #"\"([\"]*)\"" (string))
+                  :else  mtch))
+          "<blank>")
+         str))))
 
 (defmethod triggers/run-action! ::mail/send-emails
   [{::site/keys [db ses-client]} {:keys [trigger action-data]}]
@@ -102,10 +103,10 @@
          (mail-merge subject data)
          (mail-merge text-template data))))))
 
-(defmethod cruxq/aggregate 'distinct-string-list [_]
+(defmethod cruxq/aggregate 'sorted-string-list [_]
   (fn
     ([] #{})
-    ([acc] (str/join "&" acc))
+    ([acc] (str/join "&" (sort acc)))
     ([acc x] (conj acc x))))
 
 (defmethod cruxq/aggregate 'merge-with-flatten [_]
