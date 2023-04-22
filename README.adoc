@@ -1,3 +1,5 @@
+IMPORTANT: This is the repository for Site 1.0. If you are looking for the latest version (Site 2.0), it is at https://github.com/juxt-site/site.
+
 = Site
 
 image:https://circleci.com/gh/juxt/site/tree/master.svg?style=svg["CircleCI", link="https://circleci.com/gh/juxt/site/tree/master"]
