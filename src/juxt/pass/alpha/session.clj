@@ -36,35 +36,36 @@
 
 (defn escalate-session
   "If provided session-token-id! matches, create a new session with the matched identity"
-  [{::site/keys [db crux-node resource start-date]
-    ::pass/keys [session-token-id!] :as req} matched-identity]
-  (let [session (authz/lookup-session session-token-id! start-date)
+  [{::pass/keys [session-token-id!] :as req} matched-identity]
+  (let [session (authz/lookup-session req session-token-id!)
         _ (assert session)
-        new-session-token-id! (authz/access-token)
-        expires-in (get resource ::pass/expires-in (* 24 3600))]
-    (authz/remove-session! session-token-id!)
+        new-session-token-id! (authz/access-token)]
+    (authz/remove-session! req session-token-id!)
     (authz/put-session!
+     req
      new-session-token-id!
-     {::pass/user matched-identity}
-     (.plusSeconds (.toInstant start-date) expires-in))
+     {::pass/user matched-identity
+      "access_token" new-session-token-id!
+      "expires_in" (* 24 3600)
+      "user" matched-identity})
 
     (-> req
         (set-cookie new-session-token-id!)
         (update-in [:ring.response/headers "location"]
-            (fn [location]
-              (-> (new URIBuilder location)
-                  (.addParameter "code" new-session-token-id!)
-                  (.toString)))))))
+                   (fn [location]
+                     (-> (new URIBuilder location)
+                         (.addParameter "code" new-session-token-id!)
+                         (.toString)))))))
 
 (defn wrap-associate-session [h]
-  (fn [{::site/keys [db start-date] :as req}]
+  (fn [req]
     (let [session-token-id!
           (-> (assoc req :headers (get req :ring.request/headers))
               cookies-request
               :cookies (get "id") :value)
 
           session (when session-token-id!
-                    (authz/lookup-session session-token-id! start-date))
+                    (authz/lookup-session req session-token-id!))
 
           subject (some->
                    (select-keys session [::pass/user ::pass/username])
