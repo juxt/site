@@ -155,7 +155,7 @@
       {"http://localhost:8000"
        {::site/access-control-allow-methods #{:post}
         ::site/access-control-allow-headers #{"authorization" "content-type"}}}
-      ::pass/expires-in (* 60 60 1)}
+      ::pass/expires-in (* 3600 24 7)}
 
      {:crux.db/id (str base-uri "/_site/rules/anyone-can-ask-for-a-token")
       ::site/type "Rule"
@@ -194,7 +194,7 @@
     ::http/methods #{:post}
     ::http/acceptable "application/x-www-form-urlencoded"
     ::site/purpose ::site/login
-    ::pass/expires-in (* 3600 24 30)}
+    ::pass/expires-in (* 3600 24 7)}
 
    {:crux.db/id (str base-uri "/_site/rules/anyone-can-post-login-credentials")
     ::site/type "Rule"

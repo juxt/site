@@ -3,7 +3,6 @@
 (ns juxt.test.util
   (:require
    [crux.api :as x]
-   [juxt.pass.alpha.authentication :as auth]
    [juxt.site.alpha.handler :as h]
    [juxt.site.alpha.init :as site-init])
   (:import
@@ -13,7 +12,6 @@
 (def ^:dynamic ^ICruxAPI *crux-node*)
 (def ^:dynamic *handler*)
 (def ^:dynamic *db*)
-(def ^:dynamic *sessions*)
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -30,7 +28,6 @@
   (->>
    (x/submit-tx *crux-node* transactions)
    (x/await-tx *crux-node*)))
-
 
 (defn make-handler [opts]
   ((apply comp
@@ -63,10 +60,6 @@
     (binding [*db* db]
       (f))))
 
-(defn with-sessions [f]
-  (binding [*sessions* auth/sessions-by-access-token]
-    (f)))
-
 (def access-all-areas
   {:crux.db/id "https://example.org/access-rule"
    ::site/description "A rule allowing access everything"
@@ -88,7 +81,8 @@
    {::site/base-uri "https://example.org"})
   (f))
 
-(defn reset-sessions!
-  [f]
-  (reset! auth/sessions-by-access-token {})
-  (f))
+(defn query-sessions
+  [db]
+  (->> (x/q db '{:find [(pull ss [*])]
+                 :where [[ss :juxt.site.alpha/type "SiteSession"]]})
+       (mapv first)))

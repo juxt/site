@@ -64,12 +64,13 @@
 
         ;; Create a pre-auth session
         session-token-id! (make-nonce 16)
-        expires-in (get resource ::pass/expires-in (* 24 3600))
         _ (put-session!
+           req
            session-token-id!
-           (cond-> {::pass/state state ::pass/nonce nonce}
-             return-to (assoc ::pass/return-to return-to))
-           (.plusSeconds (.toInstant start-date) expires-in))
+           (cond-> {::pass/state state
+                    ::pass/nonce nonce
+                    :expires_in (* 24 3600)}
+             return-to (assoc ::pass/return-to return-to)))
 
         query-string
         (codec/form-encode

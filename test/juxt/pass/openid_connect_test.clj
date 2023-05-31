@@ -6,22 +6,21 @@
    [crux.api :as crux]
    [hato.client :as hc]
    [juxt.pass.alpha.authentication :as auth]
-   [juxt.pass.alpha.util :as util]
    [juxt.pass.alpha.openid-connect :as openid]
+   [juxt.pass.alpha.util :as util]
    [juxt.pass.openid-connect-test-utils :as tutils]
    [juxt.site.alpha.init :as site-init]
-   [juxt.test.util :refer [*crux-node* *handler* *sessions*
-                           with-crux with-handler with-sessions]
+   [juxt.test.util :refer [*crux-node* *handler* with-crux with-handler]
     :as test-util])
   (:import
    (com.auth0.jwt JWT)
-   (java.time Instant)))
+   (java.time Instant)
+   (java.util Date)))
 
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(t/use-fixtures :each with-crux with-handler with-sessions
-  test-util/reset-sessions!
+(t/use-fixtures :each with-crux with-handler
   test-util/allow-access-to-public-resources!)
 
 (deftest openid-auth0-login-redirect-test
@@ -42,12 +41,16 @@
                [util/make-nonce tutils/mock-make-nonce]
                 (*handler*
                  {:ring.request/method :get
-                  :ring.request/path "/_site/openid/auth0/login"}))]
+                  :ring.request/path "/_site/openid/auth0/login"}))
+         db (crux/db *crux-node*)
+         sessions (test-util/query-sessions db)
+         session (first sessions)]
 
-     (is (contains? @*sessions* "cccccccccccccccc"))
-     (is (= "aaaaaaaa" (get-in @*sessions* ["cccccccccccccccc" ::pass/state])))
-     (is (= "bbbbbbbbbbbb" (get-in @*sessions* ["cccccccccccccccc" ::pass/nonce])))
-     (is (nil? (get-in @*sessions* ["cccccccccccccccc" ::pass/return-to])))
+     (is (= 1 (count sessions)))
+     (is (= "https://example.org/site-session/cccccccccccccccc" (:crux.db/id session)))
+     (is (= "aaaaaaaa" (get session ::pass/state)))
+     (is (= "bbbbbbbbbbbb" (get session ::pass/nonce)))
+     (is (nil? (get session ::pass/return-to)))
 
      (is (= 303 (:ring.response/status resp)))
      (is (= "https://dev-14bkigf7.us.auth0.com/authorize?response_type=code&scope=openid&client_id=clientidihgfedcba123456789&redirect_uri=https%3A%2F%2Fexample.org%2F_site%2Fopenid%2Fauth0%2Fcallback&state=aaaaaaaa&nonce=bbbbbbbbbbbb&prompt=login"
@@ -71,12 +74,16 @@
                [util/make-nonce tutils/mock-make-nonce]
                 (*handler*
                  {:ring.request/method :get
-                  :ring.request/path "/_site/openid/aws-cognito/login"}))]
+                  :ring.request/path "/_site/openid/aws-cognito/login"}))
+         db (crux/db *crux-node*)
+         sessions (test-util/query-sessions db)
+         session (first sessions)]
 
-     (is (contains? @*sessions* "cccccccccccccccc"))
-     (is (= "aaaaaaaa" (get-in @*sessions* ["cccccccccccccccc" ::pass/state])))
-     (is (= "bbbbbbbbbbbb" (get-in @*sessions* ["cccccccccccccccc" ::pass/nonce])))
-     (is (nil? (get-in @*sessions* ["cccccccccccccccc" ::pass/return-to])))
+     (is (= 1 (count sessions)))
+     (is (= "https://example.org/site-session/cccccccccccccccc" (:crux.db/id session)))
+     (is (= "aaaaaaaa" (get session ::pass/state)))
+     (is (= "bbbbbbbbbbbb" (get session ::pass/nonce)))
+     (is (nil? (get session ::pass/return-to)))
 
      (is (= 303 (:ring.response/status resp)))
      (is (= "https://excel.auth.us-east-2.amazoncognito.com/logout?response_type=code&scope=openid&client_id=clientid123456789abcdefghi&redirect_uri=https%3A%2F%2Fexample.org%2F_site%2Fopenid%2Faws-cognito%2Fcallback&state=aaaaaaaa&nonce=bbbbbbbbbbbb&prompt=login"
@@ -101,12 +108,16 @@
                 (*handler*
                  {:ring.request/method :get
                   :ring.request/path "/_site/openid/aws-cognito/login"
-                  :ring.request/query "return-to=http://example.org/home.html"}))]
+                  :ring.request/query "return-to=http://example.org/home.html"}))
+         db (crux/db *crux-node*)
+         sessions (test-util/query-sessions db)
+         session (first sessions)]
 
-     (is (contains? @*sessions* "cccccccccccccccc"))
-     (is (= "aaaaaaaa" (get-in @*sessions* ["cccccccccccccccc" ::pass/state])))
-     (is (= "bbbbbbbbbbbb" (get-in @*sessions* ["cccccccccccccccc" ::pass/nonce])))
-     (is (= "http://example.org/home.html" (get-in @*sessions* ["cccccccccccccccc" ::pass/return-to])))
+     (is (= 1 (count sessions)))
+     (is (= "https://example.org/site-session/cccccccccccccccc" (:crux.db/id session)))
+     (is (= "aaaaaaaa" (get session ::pass/state)))
+     (is (= "bbbbbbbbbbbb" (get session ::pass/nonce)))
+     (is (= "http://example.org/home.html" (get session ::pass/return-to)))
 
      (is (= 303 (:ring.response/status resp)))
      (is (= "https://excel.auth.us-east-2.amazoncognito.com/logout?response_type=code&scope=openid&client_id=clientid123456789abcdefghi&redirect_uri=https%3A%2F%2Fexample.org%2F_site%2Fopenid%2Faws-cognito%2Fcallback&state=aaaaaaaa&nonce=bbbbbbbbbbbb&prompt=login"
@@ -170,11 +181,16 @@
       :description "Superuser"}]])
 
   (auth/put-session!
+   {::site/crux-node *crux-node*
+    ::site/base-uri "https://example.org"
+    ::site/start-date (Date.)}
    "current-session"
    {::pass/state "auth-flow-state"
-    ::pass/nonce "4f689a2585601d8050dc3cec"}
-   (.plusSeconds (Instant/now) 3600))
-
+    ::pass/nonce "4f689a2585601d8050dc3cec"
+    :expires_in 3600})
+; TODO: fails because start-date (handler.clj:1260) gets initialized with current date, not changed
+; hence generated tokens always immediately expire. Need to either inject fixed test time or not expire
+; login tokens
   (testing
    (let [resp (with-redefs
                [hc/get (tutils/mock-openid-jwks-req "aws-cognito")
@@ -189,18 +205,21 @@
                                (getToday [_]
                                  ; Token is valid from 2023-01-16T15:44:47.00Z and lasts an hour
                                  ; so set time of validation to 2023-01-16T15:45:00.00Z
-                                 (java.util.Date/from
-                                  (java.time.Instant/parse "2023-01-16T15:45:00.00Z")))))))]
+                                 (Date/from (Instant/parse "2023-01-16T15:45:00.00Z")))))))]
 
                 (*handler*
                  {:ring.request/method :get
                   :ring.request/path "/_site/openid/aws-cognito/callback"
                   :ring.request/query "state=auth-flow-state&code=randomcode"
                   :ring.request/headers {"cookie" "id=current-session"}}))
-         db (crux/db *crux-node*)]
+         db (crux/db *crux-node*)
+         sessions (test-util/query-sessions db)
+         session (first sessions)]
 
-     (is (nil? (get @*sessions* "current-session")))
-     (is (contains? @*sessions* "new-session"))
+     (is (= 1 (count sessions)))
+     (is (not= "https://example.org/site-session/current-session" (:crux.db/id session)))
+     (is (= "https://example.org/site-session/new-session" (:crux.db/id session)))
+     (is (= "https://example.org/_site/users/exceladmin" (::pass/user session)))
 
      (is (= 303 (:ring.response/status resp)))
      (is (= "/?code=new-session"
@@ -239,10 +258,13 @@
              :client-secret "clientsecret123456789abcdefghi"}})
 
   (auth/put-session!
+   {::site/crux-node *crux-node*
+    ::site/base-uri "https://example.org"
+    ::site/start-date (Date.)}
    "current-session"
    {::pass/state "auth-flow-state"
-    ::pass/nonce "4f689a2585601d8050dc3cec"}
-   (.plusSeconds (Instant/now) 3600))
+    ::pass/nonce "4f689a2585601d8050dc3cec"
+    :expires_in 3600})
 
   (testing
    (let [resp (with-redefs
@@ -258,18 +280,21 @@
                                (getToday [_]
                                  ; Token is valid from 2023-01-16T15:44:47.00Z and lasts an hour
                                  ; so set time of validation to 2023-01-16T15:45:00.00Z
-                                 (java.util.Date/from
-                                  (java.time.Instant/parse "2023-01-16T15:45:00.00Z")))))))]
+                                 (Date/from (Instant/parse "2023-01-16T15:45:00.00Z")))))))]
 
                 (*handler*
                  {:ring.request/method :get
                   :ring.request/path "/_site/openid/aws-cognito/callback"
                   :ring.request/query "state=auth-flow-state&code=randomcode"
                   :ring.request/headers {"cookie" "id=current-session"}}))
-         db (crux/db *crux-node*)]
+         db (crux/db *crux-node*)
+         sessions (test-util/query-sessions db)
+         session (first sessions)]
 
-     (is (nil? (get @*sessions* "current-session")))
-     (is (contains? @*sessions* "new-session"))
+     (is (= 1 (count sessions)))
+     (is (not= "https://example.org/site-session/current-session" (:crux.db/id session)))
+     (is (= "https://example.org/site-session/new-session" (:crux.db/id session)))
+     (is (= "https://example.org/_site/users/exceladmin" (::pass/user session)))
 
      (is (= 303 (:ring.response/status resp)))
      (is (= "/?code=new-session"
@@ -336,18 +361,21 @@
                           (getToday [_]
                             ; Token is valid from 2023-01-16T15:44:47.00Z and lasts an hour
                             ; so set time of validation to 2023-01-16T15:45:00.00Z
-                            (java.util.Date/from
-                             (java.time.Instant/parse "2023-01-16T15:45:00.00Z")))))))]
+                            (Date/from (Instant/parse "2023-01-16T15:45:00.00Z")))))))]
 
            (*handler*
             {:ring.request/method :get
              :ring.request/path "/_site/openid/aws-cognito/callback"
              :ring.request/query "state=aaaaaaaa&code=randomcode"
              :ring.request/headers {"cookie" (get-in login-resp [:ring.response/headers "set-cookie"])}}))
-         db (crux/db *crux-node*)]
+         db (crux/db *crux-node*)
+         sessions (test-util/query-sessions db)
+         session (first sessions)]
 
-     (is (nil? (get @*sessions* "cccccccccccccccc")))
-     (is (contains? @*sessions* "dddddddddddddddd"))
+     (is (= 1 (count sessions)))
+     (is (not= "https://example.org/site-session/cccccccccccccccc" (:crux.db/id session)))
+     (is (= "https://example.org/site-session/dddddddddddddddd" (:crux.db/id session)))
+     (is (= "https://example.org/_site/users/exceladmin" (::pass/user session)))
 
      (is (= 303 (:ring.response/status callback-resp)))
      (is (= "/?code=dddddddddddddddd"

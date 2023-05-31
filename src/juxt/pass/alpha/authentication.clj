@@ -2,14 +2,17 @@
 
 (ns juxt.pass.alpha.authentication
   (:require
-   [jsonista.core :as json]
    [clojure.tools.logging :as log]
-   [crypto.password.bcrypt :as password]
+   [clojure.walk :as walk]
    [crux.api :as x]
+   [crypto.password.bcrypt :as password]
+   [jsonista.core :as json]
    [juxt.reap.alpha.decoders :as reap]
    [juxt.reap.alpha.rfc7235 :as rfc7235]
-   [ring.util.codec :refer [form-decode url-decode]]
-   [ring.middleware.cookies :refer [cookies-request cookies-response]]))
+   [ring.middleware.cookies :refer [cookies-request cookies-response]]
+   [ring.util.codec :refer [form-decode]])
+  (:import
+   (java.time Instant)))
 
 (alias 'http (create-ns 'juxt.http.alpha))
 (alias 'pass (create-ns 'juxt.pass.alpha))
@@ -23,32 +26,40 @@
     (.nextBytes SECURE-RANDOM bytes)
     (.encodeToString BASE64-ENCODER bytes)))
 
-(defonce sessions-by-access-token (atom {}))
+(defn put-session! [{::site/keys [crux-node base-uri start-date]} k session]
+  (let [session (walk/keywordize-keys session)]
+    (->> [[:crux.tx/put
+           (merge
+            (select-keys session [::pass/user ::pass/state ::pass/nonce ::pass/return-to])
+            {:crux.db/id (str base-uri "/site-session/" k)
+             :juxt.site.alpha/type "SiteSession"
+             ::expiry-instant
+             (-> (if start-date (.toInstant start-date) (Instant/now))
+                 (.plusSeconds (or (:expires_in session) 3600)))})]]
+         (x/submit-tx crux-node)
+         (x/await-tx crux-node))))
 
-(defn put-session! [k session ^java.time.Instant expiry-instant]
-  (swap! sessions-by-access-token
-         assoc k (assoc session
-                        ::expiry-instant expiry-instant)))
+(defn remove-session! [{::site/keys [crux-node base-uri]} k]
+  (->> [[:crux.tx/evict (str base-uri "/site-session/" k)]]
+       (x/submit-tx crux-node)
+       (x/await-tx crux-node)))
 
-(defn remove-session! [k]
-  (swap! sessions-by-access-token
-         dissoc k))
+(defn expire-sessions! [{::site/keys [crux-node db start-date]}]
+  (->> (x/q db '{:find [ss expiry-instant]
+                 :where [[ss :juxt.site.alpha/type "SiteSession"]
+                         [ss ::expiry-instant expiry-instant]]})
+       (filter (fn [[_ expiry-instant]]
+                 (.isAfter (.toInstant start-date) expiry-instant)))
+       (mapv (fn [[ss _]] [:crux.tx/evict ss]))
+       (x/submit-tx crux-node)
+       (x/await-tx crux-node)))
 
-(defn expire-sessions! [date-now]
-  (swap! sessions-by-access-token
-         (fn [sessions]
-           (into {} (remove #(.isAfter (.toInstant date-now)
-                                       (-> % second (get ::expiry-instant)))
-                            sessions)))))
-
-(defn lookup-session [k date-now]
-  (expire-sessions! date-now)
-  (get @sessions-by-access-token k))
-
-;;(identity @sessions-by-access-token)
+(defn lookup-session [{::site/keys [db base-uri] :as req} k]
+  (expire-sessions! req)
+  (x/entity db (str base-uri "/site-session/" k)))
 
 (defn token-response
-  [{::site/keys [received-representation resource start-date]
+  [{::site/keys [received-representation resource]
     ::pass/keys [subject] :as req}]
 
   ;; Check grant_type of posted-representation
@@ -84,9 +95,9 @@
                  "user" (::pass/user subject)}
 
         _ (put-session!
+           req
            access-token
-           (merge session subject)
-           (.plusSeconds (.toInstant start-date) expires-in))
+           (merge session subject))
 
         body (.getBytes
               (str
@@ -145,10 +156,10 @@
                       "token_type" "login"
                       "expires_in" expires-in}]
          (put-session!
+          req
           access-token
           (merge session {::pass/user user
-                          ::pass/username username})
-          (.plusSeconds (.toInstant start-date) expires-in))
+                          ::pass/username username}))
          (-> req
              (assoc :ring.response/status 302
                     :ring.response/body
@@ -236,13 +247,12 @@
         (some-> req
                 ((fn [req] (assoc req :headers (get req :ring.request/headers))))
                 cookies-request
-                :cookies (get "site_session") :value json/read-value)
-        now (::site/start-date req)]
+                :cookies (get "site_session") :value json/read-value)]
 
     (or
      ;; Cookie
      (when access-token
-       (when-let [session (lookup-session access-token now)]
+       (when-let [session (lookup-session req access-token)]
          (->
           (select-keys session [::pass/user ::pass/username])
           (assoc ::pass/auth-scheme "Session"))))
@@ -276,7 +286,7 @@
                (log/error e)))
 
            "bearer"
-           (when-let [session (lookup-session token68 now)]
+           (when-let [session (lookup-session req token68)]
              (->
               (select-keys session [::pass/user ::pass/username])
               (assoc ::pass/auth-scheme "Bearer")))
