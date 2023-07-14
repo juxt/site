@@ -3,7 +3,7 @@
 (ns juxt.dave.alpha.xml
   (:require
    [clojure.tools.logging :as log]
-   [crux.api :as crux]))
+   [xtdb.api :as xt]))
 
 (defn write-doc
   ([doc output-stream]

@@ -3,7 +3,7 @@
 (ns juxt.dave.webdav-test
   (:require
    [clojure.test :refer [deftest is are testing] :as t]
-   [juxt.test.util :refer [with-crux with-handler submit-and-await! *handler*
+   [juxt.test.util :refer [with-xt with-handler submit-and-await! *handler*
                            access-all-areas access-all-apis]]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
@@ -12,13 +12,13 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(t/use-fixtures :each with-crux with-handler)
+(t/use-fixtures :each with-xt with-handler)
 
 #_(deftest get-test
   (submit-and-await!
-   [[:crux.tx/put access-all-apis]
-    [:crux.tx/put
-     {:crux.db/id "https://example.org/test.txt"
+   [[::xt/put access-all-apis]
+    [::xt/put
+     {:xt/id "https://example.org/test.txt"
       ::http/body "Hello World!\n"}]])
 
   (let [resp (*handler*
@@ -26,12 +26,12 @@
                :ring.request/path "/test.txt"
                })]))
 
-#_((t/join-fixtures [with-crux with-handler])
+#_((t/join-fixtures [with-xt with-handler])
  (fn []
    (submit-and-await!
-    [[:crux.tx/put access-all-areas]
-     [:crux.tx/put
-      {:crux.db/id "https://example.org/test.txt"
+    [[::xt/put access-all-areas]
+     [::xt/put
+      {:xt/id "https://example.org/test.txt"
        ::http/content-type "text/plain;charset=utf-8"
        ::http/content "Hello World!\n"
        ::http/methods #{:get :head :options}}]])

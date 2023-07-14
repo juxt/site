@@ -1,7 +1,7 @@
 = Site
 
 Site is a project from https://juxt.pro[JUXT] to build a Resource Server out of
-our open-source https://opencrux.com[Crux] database.
+our open-source https://xtdb.com[XTDB] database.
 
 Site supports web content, and https://www.openapis.org/[OpenAPI]. You can use
 Site as a versioned
@@ -12,7 +12,7 @@ System].
 
 CAUTION: This section describes functionality that may not yet be available.
 
-Site is a Resource Server, built on the Crux database.
+Site is a Resource Server, built on the XTDB database.
 
 You can put things into Site with (HTTP) PUT requests. When you do this, Site
 will put (the representation of) your thing (document, image, video, data…) into
@@ -61,7 +61,7 @@ See link:doc[] for more documentation.
 Site is very new, and is evolving. There isn't much to see yet.
 
 Be encouraged to study the code to improve your knowledge & understanding, for
-example, on how you can build a web application with Crux and spin.
+example, on how you can build a web application with XTDB and spin.
 
 [CAUTION]
 --
@@ -77,26 +77,26 @@ aliases. For example, write `::spin/methods` instead of
 
 == Technical Details
 
-Site is a RESTful web-layer over Crux. This section describes the concepts.
+Site is a RESTful web-layer over XTDB. This section describes the concepts.
 
 === Resources
 
-In Site, Web resources are Crux entities.
+In Site, Web resources are XTDB entities.
 
 Since a resource is identified by a URI, we use its URI (or at least its path)
-to identify the Crux entity too.
+to identify the XTDB entity too.
 
 [source,clojure]
 ----
-{:crux.db/id "https://my.site/hello"}
+{:xt/id "https://my.site/hello"}
 ----
 
-The resource's state is stored in the Crux entity's attributes, or in other Crux
+The resource's state is stored in the XTDB entity's attributes, or in other XTDB
 entities it may reference.
 
 [source,clojure]
 ----
-{:crux.db/id "https://my.site/hello"
+{:xt/id "https://my.site/hello"
  :message-today "Hello World!"}
 ----
 
@@ -106,7 +106,7 @@ configuration, such as the methods allowed on the resource.
 
 [source,clojure]
 ----
-{:crux.db/id "https://my.site/hello"
+{:xt/id "https://my.site/hello"
  :message-today "Hello World!"
  :juxt.spin.alpha/methods #{:get :head :options}}
 ----
@@ -116,9 +116,9 @@ https://tools.ietf.org/html/rfc7231#section-2[Section 2 of RFC 7231].
 
 === Representations
 
-Representations are Clojure maps. You can either store these as Crux entities
+Representations are Clojure maps. You can either store these as XTDB entities
 too (for example, if the current representations are likely to change
-often). But usually, you can store them with the resource's Crux entity, shown
+often). But usually, you can store them with the resource's XTDB entity, shown
 in <<ex-hello-world>>.
 
 [[ex-hello-world]]
@@ -133,7 +133,7 @@ payload ahead-of-time.
 ----
 (alias 'http (create-ns 'juxt.http.alpha))
 
-{:crux.db/id "https://my.site/hello"
+{:xt/id "https://my.site/hello"
  :message-today "Hello World!"
  ::http/methods #{:get :head :options}
  ::http/representations

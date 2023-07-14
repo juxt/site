@@ -3,11 +3,11 @@
  :juxt.jinx.alpha/type :object
 
  :juxt.jinx.alpha/required
- [:crux.db/id
+ [:xt/id
   :juxt.spin.alpha/methods]
 
  :juxt.jinx.alpha/properties
- {:crux.db/id {:juxt.jinx.alpha/type :uri}
+ {:xt/id {:juxt.jinx.alpha/type :uri}
 
   :juxt.spin.alpha/methods
   {:juxt.jinx.alpha/type :array
