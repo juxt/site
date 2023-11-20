@@ -26,7 +26,7 @@
     (.nextBytes SECURE-RANDOM bytes)
     (.encodeToString BASE64-ENCODER bytes)))
 
-(defn put-session! [{::site/keys [crux-node base-uri start-date]} k session]
+(defn put-session! [{::site/keys [xtdb-node base-uri start-date]} k session]
   (let [session (walk/keywordize-keys session)]
     (->> [[:crux.tx/put
            (merge
@@ -36,23 +36,23 @@
              ::expiry-instant
              (-> (if start-date (.toInstant start-date) (Instant/now))
                  (.plusSeconds (or (:expires_in session) 3600)))})]]
-         (x/submit-tx crux-node)
-         (x/await-tx crux-node))))
+         (x/submit-tx xtdb-node)
+         (x/await-tx xtdb-node))))
 
-(defn remove-session! [{::site/keys [crux-node base-uri]} k]
+(defn remove-session! [{::site/keys [xtdb-node base-uri]} k]
   (->> [[:crux.tx/evict (str base-uri "/site-session/" k)]]
-       (x/submit-tx crux-node)
-       (x/await-tx crux-node)))
+       (x/submit-tx xtdb-node)
+       (x/await-tx xtdb-node)))
 
-(defn expire-sessions! [{::site/keys [crux-node db start-date]}]
+(defn expire-sessions! [{::site/keys [xtdb-node db start-date]}]
   (->> (x/q db '{:find [ss expiry-instant]
                  :where [[ss :juxt.site.alpha/type "SiteSession"]
                          [ss ::expiry-instant expiry-instant]]})
        (filter (fn [[_ expiry-instant]]
                  (.isAfter (.toInstant start-date) expiry-instant)))
        (mapv (fn [[ss _]] [:crux.tx/evict ss]))
-       (x/submit-tx crux-node)
-       (x/await-tx crux-node)))
+       (x/submit-tx xtdb-node)
+       (x/await-tx xtdb-node)))
 
 (defn lookup-session [{::site/keys [db base-uri] :as req} k]
   (expire-sessions! req)

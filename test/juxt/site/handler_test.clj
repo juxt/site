@@ -10,7 +10,7 @@
    [juxt.reap.alpha.encoders :refer [format-http-date]]
    [juxt.mail.alpha.mail :as mailer]
    [juxt.test.util :refer [with-crux with-handler submit-and-await!
-                           *crux-node* *handler*
+                           *xtdb-node* *handler*
                            access-all-areas access-all-apis]])
   (:import
    (java.io ByteArrayInputStream)))
@@ -51,7 +51,7 @@
             :ring.request/headers
             {"content-length" (str (count body))
              "content-type" "application/json"}})
-        db (x/db *crux-node*)]
+        db (x/db *xtdb-node*)]
 
     (is (= {:a/name "foo", :crux.db/id "https://example.org/things/foo"}
            (x/entity db "https://example.org/things/foo")))))
@@ -103,7 +103,7 @@
             :ring.request/headers
             {"content-length" (str (count body))
              "content-type" "application/json"}})
-        db (x/db *crux-node*)]
+        db (x/db *xtdb-node*)]
     (is (= "putAB"
            (get-in r [::site/resource ::apex/operation "operationId"])))))
 
@@ -159,7 +159,7 @@
             :ring.request/headers
             {"content-length" (str (count body))
              "content-type" "application/json"}})
-        db (x/db *crux-node*)]
+        db (x/db *xtdb-node*)]
     (is (= "/things/{a}" (get-in r [::site/resource :juxt.apex.alpha/openapi-path])))
     (is (= {:name "zip",
             :juxt/code "ABC/DEF",
@@ -260,7 +260,7 @@
         {"content-length" (str (count body))
          "content-type" "application/json"}}))
 
-    (is (= "123" (:id (x/entity (x/db *crux-node*) "https://example.org/alerts/123"))))
+    (is (= "123" (:id (x/entity (x/db *xtdb-node*) "https://example.org/alerts/123"))))
     (is (= [{:from "notifications@example.org"
              :to "brian@example.org"
              :subject "Heart Monitor Alert!"}
@@ -593,7 +593,7 @@
        ::http/content "<h1>Unacceptable</h1>"
        ::http/methods #{:get :head :options}}]])
 
-   (let [db (x/db *crux-node*)]
+   (let [db (x/db *xtdb-node*)]
      (x/q db '{:find [er]
                :where [[er ::site/type "ErrorRepresentation"]
                        [er ::http/status 403]]}))

@@ -28,11 +28,11 @@
                      (:name m) (:arglists m) (:doc m))))
   :ok)
 
-(defn crux-node []
-  (:juxt.site.alpha.db/crux-node system))
+(defn xtdb-node []
+  (:juxt.site.alpha.db/xtdb-node system))
 
 (defn db []
-  (x/db (crux-node)))
+  (x/db (xtdb-node)))
 
 (defn e [id]
   (postwalk
@@ -50,10 +50,10 @@
 (defn put! [& ms]
   (->>
    (x/submit-tx
-    (crux-node)
+    (xtdb-node)
     (for [m ms]
       [:crux.tx/put m]))
-   (x/await-tx (crux-node))))
+   (x/await-tx (xtdb-node))))
 
 (defn grep [re coll]
   (filter #(re-matches (re-pattern re) %) coll))
@@ -61,18 +61,18 @@
 (defn rm! [& ids]
   (->>
    (x/submit-tx
-    (crux-node)
+    (xtdb-node)
     (for [id ids]
       [:crux.tx/delete id]))
-   (x/await-tx (crux-node))))
+   (x/await-tx (xtdb-node))))
 
 (defn evict! [& ids]
   (->>
    (x/submit-tx
-    (crux-node)
+    (xtdb-node)
     (for [id ids]
       [:crux.tx/evict id]))
-   (x/await-tx (crux-node))))
+   (x/await-tx (xtdb-node))))
 
 (defn q [query & args]
   (apply x/q (db) query args))
@@ -185,7 +185,7 @@
   ([opts]
    (let [{::site/keys [base-uri]} opts
          _ (assert base-uri)
-         db (x/db (crux-node))]
+         db (x/db (xtdb-node))]
      [;; Awaiting a fix to https://github.com/juxt/crux/issues/1480
       #_{:complete? (and
                    (x/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
@@ -231,7 +231,7 @@
 (defn put-site-api! []
   (let [config (config)]
     (init/put-site-api!
-     (crux-node)
+     (xtdb-node)
      (as-> "juxt/site/alpha/openapi.edn" %
        (io/resource %)
        (slurp %)
@@ -247,38 +247,38 @@
 
 (defn put-auth-resources! []
   (let [config (config)
-        crux-node (crux-node)]
-    (init/put-openid-token-endpoint! crux-node config)
-    (init/put-login-endpoint! crux-node config)
-    (init/put-logout-endpoint! crux-node config)
+        xtdb-node (xtdb-node)]
+    (init/put-openid-token-endpoint! xtdb-node config)
+    (init/put-login-endpoint! xtdb-node config)
+    (init/put-logout-endpoint! xtdb-node config)
     (status (steps config))))
 
 (defn put-superuser-role! []
   (let [config (config)
-        crux-node (crux-node)]
-    (init/put-superuser-role! crux-node config)
+        xtdb-node (xtdb-node)]
+    (init/put-superuser-role! xtdb-node config)
     (status (steps config))))
 
 (defn put-superuser! [username password fullname email]
   (let [config (config)
-        crux-node (crux-node)]
-    (init/put-superuser! crux-node username password fullname email config)
+        xtdb-node (xtdb-node)]
+    (init/put-superuser! xtdb-node username password fullname email config)
     (status (steps config))))
 
 (defn allow-public-access-to-public-resources! []
   (let [config (config)
-        crux-node (crux-node)]
-    (init/allow-public-access-to-public-resources! crux-node config)))
+        xtdb-node (xtdb-node)]
+    (init/allow-public-access-to-public-resources! xtdb-node config)))
 
 (defn allow-authenticated-users-access-to-user-info! []
   (let [config (config)
-        crux-node (crux-node)]
-    (init/allow-authenticated-users-access-to-user-info! crux-node config)))
+        xtdb-node (xtdb-node)]
+    (init/allow-authenticated-users-access-to-user-info! xtdb-node config)))
 
 (defn put-site-txfns! []
   (let [config (config)
-        crux-node (crux-node)]
-    (init/put-site-txfns! crux-node config)
+        xtdb-node (xtdb-node)]
+    (init/put-site-txfns! xtdb-node config)
     (status)))
 
 (defn reset-password! [username password]

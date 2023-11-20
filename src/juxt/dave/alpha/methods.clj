@@ -3,7 +3,7 @@
 (ns juxt.dave.alpha.methods
   (:require
    [clojure.tools.logging :as log]
-   [crux.api :as crux]
+   [xtdb.api :as xt]
    [juxt.dave.alpha :as dave]
    [juxt.dave.alpha.xml :as xml]
 
@@ -39,8 +39,8 @@
       :xml-declaration true})
     (.toByteArray baos)))
 
-(defn propfind [request resource date crux-node authorization subject]
-  (let [db (crux/db crux-node)
+(defn propfind [request resource date xtdb-node authorization subject]
+  (let [db (crux/db xtdb-node)
          ;; See https://tools.ietf.org/html/rfc4918#section-9.1
         depth (get-in request [:headers "depth"] "infinity")
         doc (xml/->document (:body request))

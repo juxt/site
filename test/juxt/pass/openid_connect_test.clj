@@ -3,14 +3,14 @@
 (ns juxt.pass.openid-connect-test
   (:require
    [clojure.test :as t :refer [deftest is testing]]
-   [crux.api :as crux]
+   [xtdb.api :as xt]
    [hato.client :as hc]
    [juxt.pass.alpha.authentication :as auth]
    [juxt.pass.alpha.openid-connect :as openid]
    [juxt.pass.alpha.util :as util]
    [juxt.pass.openid-connect-test-utils :as tutils]
    [juxt.site.alpha.init :as site-init]
-   [juxt.test.util :refer [*crux-node* *handler* with-crux with-handler]
+   [juxt.test.util :refer [*xtdb-node* *handler* with-crux with-handler]
     :as test-util])
   (:import
    (com.auth0.jwt JWT)
@@ -26,10 +26,10 @@
 (deftest openid-auth0-login-redirect-test
   (with-redefs
    [slurp (tutils/mock-openid-configuration-req "auth0")]
-    (site-init/install-openid-provider! *crux-node* "https://dev-14bkigf7.us.auth0.com/"))
+    (site-init/install-openid-provider! *xtdb-node* "https://dev-14bkigf7.us.auth0.com/"))
 
   (site-init/install-openid-resources!
-   *crux-node*
+   *xtdb-node*
    {::site/base-uri "https://example.org"
     :openid {:name "auth0"
              :issuer-id "https://dev-14bkigf7.us.auth0.com/"
@@ -42,7 +42,7 @@
                 (*handler*
                  {:ring.request/method :get
                   :ring.request/path "/_site/openid/auth0/login"}))
-         db (crux/db *crux-node*)
+         db (crux/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 
@@ -59,10 +59,10 @@
 (deftest openid-aws-cognito-login-redirect-test
   (with-redefs
    [slurp (tutils/mock-openid-configuration-req "aws-cognito")]
-    (site-init/install-openid-provider! *crux-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
+    (site-init/install-openid-provider! *xtdb-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
 
   (site-init/install-openid-resources!
-   *crux-node*
+   *xtdb-node*
    {::site/base-uri "https://example.org"
     :openid {:name "aws-cognito"
              :issuer-id "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"
@@ -75,7 +75,7 @@
                 (*handler*
                  {:ring.request/method :get
                   :ring.request/path "/_site/openid/aws-cognito/login"}))
-         db (crux/db *crux-node*)
+         db (crux/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 
@@ -92,10 +92,10 @@
 (deftest openid-login-with-return-to-test
   (with-redefs
    [slurp (tutils/mock-openid-configuration-req "aws-cognito")]
-    (site-init/install-openid-provider! *crux-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
+    (site-init/install-openid-provider! *xtdb-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
 
   (site-init/install-openid-resources!
-   *crux-node*
+   *xtdb-node*
    {::site/base-uri "https://example.org"
     :openid {:name "aws-cognito"
              :issuer-id "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"
@@ -109,7 +109,7 @@
                  {:ring.request/method :get
                   :ring.request/path "/_site/openid/aws-cognito/login"
                   :ring.request/query "return-to=http://example.org/home.html"}))
-         db (crux/db *crux-node*)
+         db (crux/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 
@@ -128,10 +128,10 @@
 (deftest openid-login-missing-client-id-test
   (with-redefs
    [slurp (tutils/mock-openid-configuration-req "aws-cognito")]
-    (site-init/install-openid-provider! *crux-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
+    (site-init/install-openid-provider! *xtdb-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
 
   (site-init/install-openid-resources!
-   *crux-node*
+   *xtdb-node*
    {::site/base-uri "https://example.org"
     :openid {:name "aws-cognito"
              :issuer-id "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"
@@ -146,7 +146,7 @@
 
 (deftest openid-login-missing-configuration-test
   (site-init/install-openid-resources!
-   *crux-node*
+   *xtdb-node*
    {::site/base-uri "https://example.org"
     :openid {:name "aws-cognito"
              :issuer-id "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"
@@ -163,10 +163,10 @@
 (deftest openid-aws-cognito-callback-test
   (with-redefs
    [slurp (tutils/mock-openid-configuration-req "aws-cognito")]
-    (site-init/install-openid-provider! *crux-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
+    (site-init/install-openid-provider! *xtdb-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
 
   (site-init/install-openid-resources!
-   *crux-node*
+   *xtdb-node*
    {::site/base-uri "https://example.org"
     :openid {:name "aws-cognito"
              :issuer-id "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"
@@ -181,7 +181,7 @@
       :description "Superuser"}]])
 
   (auth/put-session!
-   {::site/crux-node *crux-node*
+   {::site/xtdb-node *xtdb-node*
     ::site/base-uri "https://example.org"
     ::site/start-date (Date.)}
    "current-session"
@@ -212,7 +212,7 @@
                   :ring.request/path "/_site/openid/aws-cognito/callback"
                   :ring.request/query "state=auth-flow-state&code=randomcode"
                   :ring.request/headers {"cookie" "id=current-session"}}))
-         db (crux/db *crux-node*)
+         db (crux/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 
@@ -247,10 +247,10 @@
 (deftest openid-aws-cognito-callback-no-role-test
   (with-redefs
    [slurp (tutils/mock-openid-configuration-req "aws-cognito")]
-    (site-init/install-openid-provider! *crux-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
+    (site-init/install-openid-provider! *xtdb-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
 
   (site-init/install-openid-resources!
-   *crux-node*
+   *xtdb-node*
    {::site/base-uri "https://example.org"
     :openid {:name "aws-cognito"
              :issuer-id "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"
@@ -258,7 +258,7 @@
              :client-secret "clientsecret123456789abcdefghi"}})
 
   (auth/put-session!
-   {::site/crux-node *crux-node*
+   {::site/xtdb-node *xtdb-node*
     ::site/base-uri "https://example.org"
     ::site/start-date (Date.)}
    "current-session"
@@ -287,7 +287,7 @@
                   :ring.request/path "/_site/openid/aws-cognito/callback"
                   :ring.request/query "state=auth-flow-state&code=randomcode"
                   :ring.request/headers {"cookie" "id=current-session"}}))
-         db (crux/db *crux-node*)
+         db (crux/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 
@@ -318,10 +318,10 @@
 (deftest openid-aws-cognito-full-flow-test
   (with-redefs
    [slurp (tutils/mock-openid-configuration-req "aws-cognito")]
-    (site-init/install-openid-provider! *crux-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
+    (site-init/install-openid-provider! *xtdb-node* "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"))
 
   (site-init/install-openid-resources!
-   *crux-node*
+   *xtdb-node*
    {::site/base-uri "https://example.org"
     :openid {:name "aws-cognito"
              :issuer-id "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"
@@ -368,7 +368,7 @@
              :ring.request/path "/_site/openid/aws-cognito/callback"
              :ring.request/query "state=aaaaaaaa&code=randomcode"
              :ring.request/headers {"cookie" (get-in login-resp [:ring.response/headers "set-cookie"])}}))
-         db (crux/db *crux-node*)
+         db (crux/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 

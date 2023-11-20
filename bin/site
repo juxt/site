@@ -187,8 +187,8 @@
             repl {:in (io/reader (.getInputStream sock))
                   :out (io/writer (.getOutputStream sock))}]
         (repl-command repl "(require 'juxt.site.alpha.init)")
-        (repl-command repl "(def crux-node (:juxt.site.alpha.db/crux-node juxt.site.alpha.main/system))")
-        (repl-command repl (format "(juxt.site.alpha.init/init-db! crux-node %s)" (pr-str opts)))
+        (repl-command repl "(def xtdb-node (:juxt.site.alpha.db/xtdb-node juxt.site.alpha.main/system))")
+        (repl-command repl (format "(juxt.site.alpha.init/init-db! xtdb-node %s)" (pr-str opts)))
 ;;      (.readLine (:in repl))
         )))
 

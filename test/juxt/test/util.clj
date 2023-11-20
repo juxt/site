@@ -9,7 +9,7 @@
    (crux.api ICruxAPI)))
 
 (def ^:dynamic *opts* {})
-(def ^:dynamic ^ICruxAPI *crux-node*)
+(def ^:dynamic ^ICruxAPI *xtdb-node*)
 (def ^:dynamic *handler*)
 (def ^:dynamic *db*)
 
@@ -21,13 +21,13 @@
 
 (defn with-crux [f]
   (with-open [node (x/start-node *opts*)]
-    (binding [*crux-node* node]
+    (binding [*xtdb-node* node]
       (f))))
 
 (defn submit-and-await! [transactions]
   (->>
-   (x/submit-tx *crux-node* transactions)
-   (x/await-tx *crux-node*)))
+   (x/submit-tx *xtdb-node* transactions)
+   (x/await-tx *xtdb-node*)))
 
 (defn make-handler [opts]
   ((apply comp
@@ -39,7 +39,7 @@
 
 (defn with-handler [f]
   (binding [*handler* (make-handler
-                       {::site/crux-node *crux-node*
+                       {::site/xtdb-node *xtdb-node*
                         ::site/base-uri "https://example.org"
                         ::site/uri-prefix "https://example.org"})]
     (f)))
@@ -52,11 +52,11 @@
      :duration-µs (/ (- t1 t0) 1000.0)}))
 
 (defn with-db [f]
-  (binding [*db* (x/db *crux-node*)]
+  (binding [*db* (x/db *xtdb-node*)]
     (f)))
 
 (defn with-open-db [f]
-  (with-open [db (x/open-db *crux-node*)]
+  (with-open [db (x/open-db *xtdb-node*)]
     (binding [*db* db]
       (f))))
 
@@ -77,7 +77,7 @@
 (defn allow-access-to-public-resources!
   [f]
   (site-init/allow-public-access-to-public-resources!
-   *crux-node*
+   *xtdb-node*
    {::site/base-uri "https://example.org"})
   (f))
 

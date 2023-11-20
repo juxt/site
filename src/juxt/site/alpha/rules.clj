@@ -12,15 +12,15 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 
 (defn post-rule
-  [{::site/keys [crux-node uri] ::apex/keys [request-instance] :as req}]
+  [{::site/keys [xtdb-node uri] ::apex/keys [request-instance] :as req}]
 
   (let [location
         (str uri (hash (select-keys request-instance [::pass/target ::pass/effect])))]
 
     (->> (x/submit-tx
-          crux-node
+          xtdb-node
           [[:crux.tx/put (merge {:crux.db/id location} request-instance)]])
-         (x/await-tx crux-node))
+         (x/await-tx xtdb-node))
 
     (-> req
         (assoc :ring.response/status 201)

@@ -4,7 +4,7 @@
   (:require
    [clojure.walk :refer [postwalk-replace]]
    [clojure.tools.logging :as log]
-   [crux.api :as crux]
+   [xtdb.api :as xt]
    [juxt.site.alpha.rules :as rules]
    [clojure.string :as str]))
 

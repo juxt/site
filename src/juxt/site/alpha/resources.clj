@@ -21,7 +21,7 @@
 
 (defn post-resource
   "Post a new resource, or overwrite an existing one, in the database."
-  [{::site/keys [db crux-node received-representation] :as req}]
+  [{::site/keys [db xtdb-node received-representation] :as req}]
 
   (let [resources (read-forms
                    (java.io.PushbackReader.
@@ -34,7 +34,7 @@
            (let [uri (:crux.db/id resource)
                  existing? (when uri (x/entity db uri))]
              (try
-               (let [tx (x/submit-tx crux-node [[:crux.tx/put resource]])]
+               (let [tx (x/submit-tx xtdb-node [[:crux.tx/put resource]])]
                  (cond-> {:status (if existing? 204 201)
                           :tx tx}
                    uri (assoc :uri uri)))
@@ -45,7 +45,7 @@
                    uri (assoc :uri uri)))))))]
 
     (when-let [last-tx (reverse (filter :tx results))]
-      (x/await-tx crux-node last-tx))
+      (x/await-tx xtdb-node last-tx))
 
     (let [status (case (count results)
                    0 400

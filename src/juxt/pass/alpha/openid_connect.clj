@@ -10,7 +10,7 @@
   (:require
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [crux.api :as crux]
+   [xtdb.api :as xt]
    [diehard.core :as dh]
    [hato.client :as hc]
    [jsonista.core :as json]
@@ -36,7 +36,7 @@
 
 (defn login
   "Redirect to an authorization endpoint"
-  [{::site/keys [db crux-node resource start-date]
+  [{::site/keys [db xtdb-node resource start-date]
     :ring.request/keys [query]
     :as req}]
 
@@ -182,7 +182,7 @@
 (defn cached-jwks-fetch
   "Fetch JWKS from jwks_uri found in OpenID Connect configuration. Cache in XT for
   a day."
-  [{::site/keys [crux-node db] :as req} uri expiry-in-seconds]
+  [{::site/keys [xtdb-node db] :as req} uri expiry-in-seconds]
   (let [cached (crux/entity db uri)]
     (if (and cached (.after (:expiry cached) (java.util.Date.)))
       (do
@@ -208,7 +208,7 @@
                ::pass/jwks (json/read-value body)
                :expiry (Date/from (.plusSeconds (.toInstant (java.util.Date.)) expiry-in-seconds))}]
           (log/infof "Storing JWKS in database: %s" uri)
-          (crux/submit-tx crux-node [[:crux.tx/put result]])
+          (crux/submit-tx xtdb-node [[:crux.tx/put result]])
           (::pass/jwks result))))))
 
 (defn match-identity [db id-token-claims]
@@ -256,7 +256,7 @@
 
 (defn callback
   "OAuth2 callback"
-  [{::site/keys [resource db crux-node base-uri]
+  [{::site/keys [resource db xtdb-node base-uri]
     ::pass/keys [session session-token-id!]
     :ring.request/keys [query]
     :as req}]
@@ -383,11 +383,11 @@
                   ::pass/role role-id}))))
            (remove nil?)
            vec
-           (crux/submit-tx crux-node)
-           (crux/await-tx crux-node))
+           (crux/submit-tx xtdb-node)
+           (crux/await-tx xtdb-node))
 
       ;; Does the id-token match any identities in our database?
-      (if-let [matched-identity (match-identity (crux/db crux-node) (:claims id-token))]
+      (if-let [matched-identity (match-identity (crux/db xtdb-node) (:claims id-token))]
         (do (log/warnf "Successful login! %s matched claims %s" matched-identity [iss sub])
             ;; If iss and sub match identity put the ID_TOKEN into the session and cycle the session id
             ;; Always redirect to the redirect_uri stored in the session but only include code query
