@@ -25,8 +25,8 @@
 
 (deftest put-test
   (submit-and-await!
-   [[:crux.tx/put access-all-apis]
-    [:crux.tx/put
+   [[:xtdb.api/put access-all-apis]
+    [:xtdb.api/put
      {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
@@ -60,8 +60,8 @@
 
 (deftest two-path-parameter-path-preferred-test
   (submit-and-await!
-   [[:crux.tx/put access-all-apis]
-    [:crux.tx/put
+   [[:xtdb.api/put access-all-apis]
+    [:xtdb.api/put
      {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
@@ -113,8 +113,8 @@
   ;; preserved. This test tests an edge case where we want a path parameter to contain a /.
   (log/trace "")
   (submit-and-await!
-   [[:crux.tx/put access-all-apis]
-    [:crux.tx/put
+   [[:xtdb.api/put access-all-apis]
+    [:xtdb.api/put
      {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
@@ -169,31 +169,31 @@
 (deftest triggers-test
   (log/trace "TESTING")
   (submit-and-await!
-   [[:crux.tx/put access-all-apis]
+   [[:xtdb.api/put access-all-apis]
 
-    [:crux.tx/put {:xt/id "https://example.org/users/sue"
+    [:xtdb.api/put {:xt/id "https://example.org/users/sue"
                    ::site/type "User"
                    ::site/description "Sue should receive an email on every alert"
                    :email "sue@example.org"
                    ::email? true}]
-    [:crux.tx/put {:xt/id "https://example.org/users/brian"
+    [:xtdb.api/put {:xt/id "https://example.org/users/brian"
                    ::site/type "User"
                    ::site/description "Brian doesn't want emails"
                    :email "brian@example.org"
                    ::email? false}]
-    [:crux.tx/put {:xt/id "https://example.org/roles/service-manager"
+    [:xtdb.api/put {:xt/id "https://example.org/roles/service-manager"
                    ::site/type "Role"
                    ::site/description "A service manager"}]
-    [:crux.tx/put {:xt/id "https://example.org/users/sue-is-a-service-manager"
+    [:xtdb.api/put {:xt/id "https://example.org/users/sue-is-a-service-manager"
                    ::site/type "UserRoleMapping"
                    ::user "https://example.org/users/sue"
                    ::role "https://example.org/roles/service-manager"}]
-    [:crux.tx/put {:xt/id "https://example.org/users/brian-is-a-service-manager"
+    [:xtdb.api/put {:xt/id "https://example.org/users/brian-is-a-service-manager"
                    ::site/type "UserRoleMapping"
                    ::user "https://example.org/users/brian"
                    ::role "https://example.org/roles/service-manager"}]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
@@ -208,15 +208,15 @@
              {"properties"
               {"juxt.site.alpha/type" {"type" "string"}}}}}}}}}}}]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/templates/alert-notification.html"
       ::http/content "<h1>Alert</h1><p>There has been an alert. See {{ :href }}</p>"}]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/templates/alert-notification.txt"
       ::http/content "There has been an alert. See {{ :href }}"}]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/triggers/alert-notification"
       ::site/type "Trigger"
       ::site/query
@@ -270,8 +270,8 @@
 
 (deftest if-modified-since-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
-    [:crux.tx/put
+   [[:xtdb.api/put access-all-areas]
+    [:xtdb.api/put
      {:xt/id "https://example.org/test.png"
       ::http/last-modified #inst "2020-03-01"
       ::http/content-type "image/png"
@@ -294,8 +294,8 @@
 
 (deftest if-none-match-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
-    [:crux.tx/put
+   [[:xtdb.api/put access-all-areas]
+    [:xtdb.api/put
      {:xt/id "https://example.org/test.png"
       ::http/etag "\"abc\""
       ::http/content-type "image/png"
@@ -319,7 +319,7 @@
 ;; 3.1: If-Match
 (deftest if-match-wildcard-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]])
+   [[:xtdb.api/put access-all-areas]])
   (is (= 412
          (:ring.response/status
           (let [body "Hello"]
@@ -334,8 +334,8 @@
 
 (defn if-match-run [if-match]
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
-    [:crux.tx/put
+   [[:xtdb.api/put access-all-areas]
+    [:xtdb.api/put
      {:xt/id "https://example.org/test.png"
       ::site/type "StaticRepresentation"
       ::http/etag "\"abc\""
@@ -364,7 +364,7 @@
 
 (deftest redirect-test
   (submit-and-await!
-    [[:crux.tx/put
+    [[:xtdb.api/put
       {:xt/id "https://example.org/"
        ::site/type "Redirect"
        ::site/location "/test.html"}]])
@@ -377,9 +377,9 @@
 
 (deftest content-negotiation-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+   [[:xtdb.api/put access-all-areas]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/report"
       ::http/methods #{:get :head :options}
       ::http/representations
@@ -415,29 +415,29 @@
 
 (deftest variants-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+   [[:xtdb.api/put access-all-areas]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/report.html"
       ::http/content-type "text/html;charset=utf-8"
       ::http/content "<h1>Latest sales figures</h1>"}]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/report.txt"
       ::http/content-type "text/plain;charset=utf-8"
       ::http/content "Latest sales figures"}]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/report"
       ::http/methods #{:get :head :options}}]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/variants/html"
       ::site/type "Variant"
       ::site/resource "https://example.org/report"
       ::site/variant "https://example.org/report.html"}]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/variants/txt"
       ::site/type "Variant"
       ::site/resource "https://example.org/report"
@@ -478,23 +478,23 @@
 ;; resource of the URL, rather than the negotiated representation.
 (deftest template-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+   [[:xtdb.api/put access-all-areas]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/templates/list.html"
       ::http/methods #{:get :head :options}
       ::site/type "StaticRepresentation"
       ::http/content-type "text/plain;charset=utf-8"
       ::http/content "<dl><dt>Fruit</dt><dd>{{list.fruit}}</dd></dl>"}]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/templates/template-outer.html"
       ::http/methods #{:get :head :options}
       ::site/type "StaticRepresentation"
       ::http/content-type "text/plain;charset=utf-8"
       ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/nectarine.html"
       ::http/methods #{:get :head :options}
       ::site/type "TemplatedRepresentation"
@@ -522,16 +522,16 @@
 #_((t/join-fixtures [with-xtdb with-handler])
  (fn []
    (submit-and-await!
-    [[:crux.tx/put access-all-areas]
+    [[:xtdb.api/put access-all-areas]
 
-     [:crux.tx/put
+     [:xtdb.api/put
       {:xt/id "https://example.org/templates/list.html"
        ::http/methods #{:get :head :options}
        ::site/type "StaticRepresentation"
        ::http/content-type "text/plain;charset=utf-8"
        ::http/content "<dl><dt>Fruit</dt><dd>{{list.fruit}}</dd></dl>"}]
 
-     [:crux.tx/put
+     [:xtdb.api/put
       {:xt/id "https://example.org/templates/template-outer.html"
        ::http/methods #{:get :head :options}
        ::site/type "StaticRepresentation"
@@ -539,7 +539,7 @@
        :selmer.util/custom-resource-path "https://example.org/templates/"
        ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
 
-     [:crux.tx/put
+     [:xtdb.api/put
       {:xt/id "https://example.org/nectarine.html"
        ::http/methods #{:get :head :options}
        ::site/type "TemplatedRepresentation"
@@ -564,28 +564,28 @@
 #_((t/join-fixtures [with-xtdb with-handler])
  (fn []
    (submit-and-await!
-    [ ;;[:crux.tx/put access-all-areas]
-     [:crux.tx/put
+    [ ;;[:xtdb.api/put access-all-areas]
+     [:xtdb.api/put
       {:xt/id "https://example.org/sensitive-report.html"
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "Latest sales figures"
        ::http/methods #{:get :head :options}}]
 
-     [:crux.tx/put
+     [:xtdb.api/put
       {:xt/id "https://example.org/401.html"
        ::site/type "ErrorRepresentation"
        ::http/status #{401 403}
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "<h1>Unauthorized or Forbidden</h1>"}]
 
-     [:crux.tx/put
+     [:xtdb.api/put
       {:xt/id "https://example.org/401.txt"
        ::site/type "ErrorRepresentation"
        ::http/status #{401}
        ::http/content-type "text/plain;charset=utf-8"
        ::http/content "Unauthorized"}]
 
-     [:crux.tx/put
+     [:xtdb.api/put
       {:xt/id "https://example.org/406.html"
        ::site/type "ErrorRepresentation"
        ::http/status #{406}
@@ -606,8 +606,8 @@
 #_((t/join-fixtures [with-xtdb with-handler])
  (fn []
    (submit-and-await!
-    [[:crux.tx/put access-all-areas]
-     [:crux.tx/put
+    [[:xtdb.api/put access-all-areas]
+     [:xtdb.api/put
       {:xt/id "https://example.org/report.html"
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "Latest figures"
@@ -632,9 +632,9 @@
 
 #_(deftest app-test
   (submit-and-await!
-   [[:crux.tx/put access-all-areas]
+   [[:xtdb.api/put access-all-areas]
 
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/view/index.html"
       ::http/methods #{:get}
       ::http/content-type "text/html;charset=utf-8"
@@ -651,16 +651,16 @@
 
 (deftest authentication-test
   (submit-and-await!
-   [[:crux.tx/put access-all-apis]
-    [:crux.tx/put
+   [[:xtdb.api/put access-all-apis]
+    [:xtdb.api/put
      {:xt/id "https://example.org/example.txt"
       ::http/last-modified #inst "2020-03-01"
       ::http/content-type "text/plain"
       ::http/methods #{:get}}]
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/_site/users/abc"
       ::site/type "User"}]
-    [:crux.tx/put
+    [:xtdb.api/put
      {:xt/id "https://example.org/_site/users/abc/password"
       ::site/type "Password"
       ::pass/user "https://example.org/_site/users/abc"

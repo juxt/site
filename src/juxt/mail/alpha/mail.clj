@@ -7,7 +7,7 @@
    [integrant.core :as ig]
    [juxt.site.alpha.triggers :as triggers]
    [xtdb.api :as xt]
-   [crux.query :as cruxq]
+   [xtdb.query :as xtq]
    [clojure.tools.logging :as log]
    [clojure.string :as str]))
 
@@ -103,13 +103,13 @@
          (mail-merge subject data)
          (mail-merge text-template data))))))
 
-(defmethod cruxq/aggregate 'sorted-string-list [_]
+(defmethod xtq/aggregate 'sorted-string-list [_]
   (fn
     ([] #{})
     ([acc] (str/join "&" (sort acc)))
     ([acc x] (conj acc x))))
 
-(defmethod cruxq/aggregate 'merge-with-flatten [_]
+(defmethod xtq/aggregate 'merge-with-flatten [_]
   (fn
     ([] nil)
     ([acc] acc)

@@ -24,7 +24,7 @@
    (xt/submit-tx
     xtdb-node
     (for [m ms]
-      [:crux.tx/put m]))
+      [:xtdb.api/put m]))
    (xt/await-tx xtdb-node)))
 
 (defn put-superuser-role!
@@ -225,26 +225,26 @@
 (defn put-site-txfns! [xtdb-node {::site/keys [base-uri]}]
   (xt/submit-tx
    xtdb-node
-   [[:crux.tx/put
+   [[:xtdb.api/put
      {:xt/id (str base-uri "/_site/tx_fns/put_if_match_wildcard")
       ::site/description "Use this function for an If-Match header value of '*'"
-      :crux.db/fn
+      :xt/fn
       '(fn [ctx uri new-rep]
-         (let [db (crux.api/db ctx)]
-           (if (crux.api/entity db uri)
-             [[:crux.tx/put new-rep]]
+         (let [db (xt/db ctx)]
+           (if (xt/entity db uri)
+             [[:xtdb.api/put new-rep]]
              false)))
       :http/content-type "application/clojure"}]])
 
   (xt/submit-tx
    xtdb-node
-   [[:crux.tx/put
+   [[:xtdb.api/put
      {:xt/id (str base-uri "/_site/tx_fns/put_if_match_etags")
-      :crux.db/fn
+      :xt/fn
       '(fn [ctx uri header-field new-rep if-match?]
-         (let [db (crux.api/db ctx)
-               selected-representation (crux.api/entity db uri)
-               txes [[:crux.tx/put new-rep]]]
+         (let [db (xt/db ctx)
+               selected-representation (xt/entity db uri)
+               txes [[:xtdb.api/put new-rep]]]
            (if-let [rep-unparsed-etag (some-> (get selected-representation ::http/etag))]
              (if (if-match? header-field rep-unparsed-etag)
                txes ; success, we matched

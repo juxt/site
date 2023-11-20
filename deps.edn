@@ -9,8 +9,8 @@
         io.aviso/pretty {:mvn/version "0.1.35"}
 
         ;; Crux
-        juxt/crux-core {:mvn/version "21.04-1.16.0-beta"}
-        juxt/crux-rocksdb {:mvn/version "21.04-1.16.0-beta"}
+        com.xtdb/xtdb-core {:mvn/version "1.24.1"}
+        com.xtdb/xtdb-rocksdb {:mvn/version "1.24.1"}
 
         ;; Jetty
         ring/ring-jetty-adapter {:mvn/version "1.9.1"}

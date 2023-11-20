@@ -6,10 +6,10 @@
    [integrant.core :as ig]
    [clojure.tools.logging :as log]))
 
-(defmethod ig/init-key ::xtdb-node [_ crux-opts]
-  (log/info "Starting Crux node")
-  (xt/start-node crux-opts))
+(defmethod ig/init-key ::xtdb-node [_ xtdb-opts]
+  (log/info "Starting XTDB node")
+  (xt/start-node xtdb-opts))
 
 (defmethod ig/halt-key! ::xtdb-node [_ node]
   (.close node)
-  (log/info "Closed Crux node"))
+  (log/info "Closed XTDB node"))

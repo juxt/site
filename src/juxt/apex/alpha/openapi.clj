@@ -39,7 +39,7 @@
     (->>
      (xt/submit-tx
       xtdb-node
-      [[:crux.tx/put
+      [[:xtdb.api/put
         (merge
          {:xt/id uri
           ::http/methods #{:get :head :options :put}
@@ -219,7 +219,7 @@
 
     (->> (xt/submit-tx
           xtdb-node
-          [[:crux.tx/put new-resource-state]])
+          [[:xtdb.api/put new-resource-state]])
          (xt/await-tx xtdb-node))
 
     (-> req

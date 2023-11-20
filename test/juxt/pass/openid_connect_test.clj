@@ -174,7 +174,7 @@
              :client-secret "clientsecret123456789abcdefghi"}})
 
   (test-util/submit-and-await!
-   [[:crux.tx/put
+   [[:xtdb.api/put
      {:xt/id "https://example.org/_site/roles/superuser"
       ::site/type "Role"
       :name "superuser"
@@ -329,7 +329,7 @@
              :client-secret "clientsecret123456789abcdefghi"}})
 
   (test-util/submit-and-await!
-   [[:crux.tx/put
+   [[:xtdb.api/put
      {:xt/id "https://example.org/_site/roles/superuser"
       ::site/type "Role"
       :name "superuser"

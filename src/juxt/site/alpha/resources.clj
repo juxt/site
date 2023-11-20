@@ -34,7 +34,7 @@
            (let [uri (:xt/id resource)
                  existing? (when uri (xt/entity db uri))]
              (try
-               (let [tx (xt/submit-tx xtdb-node [[:crux.tx/put resource]])]
+               (let [tx (xt/submit-tx xtdb-node [[:xtdb.api/put resource]])]
                  (cond-> {:status (if existing? 204 201)
                           :tx tx}
                    uri (assoc :uri uri)))

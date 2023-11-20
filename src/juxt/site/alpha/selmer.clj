@@ -51,7 +51,7 @@
                              (assoc :xt/id (java.util.UUID/randomUUID)))))
           {}))
 
-        txes (vec (for [[_ v] temp-id-map] [:crux.tx/put v]))
+        txes (vec (for [[_ v] temp-id-map] [:xtdb.api/put v]))
 
         spec-db (xt/with-tx db txes)
 
@@ -65,7 +65,7 @@
          (fn [m]
            (cond
              (and (map? m) (contains? m ::site/query))
-             (cond-> (apply x/q spec-db
+             (cond-> (apply xt/q spec-db
                             (assoc (::site/query m) :in (vec (keys temp-id-map)))
                             (map :xt/id (vals temp-id-map)))
                (= (::site/results m) 'first) first)

@@ -52,7 +52,7 @@
    (xt/submit-tx
     (xtdb-node)
     (for [m ms]
-      [:crux.tx/put m]))
+      [:xtdb.api/put m]))
    (xt/await-tx (xtdb-node))))
 
 (defn grep [re coll]
@@ -63,7 +63,7 @@
    (xt/submit-tx
     (xtdb-node)
     (for [id ids]
-      [:crux.tx/delete id]))
+      [:xtdb.api/delete id]))
    (xt/await-tx (xtdb-node))))
 
 (defn evict! [& ids]
@@ -71,11 +71,11 @@
    (xt/submit-tx
     (xtdb-node)
     (for [id ids]
-      [:crux.tx/evict id]))
+      [:xtdb.api/evict id]))
    (xt/await-tx (xtdb-node))))
 
 (defn q [query & args]
-  (apply x/q (db) query args))
+  (apply xt/q (db) query args))
 
 (defn t [t]
   (map

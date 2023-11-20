@@ -19,7 +19,7 @@
 
     (->> (xt/submit-tx
           xtdb-node
-          [[:crux.tx/put (merge {:xt/id location} request-instance)]])
+          [[:xtdb.api/put (merge {:xt/id location} request-instance)]])
          (xt/await-tx xtdb-node))
 
     (-> req
@@ -37,7 +37,7 @@
                               vals
                               (map util/->freezeable)
                               ;; TODO: Use map rather than mapv?
-                              (mapv (fn [e] [:crux.tx/put e]))))
+                              (mapv (fn [e] [:xtdb.api/put e]))))
 
         evaluated-rules
         (try
@@ -52,7 +52,7 @@
                        (let [q {:find ['success]
                                 :where (into '[[(identity true) success]] target)
                                 :in (vec (keys temp-id-map))}
-                             match-results (apply x/q db q (map :xt/id (vals temp-id-map)))]
+                             match-results (apply xt/q db q (map :xt/id (vals temp-id-map)))]
                          (assoc rule ::pass/matched? (pos? (count match-results))))))))
                 (remove nil?)))
           (catch Exception e
@@ -70,7 +70,7 @@
                      {} request-context)
         ;; Speculatively put each entry of the request context into the
         ;; database. This new database is only in scope for this authorization.
-        db (xt/with-tx db (mapv (fn [e] [:crux.tx/put e]) (vals temp-id-map)))]
+        db (xt/with-tx db (mapv (fn [e] [:xtdb.api/put e]) (vals temp-id-map)))]
 
     (doall
      (keep
@@ -78,7 +78,7 @@
         (let [trigger (xt/entity db trigger-id)
               q (merge (::site/query trigger)
                        {:in (vec (keys temp-id-map))})
-              action-data (apply x/q db q (map :xt/id (vals temp-id-map)))]
+              action-data (apply xt/q db q (map :xt/id (vals temp-id-map)))]
           (when (seq action-data)
             {:trigger trigger
              :action-data action-data})))

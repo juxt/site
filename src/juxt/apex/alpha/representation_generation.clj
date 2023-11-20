@@ -55,7 +55,7 @@
   (let [param-defs
         (get-in resource [::apex/operation "parameters"])
 
-        db (xt/with-tx db [[:crux.tx/put
+        db (xt/with-tx db [[:xtdb.api/put
                            (-> subject
                                (assoc :xt/id :subject)
                                util/->freezeable)]])

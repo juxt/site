@@ -16,8 +16,8 @@
 
 #_(deftest get-test
   (submit-and-await!
-   [[:crux.tx/put access-all-apis]
-    [:crux.tx/put
+   [[:xtdb.api/put access-all-apis]
+    [:xtdb.api/put
      {:xt/id "https://example.org/test.txt"
       ::http/body "Hello World!\n"}]])
 
@@ -29,8 +29,8 @@
 #_((t/join-fixtures [with-xtdb with-handler])
  (fn []
    (submit-and-await!
-    [[:crux.tx/put access-all-areas]
-     [:crux.tx/put
+    [[:xtdb.api/put access-all-areas]
+     [:xtdb.api/put
       {:xt/id "https://example.org/test.txt"
        ::http/content-type "text/plain;charset=utf-8"
        ::http/content "Hello World!\n"

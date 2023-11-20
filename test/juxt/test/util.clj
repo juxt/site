@@ -6,10 +6,10 @@
    [juxt.site.alpha.handler :as h]
    [juxt.site.alpha.init :as site-init])
   (:import
-   (crux.api ICruxAPI)))
+   (xtdb.api IXtdbAPI)))
 
 (def ^:dynamic *opts* {})
-(def ^:dynamic ^ICruxAPI *xtdb-node*)
+(def ^:dynamic ^IXtdbAPI *xtdb-node*)
 (def ^:dynamic *handler*)
 (def ^:dynamic *db*)
 

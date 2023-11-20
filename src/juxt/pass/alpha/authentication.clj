@@ -28,7 +28,7 @@
 
 (defn put-session! [{::site/keys [xtdb-node base-uri start-date]} k session]
   (let [session (walk/keywordize-keys session)]
-    (->> [[:crux.tx/put
+    (->> [[:xtdb.api/put
            (merge
             (select-keys session [::pass/user ::pass/state ::pass/nonce ::pass/return-to])
             {:xt/id (str base-uri "/site-session/" k)
@@ -40,7 +40,7 @@
          (xt/await-tx xtdb-node))))
 
 (defn remove-session! [{::site/keys [xtdb-node base-uri]} k]
-  (->> [[:crux.tx/evict (str base-uri "/site-session/" k)]]
+  (->> [[:xtdb.api/evict (str base-uri "/site-session/" k)]]
        (xt/submit-tx xtdb-node)
        (xt/await-tx xtdb-node)))
 
@@ -50,7 +50,7 @@
                          [ss ::expiry-instant expiry-instant]]})
        (filter (fn [[_ expiry-instant]]
                  (.isAfter (.toInstant start-date) expiry-instant)))
-       (mapv (fn [[ss _]] [:crux.tx/evict ss]))
+       (mapv (fn [[ss _]] [:xtdb.api/evict ss]))
        (xt/submit-tx xtdb-node)
        (xt/await-tx xtdb-node)))
 

@@ -208,7 +208,7 @@
                ::pass/jwks (json/read-value body)
                :expiry (Date/from (.plusSeconds (.toInstant (java.util.Date.)) expiry-in-seconds))}]
           (log/infof "Storing JWKS in database: %s" uri)
-          (xt/submit-tx xtdb-node [[:crux.tx/put result]])
+          (xt/submit-tx xtdb-node [[:xtdb.api/put result]])
           (::pass/jwks result))))))
 
 (defn match-identity [db id-token-claims]
@@ -244,15 +244,15 @@
 
 (defn put-if-different [db entity]
   (when-not (= entity (xt/entity db (:xt/id entity)))
-    [:crux.tx/put entity]))
+    [:xtdb.api/put entity]))
 
 (defn put-if-missing [db entity]
   (when-not (xt/entity db (:xt/id entity))
-    [:crux.tx/put entity]))
+    [:xtdb.api/put entity]))
 
 (defn put-if-exists [db id entity]
   (when (xt/entity db id)
-    [:crux.tx/put entity]))
+    [:xtdb.api/put entity]))
 
 (defn callback
   "OAuth2 callback"
@@ -370,7 +370,7 @@
                :juxt.pass.jwt/iss iss
                :juxt.pass.jwt/sub sub})]
             (for [user-role-id (match-all-roles db user-id)]
-              [:crux.tx/delete user-role-id])
+              [:xtdb.api/delete user-role-id])
             (for [group groups]
               (let [role-id (format role-id group)]
                 (prn "checking for " role-id)

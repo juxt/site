@@ -417,7 +417,7 @@
 
     (->> (xt/submit-tx
           xtdb-node
-          [[:crux.tx/put new-rep]])
+          [[:xtdb.api/put new-rep]])
          (xt/await-tx xtdb-node))
 
     (into req {:ring.response/status (if existing? 204 201)})))
@@ -446,10 +446,10 @@
    (static-resources uri req)
 
    ;; We call OpenAPI location here, because a resource can be defined in
-   ;; OpenAPI, and exits in Crux, simultaneously.
+   ;; OpenAPI, and exits in XTDB, simultaneously.
    (openapi/locate-resource db uri req)
 
-   ;; Is it in Crux?
+   ;; Is it in XTDB?
    (when-let [r (xt/entity db uri)]
      (cond-> (assoc r ::site/resource-provider ::db)
        (= (get r ::site/type) "StaticRepresentation")
@@ -525,7 +525,7 @@
 
 (defn current-representations [{::site/keys [resource uri db] :as req}]
   (->> (or
-        ;; This is not common in the Crux DB, but allows 'dynamic' resources to
+        ;; This is not common in the XTDB DB, but allows 'dynamic' resources to
         ;; declare multiple representations.
         (::http/representations resource)
 
@@ -591,7 +591,7 @@
 
     (->> (xt/submit-tx
           xtdb-node
-          [[:crux.tx/put (merge {:xt/id location} request-instance)]])
+          [[:xtdb.api/put (merge {:xt/id location} request-instance)]])
          (xt/await-tx xtdb-node))
 
     (into req {:ring.response/status (if existing 204 201)
@@ -604,7 +604,7 @@
         existing (xt/entity db resource)]
     (->> (xt/submit-tx
           xtdb-node
-          [[:crux.tx/put
+          [[:xtdb.api/put
             (merge
              {:xt/id resource}
              ;; ::site/resource = :xt/id, no need to duplicate
@@ -661,7 +661,7 @@
                       {:ring.response/status 500}))))))
 
 (defn DELETE [{::site/keys [xtdb-node uri] :as req}]
-  (xt/await-tx xtdb-node (xt/submit-tx xtdb-node [[:crux.tx/delete uri]]))
+  (xt/await-tx xtdb-node (xt/submit-tx xtdb-node [[:xtdb.api/delete uri]]))
   (into req {:ring.response/status 204}))
 
 (defn OPTIONS [{::site/keys [resource allowed-methods] :as req}]
@@ -867,7 +867,7 @@
            'environment {}}]
 
       (try
-        ;; TODO: Can we use the new refreshed db here to save another call to x/db?
+        ;; TODO: Can we use the new refreshed db here to save another call to xt/db?
         (let [actions (rules/eval-triggers (xt/db xtdb-node) triggers request-context)]
           (log/tracef "Triggered actions are %s" (pr-str actions))
           (doseq [action actions]
@@ -930,7 +930,7 @@
 
 (defn ->storable [{::site/keys [request-id db] :as req}]
   (-> req
-      (into (select-keys db [:crux.db/valid-time :crux.tx/tx-id]))
+      (into (select-keys db [:xtdb.api/valid-time :xtdb.api/tx-id]))
       (assoc :xt/id request-id ::site/type "Request")
       redact
       (dissoc ::site/xtdb-node ::site/db :ring.request/body)
