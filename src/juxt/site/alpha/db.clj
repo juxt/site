@@ -8,7 +8,7 @@
 
 (defmethod ig/init-key ::xtdb-node [_ crux-opts]
   (log/info "Starting Crux node")
-  (crux/start-node crux-opts))
+  (xt/start-node crux-opts))
 
 (defmethod ig/halt-key! ::xtdb-node [_ node]
   (.close node)

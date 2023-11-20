@@ -5,7 +5,7 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.walk :refer [postwalk]]
-   [crux.api :as x]
+   [xtdb.api :as xt]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
    [io.aviso.ansi :as ansi]
@@ -32,7 +32,7 @@
   (:juxt.site.alpha.db/xtdb-node system))
 
 (defn db []
-  (x/db (xtdb-node)))
+  (xt/db (xtdb-node)))
 
 (defn e [id]
   (postwalk
@@ -45,34 +45,34 @@
                 (= ::http/content (first x)) (str (subs (second x) 0 80) "…")
                 :else (format "(%d bytes)" (count (second x))))]
              x))
-   (x/entity (db) id)))
+   (xt/entity (db) id)))
 
 (defn put! [& ms]
   (->>
-   (x/submit-tx
+   (xt/submit-tx
     (xtdb-node)
     (for [m ms]
       [:crux.tx/put m]))
-   (x/await-tx (xtdb-node))))
+   (xt/await-tx (xtdb-node))))
 
 (defn grep [re coll]
   (filter #(re-matches (re-pattern re) %) coll))
 
 (defn rm! [& ids]
   (->>
-   (x/submit-tx
+   (xt/submit-tx
     (xtdb-node)
     (for [id ids]
       [:crux.tx/delete id]))
-   (x/await-tx (xtdb-node))))
+   (xt/await-tx (xtdb-node))))
 
 (defn evict! [& ids]
   (->>
-   (x/submit-tx
+   (xt/submit-tx
     (xtdb-node)
     (for [id ids]
       [:crux.tx/evict id]))
-   (x/await-tx (xtdb-node))))
+   (xt/await-tx (xtdb-node))))
 
 (defn q [query & args]
   (apply x/q (db) query args))
@@ -80,12 +80,12 @@
 (defn t [t]
   (map
    first
-   (x/q (db) '{:find [e] :where [[e ::site/type t]] :in [t]} t)))
+   (xt/q (db) '{:find [e] :where [[e ::site/type t]] :in [t]} t)))
 
 (defn t* [t]
   (map
    first
-   (x/q (db) '{:find [e] :where [[e :type t]] :in [t]} t)))
+   (xt/q (db) '{:find [e] :where [[e :type t]] :in [t]} t)))
 
 (defn types []
   (->> (q '{:find [t]
@@ -97,7 +97,7 @@
   "List Site resources"
   ([]
    (->> (q '{:find [e]
-             :where [[e :crux.db/id]
+             :where [[e :xt/id]
                      [e ::site/type typ]]
              :in [[typ ...]]}
            (disj (set (types)) "Request"))
@@ -105,7 +105,7 @@
         (sort-by str)))
   ([pat]
    (->> (q '{:find [e]
-             :where [[e :crux.db/id]
+             :where [[e :xt/id]
                      [(str e) id]
                      [(re-seq pat id) match]
                      [(some? match)]]
@@ -117,7 +117,7 @@
 (defn ls-type
   [t]
   (->> (q '{:find [e]
-            :where [[e :crux.db/id]
+            :where [[e :xt/id]
                     [e ::site/type t]]
             :in [t]} t)
        (map first)
@@ -126,7 +126,7 @@
 (defn cat-type
   [t]
   (->> (q '{:find [(pull e [*])]
-            :where [[e :crux.db/id]
+            :where [[e :xt/id]
                     [e ::site/type t]]
             :in [t]} t)
        (map first)
@@ -172,7 +172,7 @@
   ([] (superusers (config)))
   ([{::site/keys [base-uri]}]
    (map first
-        (x/q (db) '{:find [user]
+        (xt/q (db) '{:find [user]
                     :where [[user ::site/type "User"]
                             [mapping ::site/type "UserRoleMapping"]
                             [mapping ::pass/assignee user]
@@ -185,26 +185,26 @@
   ([opts]
    (let [{::site/keys [base-uri]} opts
          _ (assert base-uri)
-         db (x/db (xtdb-node))]
-     [;; Awaiting a fix to https://github.com/juxt/crux/issues/1480
+         db (xt/db (xtdb-node))]
+     [;; Awaiting a fix to https://github.com/juxt/xt/issues/1480
       #_{:complete? (and
-                   (x/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
-                   (x/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
+                   (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_wildcard"))
+                   (xt/entity db (str base-uri "/_site/tx_fns/put_if_match_etags")))
        :happy-message "Site transaction functions installed."
        :sad-message "Site transaction functions not installed. "
        :fix "Enter (put-site-txfns!) to fix this."}
 
-      {:complete? (x/entity db (str base-uri "/_site/apis/site/openapi.json"))
+      {:complete? (xt/entity db (str base-uri "/_site/apis/site/openapi.json"))
        :happy-message "Site API resources installed."
        :sad-message "Site API not installed. "
        :fix "Enter (put-site-api!) to fix this."}
 
-      {:complete? (x/entity db (str base-uri "/_site/token"))
+      {:complete? (xt/entity db (str base-uri "/_site/token"))
        :happy-message "Authentication resources installed."
        :sad-message "Authentication resources not installed. "
        :fix "Enter (put-auth-resources!) to fix this."}
 
-      {:complete? (x/entity db (str base-uri "/_site/roles/superuser"))
+      {:complete? (xt/entity db (str base-uri "/_site/roles/superuser"))
        :happy-message "Role of superuser exists."
        :sad-message "Role of superuser not yet created."
        :fix "Enter (put-superuser-role!) to fix this."}
@@ -284,7 +284,7 @@
 (defn reset-password! [username password]
   (let [user (str (::site/base-uri (config))  "/_site/users/" username)]
     (put!
-     {:crux.db/id (str user "/password")
+     {:xt/id (str user "/password")
       ::site/type "Password"
       ::http/methods #{:post}
       ::pass/user user

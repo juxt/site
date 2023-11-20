@@ -3,7 +3,7 @@
 (ns juxt.site.alpha.init
   (:require
    [clojure.tools.logging :as log]
-   [crux.api :as x]
+   [xtdb.api :as xt]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
    [juxt.reap.alpha.combinators :as p]
@@ -21,11 +21,11 @@
 
 (defn put! [xtdb-node & ms]
   (->>
-   (x/submit-tx
+   (xt/submit-tx
     xtdb-node
     (for [m ms]
       [:crux.tx/put m]))
-   (x/await-tx xtdb-node)))
+   (xt/await-tx xtdb-node)))
 
 (defn put-superuser-role!
   "Create the superuser role."
@@ -34,13 +34,13 @@
   (let [role (str base-uri "/_site/roles/superuser")]
     (put!
      xtdb-node
-     {:crux.db/id role
+     {:xt/id role
       ::site/type "Role"
       :name "superuser"
       :description "Superuser"}
 
      ;; Add rule that allows superusers to do everything.
-     {:crux.db/id (str base-uri "/_site/rules/superuser-allow-all")
+     {:xt/id (str base-uri "/_site/rules/superuser-allow-all")
       :description "Superusers can do everything"
       ::site/type "Rule"
       ::pass/target [['subject :juxt.pass.alpha/user 'user]
@@ -56,25 +56,25 @@
   (let [user (str base-uri "/_site/users/" username)]
     (put!
      xtdb-node
-     {:crux.db/id user
+     {:xt/id user
       ::site/type "User"
       ::pass/username username
       :name fullname
       :email email}
 
-     {:crux.db/id (str user "/password")
+     {:xt/id (str user "/password")
       ::site/type "Password"
       ::pass/user user
       ::pass/password-hash (password/encrypt password)
       ::pass/classification "RESTRICTED"}
 
-     {:crux.db/id (str user "/oauth-credentials")
+     {:xt/id (str user "/oauth-credentials")
       ::site/type "OAuthCredentials"
       ::pass/user user
       :juxt.pass.jwt/iss (-> config :openid :issuer-id)
       :juxt.pass.jwt/sub (-> config :openid :superuser-sub)}
 
-     {:crux.db/id (format "%s/_site/roles/%s/users/%s" base-uri "superuser" username)
+     {:xt/id (format "%s/_site/roles/%s/users/%s" base-uri "superuser" username)
       ::site/type "UserRoleMapping"
       ::pass/assignee (format "%s/_site/users/%s" base-uri username)
       ::pass/role (str base-uri "/_site/roles/superuser")})))
@@ -85,7 +85,7 @@
   [xtdb-node {::site/keys [base-uri]}]
   (put!
    xtdb-node
-   {:crux.db/id (str base-uri "/_site/rules/public-resources")
+   {:xt/id (str base-uri "/_site/rules/public-resources")
     ::site/type "Rule"
     ::site/description "PUBLIC resources are accessible to GET"
     ::pass/target '[[request :ring.request/method #{:get :head :options}]
@@ -97,7 +97,7 @@
   [xtdb-node {::site/keys [base-uri]}]
   (put!
    xtdb-node
-   {:crux.db/id (str base-uri "/_site/rules/any-authenticated-allow-user-info")
+   {:xt/id (str base-uri "/_site/rules/any-authenticated-allow-user-info")
     ::site/type "Rule"
     ::site/description "Allow authenticated users to get their user details"
     ::pass/target '[[subject ::pass/user user]
@@ -113,7 +113,7 @@
   [xtdb-node {::site/keys [base-uri]}]
   (put!
    xtdb-node
-   {:crux.db/id (str base-uri "/_site/rules/restricted-resources")
+   {:xt/id (str base-uri "/_site/rules/restricted-resources")
     ::site/type "Rule"
     ::site/description "RESTRICTED access is denied by default"
     ::pass/target '[[resource ::pass/classification "RESTRICTED"]]
@@ -127,7 +127,7 @@
         body (.getBytes json "UTF-8")]
     (put!
      xtdb-node
-     {:crux.db/id (str base-uri "/_site/apis/site/openapi.json")
+     {:xt/id (str base-uri "/_site/apis/site/openapi.json")
       ::site/type "OpenAPI"
       ::http/methods #{:get :head :options :put}
       ::http/content-type "application/vnd.oai.openapi+json;version=3.0.2"
@@ -147,7 +147,7 @@
         grant-types #{"client_credentials"}]
     (put!
      xtdb-node
-     {:crux.db/id token-endpoint
+     {:xt/id token-endpoint
       ::http/methods #{:post :options}
       ::http/acceptable "application/x-www-form-urlencoded"
       ::site/purpose ::site/acquire-token
@@ -157,7 +157,7 @@
         ::site/access-control-allow-headers #{"authorization" "content-type"}}}
       ::pass/expires-in (* 3600 24 7)}
 
-     {:crux.db/id (str base-uri "/_site/rules/anyone-can-ask-for-a-token")
+     {:xt/id (str base-uri "/_site/rules/anyone-can-ask-for-a-token")
       ::site/type "Rule"
       ::site/description "The token_endpoint must be accessible"
       ::pass/target '[[request :ring.request/method #{:post}]
@@ -176,7 +176,7 @@
            "\r\n")]
       (put!
        xtdb-node
-       {:crux.db/id (str base-uri "/.well-known/openid-configuration")
+       {:xt/id (str base-uri "/.well-known/openid-configuration")
         ;; OpenID Connect Discovery documents are publically available
         ::pass/classification "PUBLIC"
         ::http/methods #{:get :head :options}
@@ -190,13 +190,13 @@
   ;; Allow anyone to login
   (put!
    xtdb-node
-   {:crux.db/id (str base-uri "/_site/login")
+   {:xt/id (str base-uri "/_site/login")
     ::http/methods #{:post}
     ::http/acceptable "application/x-www-form-urlencoded"
     ::site/purpose ::site/login
     ::pass/expires-in (* 3600 24 7)}
 
-   {:crux.db/id (str base-uri "/_site/rules/anyone-can-post-login-credentials")
+   {:xt/id (str base-uri "/_site/rules/anyone-can-post-login-credentials")
     ::site/type "Rule"
     ::site/description "The login POST handler must be accessible by all"
     ::pass/target '[[request :ring.request/method #{:post}]
@@ -208,25 +208,25 @@
   ;; Allow anyone to login
   (put!
    xtdb-node
-   {:crux.db/id (str base-uri "/_site/logout")
+   {:xt/id (str base-uri "/_site/logout")
     ::http/methods #{:post}
     ::http/acceptable "application/x-www-form-urlencoded"
     ::site/purpose ::site/logout}
 
-   {:crux.db/id (str base-uri "/_site/rules/anyone-can-post-logout-credentials")
+   {:xt/id (str base-uri "/_site/rules/anyone-can-post-logout-credentials")
     ::site/type "Rule"
     ::site/description "The logout POST handler must be accessible by all"
     ::pass/target '[[request :ring.request/method #{:post}]
                     [resource ::site/purpose ::site/logout]]
     ::pass/effect ::pass/allow}))
 
-;; Currently awaiting a fix to https://github.com/juxt/crux/issues/1480 because
+;; Currently awaiting a fix to https://github.com/juxt/xt/issues/1480 because
 ;; these can be used.
 (defn put-site-txfns! [xtdb-node {::site/keys [base-uri]}]
-  (x/submit-tx
+  (xt/submit-tx
    xtdb-node
    [[:crux.tx/put
-     {:crux.db/id (str base-uri "/_site/tx_fns/put_if_match_wildcard")
+     {:xt/id (str base-uri "/_site/tx_fns/put_if_match_wildcard")
       ::site/description "Use this function for an If-Match header value of '*'"
       :crux.db/fn
       '(fn [ctx uri new-rep]
@@ -236,10 +236,10 @@
              false)))
       :http/content-type "application/clojure"}]])
 
-  (x/submit-tx
+  (xt/submit-tx
    xtdb-node
    [[:crux.tx/put
-     {:crux.db/id (str base-uri "/_site/tx_fns/put_if_match_etags")
+     {:xt/id (str base-uri "/_site/tx_fns/put_if_match_etags")
       :crux.db/fn
       '(fn [ctx uri header-field new-rep if-match?]
          (let [db (crux.api/db ctx)
@@ -293,7 +293,7 @@
     (log/info "Issuer added:" (get config "issuer"))
     (put!
      xtdb-node
-     {:crux.db/id issuer-id
+     {:xt/id issuer-id
       :juxt.pass.alpha/openid-configuration config})))
 
 (defn install-openid-resources!
@@ -308,20 +308,20 @@
 
     (put!
      xtdb-node
-     {:crux.db/id client
+     {:xt/id client
       :juxt.pass.alpha/openid-issuer-id issuer-id
       :juxt.pass.alpha/oauth-client-id client-id
       :juxt.pass.alpha/oauth-client-secret client-secret
       :juxt.pass.alpha/redirect-uri callback}
 
-     {:crux.db/id login
+     {:xt/id login
       :juxt.http.alpha/methods #{:head :get :options}
       :juxt.pass.alpha/classification "PUBLIC"
       :juxt.http.alpha/content-type "text/plain"
       :juxt.site.alpha/get-fn 'juxt.pass.alpha.openid-connect/login
       :juxt.pass.alpha/oauth-client client}
 
-     {:crux.db/id callback
+     {:xt/id callback
       :juxt.http.alpha/methods #{:head :get :options}
       :juxt.pass.alpha/classification "PUBLIC"
       :juxt.http.alpha/content-type "text/plain"

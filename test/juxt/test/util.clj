@@ -2,7 +2,7 @@
 
 (ns juxt.test.util
   (:require
-   [crux.api :as x]
+   [xtdb.api :as xt]
    [juxt.site.alpha.handler :as h]
    [juxt.site.alpha.init :as site-init])
   (:import
@@ -19,15 +19,15 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn with-crux [f]
-  (with-open [node (x/start-node *opts*)]
+(defn with-xtdb [f]
+  (with-open [node (xt/start-node *opts*)]
     (binding [*xtdb-node* node]
       (f))))
 
 (defn submit-and-await! [transactions]
   (->>
-   (x/submit-tx *xtdb-node* transactions)
-   (x/await-tx *xtdb-node*)))
+   (xt/submit-tx *xtdb-node* transactions)
+   (xt/await-tx *xtdb-node*)))
 
 (defn make-handler [opts]
   ((apply comp
@@ -52,23 +52,23 @@
      :duration-µs (/ (- t1 t0) 1000.0)}))
 
 (defn with-db [f]
-  (binding [*db* (x/db *xtdb-node*)]
+  (binding [*db* (xt/db *xtdb-node*)]
     (f)))
 
 (defn with-open-db [f]
-  (with-open [db (x/open-db *xtdb-node*)]
+  (with-open [db (xt/open-db *xtdb-node*)]
     (binding [*db* db]
       (f))))
 
 (def access-all-areas
-  {:crux.db/id "https://example.org/access-rule"
+  {:xt/id "https://example.org/access-rule"
    ::site/description "A rule allowing access everything"
    ::site/type "Rule"
    ::pass/target '[]
    ::pass/effect ::pass/allow})
 
 (def access-all-apis
-  {:crux.db/id "https://example.org/access-rule"
+  {:xt/id "https://example.org/access-rule"
    ::site/description "A rule allowing access to all APIs"
    ::site/type "Rule"
    ::pass/target '[[resource ::site/resource-provider ::apex/openapi-path]]
@@ -83,6 +83,6 @@
 
 (defn query-sessions
   [db]
-  (->> (x/q db '{:find [(pull ss [*])]
+  (->> (xt/q db '{:find [(pull ss [*])]
                  :where [[ss :juxt.site.alpha/type "SiteSession"]]})
        (mapv first)))

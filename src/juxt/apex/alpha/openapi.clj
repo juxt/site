@@ -4,7 +4,7 @@
   (:require
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [crux.api :as x]
+   [xtdb.api :as xt]
    [jsonista.core :as json]
    [juxt.apex.alpha.representation-generation :refer [entity-bytes-generator]]
    [juxt.jinx.alpha :as jinx]
@@ -37,11 +37,11 @@
                        (.getBytes (pr-str openapi) "UTF-8")) 0 32))]
 
     (->>
-     (x/submit-tx
+     (xt/submit-tx
       xtdb-node
       [[:crux.tx/put
         (merge
-         {:crux.db/id uri
+         {:xt/id uri
           ::http/methods #{:get :head :options :put}
           ::http/etag etag
           ::http/last-modified start-date
@@ -52,7 +52,7 @@
           :title (get-in openapi ["info" "title"])
           :version (get-in openapi ["info" "version"])
           :description (get-in openapi ["info" "description"])})]])
-     (x/await-tx xtdb-node))
+     (xt/await-tx xtdb-node))
 
     (assoc req
            :ring.response/status
@@ -129,7 +129,7 @@
                        (into req {:ring.response/status 400})))))
         _ (assert instance)
         openapi-ref (get resource ::apex/openapi) _ (assert openapi-ref)
-        openapi-resource (x/entity db openapi-ref) _ (assert openapi-resource)
+        openapi-resource (xt/entity db openapi-ref) _ (assert openapi-resource)
 
         validation
         (jinx.api/validate
@@ -170,7 +170,7 @@
 
 (defn put-resource-state
   "Put some new resource state into Crux, if authorization checks pass. The new
-  resource state should be a valid Crux entity, with a :crux.db/id"
+  resource state should be a valid Crux entity, with a :xt/id"
   [{::site/keys [received-representation start-date resource db xtdb-node]
     ::pass/keys [subject]
     :as req}
@@ -178,7 +178,7 @@
 
   (assert new-resource-state)
 
-  (let [id (:crux.db/id new-resource-state)
+  (let [id (:xt/id new-resource-state)
         _ (assert id)
         authorization
         (pdp/authorization
@@ -203,7 +203,7 @@
                 message
                 (into req {:ring.response/status status})))))
 
-        already-exists? (x/entity db id)
+        already-exists? (xt/entity db id)
 
         last-modified start-date
         etag (format "\"%s\"" (-> received-representation
@@ -217,10 +217,10 @@
     ;; representation into the db anyway, if only to store the last-modified and
     ;; etag validators?
 
-    (->> (x/submit-tx
+    (->> (xt/submit-tx
           xtdb-node
           [[:crux.tx/put new-resource-state]])
-         (x/await-tx xtdb-node))
+         (xt/await-tx xtdb-node))
 
     (-> req
         (assoc :ring.response/status (if-not already-exists? 201 204)
@@ -337,7 +337,7 @@
 
              ;; This is useful, because it is the base document for any relative
              ;; json pointers.
-             ;; TODO: Search for instances of apex/openapi and ensure they do (x/entity)
+             ;; TODO: Search for instances of apex/openapi and ensure they do (xt/entity)
              ::apex/openapi openapi-uri
 
              ::apex/operation operation-object
@@ -439,7 +439,7 @@
                 (-> req
                     received-body->resource-state
                     ;; Since this is a PUT, we add
-                    (assoc :crux.db/id (::site/uri req))))))))))))
+                    (assoc :xt/id (::site/uri req))))))))))))
 
 (defn locate-resource
   [db uri
@@ -461,7 +461,7 @@
    (when (re-matches (re-pattern (format "%s/_site/apis/\\w+/openapi.json" base-uri)) uri)
      (or
       ;; It might exist
-      (some-> (x/entity db uri)
+      (some-> (xt/entity db uri)
               (assoc ::site/resource-provider ::openapi-document
                      ::site/put-fn put-openapi))
 
@@ -475,7 +475,7 @@
        ::site/put-fn put-openapi}))
 
    (let [openapis (filter (comp #(str/starts-with? % base-uri) first)
-                          (x/q db '{:find [openapi-uri openapi]
+                          (xt/q db '{:find [openapi-uri openapi]
                                     :where [[openapi-uri ::apex/openapi openapi]]}))
          matches
          (for [[openapi-uri openapi] openapis
@@ -501,7 +501,7 @@
 
        (if (= (count matches) 1)        ; this is the most common case
          (let [openapi-resource (first matches)
-               resource (merge openapi-resource (x/entity db uri))]
+               resource (merge openapi-resource (xt/entity db uri))]
            (if (every? ::jinx/valid? (vals (::apex/openapi-path-params openapi-resource)))
              resource
              (throw

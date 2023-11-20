@@ -4,12 +4,12 @@
   (:require
    [clojure.test :refer [deftest is are testing] :as t]
    [clojure.tools.logging :as log]
-   [crux.api :as x]
+   [xtdb.api :as xt]
    [crypto.password.bcrypt :as password]
    [jsonista.core :as json]
    [juxt.reap.alpha.encoders :refer [format-http-date]]
    [juxt.mail.alpha.mail :as mailer]
-   [juxt.test.util :refer [with-crux with-handler submit-and-await!
+   [juxt.test.util :refer [with-xtdb with-handler submit-and-await!
                            *xtdb-node* *handler*
                            access-all-areas access-all-apis]])
   (:import
@@ -21,13 +21,13 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(t/use-fixtures :each with-crux with-handler)
+(t/use-fixtures :each with-xtdb with-handler)
 
 (deftest put-test
   (submit-and-await!
    [[:crux.tx/put access-all-apis]
     [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
+     {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
       {"servers" [{"url" ""}]
@@ -51,10 +51,10 @@
             :ring.request/headers
             {"content-length" (str (count body))
              "content-type" "application/json"}})
-        db (x/db *xtdb-node*)]
+        db (xt/db *xtdb-node*)]
 
-    (is (= {:a/name "foo", :crux.db/id "https://example.org/things/foo"}
-           (x/entity db "https://example.org/things/foo")))))
+    (is (= {:a/name "foo", :xt/id "https://example.org/things/foo"}
+           (xt/entity db "https://example.org/things/foo")))))
 
 ;; Evoke "Throwing Multiple API paths match"
 
@@ -62,7 +62,7 @@
   (submit-and-await!
    [[:crux.tx/put access-all-apis]
     [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
+     {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
       {"servers" [{"url" ""}]
@@ -103,7 +103,7 @@
             :ring.request/headers
             {"content-length" (str (count body))
              "content-type" "application/json"}})
-        db (x/db *xtdb-node*)]
+        db (xt/db *xtdb-node*)]
     (is (= "putAB"
            (get-in r [::site/resource ::apex/operation "operationId"])))))
 
@@ -115,7 +115,7 @@
   (submit-and-await!
    [[:crux.tx/put access-all-apis]
     [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
+     {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
       {"servers" [{"url" ""}]
@@ -159,42 +159,42 @@
             :ring.request/headers
             {"content-length" (str (count body))
              "content-type" "application/json"}})
-        db (x/db *xtdb-node*)]
+        db (xt/db *xtdb-node*)]
     (is (= "/things/{a}" (get-in r [::site/resource :juxt.apex.alpha/openapi-path])))
     (is (= {:name "zip",
             :juxt/code "ABC/DEF",
-            :crux.db/id "https://example.org/things/ABC%2FDEF"}
-           (x/entity db (str "https://example.org" path))))))
+            :xt/id "https://example.org/things/ABC%2FDEF"}
+           (xt/entity db (str "https://example.org" path))))))
 
 (deftest triggers-test
   (log/trace "TESTING")
   (submit-and-await!
    [[:crux.tx/put access-all-apis]
 
-    [:crux.tx/put {:crux.db/id "https://example.org/users/sue"
+    [:crux.tx/put {:xt/id "https://example.org/users/sue"
                    ::site/type "User"
                    ::site/description "Sue should receive an email on every alert"
                    :email "sue@example.org"
                    ::email? true}]
-    [:crux.tx/put {:crux.db/id "https://example.org/users/brian"
+    [:crux.tx/put {:xt/id "https://example.org/users/brian"
                    ::site/type "User"
                    ::site/description "Brian doesn't want emails"
                    :email "brian@example.org"
                    ::email? false}]
-    [:crux.tx/put {:crux.db/id "https://example.org/roles/service-manager"
+    [:crux.tx/put {:xt/id "https://example.org/roles/service-manager"
                    ::site/type "Role"
                    ::site/description "A service manager"}]
-    [:crux.tx/put {:crux.db/id "https://example.org/users/sue-is-a-service-manager"
+    [:crux.tx/put {:xt/id "https://example.org/users/sue-is-a-service-manager"
                    ::site/type "UserRoleMapping"
                    ::user "https://example.org/users/sue"
                    ::role "https://example.org/roles/service-manager"}]
-    [:crux.tx/put {:crux.db/id "https://example.org/users/brian-is-a-service-manager"
+    [:crux.tx/put {:xt/id "https://example.org/users/brian-is-a-service-manager"
                    ::site/type "UserRoleMapping"
                    ::user "https://example.org/users/brian"
                    ::role "https://example.org/roles/service-manager"}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/apis/test/openapi.json"
+     {:xt/id "https://example.org/_site/apis/test/openapi.json"
       ::site/type "OpenAPI"
       :juxt.apex.alpha/openapi
       {"servers" [{"url" ""}]
@@ -209,15 +209,15 @@
               {"juxt.site.alpha/type" {"type" "string"}}}}}}}}}}}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/alert-notification.html"
+     {:xt/id "https://example.org/templates/alert-notification.html"
       ::http/content "<h1>Alert</h1><p>There has been an alert. See {{ :href }}</p>"}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/alert-notification.txt"
+     {:xt/id "https://example.org/templates/alert-notification.txt"
       ::http/content "There has been an alert. See {{ :href }}"}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/triggers/alert-notification"
+     {:xt/id "https://example.org/triggers/alert-notification"
       ::site/type "Trigger"
       ::site/query
       '{:find [(pull user [:email]) alert asset-type customer]
@@ -260,7 +260,7 @@
         {"content-length" (str (count body))
          "content-type" "application/json"}}))
 
-    (is (= "123" (:id (x/entity (x/db *xtdb-node*) "https://example.org/alerts/123"))))
+    (is (= "123" (:id (xt/entity (xt/db *xtdb-node*) "https://example.org/alerts/123"))))
     (is (= [{:from "notifications@example.org"
              :to "brian@example.org"
              :subject "Heart Monitor Alert!"}
@@ -272,7 +272,7 @@
   (submit-and-await!
    [[:crux.tx/put access-all-areas]
     [:crux.tx/put
-     {:crux.db/id "https://example.org/test.png"
+     {:xt/id "https://example.org/test.png"
       ::http/last-modified #inst "2020-03-01"
       ::http/content-type "image/png"
       ::http/methods #{:get}}]])
@@ -296,7 +296,7 @@
   (submit-and-await!
    [[:crux.tx/put access-all-areas]
     [:crux.tx/put
-     {:crux.db/id "https://example.org/test.png"
+     {:xt/id "https://example.org/test.png"
       ::http/etag "\"abc\""
       ::http/content-type "image/png"
       ::http/methods #{:get :head :options}}]])
@@ -336,7 +336,7 @@
   (submit-and-await!
    [[:crux.tx/put access-all-areas]
     [:crux.tx/put
-     {:crux.db/id "https://example.org/test.png"
+     {:xt/id "https://example.org/test.png"
       ::site/type "StaticRepresentation"
       ::http/etag "\"abc\""
       ::http/content-type "image/png"
@@ -365,7 +365,7 @@
 (deftest redirect-test
   (submit-and-await!
     [[:crux.tx/put
-      {:crux.db/id "https://example.org/"
+      {:xt/id "https://example.org/"
        ::site/type "Redirect"
        ::site/location "/test.html"}]])
 
@@ -380,7 +380,7 @@
    [[:crux.tx/put access-all-areas]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/report"
+     {:xt/id "https://example.org/report"
       ::http/methods #{:get :head :options}
       ::http/representations
       #{{::http/content-type "text/html;charset=utf-8"
@@ -418,27 +418,27 @@
    [[:crux.tx/put access-all-areas]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/report.html"
+     {:xt/id "https://example.org/report.html"
       ::http/content-type "text/html;charset=utf-8"
       ::http/content "<h1>Latest sales figures</h1>"}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/report.txt"
+     {:xt/id "https://example.org/report.txt"
       ::http/content-type "text/plain;charset=utf-8"
       ::http/content "Latest sales figures"}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/report"
+     {:xt/id "https://example.org/report"
       ::http/methods #{:get :head :options}}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/variants/html"
+     {:xt/id "https://example.org/variants/html"
       ::site/type "Variant"
       ::site/resource "https://example.org/report"
       ::site/variant "https://example.org/report.html"}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/variants/txt"
+     {:xt/id "https://example.org/variants/txt"
       ::site/type "Variant"
       ::site/resource "https://example.org/report"
       ::site/variant "https://example.org/report.txt"}]])
@@ -481,21 +481,21 @@
    [[:crux.tx/put access-all-areas]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/list.html"
+     {:xt/id "https://example.org/templates/list.html"
       ::http/methods #{:get :head :options}
       ::site/type "StaticRepresentation"
       ::http/content-type "text/plain;charset=utf-8"
       ::http/content "<dl><dt>Fruit</dt><dd>{{list.fruit}}</dd></dl>"}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/templates/template-outer.html"
+     {:xt/id "https://example.org/templates/template-outer.html"
       ::http/methods #{:get :head :options}
       ::site/type "StaticRepresentation"
       ::http/content-type "text/plain;charset=utf-8"
       ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/nectarine.html"
+     {:xt/id "https://example.org/nectarine.html"
       ::http/methods #{:get :head :options}
       ::site/type "TemplatedRepresentation"
       ::site/template "https://example.org/templates/template-outer.html"
@@ -519,20 +519,20 @@
     (is (= "text/plain;charset=utf-8"
            (get-in response [:ring.response/headers "content-type"])))))
 
-#_((t/join-fixtures [with-crux with-handler])
+#_((t/join-fixtures [with-xtdb with-handler])
  (fn []
    (submit-and-await!
     [[:crux.tx/put access-all-areas]
 
      [:crux.tx/put
-      {:crux.db/id "https://example.org/templates/list.html"
+      {:xt/id "https://example.org/templates/list.html"
        ::http/methods #{:get :head :options}
        ::site/type "StaticRepresentation"
        ::http/content-type "text/plain;charset=utf-8"
        ::http/content "<dl><dt>Fruit</dt><dd>{{list.fruit}}</dd></dl>"}]
 
      [:crux.tx/put
-      {:crux.db/id "https://example.org/templates/template-outer.html"
+      {:xt/id "https://example.org/templates/template-outer.html"
        ::http/methods #{:get :head :options}
        ::site/type "StaticRepresentation"
        ::http/content-type "text/plain;charset=utf-8"
@@ -540,7 +540,7 @@
        ::http/content "<h1>{{title}}</h1>{% include \"list.html\" %}"}]
 
      [:crux.tx/put
-      {:crux.db/id "https://example.org/nectarine.html"
+      {:xt/id "https://example.org/nectarine.html"
        ::http/methods #{:get :head :options}
        ::site/type "TemplatedRepresentation"
        ::site/template "https://example.org/templates/template-outer.html"
@@ -561,40 +561,40 @@
 
 
 ;; TODO: Test that 401 gets an error representation
-#_((t/join-fixtures [with-crux with-handler])
+#_((t/join-fixtures [with-xtdb with-handler])
  (fn []
    (submit-and-await!
     [ ;;[:crux.tx/put access-all-areas]
      [:crux.tx/put
-      {:crux.db/id "https://example.org/sensitive-report.html"
+      {:xt/id "https://example.org/sensitive-report.html"
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "Latest sales figures"
        ::http/methods #{:get :head :options}}]
 
      [:crux.tx/put
-      {:crux.db/id "https://example.org/401.html"
+      {:xt/id "https://example.org/401.html"
        ::site/type "ErrorRepresentation"
        ::http/status #{401 403}
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "<h1>Unauthorized or Forbidden</h1>"}]
 
      [:crux.tx/put
-      {:crux.db/id "https://example.org/401.txt"
+      {:xt/id "https://example.org/401.txt"
        ::site/type "ErrorRepresentation"
        ::http/status #{401}
        ::http/content-type "text/plain;charset=utf-8"
        ::http/content "Unauthorized"}]
 
      [:crux.tx/put
-      {:crux.db/id "https://example.org/406.html"
+      {:xt/id "https://example.org/406.html"
        ::site/type "ErrorRepresentation"
        ::http/status #{406}
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "<h1>Unacceptable</h1>"
        ::http/methods #{:get :head :options}}]])
 
-   (let [db (x/db *xtdb-node*)]
-     (x/q db '{:find [er]
+   (let [db (xt/db *xtdb-node*)]
+     (xt/q db '{:find [er]
                :where [[er ::site/type "ErrorRepresentation"]
                        [er ::http/status 403]]}))
 
@@ -603,12 +603,12 @@
      :ring.request/path "/sensitive-report.html"
      :ring.request/headers {"accept" "text/html"}})))
 
-#_((t/join-fixtures [with-crux with-handler])
+#_((t/join-fixtures [with-xtdb with-handler])
  (fn []
    (submit-and-await!
     [[:crux.tx/put access-all-areas]
      [:crux.tx/put
-      {:crux.db/id "https://example.org/report.html"
+      {:xt/id "https://example.org/report.html"
        ::http/content-type "text/html;charset=utf-8"
        ::http/content "Latest figures"
        ::http/methods #{:get :head :options}
@@ -635,7 +635,7 @@
    [[:crux.tx/put access-all-areas]
 
     [:crux.tx/put
-     {:crux.db/id "https://example.org/view/index.html"
+     {:xt/id "https://example.org/view/index.html"
       ::http/methods #{:get}
       ::http/content-type "text/html;charset=utf-8"
       ::http/content "<h1>Hello!</h1>"}]])
@@ -653,15 +653,15 @@
   (submit-and-await!
    [[:crux.tx/put access-all-apis]
     [:crux.tx/put
-     {:crux.db/id "https://example.org/example.txt"
+     {:xt/id "https://example.org/example.txt"
       ::http/last-modified #inst "2020-03-01"
       ::http/content-type "text/plain"
       ::http/methods #{:get}}]
     [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/users/abc"
+     {:xt/id "https://example.org/_site/users/abc"
       ::site/type "User"}]
     [:crux.tx/put
-     {:crux.db/id "https://example.org/_site/users/abc/password"
+     {:xt/id "https://example.org/_site/users/abc/password"
       ::site/type "Password"
       ::pass/user "https://example.org/_site/users/abc"
       ::pass/password-hash (password/encrypt "123")}]])

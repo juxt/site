@@ -3,7 +3,7 @@
 (ns juxt.site.alpha.resources
   (:require
    [clojure.edn :as edn]
-   [crux.api :as x]
+   [xtdb.api :as xt]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log]))
 
@@ -31,10 +31,10 @@
         results
         (doall
          (for [resource resources]
-           (let [uri (:crux.db/id resource)
-                 existing? (when uri (x/entity db uri))]
+           (let [uri (:xt/id resource)
+                 existing? (when uri (xt/entity db uri))]
              (try
-               (let [tx (x/submit-tx xtdb-node [[:crux.tx/put resource]])]
+               (let [tx (xt/submit-tx xtdb-node [[:crux.tx/put resource]])]
                  (cond-> {:status (if existing? 204 201)
                           :tx tx}
                    uri (assoc :uri uri)))
@@ -45,7 +45,7 @@
                    uri (assoc :uri uri)))))))]
 
     (when-let [last-tx (reverse (filter :tx results))]
-      (x/await-tx xtdb-node last-tx))
+      (xt/await-tx xtdb-node last-tx))
 
     (let [status (case (count results)
                    0 400

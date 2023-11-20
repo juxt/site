@@ -30,7 +30,7 @@
         ;; attributes to merge into the target, then for each rule in the
         ;; policy... the apply rule-combining algo...
 
-        rules (->> (crux/q db '{:find [rule]
+        rules (->> (xt/q db '{:find [rule]
                                 :where [[rule ::site/type "Rule"]]})
                    (map first)
                    (filter #(str/starts-with? % base-uri)))

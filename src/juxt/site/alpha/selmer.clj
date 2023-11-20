@@ -4,7 +4,7 @@
   (:require
    [clojure.tools.logging :as log]
    [clojure.walk :refer [postwalk]]
-   [crux.api :as x]
+   [xtdb.api :as xt]
    [juxt.site.alpha.templating :as templating]
    [juxt.site.alpha.util :as util]
    [selmer.parser :as selmer])
@@ -26,7 +26,7 @@
                 (proxy [java.net.URLConnection] [url]
                   (getInputStream []
                     (log/tracef "Loading template: url=%s" url)
-                    (let [res (x/entity db (str url))]
+                    (let [res (xt/entity db (str url))]
                       (java.io.ByteArrayInputStream.
                        (cond
                          (::http/content res) (.getBytes (::http/content res) (or (::http/charset res) "UTF-8"))
@@ -44,16 +44,16 @@
                      :ring.request/scheme :ring.request/server-name :ring.request/server-post
                      :ring.request/ssl-client-cert])}
          (reduce-kv
-          ;; Preserve any existing crux.db/id - e.g. the resource will have one
+          ;; Preserve any existing xt/id - e.g. the resource will have one
           (fn [acc k v]
             (assoc acc k (-> v
                              util/->freezeable
-                             (assoc :crux.db/id (java.util.UUID/randomUUID)))))
+                             (assoc :xt/id (java.util.UUID/randomUUID)))))
           {}))
 
         txes (vec (for [[_ v] temp-id-map] [:crux.tx/put v]))
 
-        spec-db (x/with-tx db txes)
+        spec-db (xt/with-tx db txes)
 
         template-model (assoc
                          (templating/process-template-model
@@ -67,7 +67,7 @@
              (and (map? m) (contains? m ::site/query))
              (cond-> (apply x/q spec-db
                             (assoc (::site/query m) :in (vec (keys temp-id-map)))
-                            (map :crux.db/id (vals temp-id-map)))
+                            (map :xt/id (vals temp-id-map)))
                (= (::site/results m) 'first) first)
              :else m))
          template-model)
@@ -77,9 +77,9 @@
         custom-resource-path (:selmer.util/custom-resource-path selected-representation)]
 
     (try
-      (log/tracef "Render template: %s" (:crux.db/id template))
+      (log/tracef "Render template: %s" (:xt/id template))
       (selmer/render-file
-       (java.net.URL. nil (:crux.db/id template) ush)
+       (java.net.URL. nil (:xt/id template) ush)
        template-model
        (cond-> {:url-stream-handler ush}
          custom-resource-path

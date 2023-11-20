@@ -32,7 +32,7 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 
 (defn lookup [id db]
-  (crux/entity db id))
+  (xt/entity db id))
 
 (defn login
   "Redirect to an authorization endpoint"
@@ -41,7 +41,7 @@
     :as req}]
 
   (let [{::pass/keys [oauth-client]} resource
-        {::pass/keys [oauth-client-id redirect-uri openid-issuer-id]} (crux/entity db oauth-client)
+        {::pass/keys [oauth-client-id redirect-uri openid-issuer-id]} (xt/entity db oauth-client)
 
         query-params (some-> req :ring.request/query (codec/form-decode "US-ASCII"))
         return-to (get query-params "return-to")
@@ -183,7 +183,7 @@
   "Fetch JWKS from jwks_uri found in OpenID Connect configuration. Cache in XT for
   a day."
   [{::site/keys [xtdb-node db] :as req} uri expiry-in-seconds]
-  (let [cached (crux/entity db uri)]
+  (let [cached (xt/entity db uri)]
     (if (and cached (.after (:expiry cached) (java.util.Date.)))
       (do
         (log/tracef "Returning JWKS from cache")
@@ -204,17 +204,17 @@
               _ (when-not (= status 200)
                   (return req 500 "Failed to fetch JWKS from %s" {} uri))
               result
-              {:crux.db/id uri
+              {:xt/id uri
                ::pass/jwks (json/read-value body)
                :expiry (Date/from (.plusSeconds (.toInstant (java.util.Date.)) expiry-in-seconds))}]
           (log/infof "Storing JWKS in database: %s" uri)
-          (crux/submit-tx xtdb-node [[:crux.tx/put result]])
+          (xt/submit-tx xtdb-node [[:crux.tx/put result]])
           (::pass/jwks result))))))
 
 (defn match-identity [db id-token-claims]
   (let [identities
         (map first
-             (crux/q db '{:find [i]
+             (xt/q db '{:find [i]
                           :where [[i :juxt.site.alpha/type "User"]
                                   [oc :juxt.site.alpha/type "OAuthCredentials"]
                                   [oc :juxt.pass.alpha/user i]
@@ -235,23 +235,23 @@
 
 (defn match-all-roles [db user-id]
   (map first
-       (crux/q db '{:find [user-role-id]
-                    :where [[ur :crux.db/id user-role-id]
+       (xt/q db '{:find [user-role-id]
+                    :where [[ur :xt/id user-role-id]
                             [ur :juxt.site.alpha/type "UserRoleMapping"]
                             [ur :juxt.pass.alpha/assignee user-id]]
                     :in [user-id]}
                user-id)))
 
 (defn put-if-different [db entity]
-  (when-not (= entity (crux/entity db (:crux.db/id entity)))
+  (when-not (= entity (xt/entity db (:xt/id entity)))
     [:crux.tx/put entity]))
 
 (defn put-if-missing [db entity]
-  (when-not (crux/entity db (:crux.db/id entity))
+  (when-not (xt/entity db (:xt/id entity))
     [:crux.tx/put entity]))
 
 (defn put-if-exists [db id entity]
-  (when (crux/entity db id)
+  (when (xt/entity db id)
     [:crux.tx/put entity]))
 
 (defn callback
@@ -270,7 +270,7 @@
     ;; Exchange code for JWT
     (let [{::pass/keys [oauth-client]} resource
           {::pass/keys [oauth-client-id oauth-client-secret redirect-uri openid-issuer-id]}
-          (crux/entity db oauth-client)
+          (xt/entity db oauth-client)
 
           openid-configuration (some-> openid-issuer-id (lookup db) ::pass/openid-configuration)
 
@@ -357,14 +357,14 @@
       (->> (concat
             [(put-if-different
               db
-              {:crux.db/id user-id
+              {:xt/id user-id
                ::site/type "User"
                ::pass/username username
                :name name
                :email email})
              (put-if-missing
               db
-              {:crux.db/id (str user-id "/oauth-credentials")
+              {:xt/id (str user-id "/oauth-credentials")
                ::site/type "OAuthCredentials"
                ::pass/user user-id
                :juxt.pass.jwt/iss iss
@@ -377,17 +377,17 @@
                 (put-if-exists
                  db
                  role-id
-                 {:crux.db/id (format user-role-id group)
+                 {:xt/id (format user-role-id group)
                   ::site/type "UserRoleMapping"
                   ::pass/assignee user-id
                   ::pass/role role-id}))))
            (remove nil?)
            vec
-           (crux/submit-tx xtdb-node)
-           (crux/await-tx xtdb-node))
+           (xt/submit-tx xtdb-node)
+           (xt/await-tx xtdb-node))
 
       ;; Does the id-token match any identities in our database?
-      (if-let [matched-identity (match-identity (crux/db xtdb-node) (:claims id-token))]
+      (if-let [matched-identity (match-identity (xt/db xtdb-node) (:claims id-token))]
         (do (log/warnf "Successful login! %s matched claims %s" matched-identity [iss sub])
             ;; If iss and sub match identity put the ID_TOKEN into the session and cycle the session id
             ;; Always redirect to the redirect_uri stored in the session but only include code query

@@ -10,7 +10,7 @@
    [juxt.pass.alpha.util :as util]
    [juxt.pass.openid-connect-test-utils :as tutils]
    [juxt.site.alpha.init :as site-init]
-   [juxt.test.util :refer [*xtdb-node* *handler* with-crux with-handler]
+   [juxt.test.util :refer [*xtdb-node* *handler* with-xtdb with-handler]
     :as test-util])
   (:import
    (com.auth0.jwt JWT)
@@ -20,7 +20,7 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(t/use-fixtures :each with-crux with-handler
+(t/use-fixtures :each with-xtdb with-handler
   test-util/allow-access-to-public-resources!)
 
 (deftest openid-auth0-login-redirect-test
@@ -42,12 +42,12 @@
                 (*handler*
                  {:ring.request/method :get
                   :ring.request/path "/_site/openid/auth0/login"}))
-         db (crux/db *xtdb-node*)
+         db (xt/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 
      (is (= 1 (count sessions)))
-     (is (= "https://example.org/site-session/cccccccccccccccc" (:crux.db/id session)))
+     (is (= "https://example.org/site-session/cccccccccccccccc" (:xt/id session)))
      (is (= "aaaaaaaa" (get session ::pass/state)))
      (is (= "bbbbbbbbbbbb" (get session ::pass/nonce)))
      (is (nil? (get session ::pass/return-to)))
@@ -75,12 +75,12 @@
                 (*handler*
                  {:ring.request/method :get
                   :ring.request/path "/_site/openid/aws-cognito/login"}))
-         db (crux/db *xtdb-node*)
+         db (xt/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 
      (is (= 1 (count sessions)))
-     (is (= "https://example.org/site-session/cccccccccccccccc" (:crux.db/id session)))
+     (is (= "https://example.org/site-session/cccccccccccccccc" (:xt/id session)))
      (is (= "aaaaaaaa" (get session ::pass/state)))
      (is (= "bbbbbbbbbbbb" (get session ::pass/nonce)))
      (is (nil? (get session ::pass/return-to)))
@@ -109,12 +109,12 @@
                  {:ring.request/method :get
                   :ring.request/path "/_site/openid/aws-cognito/login"
                   :ring.request/query "return-to=http://example.org/home.html"}))
-         db (crux/db *xtdb-node*)
+         db (xt/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 
      (is (= 1 (count sessions)))
-     (is (= "https://example.org/site-session/cccccccccccccccc" (:crux.db/id session)))
+     (is (= "https://example.org/site-session/cccccccccccccccc" (:xt/id session)))
      (is (= "aaaaaaaa" (get session ::pass/state)))
      (is (= "bbbbbbbbbbbb" (get session ::pass/nonce)))
      (is (= "http://example.org/home.html" (get session ::pass/return-to)))
@@ -175,7 +175,7 @@
 
   (test-util/submit-and-await!
    [[:crux.tx/put
-     {:crux.db/id "https://example.org/_site/roles/superuser"
+     {:xt/id "https://example.org/_site/roles/superuser"
       ::site/type "Role"
       :name "superuser"
       :description "Superuser"}]])
@@ -212,34 +212,34 @@
                   :ring.request/path "/_site/openid/aws-cognito/callback"
                   :ring.request/query "state=auth-flow-state&code=randomcode"
                   :ring.request/headers {"cookie" "id=current-session"}}))
-         db (crux/db *xtdb-node*)
+         db (xt/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 
      (is (= 1 (count sessions)))
-     (is (not= "https://example.org/site-session/current-session" (:crux.db/id session)))
-     (is (= "https://example.org/site-session/new-session" (:crux.db/id session)))
+     (is (not= "https://example.org/site-session/current-session" (:xt/id session)))
+     (is (= "https://example.org/site-session/new-session" (:xt/id session)))
      (is (= "https://example.org/_site/users/exceladmin" (::pass/user session)))
 
      (is (= 303 (:ring.response/status resp)))
      (is (= "/?code=new-session"
             (get-in resp [:ring.response/headers "location"])))
 
-     (is (= (crux/entity db "https://example.org/_site/users/exceladmin")
-            {:crux.db/id "https://example.org/_site/users/exceladmin"
+     (is (= (xt/entity db "https://example.org/_site/users/exceladmin")
+            {:xt/id "https://example.org/_site/users/exceladmin"
              ::site/type "User"
              ::pass/username "exceladmin"
              :name "Excel Admin"
              :email "fwc+exceladmin@juxt.pro"}))
-     (is (= (crux/entity db "https://example.org/_site/users/exceladmin/oauth-credentials")
-            {:crux.db/id "https://example.org/_site/users/exceladmin/oauth-credentials"
+     (is (= (xt/entity db "https://example.org/_site/users/exceladmin/oauth-credentials")
+            {:xt/id "https://example.org/_site/users/exceladmin/oauth-credentials"
              ::site/type "OAuthCredentials"
              ::pass/user "https://example.org/_site/users/exceladmin"
              :juxt.pass.jwt/iss "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"
              :juxt.pass.jwt/sub "2353661c-e432-464f-9b22-e908ddd920e5"}))
-     (is (some? (crux/entity db "https://example.org/_site/roles/superuser")))
-     (is (= (crux/entity db "https://example.org/_site/roles/superuser/users/exceladmin")
-            {:crux.db/id "https://example.org/_site/roles/superuser/users/exceladmin",
+     (is (some? (xt/entity db "https://example.org/_site/roles/superuser")))
+     (is (= (xt/entity db "https://example.org/_site/roles/superuser/users/exceladmin")
+            {:xt/id "https://example.org/_site/roles/superuser/users/exceladmin",
              ::site/type "UserRoleMapping",
              ::pass/assignee "https://example.org/_site/users/exceladmin",
              ::pass/role "https://example.org/_site/roles/superuser"})))))
@@ -287,33 +287,33 @@
                   :ring.request/path "/_site/openid/aws-cognito/callback"
                   :ring.request/query "state=auth-flow-state&code=randomcode"
                   :ring.request/headers {"cookie" "id=current-session"}}))
-         db (crux/db *xtdb-node*)
+         db (xt/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 
      (is (= 1 (count sessions)))
-     (is (not= "https://example.org/site-session/current-session" (:crux.db/id session)))
-     (is (= "https://example.org/site-session/new-session" (:crux.db/id session)))
+     (is (not= "https://example.org/site-session/current-session" (:xt/id session)))
+     (is (= "https://example.org/site-session/new-session" (:xt/id session)))
      (is (= "https://example.org/_site/users/exceladmin" (::pass/user session)))
 
      (is (= 303 (:ring.response/status resp)))
      (is (= "/?code=new-session"
             (get-in resp [:ring.response/headers "location"])))
 
-     (is (= (crux/entity db "https://example.org/_site/users/exceladmin")
-            {:crux.db/id "https://example.org/_site/users/exceladmin"
+     (is (= (xt/entity db "https://example.org/_site/users/exceladmin")
+            {:xt/id "https://example.org/_site/users/exceladmin"
              ::site/type "User"
              ::pass/username "exceladmin"
              :name "Excel Admin"
              :email "fwc+exceladmin@juxt.pro"}))
-     (is (= (crux/entity db "https://example.org/_site/users/exceladmin/oauth-credentials")
-            {:crux.db/id "https://example.org/_site/users/exceladmin/oauth-credentials"
+     (is (= (xt/entity db "https://example.org/_site/users/exceladmin/oauth-credentials")
+            {:xt/id "https://example.org/_site/users/exceladmin/oauth-credentials"
              ::site/type "OAuthCredentials"
              ::pass/user "https://example.org/_site/users/exceladmin"
              :juxt.pass.jwt/iss "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"
              :juxt.pass.jwt/sub "2353661c-e432-464f-9b22-e908ddd920e5"}))
-     (is (nil? (crux/entity db "https://example.org/_site/roles/superuser")))
-     (is (nil? (crux/entity db "https://example.org/_site/roles/superuser/user/exceladmin"))))))
+     (is (nil? (xt/entity db "https://example.org/_site/roles/superuser")))
+     (is (nil? (xt/entity db "https://example.org/_site/roles/superuser/user/exceladmin"))))))
 
 (deftest openid-aws-cognito-full-flow-test
   (with-redefs
@@ -330,7 +330,7 @@
 
   (test-util/submit-and-await!
    [[:crux.tx/put
-     {:crux.db/id "https://example.org/_site/roles/superuser"
+     {:xt/id "https://example.org/_site/roles/superuser"
       ::site/type "Role"
       :name "superuser"
       :description "Superuser"}]])
@@ -368,34 +368,34 @@
              :ring.request/path "/_site/openid/aws-cognito/callback"
              :ring.request/query "state=aaaaaaaa&code=randomcode"
              :ring.request/headers {"cookie" (get-in login-resp [:ring.response/headers "set-cookie"])}}))
-         db (crux/db *xtdb-node*)
+         db (xt/db *xtdb-node*)
          sessions (test-util/query-sessions db)
          session (first sessions)]
 
      (is (= 1 (count sessions)))
-     (is (not= "https://example.org/site-session/cccccccccccccccc" (:crux.db/id session)))
-     (is (= "https://example.org/site-session/dddddddddddddddd" (:crux.db/id session)))
+     (is (not= "https://example.org/site-session/cccccccccccccccc" (:xt/id session)))
+     (is (= "https://example.org/site-session/dddddddddddddddd" (:xt/id session)))
      (is (= "https://example.org/_site/users/exceladmin" (::pass/user session)))
 
      (is (= 303 (:ring.response/status callback-resp)))
      (is (= "/?code=dddddddddddddddd"
             (get-in callback-resp [:ring.response/headers "location"])))
 
-     (is (= (crux/entity db "https://example.org/_site/users/exceladmin")
-            {:crux.db/id "https://example.org/_site/users/exceladmin"
+     (is (= (xt/entity db "https://example.org/_site/users/exceladmin")
+            {:xt/id "https://example.org/_site/users/exceladmin"
              ::site/type "User"
              ::pass/username "exceladmin"
              :name "Excel Admin"
              :email "fwc+exceladmin@juxt.pro"}))
-     (is (= (crux/entity db "https://example.org/_site/users/exceladmin/oauth-credentials")
-            {:crux.db/id "https://example.org/_site/users/exceladmin/oauth-credentials"
+     (is (= (xt/entity db "https://example.org/_site/users/exceladmin/oauth-credentials")
+            {:xt/id "https://example.org/_site/users/exceladmin/oauth-credentials"
              ::site/type "OAuthCredentials"
              ::pass/user "https://example.org/_site/users/exceladmin"
              :juxt.pass.jwt/iss "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_ccXNbbzY6"
              :juxt.pass.jwt/sub "2353661c-e432-464f-9b22-e908ddd920e5"}))
-     (is (some? (crux/entity db "https://example.org/_site/roles/superuser")))
-     (is (= (crux/entity db "https://example.org/_site/roles/superuser/users/exceladmin")
-            {:crux.db/id "https://example.org/_site/roles/superuser/users/exceladmin",
+     (is (some? (xt/entity db "https://example.org/_site/roles/superuser")))
+     (is (= (xt/entity db "https://example.org/_site/roles/superuser/users/exceladmin")
+            {:xt/id "https://example.org/_site/roles/superuser/users/exceladmin",
              ::site/type "UserRoleMapping",
              ::pass/assignee "https://example.org/_site/users/exceladmin",
              ::pass/role "https://example.org/_site/roles/superuser"})))))

@@ -88,7 +88,7 @@ to identify the Crux entity too.
 
 [source,clojure]
 ----
-{:crux.db/id "https://my.site/hello"}
+{:xt/id "https://my.site/hello"}
 ----
 
 The resource's state is stored in the Crux entity's attributes, or in other Crux
@@ -96,7 +96,7 @@ entities it may reference.
 
 [source,clojure]
 ----
-{:crux.db/id "https://my.site/hello"
+{:xt/id "https://my.site/hello"
  :message-today "Hello World!"}
 ----
 
@@ -106,7 +106,7 @@ configuration, such as the methods allowed on the resource.
 
 [source,clojure]
 ----
-{:crux.db/id "https://my.site/hello"
+{:xt/id "https://my.site/hello"
  :message-today "Hello World!"
  :juxt.spin.alpha/methods #{:get :head :options}}
 ----
@@ -133,7 +133,7 @@ payload ahead-of-time.
 ----
 (alias 'http (create-ns 'juxt.http.alpha))
 
-{:crux.db/id "https://my.site/hello"
+{:xt/id "https://my.site/hello"
  :message-today "Hello World!"
  ::http/methods #{:get :head :options}
  ::http/representations
