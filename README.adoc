@@ -260,6 +260,19 @@ work sessions. You can set the expiry time of new tokens via the REPL.
 (put! (assoc (e "http://localhost:2021/_site/token")  ::pass/expires-in (* 24 3600)))
 ----
 
+== Enable XTDB transaction lag check in healthcheck handler
+
+In the server section of your config.edn add the following 2 entries:
+
+```
+:juxt.site.alpha.server/server
+{
+...
+:juxt.site.alpha/check-xtdb-tx-lag-in-health-check true
+:juxt.site.alpha/xtdb-tx-lag-threshold 100
+}
+```
+
 == License
 
 The MIT License (MIT)

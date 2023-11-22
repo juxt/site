@@ -442,3 +442,22 @@
           :ring.request/headers {"accept" "text/html"}})]
     (is (= 200 (:ring.response/status response)))
     (is (= "<h1>Hello!</h1>" (:ring.response/body response)))))
+
+(deftest health-check-test
+  (submit-and-await!
+    [[:xtdb.api/put access-all-areas]])
+  (let [req {:ring.request/method :get
+             :ring.request/headers {"content-type" "application/json"}
+             :ring.request/path "/_site/healthcheck"}]
+    (= 200
+       (:ring.response/status
+         (*handler* req)))
+    (let [req-with-xt-check (assoc req ::site/xtdb-tx-lag-threshold 100
+                                       ::site/check-xtdb-tx-lag-in-health-check true)]
+      (is (= 200
+             (:ring.response/status
+               (*handler* req-with-xt-check))))
+      (is (= 503
+             (:ring.response/status
+               (with-redefs [juxt.site.alpha.handler/xtdb-tx-lag (fn [xt-node] (assert xt-node) 101)]
+                 (*handler* req-with-xt-check))))))))

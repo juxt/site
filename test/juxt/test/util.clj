@@ -32,8 +32,7 @@
 (defn make-handler [opts]
   ((apply comp
           (remove
-           #{h/wrap-healthcheck
-             h/wrap-ring-1-adapter}
+           #{h/wrap-ring-1-adapter}
            (h/make-pipeline opts)))
    identity))
 
