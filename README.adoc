@@ -178,6 +178,19 @@ The OpenAPI features are supported by some additional libraries:
 Consulting services are available directly from JUXT. Write to info@juxt.pro if
 you would like further details.
 
+== Enable XTDB transaction lag check in healthcheck handler
+
+In the server section of your config.edn add the following 2 entries:
+
+```
+:juxt.site.alpha.server/server
+{
+...
+:juxt.site.alpha/check-xtdb-tx-lag-in-health-check true
+:juxt.site.alpha/xtdb-tx-lag-threshold 100
+}
+```
+
 == License
 
 The MIT License (MIT)

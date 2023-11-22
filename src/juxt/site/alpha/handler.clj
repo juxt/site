@@ -1312,11 +1312,22 @@
   (fn [req]
     (doto (h req) (log-request!))))
 
+(defn xtdb-tx-lag [xt-node]
+  (assert xt-node)
+  (let [tx-id (fn [tx] (get tx ::crux/tx-id 0))]
+    (- (tx-id (crux/latest-submitted-tx xt-node))
+       (tx-id (crux/latest-completed-tx xt-node)))))
+
 (defn wrap-healthcheck
   [h]
-  (fn [req]
-    (if (= "/_site/healthcheck" (:ring.request/path req))
-      {:ring.response/status 200 :ring.response/body "Site OK!\r\n"}
+  (fn [{::site/keys [crux-node xtdb-tx-lag-threshold check-xtdb-tx-lag-in-health-check]
+        :ring.request/keys [path]
+        :as req}]
+    (if (= "/_site/healthcheck" path)
+      (if (and check-xtdb-tx-lag-in-health-check
+               (> (xtdb-tx-lag crux-node) xtdb-tx-lag-threshold))
+        {:ring.response/status 503 :ring.response/body (format "XTDB lag > %d\r\n" xtdb-tx-lag-threshold)}
+        {:ring.response/status 200 :ring.response/body "Site OK!\r\n"})
       (h req))))
 
 (defn service-available? [req]
@@ -1344,11 +1355,11 @@
   [;; Switch Ring requests/responses to Ring 2 namespaced keywords
    wrap-ring-1-adapter
 
-   ;; Optional, helpful for AWS ALB
-   wrap-healthcheck
-
    ;; Initialize the request by merging in some extra data
    #(wrap-initialize-request % opts)
+
+   ;; Optional, helpful for AWS ALB
+   wrap-healthcheck
 
    wrap-service-unavailable?
 
