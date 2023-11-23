@@ -1314,7 +1314,9 @@
 
 (defn xtdb-tx-lag [xt-node]
   (assert xt-node)
-  (let [tx-id (fn [tx] (get tx ::crux/tx-id 0))
+  (let [tx-id (fn [tx]
+                (log/info "tx:" tx)
+                (get tx :crux.tx/tx-id 0))
         latest-submitted-tx (tx-id (crux/latest-submitted-tx xt-node))
         latest-completed-tx (tx-id (crux/latest-completed-tx xt-node))]
     (log/infof "healthcheck lag: latest-submitted-tx: %s latest-completed-tx: %s" latest-submitted-tx latest-completed-tx)
