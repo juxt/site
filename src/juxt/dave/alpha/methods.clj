@@ -3,7 +3,7 @@
 (ns juxt.dave.alpha.methods
   (:require
    [clojure.tools.logging :as log]
-   [crux.api :as crux]
+   [xtdb.api :as xtdb]
    [juxt.dave.alpha :as dave]
    [juxt.dave.alpha.xml :as xml]
 
@@ -24,7 +24,7 @@
                    ]]
          {:tag "response" :ns "DAV:"
           :children
-          [{:tag "href" :ns "DAV:" :children [(:crux.db/id resource)]}
+          [{:tag "href" :ns "DAV:" :children [(:xt/id resource)]}
            {:tag "propstat" :ns "DAV:"
             :children
             [{:tag "prop" :ns "DAV:"
@@ -39,12 +39,12 @@
       :xml-declaration true})
     (.toByteArray baos)))
 
-(defn propfind [request resource date crux-node authorization subject]
-  (let [db (crux/db crux-node)
+(defn propfind [request resource date xtdb-node authorization subject]
+  (let [db (xtdb/db xtdb-node)
          ;; See https://tools.ietf.org/html/rfc4918#section-9.1
         depth (get-in request [:headers "depth"] "infinity")
         doc (xml/->document (:body request))
-        members (map first (crux/q db {:find '[(pull e [*])]
+        members (map first (xtdb/q db {:find '[(pull e [*])]
                                        :where (::dave/query resource)}))]
     {:status 207
      :headers {"content-type" "application/xml"}

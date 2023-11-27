@@ -187,8 +187,8 @@
             repl {:in (io/reader (.getInputStream sock))
                   :out (io/writer (.getOutputStream sock))}]
         (repl-command repl "(require 'juxt.site.alpha.init)")
-        (repl-command repl "(def crux-node (:juxt.site.alpha.db/crux-node juxt.site.alpha.main/system))")
-        (repl-command repl (format "(juxt.site.alpha.init/init-db! crux-node %s)" (pr-str opts)))
+        (repl-command repl "(def xtdb-node (:juxt.site.alpha.db/xtdb-node juxt.site.alpha.main/system))")
+        (repl-command repl (format "(juxt.site.alpha.init/init-db! xtdb-node %s)" (pr-str opts)))
 ;;      (.readLine (:in repl))
         )))
 
@@ -840,13 +840,13 @@
     (when-not (.exists (io/file file)) (error-and-exit! 1 (str "File not found: " file)))
 
     (let [embedded-url (when (.endsWith file ".edn")
-                         (:crux.db/id (edn/read-string (slurp file))))
+                         (:xt/id (edn/read-string (slurp file))))
 
           _ (when (and embedded-url url) (error-and-exit! 1 "Should not specify URL both in the document and as an option"))
 
           url (or embedded-url url)
 
-          _ (when-not url (error-and-exit! 1 "Failed to specify identity (URI), either in the document (crux.db/id) or as an option"))
+          _ (when-not url (error-and-exit! 1 "Failed to specify identity (URI), either in the document (xtdb.db/id) or as an option"))
 
           url (str/replace url "{{base-uri}}" base-uri)
           {:keys [status headers body]}

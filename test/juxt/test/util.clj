@@ -2,14 +2,14 @@
 
 (ns juxt.test.util
   (:require
-   [crux.api :as x]
+   [xtdb.api :as x]
    [juxt.site.alpha.handler :as h]
    [juxt.site.alpha.init :as site-init])
   (:import
-   (crux.api ICruxAPI)))
+   (xtdb.api ICruxAPI)))
 
 (def ^:dynamic *opts* {})
-(def ^:dynamic ^ICruxAPI *crux-node*)
+(def ^:dynamic ^ICruxAPI *xtdb-node*)
 (def ^:dynamic *handler*)
 (def ^:dynamic *db*)
 
@@ -19,15 +19,15 @@
 (alias 'pass (create-ns 'juxt.pass.alpha))
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defn with-crux [f]
+(defn with-xtdb [f]
   (with-open [node (x/start-node *opts*)]
-    (binding [*crux-node* node]
+    (binding [*xtdb-node* node]
       (f))))
 
 (defn submit-and-await! [transactions]
   (->>
-   (x/submit-tx *crux-node* transactions)
-   (x/await-tx *crux-node*)))
+   (x/submit-tx *xtdb-node* transactions)
+   (x/await-tx *xtdb-node*)))
 
 (defn make-handler [opts]
   ((apply comp
@@ -38,7 +38,7 @@
 
 (defn with-handler [f]
   (binding [*handler* (make-handler
-                       {::site/crux-node *crux-node*
+                       {::site/xtdb-node *xtdb-node*
                         ::site/base-uri "https://example.org"
                         ::site/uri-prefix "https://example.org"})]
     (f)))
@@ -51,23 +51,23 @@
      :duration-µs (/ (- t1 t0) 1000.0)}))
 
 (defn with-db [f]
-  (binding [*db* (x/db *crux-node*)]
+  (binding [*db* (x/db *xtdb-node*)]
     (f)))
 
 (defn with-open-db [f]
-  (with-open [db (x/open-db *crux-node*)]
+  (with-open [db (x/open-db *xtdb-node*)]
     (binding [*db* db]
       (f))))
 
 (def access-all-areas
-  {:crux.db/id "https://example.org/access-rule"
+  {:xt/id "https://example.org/access-rule"
    ::site/description "A rule allowing access everything"
    ::site/type "Rule"
    ::pass/target '[]
    ::pass/effect ::pass/allow})
 
 (def access-all-apis
-  {:crux.db/id "https://example.org/access-rule"
+  {:xt/id "https://example.org/access-rule"
    ::site/description "A rule allowing access to all APIs"
    ::site/type "Rule"
    ::pass/target '[[resource ::site/resource-provider ::apex/openapi-path]]
@@ -76,7 +76,7 @@
 (defn allow-access-to-public-resources!
   [f]
   (site-init/allow-public-access-to-public-resources!
-   *crux-node*
+   *xtdb-node*
    {::site/base-uri "https://example.org"})
   (f))
 

@@ -4,7 +4,7 @@
   (:require
    [clojure.walk :refer [postwalk-replace]]
    [clojure.tools.logging :as log]
-   [crux.api :as crux]
+   [xtdb.api :as xtdb]
    [juxt.site.alpha.rules :as rules]
    [clojure.string :as str]))
 
@@ -30,7 +30,7 @@
         ;; attributes to merge into the target, then for each rule in the
         ;; policy... the apply rule-combining algo...
 
-        rules (->> (crux/q db '{:find [rule]
+        rules (->> (xtdb/q db '{:find [rule]
                                 :where [[rule ::site/type "Rule"]]})
                    (map first)
                    (filter #(str/starts-with? % base-uri)))

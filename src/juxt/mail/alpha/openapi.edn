@@ -19,7 +19,7 @@
   {:get
    {:responses
     {200
-     {:crux/query
+     {:xtdb/query
       {:find [e]
        :where [[e :juxt.site.alpha/type t]]
        :args [{t "EmailTemplate"}]}
@@ -74,9 +74,9 @@
     :type "object"
     :description
     "The unique identifier of the document in the database. This is maps
-    directly to the crux.db/id attribute."
+    directly to the xtdb.db/id attribute."
     :required ["id"]
-    :juxt.jinx.alpha/keyword-mappings {"id" "crux.db/id"}
+    :juxt.jinx.alpha/keyword-mappings {"id" "xtdb.db/id"}
     :properties
     {"id" {:type "string" :format "uri-reference"}}}
 

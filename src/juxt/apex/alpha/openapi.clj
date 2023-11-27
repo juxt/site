@@ -4,7 +4,7 @@
   (:require
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [crux.api :as x]
+   [xtdb.api :as x]
    [jsonista.core :as json]
    [juxt.apex.alpha.representation-generation :refer [entity-bytes-generator]]
    [juxt.jinx.alpha :as jinx]
@@ -23,7 +23,7 @@
 (alias 'site (create-ns 'juxt.site.alpha))
 
 (defn put-openapi
-  [{::site/keys [crux-node uri resource received-representation start-date] :as req}]
+  [{::site/keys [xtdb-node uri resource received-representation start-date] :as req}]
 
   (let [body (json/read-value
               (java.io.ByteArrayInputStream.
@@ -38,10 +38,10 @@
 
     (->>
      (x/submit-tx
-      crux-node
-      [[:crux.tx/put
+      xtdb-node
+      [[:xtdb.tx/put
         (merge
-         {:crux.db/id uri
+         {:xt/id uri
           ::http/methods #{:get :head :options :put}
           ::http/etag etag
           ::http/last-modified start-date
@@ -52,7 +52,7 @@
           :title (get-in openapi ["info" "title"])
           :version (get-in openapi ["info" "version"])
           :description (get-in openapi ["info" "description"])})]])
-     (x/await-tx crux-node))
+     (x/await-tx xtdb-node))
 
     (assoc req
            :ring.response/status
@@ -170,15 +170,15 @@
 
 (defn put-resource-state
   "Put some new resource state into Crux, if authorization checks pass. The new
-  resource state should be a valid Crux entity, with a :crux.db/id"
-  [{::site/keys [received-representation start-date resource db crux-node]
+  resource state should be a valid Crux entity, with a :xt/id"
+  [{::site/keys [received-representation start-date resource db xtdb-node]
     ::pass/keys [subject]
     :as req}
    new-resource-state]
 
   (assert new-resource-state)
 
-  (let [id (:crux.db/id new-resource-state)
+  (let [id (:xt/id new-resource-state)
         _ (assert id)
         authorization
         (pdp/authorization
@@ -218,9 +218,9 @@
     ;; etag validators?
 
     (->> (x/submit-tx
-          crux-node
-          [[:crux.tx/put new-resource-state]])
-         (x/await-tx crux-node))
+          xtdb-node
+          [[:xtdb.tx/put new-resource-state]])
+         (x/await-tx xtdb-node))
 
     (-> req
         (assoc :ring.response/status (if-not already-exists? 201 204)
@@ -439,7 +439,7 @@
                 (-> req
                     received-body->resource-state
                     ;; Since this is a PUT, we add
-                    (assoc :crux.db/id (::site/uri req))))))))))))
+                    (assoc :xt/id (::site/uri req))))))))))))
 
 (defn locate-resource
   [db uri
