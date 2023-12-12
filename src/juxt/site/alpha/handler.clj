@@ -809,12 +809,22 @@
            'representation (dissoc resource ::http/body ::http/content)
            'environment {}}
 
+          user-id (:juxt.pass.alpha/user subject)
+
+          roles (crux/q db '{:find [role]
+                             :where [[role-mapping :juxt.site.alpha/type "UserRoleMapping"]
+                                     [role-mapping :juxt.pass.alpha/assignee user-id]
+                                     [role-mapping :juxt.pass.alpha/role role]]
+                             :in [user-id]}
+                        user-id)
+
           authz (when (not= method :options)
                   (pdp/authorization db request-context))
 
           req (cond-> req
                 true (assoc ::pass/request-context request-context)
                 authz (assoc ::pass/authorization authz)
+                roles (assoc ::pass/roles roles)
                 ;; If the max-content-length has been modified, update that in the
                 ;; resource
                 (::http/max-content-length authz)
