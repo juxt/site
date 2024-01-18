@@ -6,8 +6,8 @@
    [amazonica.aws.sns :as sns]
    [integrant.core :as ig]
    [juxt.site.alpha.triggers :as triggers]
-   [crux.api :as x]
-   [crux.query :as cruxq]
+   [xtdb.api :as xt]
+   [xtdb.query :as xtq]
    [clojure.tools.logging :as log]
    [clojure.string :as str]))
 
@@ -78,8 +78,8 @@
 (defmethod triggers/run-action! ::mail/send-emails
   [{::site/keys [db ses-client]} {:keys [trigger action-data]}]
   (let [{::mail/keys [html-template text-template from subject]} trigger
-        html-template (some-> (x/entity db html-template) ::http/content)
-        text-template (some-> (x/entity db text-template) ::http/content)]
+        html-template (some-> (xt/entity db html-template) ::http/content)
+        text-template (some-> (xt/entity db text-template) ::http/content)]
     (assert html-template)
     (assert text-template)
     (doseq [{:keys [user] :as data} action-data]
@@ -93,7 +93,7 @@
 (defmethod triggers/run-action! ::mail/send-sms
   [{::site/keys [db sns-client]} {:keys [trigger action-data]}]
   (let [{::mail/keys [text-template from-sms-name subject]} trigger
-        text-template (some-> (x/entity db text-template) ::http/content)]
+        text-template (some-> (xt/entity db text-template) ::http/content)]
     (assert text-template)
     (doseq [{:keys [user] :as data} action-data]
       (when-let [phone-number (:phone-number user)]
@@ -103,13 +103,13 @@
          (mail-merge subject data)
          (mail-merge text-template data))))))
 
-(defmethod cruxq/aggregate 'sorted-string-list [_]
+(defmethod xtq/aggregate 'sorted-string-list [_]
   (fn
     ([] #{})
     ([acc] (str/join "&" (sort acc)))
     ([acc x] (conj acc x))))
 
-(defmethod cruxq/aggregate 'merge-with-flatten [_]
+(defmethod xtq/aggregate 'merge-with-flatten [_]
   (fn
     ([] nil)
     ([acc] acc)

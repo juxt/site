@@ -5,7 +5,7 @@
    [clojure.java.io :as io]
    [clojure.pprint :refer [pprint]]
    [clojure.walk :refer [postwalk]]
-   [crux.api :as x]
+   [xtdb.api :as xt]
    [hiccup.page :as hp]
    [json-html.core :refer [edn->html]]
    [jsonista.core :as json]
@@ -55,9 +55,9 @@
   (let [param-defs
         (get-in resource [::apex/operation "parameters"])
 
-        db (x/with-tx db [[:crux.tx/put
+        db (xt/with-tx db [[:xtdb.api/put
                            (-> subject
-                               (assoc :crux.db/id :subject)
+                               (assoc :xt/id :subject)
                                util/->freezeable)]])
 
         query-params (when-let [query-param-defs
@@ -82,14 +82,14 @@
         resource-state
         (or
          (when query
-           (cond->> (x/q db query)
+           (cond->> (xt/q db query)
              extract-first-projection? (map first)
              extract-entry (map #(get % extract-entry))
              singular-result? first))
 
          ;; The resource-state is the entity, if found. TODO: Might want to
          ;; filter out the http metadata?
-         (x/entity db uri)
+         (xt/entity db uri)
 
          ;; No resource-state, so there can be no representations, so 404.
          (throw
@@ -124,7 +124,7 @@
 
             (= (get config "type") "table")
             (if (seq resource-state)
-              (let [fields (distinct (concat [:crux.db/id]
+              (let [fields (distinct (concat [:xt/id]
                                              (keys (first resource-state))))]
                 [:table {:style "border: 1px solid #888; border-collapse: collapse;"}
                  [:thead
@@ -146,7 +146,7 @@
               [:p "No results"])
 
             :else
-            (let [fields (distinct (concat [:crux.db/id] (keys resource-state)))]
+            (let [fields (distinct (concat [:xt/id] (keys resource-state)))]
               [:dl
                (for [field fields
                      :let [val (get resource-state field)]]

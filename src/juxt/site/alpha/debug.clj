@@ -3,7 +3,7 @@
 (ns juxt.site.alpha.debug
   (:require
    [jsonista.core :as json]
-   [crux.api :as x]))
+   [xtdb.api :as xt]))
 
 (alias 'apex (create-ns 'juxt.apex.alpha))
 (alias 'http (create-ns 'juxt.http.alpha))
@@ -38,7 +38,7 @@
 
 (defn html-representation-of-request [{::site/keys [db base-uri]} request-to-show]
   (let [template (str base-uri "/_site/templates/debug-request.html")]
-    (when (x/entity db template)
+    (when (xt/entity db template)
       ;; Do we see a template?
       {::http/content-type "text/html;charset=utf-8"
        ;; Hmm. This should really be the more recent of the request-object AND template rendering it

@@ -44,7 +44,7 @@ need to begin adding your own resources.
 Choose a strong password for your webmaster user, and call `init-db`.
 
 ----
-dev=> (init-db! (crux-node) <password>)
+dev=> (init-db! (xtdb-node) <password>)
 ----
 
 Now browse at https://localhost:2021 and login as webmaster.

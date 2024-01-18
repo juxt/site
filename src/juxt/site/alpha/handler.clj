@@ -7,11 +7,9 @@
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [crux.api :as crux]
+   [xtdb.api :as xt]
    [crypto.password.bcrypt :as password]
    [juxt.apex.alpha.openapi :as openapi]
-   [juxt.dave.alpha :as dave]
-   [juxt.dave.alpha.methods :as dave.methods]
    [juxt.jinx.alpha.vocabularies.transformation :refer [transform-value]]
    [juxt.pass.alpha.authentication :as authn]
    [juxt.pass.alpha.session :as session]
@@ -398,12 +396,12 @@
 (defn put-static-resource
   "PUT a new representation of the target resource. All other representations are
   replaced."
-  [{::site/keys [uri db received-representation start-date crux-node base-uri] :as req}]
-  (let [existing? (crux/entity db uri)
+  [{::site/keys [uri db received-representation start-date xtdb-node base-uri] :as req}]
+  (let [existing? (xt/entity db uri)
         classification (get-in req [:ring.request/headers "site-classification"])
         new-rep (merge
                  (cond->
-                  {:crux.db/id uri
+                  {:xt/id uri
                    ::site/type "StaticRepresentation"
                    ::http/methods #{:get :head :options :put :patch}
                    ::http/etag (etag received-representation)
@@ -412,15 +410,15 @@
                  received-representation)]
 
     ;; Currently we cannot tell whether a submitted tx has been successful,
-    ;; see https://github.com/juxt/crux/issues/1480. As a workaround, we do
+    ;; see https://github.com/juxt/xt/issues/1480. As a workaround, we do
     ;; the conditional checks here. In the future, we'll call into separate
     ;; tx fns.
     (evaluate-preconditions! req)
 
-    (->> (crux/submit-tx
-          crux-node
-          [[:crux.tx/put new-rep]])
-         (crux/await-tx crux-node))
+    (->> (xt/submit-tx
+          xtdb-node
+          [[:xtdb.api/put new-rep]])
+         (xt/await-tx xtdb-node))
 
     (into req {:ring.response/status (if existing? 204 201)})))
 
@@ -448,11 +446,11 @@
    (static-resources uri req)
 
    ;; We call OpenAPI location here, because a resource can be defined in
-   ;; OpenAPI, and exits in Crux, simultaneously.
+   ;; OpenAPI, and exits in XTDB, simultaneously.
    (openapi/locate-resource db uri req)
 
-   ;; Is it in Crux?
-   (when-let [r (crux/entity db uri)]
+   ;; Is it in XTDB?
+   (when-let [r (xt/entity db uri)]
      (cond-> (assoc r ::site/resource-provider ::db)
        (= (get r ::site/type) "StaticRepresentation")
        (assoc ::site/put-fn put-static-resource
@@ -463,7 +461,7 @@
 
    ;; Is it a redirect?
    (when-let [[r loc] (first
-                       (crux/q db '{:find [r loc]
+                       (xt/q db '{:find [r loc]
                                     :where [[r ::site/resource uri]
                                             [r ::site/location loc]
                                             [r ::site/type "Redirect"]]
@@ -504,7 +502,7 @@
   representation metadata. This function takes a representation and merges in
   its template's metadata, if necessary."
   [db representation]
-  (if-let [template (some->> representation ::site/template (crux/entity db))]
+  (if-let [template (some->> representation ::site/template (xt/entity db))]
     (merge
      (select-keys template [::http/content-type ::http/content-encoding ::http/content-language])
      representation)
@@ -512,14 +510,14 @@
 
 (defn find-variants [{::site/keys [resource uri db] :as req}]
 
-  (let [variants (crux/q db '{:find [r]
+  (let [variants (xt/q db '{:find [r]
                               :where [[v ::site/type "Variant"]
                                       [v ::site/resource uri]
                                       [v ::site/variant r]]
                               :in [uri]} uri)]
     (when (pos? (count variants))
       (cond-> (for [[v] variants
-                    :let [rep (crux/entity db v)]
+                    :let [rep (xt/entity db v)]
                     :when rep]
                 (assoc rep ::http/content-location v))
         (or (::http/content-type resource) (::site/template resource))
@@ -527,7 +525,7 @@
 
 (defn current-representations [{::site/keys [resource uri db] :as req}]
   (->> (or
-        ;; This is not common in the Crux DB, but allows 'dynamic' resources to
+        ;; This is not common in the XTDB DB, but allows 'dynamic' resources to
         ;; declare multiple representations.
         (::http/representations resource)
 
@@ -546,7 +544,7 @@
 
 (defn add-payload [{::site/keys [selected-representation db] :as req}]
   (let [{::http/keys [body content] ::site/keys [get-fn body-fn]} selected-representation
-        template (some->> selected-representation ::site/template (crux/entity db))]
+        template (some->> selected-representation ::site/template (xt/entity db))]
     (cond
       get-fn
       (if-let [f (cond-> get-fn (symbol? get-fn) requiring-resolve)]
@@ -584,34 +582,34 @@
           (assoc :ring.response/status 200)
           (add-payload)))))
 
-(defn post-variant [{::site/keys [crux-node db uri]
+(defn post-variant [{::site/keys [xtdb-node db uri]
                      ::apex/keys [request-instance]
                      :as req}]
   (let [location
         (str uri (hash (select-keys request-instance [::site/resource ::site/variant])))
-        existing (crux/entity db location)]
+        existing (xt/entity db location)]
 
-    (->> (crux/submit-tx
-          crux-node
-          [[:crux.tx/put (merge {:crux.db/id location} request-instance)]])
-         (crux/await-tx crux-node))
+    (->> (xt/submit-tx
+          xtdb-node
+          [[:xtdb.api/put (merge {:xt/id location} request-instance)]])
+         (xt/await-tx xtdb-node))
 
     (into req {:ring.response/status (if existing 204 201)
                :ring.response/headers {"location" location}})))
 
-(defn post-redirect [{::site/keys [crux-node db]
+(defn post-redirect [{::site/keys [xtdb-node db]
                       :as req}]
   (let [resource-state (openapi/received-body->resource-state req)
         {::site/keys [resource]} resource-state
-        existing (crux/entity db resource)]
-    (->> (crux/submit-tx
-          crux-node
-          [[:crux.tx/put
+        existing (xt/entity db resource)]
+    (->> (xt/submit-tx
+          xtdb-node
+          [[:xtdb.api/put
             (merge
-             {:crux.db/id resource}
-             ;; ::site/resource = :crux.db/id, no need to duplicate
+             {:xt/id resource}
+             ;; ::site/resource = :xt/id, no need to duplicate
              (dissoc resource-state ::site/resource))]])
-         (crux/await-tx crux-node))
+         (xt/await-tx xtdb-node))
 
     (into req {:ring.response/status (if existing 204 201)})))
 
@@ -662,8 +660,8 @@
                 (into req
                       {:ring.response/status 500}))))))
 
-(defn DELETE [{::site/keys [crux-node uri] :as req}]
-  (crux/await-tx crux-node (crux/submit-tx crux-node [[:crux.tx/delete uri]]))
+(defn DELETE [{::site/keys [xtdb-node uri] :as req}]
+  (xt/await-tx xtdb-node (xt/submit-tx xtdb-node [[:xtdb.api/delete uri]]))
   (into req {:ring.response/status 204}))
 
 (defn OPTIONS [{::site/keys [resource allowed-methods] :as req}]
@@ -707,23 +705,6 @@
            access-control-allow-methods (assoc "access-control-allow-methods" (join-keywords access-control-allow-methods true))
            access-control-allow-headers (assoc "access-control-allow-headers" (join-keywords access-control-allow-headers false))
            access-control-allow-credentials (assoc "access-control-allow-credentials" access-control-allow-credentials)))))))
-
-(defn PROPFIND [req]
-  (dave.methods/propfind req))
-
-(defn MKCOL [{::site/keys [crux-node uri]}]
-  (let [tx (crux/submit-tx
-            crux-node
-            [[:crux.tx/put
-              {:crux.db/id uri
-               ::dave/resource-type :collection
-               ::http/methods #{:get :head :options :propfind}
-               ::http/content-type "text/html;charset=utf-8"
-               ::http/content "<h1>Index</h1>\r\n"
-               ::http/options {"DAV" "1"}}]])]
-    (crux/await-tx crux-node tx))
-  {:ring.response/status 201
-   :ring.response/headers {}})
 
 (defmethod transform-value "password" [_ instance]
   (password/encrypt instance 11))
@@ -864,21 +845,19 @@
          :put (PUT req)
          :patch (PATCH req)
          :delete (DELETE req)
-         :options (OPTIONS req)
-         :propfind (PROPFIND req)
-         :mkcol (MKCOL req)))))
+         :options (OPTIONS req)))))
 
 (defn wrap-triggers [h]
   ;; Site-specific step: Check for any observers and 'run' them TODO:
   ;; Perhaps effects need to run against happy and sad paths - i.e. errors
   ;; - this should really be in a 'finally' block.
-  (fn [{::site/keys [crux-node base-uri] ::pass/keys [subject] :as req}]
+  (fn [{::site/keys [xtdb-node base-uri] ::pass/keys [subject] :as req}]
 
-    (let [db (crux/db crux-node) ; latest post-method db
+    (let [db (xt/db xtdb-node) ; latest post-method db
           result (h req)
 
           triggers
-          (->> (crux/q db '{:find [rule]
+          (->> (xt/q db '{:find [rule]
                             :where [[rule ::site/type "Trigger"]]})
                (map first)
                (filter #(str/starts-with? % base-uri)))
@@ -898,8 +877,8 @@
            'environment {}}]
 
       (try
-        ;; TODO: Can we use the new refreshed db here to save another call to x/db?
-        (let [actions (rules/eval-triggers (crux/db crux-node) triggers request-context)]
+        ;; TODO: Can we use the new refreshed db here to save another call to xt/db?
+        (let [actions (rules/eval-triggers (xt/db xtdb-node) triggers request-context)]
           (log/tracef "Triggered actions are %s" (pr-str actions))
           (doseq [action actions]
             (log/tracef "Running action: %s" (get-in action [:trigger ::site/action]))
@@ -961,10 +940,10 @@
 
 (defn ->storable [{::site/keys [request-id db] :as req}]
   (-> req
-      (into (select-keys db [:crux.db/valid-time :crux.tx/tx-id]))
-      (assoc :crux.db/id request-id ::site/type "Request")
+      (into (select-keys db [:xtdb.api/valid-time :xtdb.api/tx-id]))
+      (assoc :xt/id request-id ::site/type "Request")
       redact
-      (dissoc ::site/crux-node ::site/db :ring.request/body)
+      (dissoc ::site/xtdb-node ::site/db :ring.request/body)
       (util/deep-replace
        (fn [form]
          (cond-> form
@@ -1083,7 +1062,7 @@
   variables to determine the resource to use."
   [{::site/keys [db]} status]
   (ffirst
-   (crux/q db '{:find [(pull er [*])]
+   (xt/q db '{:find [(pull er [*])]
                 :where [[er ::site/type "ErrorResource"]
                         [er :ring.response/status status]]
                 :in [status]} status)))
@@ -1143,7 +1122,7 @@
                   (current-representations
                    (assoc req
                           ::site/resource error-resource
-                          ::site/uri (:crux.db/id error-resource))))
+                          ::site/uri (:xt/id error-resource))))
 
                 _ (log/tracef "error-representations: %s" (pr-str error-representations))
 
@@ -1241,11 +1220,11 @@
 
 (defn wrap-initialize-request
   "Initialize request state."
-  [h {::site/keys [crux-node base-uri uri-prefix] :as opts}]
-  (assert crux-node)
+  [h {::site/keys [xtdb-node base-uri uri-prefix] :as opts}]
+  (assert xtdb-node)
   (assert base-uri)
   (fn [{:ring.request/keys [scheme] :as req}]
-    (let [db (crux/db crux-node)
+    (let [db (xt/db xtdb-node)
           req-id (new-request-id base-uri)
           scheme+authority
           (or uri-prefix

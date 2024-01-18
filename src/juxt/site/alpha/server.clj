@@ -8,7 +8,7 @@
 
 (alias 'site (create-ns 'juxt.site.alpha))
 
-(defmethod ig/init-key ::server [_ {::site/keys [crux-node port base-uri dynamic?] :as opts}]
+(defmethod ig/init-key ::server [_ {::site/keys [xtdb-node port base-uri dynamic?] :as opts}]
   (run-jetty
    ;; Dynamic mode helps in development where performance is less critical than
    ;; development speed. Dynamic mode allows functions to be re-evaled.
