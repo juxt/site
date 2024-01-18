@@ -792,12 +792,12 @@
 
           user-id (:juxt.pass.alpha/user subject)
 
-          roles (crux/q db '{:find [role]
-                             :where [[role-mapping :juxt.site.alpha/type "UserRoleMapping"]
-                                     [role-mapping :juxt.pass.alpha/assignee user-id]
-                                     [role-mapping :juxt.pass.alpha/role role]]
-                             :in [user-id]}
-                        user-id)
+          roles (xt/q db '{:find [role]
+                           :where [[role-mapping :juxt.site.alpha/type "UserRoleMapping"]
+                                   [role-mapping :juxt.pass.alpha/assignee user-id]
+                                   [role-mapping :juxt.pass.alpha/role role]]
+                           :in [user-id]}
+                      user-id)
 
           authz (when (not= method :options)
                   (pdp/authorization db request-context))
