@@ -698,7 +698,7 @@
 
 (deftest health-check-test
   (submit-and-await!
-    [[:crux.tx/put access-all-areas]])
+    [[:xtdb.api/put access-all-areas]])
   (let [req {:ring.request/method :get
              :ring.request/headers {"content-type" "application/json"}
              :ring.request/path "/_site/healthcheck"}]

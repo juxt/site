@@ -32,7 +32,7 @@ dev=> (go)
 You should get something similar to the following:
 
 ----
-Starting Crux node
+Starting XTDB node
 [Edge] Now make code changes, then enter (reset) here
 :initiated
 ----

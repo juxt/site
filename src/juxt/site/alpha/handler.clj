@@ -1194,7 +1194,7 @@
 
 (defn normalize-path
   "Normalize path prior to constructing URL used for resource lookup. This is to
-  avoid two equivalent URLs pointing to two different Crux entities."
+  avoid two equivalent URLs pointing to two different XTDB entities."
   [path]
   (cond
     (str/blank? path) "/"
@@ -1303,20 +1303,20 @@
 
 (defn xtdb-tx-lag [xt-node]
   (assert xt-node)
-  (let [tx-id (fn [tx] (get tx :crux.tx/tx-id 0))
-        latest-submitted-tx (tx-id (crux/latest-submitted-tx xt-node))
-        latest-completed-tx (tx-id (crux/latest-completed-tx xt-node))]
+  (let [tx-id (fn [tx] (get tx :xtdb.api/tx-id 0))
+        latest-submitted-tx (tx-id (xt/latest-submitted-tx xt-node))
+        latest-completed-tx (tx-id (xt/latest-completed-tx xt-node))]
     (log/infof "healthcheck lag: latest-submitted-tx: %s latest-completed-tx: %s" latest-submitted-tx latest-completed-tx)
     (- latest-submitted-tx latest-completed-tx)))
 
 (defn wrap-healthcheck
   [h]
-  (fn [{::site/keys [crux-node xtdb-tx-lag-threshold check-xtdb-tx-lag-in-health-check]
+  (fn [{::site/keys [xtdb-node xtdb-tx-lag-threshold check-xtdb-tx-lag-in-health-check]
         :ring.request/keys [path]
         :as req}]
     (if (= "/_site/healthcheck" path)
       (if (and check-xtdb-tx-lag-in-health-check
-               (> (xtdb-tx-lag crux-node) xtdb-tx-lag-threshold))
+               (> (xtdb-tx-lag xtdb-node) xtdb-tx-lag-threshold))
         {:ring.response/status 503 :ring.response/body (format "XTDB lag > %d\r\n" xtdb-tx-lag-threshold)}
         {:ring.response/status 200 :ring.response/body "Site OK!\r\n"})
       (h req))))

@@ -72,7 +72,7 @@
 (defmethod received-body->resource-state :default [req]
   ;; Regardless of whether the OpenAPI declares it can read the content-type, we
   ;; can't process it. TODO: Should have some way of passing it 'raw' to some
-  ;; processing function that is able to turn it into resource state (a Crux
+  ;; processing function that is able to turn it into resource state (a XTDB
   ;; resource)?
   (throw
    (ex-info
@@ -169,8 +169,8 @@
     instance))
 
 (defn put-resource-state
-  "Put some new resource state into Crux, if authorization checks pass. The new
-  resource state should be a valid Crux entity, with a :xt/id"
+  "Put some new resource state into XTDB, if authorization checks pass. The new
+  resource state should be a valid XTDB entity, with a :xt/id"
   [{::site/keys [received-representation start-date resource db xtdb-node]
     ::pass/keys [subject]
     :as req}
@@ -364,7 +364,7 @@
                ::site/access-control-allow-credentials true}}
 
              ;; TODO: Merge in any properties of a resource that is in
-             ;; Crux - e.g. if this resource is a collection, what type
+             ;; XTDB - e.g. if this resource is a collection, what type
              ;; of collection is it? Some properties that can be used in
              ;; the PDP.
              }]
