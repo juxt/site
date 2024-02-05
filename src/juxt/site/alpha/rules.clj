@@ -63,6 +63,11 @@
         ]
     (filter ::pass/matched? evaluated-rules)))
 
+(defn bisect-query [q]
+  (->> (range 3 (inc (count (:where q))))
+       (map #(update q :where (fn [clauses]
+                                (take % clauses))))))
+
 (defn eval-triggers [db triggers request-context]
   (let [temp-id-map (reduce-kv
                      ;; Preserve any existing xt/id - e.g. the resource will have one
@@ -187,7 +192,7 @@
                                                 (catch Exception e
                                                   e)))
 
-                                 (log/error "Failed trigger data 3:"
+                                 (log/info "Failed trigger data 3:"
                                             (try (apply xt/q db
                                                         (merge
                                                           '{:find [(pull sr [*])]
@@ -206,6 +211,96 @@
                                                         (map :xt/id (vals temp-id-map)))
                                                  (catch Exception e
                                                    e)))
+
+                                 (log/info "Failed trigger data 4:"
+                                           (try (apply xt/q db
+                                                       (merge
+                                                         '{:find [(pull sr [*])]
+                                                           :where [[request :ring.request/method :put]
+                                                                   [request :juxt.site.alpha/uri sr]
+                                                                   [sr :juxt.site.alpha/type "PileStageReport"]
+                                                                   [sr :edited-by edited-by]
+                                                                   [sr :stages stages]
+                                                                   [sr :wells wells]
+                                                                   [sr :buckets buckets]
+                                                                   ; Total - tons and lbs
+                                                                   [sr :total-tons total-tons]
+                                                                   [(clojure.edn/read-string total-tons) total-tons-float]
+                                                                   [(int total-tons-float) total-tons-int]
+                                                                   [(- total-tons-float total-tons-int) total-tons-dec]
+                                                                   [(clojure.pprint/cl-format nil "~:d~0,2f" total-tons-int total-tons-dec) total-tons-fmt]
+                                                                   [(* total-tons-int 2000) total-lbs-float]
+                                                                   [(int total-lbs-float) total-lbs-int]
+                                                                   [(clojure.pprint/cl-format nil "~:d" total-lbs-int) total-lbs-fmt]
+                                                                   ; Belt scale - tons and lbs
+                                                                   [sr :belt-scale belt-scale-lbs]
+                                                                   [(clojure.edn/read-string belt-scale-lbs) belt-scale-lbs-float]
+                                                                   [(int belt-scale-lbs-float) belt-scale-lbs-int]
+                                                                   [(clojure.pprint/cl-format nil "~:d" belt-scale-lbs-int) belt-scale-lbs-fmt]
+                                                                   [(/ belt-scale-lbs-float 2000) belt-scale-tons-float]
+                                                                   [(int belt-scale-tons-float) belt-scale-tons-int]
+                                                                   [(- belt-scale-tons-float belt-scale-tons-int) belt-scale-tons-dec]
+                                                                   [(clojure.pprint/cl-format nil "~:d~0,2f" belt-scale-tons-int belt-scale-tons-dec) belt-scale-tons-fmt]
+                                                                   ; Start - tons
+                                                                   [sr :start-tons start-tons]
+                                                                   [(clojure.edn/read-string start-tons) start-tons-float]
+                                                                   [(int start-tons-float) start-tons-int]
+                                                                   [(clojure.pprint/cl-format nil "~:d" start-tons-int) start-tons-fmt]
+                                                                   ; End - tons
+                                                                   [sr :end-tons end-tons]
+                                                                   [(clojure.edn/read-string end-tons) end-tons-float]
+                                                                   [(int end-tons-float) end-tons-int]
+                                                                   [(clojure.pprint/cl-format nil "~:d" end-tons-int) end-tons-fmt]
+                                                                   [sr :pad pad]
+                                                                   [pad :juxt.site.alpha/type "Pad"]
+                                                                   [pad :name pad-name]
+                                                                   [pad :stages pad-stages]
+                                                                   [(get pad-stages "end-stage") pad-end-stages]
+                                                                   [pad :contact-list cl]
+                                                                   [cl :juxt.site.alpha/type "ContactList"]
+                                                                   [cl :contacts contacts]
+                                                                   [(get contacts "email") emails]
+                                                                   [(assoc nil :email emails) nested-emails]]}
+                                                         {:in (vec (keys temp-id-map))})
+                                                       (map :xt/id (vals temp-id-map)))
+                                                (catch Exception e
+                                                  e)))
+
+                                 (log/info "Failed trigger data 5:"
+                                           (try (apply xt/q db
+                                                       (merge
+                                                         '{:find [(pull sr [*])]
+                                                           :where [[request :ring.request/method :put]
+                                                                   [request :juxt.site.alpha/uri sr]
+                                                                   [sr :juxt.site.alpha/type "PileStageReport"]
+                                                                   [sr :edited-by edited-by]
+                                                                   [sr :stages stages]
+                                                                   [sr :wells wells]
+                                                                   [sr :buckets buckets]
+                                                                   ; Total - tons and lbs
+                                                                   [sr :total-tons total-tons]
+                                                                   [(clojure.edn/read-string total-tons) total-tons-float]
+                                                                   [(int total-tons-float) total-tons-int]
+                                                                   [(- total-tons-float total-tons-int) total-tons-dec]
+                                                                   [(clojure.pprint/cl-format nil "~:d~0,2f" total-tons-int total-tons-dec) total-tons-fmt]
+                                                                   [(* total-tons-int 2000) total-lbs-float]
+                                                                   [(int total-lbs-float) total-lbs-int]
+                                                                   ]}
+                                                         {:in (vec (keys temp-id-map))})
+                                                       (map :xt/id (vals temp-id-map)))
+                                                (catch Exception e
+                                                  e)))
+
+                                 (try
+                                   (doseq [query-part (bisect-query q)]
+                                     (try (apply xt/q db query-part
+                                                 (map :xt/id (vals temp-id-map)))
+                                          (catch Exception e
+                                            (log/error "Failed trigger query part"
+                                                       {:query-part query-part
+                                                        :e e}))))
+                                   (catch Exception ex
+                                     (log/error "Bisecting failed" ex)))
                                  (throw e)))]
           (when (seq action-data)
             {:trigger trigger
