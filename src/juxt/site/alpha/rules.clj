@@ -78,14 +78,47 @@
         (let [trigger (xt/entity db trigger-id)
               q (merge (::site/query trigger)
                        {:in (vec (keys temp-id-map))})
-              _ (def trigger-q q)
-              _ (def trigger-q-args (map :xt/id (vals temp-id-map)))
-              _ (def my-trigger trigger)
-              _ (log/info "Trigger query:" {:q q
-                                            :q-args (map :xt/id (vals temp-id-map))
-                                            :trigger trigger})
-              _ (log/info "Trigger request-context:" request-context)
-              action-data (apply xt/q db q (map :xt/id (vals temp-id-map)))]
+              action-data (try (apply xt/q db q (map :xt/id (vals temp-id-map)))
+                               (catch Exception e
+                                 (log/error "Failed trigger" e)
+                                 (log/info "Failed trigger query:" {:q q
+                                                                    :q-args (map :xt/id (vals temp-id-map))
+                                                                    :trigger trigger})
+                                 (log/info "Failed trigger request-context:" request-context)
+                                 (log/info "Failed trigger data:"
+                                           {:stage-report-creation
+                                            (apply xt/q db
+                                                   '{:find [(pull sr [*])]
+                                                     :where [[request :ring.request/method :put]
+                                                             [request :juxt.site.alpha/uri sr]
+                                                             [sr :juxt.site.alpha/type "PileStageReport"]
+                                                             (not [sr :edited-by])
+                                                             [sr :stages stages]
+                                                             [sr :wells wells]
+                                                             [sr :buckets buckets]
+                                                             ; Total - tons and lbs
+                                                             [sr :total-tons total-tons]
+                                                             [(clojure.edn/read-string total-tons) total-tons-float]
+                                                             #_[(int total-tons-float) total-tons-int]]
+                                                     :in (vec (keys temp-id-map))}
+                                                   (map :xt/id (vals temp-id-map)))
+                                            :stage-report-correction
+                                            (apply xt/q db
+                                                   '{:find [(pull sr [*])]
+                                                     :where [[request :ring.request/method :put]
+                                                             [request :juxt.site.alpha/uri sr]
+                                                             [sr :juxt.site.alpha/type "PileStageReport"]
+                                                             [sr :edited-by edited-by]
+                                                             [sr :stages stages]
+                                                             [sr :wells wells]
+                                                             [sr :buckets buckets]
+                                                             ; Total - tons and lbs
+                                                             [sr :total-tons total-tons]
+                                                             [(clojure.edn/read-string total-tons) total-tons-float]
+                                                             #_[(int total-tons-float) total-tons-int]]
+                                                     :in (vec (keys temp-id-map))}
+                                                   (map :xt/id (vals temp-id-map)))})
+                                 (throw e)))]
           (when (seq action-data)
             {:trigger trigger
              :action-data action-data})))
