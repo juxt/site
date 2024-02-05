@@ -66,7 +66,7 @@
 (defn bisect-query [q]
   (->> (range 3 (inc (count (:where q))))
        (map #(update q :where (fn [clauses]
-                                (take % clauses))))))
+                                (vec (take % clauses)))))))
 
 (defn eval-triggers [db triggers request-context]
   (let [temp-id-map (reduce-kv
