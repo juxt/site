@@ -78,6 +78,13 @@
         (let [trigger (xt/entity db trigger-id)
               q (merge (::site/query trigger)
                        {:in (vec (keys temp-id-map))})
+              _ (def trigger-q q)
+              _ (def trigger-q-args (map :xt/id (vals temp-id-map)))
+              _ (def my-trigger trigger)
+              _ (log/info "Trigger query:" {:q q
+                                            :q-args (map :xt/id (vals temp-id-map))
+                                            :trigger trigger})
+              _ (log/info "Trigger request-context:" request-context)
               action-data (apply xt/q db q (map :xt/id (vals temp-id-map)))]
           (when (seq action-data)
             {:trigger trigger
