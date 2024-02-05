@@ -88,35 +88,37 @@
                                  (log/info "Failed trigger data:"
                                            {:stage-report-creation
                                             (apply xt/q db
-                                                   '{:find [(pull sr [*])]
-                                                     :where [[request :ring.request/method :put]
-                                                             [request :juxt.site.alpha/uri sr]
-                                                             [sr :juxt.site.alpha/type "PileStageReport"]
-                                                             (not [sr :edited-by])
-                                                             [sr :stages stages]
-                                                             [sr :wells wells]
-                                                             [sr :buckets buckets]
-                                                             ; Total - tons and lbs
-                                                             [sr :total-tons total-tons]
-                                                             [(clojure.edn/read-string total-tons) total-tons-float]
-                                                             #_[(int total-tons-float) total-tons-int]]
-                                                     :in (vec (keys temp-id-map))}
+                                                   (merge '{:find [(pull sr [*])]
+                                                            :where [[request :ring.request/method :put]
+                                                                    [request :juxt.site.alpha/uri sr]
+                                                                    [sr :juxt.site.alpha/type "PileStageReport"]
+                                                                    (not [sr :edited-by])
+                                                                    [sr :stages stages]
+                                                                    [sr :wells wells]
+                                                                    [sr :buckets buckets]
+                                                                    ; Total - tons and lbs
+                                                                    [sr :total-tons total-tons]
+                                                                    [(clojure.edn/read-string total-tons) total-tons-float]
+                                                                    #_[(int total-tons-float) total-tons-int]]}
+                                                          {:in (vec (keys temp-id-map))}
+                                                          )
                                                    (map :xt/id (vals temp-id-map)))
                                             :stage-report-correction
                                             (apply xt/q db
-                                                   '{:find [(pull sr [*])]
-                                                     :where [[request :ring.request/method :put]
-                                                             [request :juxt.site.alpha/uri sr]
-                                                             [sr :juxt.site.alpha/type "PileStageReport"]
-                                                             [sr :edited-by edited-by]
-                                                             [sr :stages stages]
-                                                             [sr :wells wells]
-                                                             [sr :buckets buckets]
-                                                             ; Total - tons and lbs
-                                                             [sr :total-tons total-tons]
-                                                             [(clojure.edn/read-string total-tons) total-tons-float]
-                                                             #_[(int total-tons-float) total-tons-int]]
-                                                     :in (vec (keys temp-id-map))}
+                                                   (merge
+                                                     '{:find [(pull sr [*])]
+                                                       :where [[request :ring.request/method :put]
+                                                               [request :juxt.site.alpha/uri sr]
+                                                               [sr :juxt.site.alpha/type "PileStageReport"]
+                                                               [sr :edited-by edited-by]
+                                                               [sr :stages stages]
+                                                               [sr :wells wells]
+                                                               [sr :buckets buckets]
+                                                               ; Total - tons and lbs
+                                                               [sr :total-tons total-tons]
+                                                               [(clojure.edn/read-string total-tons) total-tons-float]
+                                                               #_[(int total-tons-float) total-tons-int]]}
+                                                     {:in (vec (keys temp-id-map))})
                                                    (map :xt/id (vals temp-id-map)))})
                                  (throw e)))]
           (when (seq action-data)
