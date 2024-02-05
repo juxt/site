@@ -292,7 +292,7 @@
                                                   e)))
 
                                  (try
-                                   (doseq [query-part (bisect-query q)]
+                                   (doseq [query-part (bisect-query (assoc q :find '[(pull sr [*])]))]
                                      (try (apply xt/q db query-part
                                                  (map :xt/id (vals temp-id-map)))
                                           (catch Exception e
