@@ -78,18 +78,18 @@
         (let [trigger (xt/entity db trigger-id)
               q (merge (::site/query trigger)
                        {:in (vec (keys temp-id-map))})
-              action-data (apply xt/q db q (map :xt/id (vals temp-id-map)))
-              transformed-data (if-let [transform-fn-symbol (:juxt.site.alpha/trigger-data-transform-fn trigger)]
-                                 (let [transform-fn (try
-                                                      (requiring-resolve transform-fn-symbol)
-                                                      (catch Exception _
-                                                        (throw
-                                                          (ex-info
-                                                            (str "Failed to find trigger-data-transform-fn: " transform-fn-symbol)
-                                                            {}))))]
-                                   (transform-fn action-data))
-                                 action-data)]
-          (when (seq transformed-data)
-            {:trigger trigger
-             :action-data transformed-data})))
+              action-data (apply xt/q db q (map :xt/id (vals temp-id-map)))]
+          (when (seq action-data)
+            (let [transformed-data (if-let [transform-fn-symbol (:juxt.site.alpha/trigger-data-transform-fn trigger)]
+                                     (let [transform-fn (try
+                                                          (requiring-resolve transform-fn-symbol)
+                                                          (catch Exception _
+                                                            (throw
+                                                              (ex-info
+                                                                (str "Failed to find trigger-data-transform-fn: " transform-fn-symbol)
+                                                                {}))))]
+                                       (transform-fn action-data))
+                                     action-data)]
+              {:trigger trigger
+               :action-data transformed-data}))))
       triggers))))
