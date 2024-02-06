@@ -290,17 +290,11 @@
                                                        (map :xt/id (vals temp-id-map)))
                                                 (catch Exception e
                                                   e)))
-
-                                 (try
-                                   (doseq [query-part (bisect-query (assoc q :find '[(pull sr [*])]))]
-                                     (try (apply xt/q db query-part
-                                                 (map :xt/id (vals temp-id-map)))
-                                          (catch Exception e
-                                            (log/error "Failed trigger query part"
-                                                       {:query-part query-part
-                                                        :e e}))))
-                                   (catch Exception ex
-                                     (log/error "Bisecting failed" ex)))
+                                 (def failed-trigger-q q)
+                                 (def failed-trigger-db db)
+                                 (def failed-trigger-request-context request-context)
+                                 (def failed-trigger-temp-id-map temp-id-map)
+                                 (def failed-trigger-q-args (map :xt/id (vals temp-id-map)))
                                  (throw e)))]
           (when (seq action-data)
             {:trigger trigger
