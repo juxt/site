@@ -398,5 +398,5 @@
         (throw (ex-info "Failed to match user with claims" (:claims id-token)))))
     (catch Exception e
       (do
-        (log/warnf "Unsuccessful login: %s" e)
+        (log/warn "Unsuccessful login: " e)
         (redirect req 303 (get session ::pass/return-to "/"))))))
