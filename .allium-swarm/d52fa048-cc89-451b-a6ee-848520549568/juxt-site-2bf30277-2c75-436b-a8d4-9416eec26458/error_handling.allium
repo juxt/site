@@ -1,0 +1,411 @@
+spec juxt.site.error-handling
+  title "juxt-site error conditions and recovery"
+
+  ; Error handling architecture:
+  ; - Errors are thrown as ExceptionInfo with ::site/request-context
+  ; - wrap-error-handling middleware catches and converts to responses
+  ; - wrap-check-error-handling ensures no errors escape
+  ; - All errors logged with request ID for tracing
+
+  error InvalidHost
+    status 400
+    when Host header does not match RFC 7230 syntax
+    message "Illegal host format"
+    recovery
+      client must send valid Host header
+      server rejects request before processing
+
+  error MissingContentLength
+    status 411
+    when PUT/POST without Content-Length header
+    message "No Content-Length header found"
+    constraint "RFC 7231 Section 3.3.3 requires Content-Length for PUT/POST"
+    recovery
+      client must include Content-Length
+      server rejects before reading body
+
+  error BadContentLength
+    status 400
+    when Content-Length header is not a valid integer
+    message "Bad content length"
+    recovery
+      client retransmits with valid Content-Length
+
+  error PayloadTooLarge
+    status 413
+    when Content-Length > resource.http/max-content-length
+    message "Payload too large"
+    constraint "Resource enforces max-content-length (default 16MB)"
+    recovery
+      client reduces payload size
+      client may upload in chunks (not yet supported)
+
+  error MissingBody
+    status 400
+    when PUT/POST declares Content-Length but body is empty
+    message "No body in request"
+    recovery
+      client provides body matching Content-Length
+
+  error ContentTypeNotAcceptable
+    status 415
+    when request Content-Type not in resource.http/acceptable-on-{put,post}
+    message "The content-type of the request payload is not supported"
+    recovery
+      client uses acceptable content-type
+      server advertises acceptable types in error response
+
+  error CharsetMissing
+    status 415
+    when text/* Content-Type without charset parameter
+    message "Content-Type header in request is text type and must specify charset"
+    recovery
+      client adds charset parameter to Content-Type
+
+  error CharsetNotAcceptable
+    status 415
+    when charset not in resource-accepted charsets
+    message "The charset of the Content-Type header is not supported"
+    recovery
+      client uses acceptable charset
+
+  error ContentEncodingNotAcceptable
+    status 409
+    when Content-Encoding not accepted by resource
+    message "The content-encoding in the request is not supported"
+    recovery
+      client uses acceptable encoding
+
+  error ContentLanguageNotAcceptable
+    status 409
+    when Content-Language not accepted by resource
+    message "Content-Language in request is not supported"
+    recovery
+      client uses acceptable language
+
+  error ContentRangeNotAllowed
+    status 400
+    when Content-Range header present on PUT request
+    message "Content-Range header not allowed on a PUT request"
+    note "Partial updates via range not yet supported"
+    recovery
+      client sends full resource
+
+  error NotFound
+    status 404
+    when resource.xt/id not in database
+    when GET/HEAD with no representations
+    message "Not Found" or "The requested resource does not exist"
+    recovery
+      client verifies URI
+      client may list parent collection
+      server may provide list of similar URIs
+
+  error NotAcceptable
+    status 406
+    when no representation matches Accept* headers
+    message "Not Acceptable"
+    constraint "RFC 7231 Section 6.5.6"
+    recovery
+      client removes restrictive Accept headers
+      server advertises available representations in error response
+      (currently not implemented)
+
+  error PreconditionFailed
+    status 412
+    when If-Match header does not match any representation ETags
+    when If-None-Match header matches (for non-GET/HEAD)
+    when If-Unmodified-Since is before Last-Modified
+    message "Precondition failed" or "If-Match precondition failed"
+    constraint "RFC 7232 Sections 3.1, 3.2, 3.3"
+    recovery
+      client re-fetches resource with GET
+      client updates If-Match/If-None-Match with correct ETags
+      client re-sends request
+
+  error NotModified
+    status 304
+    when If-None-Match matches (for GET/HEAD)
+    when If-Modified-Since >= Last-Modified (for GET/HEAD)
+    message "Not Modified"
+    constraint "RFC 7232 Section 4.1"
+    recovery
+      client uses cached representation
+      server sends headers but no body
+
+  error Unauthorized
+    status 401
+    when authentication required but no credentials present
+    when credentials invalid
+    message "Unauthorized"
+    constraint "Resource has pass/classification != PUBLIC"
+    recovery
+      client provides credentials (user/password or token)
+      client may retry after authentication
+
+  error Forbidden
+    status 403
+    when authenticated but authorization rules deny access
+    message "Forbidden"
+    recovery
+      client may request access from resource owner
+      client may use different user account
+      server logs attempt for audit
+
+  error MethodNotAllowed
+    status 405
+    when request.method not in resource.http/methods
+    message "Method not allowed"
+    response-header Allow "Comma-separated list of allowed methods"
+    recovery
+      client uses allowed method
+      client discovers available methods via HEAD or OPTIONS
+
+  error MethodNotImplemented
+    status 501
+    when request.method not in #{:get :head :post :put :delete :options :patch :mkcol :propfind}
+    message "Method not implemented"
+    recovery
+      client uses standard HTTP method
+      server may add support for custom methods
+
+  error Redirect
+    status 302 or 307
+    when resource.site/type == "Redirect"
+    response-header Location "Target URI"
+    thrown-exception ex-info with status and location
+    recovery
+      client follows redirect (automatic in browsers)
+      client respects status: 302 (may change method), 307 (preserve method)
+
+  error BadRequest
+    status 400
+    when request format invalid (not URI, not headers, parsing error)
+    message "Bad Request" with context
+    examples
+      ; Malformed query string
+      ; Invalid header format
+      ; Missing required form parameter
+    recovery
+      client fixes request format
+      client may inspect error response for hints
+
+  error UnsupportedMediaType
+    status 415
+    when Content-Type not parseable
+    message "Unsupported Media Type"
+    recovery
+      client sends valid Content-Type header
+
+  error InternalServerError
+    status 500
+    when unexpected exception during processing
+    when post-fn/put-fn/template-fn throws uncaught exception
+    when rule evaluation throws exception
+    message "Internal Server Error" (with request-id)
+    logging
+      always log full exception with stack trace
+      include request details (redacted auth headers)
+      correlate via MDC["reqid"]
+    recovery
+      server admin investigates logs
+      client retries (may be transient)
+      client contacts server admin if persistent
+
+  error ServiceUnavailable
+    status 503
+    when service-available? returns false
+    response-header Retry-After "120 (seconds)"
+    message "Service Unavailable"
+    recovery
+      client retries after delay
+      client waits for server maintenance to complete
+
+  ; XTDB-related error conditions
+
+  error DatabaseNotAvailable
+    status 503
+    when xtdb-node.query() throws connection error
+    when xtdb-node.submit-tx() throws persistence error
+    cause "XTDB node crashed or network partition"
+    recovery
+      server supervisor restarts XTDB node
+      client retries after exponential backoff
+
+  error TransactionConflict
+    status 409
+    when XTDB rejects transaction due to conflict
+    cause "Concurrent modification of same entity"
+    note "XTDB uses optimistic locking"
+    recovery
+      client re-fetches resource with latest ETag
+      client recomputes changes
+      client retries with If-Match: new-etag
+
+  error QueryTimeout
+    status 504
+    when Datalog query execution exceeds timeout
+    cause "Complex rule evaluation or large dataset"
+    recovery
+      server admin tunes indexes or rules
+      client may simplify query or reduce dataset
+
+  ; Authorization-specific errors
+
+  error RuleEvaluationFailure
+    status 500
+    when rule.target contains invalid Datalog syntax
+    when rule evaluation throws exception
+    logging "Failed to evaluate rules: " + exception
+    recovery
+      admin fixes rule definition
+      request retried after rule updated
+
+  error MissingResourceInRule
+    status 500
+    when rule target references resource that doesn't exist
+    example "Rule references role 'superuser' but role not created"
+    recovery
+      admin creates missing role/resource
+      request retried
+
+  ; Content generation errors
+
+  error TemplateMissing
+    status 500
+    when selected-representation.site/template URI not found
+    message "Failed to find template resource"
+    logging "template-uri: {uri}"
+    recovery
+      admin creates template resource
+      or admin removes template reference
+
+  error TemplateRenderingFailed
+    status 500
+    when selmer/render throws exception
+    cause "Invalid template syntax, missing model keys, xt-loader failure"
+    logging "Template: {template-uri}, exception: ..."
+    recovery
+      admin fixes template syntax
+      admin ensures model provides all required keys
+
+  error GraphQLSchemaMissing
+    status 500
+    when resource.site/graphql-schema URI not found
+    recovery
+      admin creates GraphQL schema resource
+
+  error GraphQLParseError
+    status 400
+    when GraphQL query syntax is invalid
+    message GraphQL parser error with location
+    recovery
+      client fixes query syntax
+
+  error GraphQLValidationError
+    status 400
+    when GraphQL query fails schema validation
+    message Validation errors with field paths
+    recovery
+      client fixes query to conform to schema
+
+  ; Datalog query errors
+
+  error InvalidDatalogQuery
+    status 500
+    when query syntax invalid
+    when query references undefined rules
+    logging "Failed to parse/execute datalog: ..."
+    recovery
+      admin fixes query in rule or template-model
+
+  ; Session/authentication errors
+
+  error SessionExpired
+    status 401
+    when access-token in Authorization header has expired
+    procedure
+      sessions-by-access-token stores (token, session+expiry)
+      on each request, expire-sessions! removes expired entries
+      lookup-session returns nil for expired
+      → no subject, → 401
+    recovery
+      client re-authenticates with credentials
+      client obtains new access-token
+
+  error InvalidToken
+    status 401
+    when Authorization header Bearer token not found in sessions
+    recovery
+      client re-authenticates
+
+  ; Error response generation
+
+  interaction ErrorResponseConstruction
+    precedence
+      1. Try method-specific error rep (PUT/POST with error handlers)
+      2. Try load ErrorResource for status code
+      3. Default: text/html or text/plain
+
+    redaction-rules
+      ; Don't expose internal stack traces to untrusted clients
+      unknown-user: "Not Found"
+      known-user: "Internal Server Error" + request-id
+      ; Client can then fetch /_site/requests/{request-id} if authorized
+
+  interaction ErrorLogging
+    always-log
+      method, path, status >= 500
+      exception message
+      request-id (MDC)
+    debug-log (if enabled)
+      exception stack trace
+      request headers (except Authorization)
+      response status
+    audit-log
+      unauthorized/forbidden attempts
+      with subject identity
+
+  ; Recovery strategies
+
+  strategy ExponentialBackoff
+    use when transient errors (5xx, 503)
+    delay = 2^attempt * base-delay (1s)
+    max-attempts = 5
+    max-delay = 60s
+
+  strategy BreakingCircuit
+    use when resource persistently fails (e.g. XTDB down)
+    trigger = N consecutive 503 errors
+    effect = fast-fail with 503 without trying
+    recovery-check = periodic retry (e.g., every 10s)
+    note "Currently not implemented; could be added"
+
+  strategy GracefulDegradation
+    use when non-critical functionality fails
+    example = Trigger.run-action! throws → log but continue response
+    ensure = core request processing succeeds even if side effects fail
+
+  strategy Idempotency
+    ensure = repeated requests have same effect
+    mechanism = If-None-Match with ETag (client-side)
+    support = PUT/POST handlers must be idempotent
+
+  constraint ErrorsBoundedByWrap
+    description "All exceptions caught by wrap-check-error-handling"
+    behavior "If error escapes, throw to container (fatal)"
+    assumption "Jetty will format as 500 response"
+
+  constraint AuthenticationIsEarlyInteractive
+    description "Authentication errors throw early, before method invocation"
+    benefit "Prevents unnecessary processing on auth failures"
+
+  constraint AuthorizationIsLateConservative
+    description "Authorization checked after resource located but before invoke"
+    rationale "RFC 4918 Section 8.5 requires auth checks before conditionals"
+    effect "Conditionals (If-Match) evaluated before authorization"
+
+  constraint TriggersNeverBlockResponse
+    description "Trigger failures logged but don't fail the response"
+    behavior "Catch all exceptions from run-action!"
+    rationale "Side effects shouldn't affect client-facing behavior"

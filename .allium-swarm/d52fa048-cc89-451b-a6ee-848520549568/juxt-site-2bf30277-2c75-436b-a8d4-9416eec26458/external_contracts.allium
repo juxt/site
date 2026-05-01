@@ -1,0 +1,396 @@
+spec juxt.site.external-contracts
+  title "juxt-site expectations on external dependencies"
+
+  ; This spec describes the contracts that juxt-site expects from its dependencies.
+  ; Each dependency is treated as a black box; only the observable interface and contracts matter.
+
+  contract XTDB
+    description "Distributed temporal database (1.21.0)"
+    role "Persistent data store"
+
+    api-requirement start-node
+      input xtdb-config Map
+      output xt-node IXtdbNode
+      behavior "Creates database node with RocksDB backend"
+
+    api-requirement submit-tx
+      input xt-node, transaction Vector
+      output tx-result TxResult
+      behavior "Submits atomic transaction, returns immediately"
+      ; Example: [[:xtdb.api/put {:xt/id "uri" :attr value}]]
+      ; Returns map with tx-id, tx-time
+
+    api-requirement await-tx
+      input xt-node, tx-result
+      behavior "Blocks until transaction applied"
+      timeout "Undefined, may be seconds for normal workloads"
+
+    api-requirement db
+      input xt-node
+      output db-snapshot DbSnapshot
+      behavior "Returns point-in-time snapshot of database"
+      consistency "Snapshot is immutable; queries are linearizable"
+
+    api-requirement query
+      input db, query-map, args...
+      output results Set
+      behavior "Executes Datalog query synchronously"
+      ; Query format: {:find [...], :where [...], :in [...]}
+      ; Returns set of tuples matching :find projection
+      ; Throws on syntax error or timeout
+
+    api-requirement entity
+      input db, entity-id
+      output entity Map or nil
+      behavior "Retrieves full document by ID"
+
+    api-requirement with-tx
+      input db, transaction Vector
+      output new-db DbSnapshot
+      behavior "Speculatively applies transaction to snapshot, returns new snapshot"
+      semantics "For authorization rule evaluation (not persisted)"
+
+    api-requirement close
+      input xt-node
+      behavior "Cleanly shuts down node"
+
+    invariants
+      consistency "All transactions serializable"
+      durability "Committed transactions survive crashes"
+      temporal "Bitemporal versioning with valid-time and tx-time"
+
+    version "1.21.0"
+    note "Must have RocksDB backend for persistence"
+
+  contract Ring
+    description "HTTP abstraction layer (Ring 2.0 spec)"
+    role "HTTP request/response marshalling"
+
+    api-requirement ring-request-map
+      format
+        {
+          :request-method :get|:post|...,
+          :uri "/path",
+          :query-string "foo=bar",
+          :headers {"host" "example.com", ...},
+          :body InputStream,
+          :scheme :http|:https,
+          :server-name "example.com",
+          :server-port 80,
+          :remote-addr "1.2.3.4",
+          ...
+        }
+      behavior "Represents inbound HTTP request"
+
+    api-requirement ring-response-map
+      format
+        {
+          :status 200,
+          :headers {"content-type" "text/html", ...},
+          :body "content" | InputStream | File | ISeq
+        }
+      behavior "Represents outbound HTTP response"
+
+    contract ring-middleware
+      definition "fn handler -> fn request -> response"
+      composition "compose(mw1, mw2, mw3)(h) = mw1(mw2(mw3(h)))"
+      flow "request flows through composed middleware to handler, response flows back"
+
+    invariants
+      status "Must be integer 1xx-5xx"
+      headers "Must be map of string keys and values"
+      body "May be string, bytes, InputStream, or seq; may be nil"
+
+    adaptation-required
+      ring-1-vs-2 "Ring 1 uses :request-method, Ring 2 uses :ring.request/method"
+      note "juxt-site implements wrap-ring-1-adapter to convert"
+
+  contract Jetty
+    description "HTTP server (9.x via Ring)"
+    role "HTTP transport layer"
+
+    api-requirement run-jetty
+      input handler (fn request -> response)
+      input options {:port, :join?, ...}
+      output server JettyServer
+      behavior "Starts HTTP server, binds to port"
+      note "Managed via ring/ring-jetty-adapter"
+
+    api-requirement stop
+      input server
+      behavior "Gracefully shuts down server"
+
+    invariants
+      port "Must be available; throws if bound"
+      handler "Must be function accepting request, returning response"
+
+  contract Integrant
+    description "Component lifecycle management"
+    role "Dependency injection and system initialization"
+
+    api-requirement init-key
+      form "defmethod ig/init-key :component-key [_ options] ..."
+      behavior "Initialize component with given options"
+      returns "Component instance"
+
+    api-requirement halt-key!
+      form "defmethod ig/halt-key! :component-key [_ component] ..."
+      behavior "Clean up component resources"
+
+    api-requirement prep
+      input config Map
+      output prepped-config Map
+      behavior "Validates and prepares config for initialization"
+
+    api-requirement init
+      input config
+      output system Map
+      behavior "Initializes all components in dependency order"
+
+    api-requirement halt!
+      input system
+      behavior "Halts all components in reverse order"
+
+    contract integrant-ref
+      usage "#ig/ref :component-key"
+      behavior "Dependency reference resolved during init"
+
+    contract aero
+      usage "aero/read-config file {:profile :prod}"
+      behavior "Reads EDN config with environment substitution"
+      features "#env VAR, #join [...], #profile {:prod ... :dev ...}"
+
+  contract Ring Jetty Adapter
+    name "ring/ring-jetty-adapter 1.9.5"
+    provides "HTTP server via Jetty backed by Ring"
+
+    behavior
+      create-handler = fn [config] -> fn [request] -> response
+      request conversion: Ring 1.0 → internal format
+      response conversion: internal format → Ring 2.0
+      lifecycle: run-jetty manages server lifecycle
+
+  contract Selmer
+    description "Template engine (1.12.50)"
+    role "Dynamic content generation"
+
+    api-requirement parse
+      input template-string
+      output parsed-template
+      behavior "Parses template with {{ }} placeholders"
+
+    api-requirement render
+      input parsed-template, context Map, loader StreamHandler
+      output rendered-string
+      behavior "Evaluates template with context data"
+      loaders "Custom URLStreamHandler for resource resolution"
+
+    syntax
+      variables "{{ variable }}"
+      if-blocks "{% if condition %} ... {% endif %}"
+      for-loops "{% for item in items %} ... {% endfor %}"
+
+  contract juxt/pick
+    description "Content negotiation (git SHA)"
+    role "Representation selection from Accept* headers"
+
+    api-requirement pick
+      input request-map, representations, options
+      output result {:juxt.pick.alpha/representation, :juxt.pick.alpha/vary}
+      behavior "Selects best representation using quality values"
+
+    algorithm
+      q-values: Accept header media-type quality scores
+      weighted: multiply q-values for type, charset, encoding, language
+      select: highest score wins; 0.0 = rejected
+
+    invariants
+      qvalue-range "[0.0, 1.0]"
+      wildcard "*/* accepted when no specific match"
+
+  contract juxt/grab
+    description "GraphQL execution (git SHA)"
+    role "GraphQL schema validation and query execution"
+
+    api-requirement schema
+      input graphql-schema-text
+      output compiled-schema
+      behavior "Parses and compiles GraphQL schema"
+
+    api-requirement execute-request
+      input compiled-schema, query, variables
+      output result {:data {...}} | {:errors [...]}
+      behavior "Executes GraphQL query against data source"
+
+    note "juxt-site provides custom resolvers for Datalog queries"
+
+  contract cryptography/crypto-password
+    description "Password hashing (0.3.0)"
+    role "Bcrypt password storage"
+
+    api-requirement encrypt
+      input password String, cost Integer (default 11)
+      output hash String
+      behavior "One-way bcrypt hash"
+      deterministic false ; includes salt
+      time-cost "Exponential in cost parameter; cost=11 ≈ 100ms"
+
+    api-requirement check
+      input password, hash
+      output valid Boolean
+      behavior "Constant-time comparison"
+
+  contract java.util.Base64
+    description "Standard library"
+    role "URL-safe base64 encoding for tokens"
+
+    api-requirement getUrlEncoder
+      output encoder Base64$Encoder
+      behavior "URL-safe base64 (- and _ instead of + and /)"
+
+    api-requirement encodeToString
+      input bytes
+      output encoded-string
+      behavior "Encodes bytes to base64 string"
+
+  contract java.security.SecureRandom
+    description "Cryptographic random number generator"
+    role "Token generation"
+
+    api-requirement nextBytes
+      input byte[]
+      behavior "Fills array with cryptographically secure random bytes"
+
+  contract java.net.URI
+    description "URI parsing and normalization"
+    role "Request path normalization"
+
+    api-requirement constructor
+      input uri-string
+      output uri-object
+      behavior "Parses URI; throws if invalid"
+
+    api-requirement normalize
+      input uri-object
+      output normalized-uri
+      behavior "Removes dot-segments (. and ..)"
+      spec "RFC 3986 Section 6.2.2.3"
+
+  contract java.time
+    description "Temporal types (Date, Instant)"
+    role "Timestamp handling and HTTP date formatting"
+
+    api-requirement now
+      output current-instant Instant
+      behavior "Current system time"
+
+    api-requirement toInstant
+      input date Date
+      output instant Instant
+      behavior "Converts to Instant"
+
+    api-requirement toDate
+      input instant Instant
+      output date Date
+      behavior "Converts to Date"
+
+    api-requirement isAfter
+      input instant1, instant2
+      output boolean
+      behavior "Temporal comparison"
+
+  contract org.slf4j
+    description "Logging facade"
+    role "Structured logging with MDC"
+
+    api-requirement LoggerFactory.getLogger
+      input class-name
+      output logger Logger
+      behavior "Gets logger for namespace"
+
+    api-requirement logger.info, logger.debug, logger.error
+      input message, exception?
+      behavior "Logs at level"
+
+    api-requirement MDC.put, MDC.get, MDC.clear
+      input key String, value String
+      behavior "Thread-local context for log correlation"
+      use "MDC['reqid'] = request-id"
+
+  contract Clojure core
+    description "Clojure language runtime"
+    role "Execution environment"
+
+    api-requirement require, resolve
+      input symbol
+      output namespace/function
+      behavior "Dynamic code loading"
+      use "requiring-resolve 'ns/fn for runtime resolution"
+
+    api-requirement ex-info, ex-data
+      behavior "Exception construction and inspection"
+      use "Structured error information with Clojure maps"
+
+    api-requirement eval, list*
+      behavior "Code evaluation"
+      use "Safe-ish evaluation of datalog queries from db"
+      note "Datalog is evaluated by XTDB, not via eval()"
+
+  contract HTTP RFC compliance
+
+    rfc7230
+      requirement "Host header validation"
+      behavior "Must parse Host header per RFC 7230"
+
+    rfc7231
+      requirement "HTTP semantics"
+      behavior "GET, PUT, POST, DELETE semantics per spec"
+      behavior "Content-Type, Accept negotiation"
+
+    rfc7232
+      requirement "Conditional requests"
+      behavior "ETag strong/weak comparison"
+      behavior "If-Match, If-None-Match, If-Modified-Since"
+
+    rfc7233
+      requirement "Range requests"
+      behavior "NOT YET IMPLEMENTED; Content-Range rejected"
+
+    rfc3986
+      requirement "URI normalization"
+      behavior "Percent-encoding, dot-segment removal"
+      behavior "Case normalization (scheme, authority lowercase)"
+
+    rfc4918
+      requirement "WebDAV"
+      behavior "PROPFIND, MKCOL methods"
+      behavior "XML multi-status responses"
+
+    rfc5789
+      requirement "PATCH method"
+      behavior "Custom PATCH handlers"
+
+  contract Database Configuration
+
+    storage-backends
+      requirement "Configurable via EDN"
+      xtdb/rocksdb "Local persistent store"
+      behavior "Stores in ~/.local/share/site/db/"
+      behavior "Survives process restart"
+
+    query-language
+      behavior "Datalog as query language"
+      encoding "Encoded as Clojure data structures"
+      security "Patterns pre-generated, not user-provided"
+
+  assumption "All external libraries used correctly; no version conflicts"
+
+  assumption "Network is reliable for XTDB operations (not distributed consensus)"
+
+  assumption "Jetty binds to port successfully; port not in use"
+
+  assumption "XTDB RocksDB files accessible and not corrupted"
+
+  assumption "Selmer template syntax is valid; users provide valid templates"
+
+  assumption "GraphQL schemas conform to spec; no circular references"

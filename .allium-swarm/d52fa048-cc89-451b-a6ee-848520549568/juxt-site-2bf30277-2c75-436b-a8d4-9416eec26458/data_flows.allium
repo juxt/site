@@ -1,0 +1,457 @@
+spec juxt.site.data-flows
+  title "juxt-site end-to-end request flows"
+
+  flow SuccessfulGETRequest
+    description "Request for existing resource with successful content negotiation"
+
+    stage RawRequest
+      input HTTP request from client
+      method GET
+      path /api/users/123
+      headers:
+        Host: example.com
+        Accept: application/json
+        Accept-Encoding: gzip
+
+    stage RingAdapter
+      transforms Ring 1.0 to Ring 2.0
+      output request-map with ring.request/* keys
+
+    stage InitializeRequest
+      compute start-date = now()
+      compute request-id = uuid()
+      lookup db = xtdb.snapshot()
+      normalize URI = https://example.com/api/users/123
+      merge all into request
+
+    stage LocateResource
+      query db: resource where xt/id == uri
+      result: resource metadata
+      if not found:
+        throw 404 NotFound
+
+    stage CheckRedirect
+      if resource.site/type == "Redirect":
+        throw 302/307 with location
+        → skip remaining stages
+
+    stage FindRepresentations
+      query db: representations where variant-of == resource.id
+      include primary if has content-type
+      result: [Representation]
+
+    stage NegotiateRepresentation
+      apply pick(headers, representations)
+      select best match on [type, charset, encoding, language]
+      result: selected-representation
+      if no match: throw 406 NotAcceptable
+
+    stage Authenticate
+      inspect request.headers[authorization]
+      if header present:
+        decode token/credentials
+        lookup user from db
+        verify password/signature
+        result: subject = {user, username}
+      else:
+        result: subject = nil
+
+    stage Authorize
+      build request-context:
+        subject: authenticated user or nil
+        resource: resource (without body)
+        request: {method, path, headers, ...}
+      query db: all Rule entities
+      for each rule:
+        match = evaluate(rule.target, context)
+        if matched: add to matched-rules
+
+      combine effects:
+        if any rule.effect == :deny:
+          result: access = :denied
+        else if any rule.effect == :allow:
+          result: access = :approved
+        else:
+          result: access = :denied
+
+      if access == :denied:
+        throw 401 (no subject) or 403 (subject exists)
+
+    stage CheckMethods
+      if request.method not in resource.http/methods:
+        throw 405 with Allow header = joined(methods)
+
+    stage InvokeGET
+      call GET-handler
+      evaluation chain:
+        1. evaluate-if-match! (preconditions)
+        2. evaluate-if-none-match!
+        3. set status = 200
+        4. add-payload (generate body from representation)
+      result: response with status, headers, body
+
+    stage ExecuteTriggers
+      (post-request, after successful execution)
+      query db: all Trigger entities
+      for trigger:
+        evaluate trigger.query against request context
+        if matches:
+          execute trigger.action (side effects)
+      failures logged but not propagated
+
+    stage FormatResponse
+      set headers:
+        Content-Type from selected-representation
+        Content-Length
+        Last-Modified, ETag, Vary (if applicable)
+        Date = now()
+      ensure headers match RFC compliance
+
+    stage StoreRequest
+      (async, not blocking)
+      create Request entity:
+        xt/id = request-id
+        site/uri, method, status, date
+        subject if authenticated
+      submit to db
+
+    stage LogRequest
+      log: "GET /api/users/123 HTTP/1.1 200"
+
+    stage SerializeRingResponse
+      map from internal to Ring 2.0 format:
+        ring.response/status → :status
+        ring.response/headers → :headers
+        ring.response/body → :body
+
+    output
+      HTTP 200 response
+      body: JSON representation
+      headers: Content-Type, Content-Length, ETag, Vary, ...
+
+  flow PreconditionFailureFlow
+    description "Request with If-None-Match header that matches current ETag"
+
+    precondition
+      GET request
+      header If-None-Match: "abc123"
+      resource exists with etag "abc123"
+
+    at NegotiateRepresentation
+      select current representation
+
+    at InvokeGET
+      evaluate-if-none-match! checks:
+        weak-match("abc123", "abc123") = true
+        method is :get
+      throw 304 (Not Modified)
+
+    at FormatResponse
+      status = 304
+      headers: no body (preserved)
+      body: empty
+
+    output
+      HTTP 304 Not Modified
+      body: (empty)
+
+  flow AuthorizationFailureFlow
+    description "User attempts action not permitted by rules"
+
+    precondition
+      authenticated subject
+      subject lacks required role
+      resource classification = RESTRICTED
+
+    at Authorize
+      build request-context with subject
+      query rules
+      no rules match with effect :allow
+      access = :denied
+
+    at wrap-authorize
+      check: access == :approved
+      condition fails
+      determine status:
+        if subject.user nil: status = 401
+        else: status = 403
+      throw ExceptionInfo
+
+    at wrap-error-handling
+      catch ExceptionInfo
+      extract request-context with status = 403
+      call error-response
+
+    at error-response
+      negotiate error representation
+      default: text/html message
+      try to load ErrorResource for 403
+      if found: use its representation
+
+    output
+      HTTP 403 Forbidden
+      body: error description (if authorized to see it)
+
+  flow UnauthenticatedPublicAccessFlow
+    description "Unauthenticated user accesses PUBLIC resource"
+
+    precondition
+      no authorization header
+      resource.pass/classification = "PUBLIC"
+
+    at Authenticate
+      no credentials present
+      subject = nil
+
+    at Authorize
+      request-context has subject = nil
+      query db for matching rules
+      rule "PublicResourcesReadable" matches:
+        target [[request :ring.request/method #{:get :head :options}]
+                [resource ::pass/classification "PUBLIC"]]
+        effect = :allow
+      access = :approved
+
+    at CheckMethods
+      :get in resource.http/methods ✓
+
+    at InvokeGET
+      returns 200 with content
+
+    output
+      HTTP 200 OK
+      body: public content
+
+  flow AuthenticationViaTokenFlow
+    description "Client supplies Bearer token, obtains session"
+
+    stage LoginRequest
+      input:
+        POST /_site/login
+        body: {username, password}
+        content-type: application/x-www-form-urlencoded
+
+      at Authenticate
+        inspect form data
+        lookup user by username
+        verify bcrypt(password) == user.password-hash
+        result: subject = {user, username}
+
+      at POST-handler
+        invoke resource.site/post-fn = 'authn/login-response
+        generate access-token (24 random bytes, base64)
+        compute expires = now() + resource.pass/expires-in
+        store in sessions-by-access-token[token]:
+          user, username, expiry-instant
+        return JSON: {access_token, expires_in, user}
+
+      output
+        HTTP 200 OK
+        body: {
+          "access_token": "...",
+          "expires_in": 86400,
+          "user": "https://example.com/_site/users/alice"
+        }
+
+    stage SubsequentAuthorizedRequest
+      input:
+        GET /api/protected
+        header Authorization: Bearer <token>
+
+      at Authenticate
+        extract token from Authorization header
+        lookup sessions-by-access-token[token]
+        check expiry-instant > now()
+        if expired: remove session, subject = nil
+        if valid: subject = session data
+
+      at Authorize
+        rules now evaluate against authenticated subject
+        may grant access based on user's roles
+
+  flow ResourceCreationFlow
+    description "Client creates new resource via PUT"
+
+    precondition
+      resource does not exist
+      client has create permission
+
+    stage PutRequest
+      input:
+        PUT /api/resources/new-id
+        Content-Type: application/json
+        If-None-Match: * (create-only)
+        body: {...}
+
+    at ReceiveRepresentation
+      validate Content-Length present
+      validate Content-Length <= max-content-length
+      parse Content-Type against acceptable
+      read body into representation
+
+    at EvaluatePreconditions
+      If-None-Match: * means:
+        if representation exists:
+          throw 412 (Precondition Failed)
+        else:
+          proceed (no current representation to match)
+
+    at InvokePUT
+      call resource.site/put-fn
+      function submits transaction to XTDB:
+        [[:xtdb.api/put resource-entity]]
+      transaction committed durably
+      function returns 201 Created
+
+    at response
+      headers:
+        Location: /api/resources/new-id
+      body: (empty for 201)
+
+    output
+      HTTP 201 Created
+      header Location: /api/resources/new-id
+
+  flow TemplateRenderingFlow
+    description "Response generation via template + model"
+
+    given
+      selected-representation.site/template = "/_site/templates/user.html"
+      selected-representation.site/template-model = "queryFn"
+
+    at response/add-payload
+      load-template via xt-template-loader
+      load template from db:
+        resource where xt/id == template-uri
+        extract html source
+      build model:
+        symbol "queryFn" → requiring-resolve → fn
+        invoke fn with (req)
+        result: model map with {title, items, ...}
+      render template:
+        selmer/parse(source)
+        selmer/render(parsed, model, xt-loader)
+        xt-loader handles {{path/to/resource}} URIs
+      result: rendered-html
+      set body = rendered-html
+
+    output
+      HTTP 200 OK
+      Content-Type: text/html
+      body: rendered HTML
+
+  flow GraphQLQueryFlow
+    description "Client queries via GraphQL endpoint"
+
+    stage GraphQLRequest
+      input:
+        POST /_site/graphql
+        Content-Type: application/x-www-form-urlencoded or application/json
+        body: {query: "...", variables: {...}}
+
+    at ReceiveRepresentation
+      decode form or JSON
+
+    at InvokePOST
+      call stored-document-post-handler
+      extract query from form/JSON
+      lookup schema from resource.site/graphql-schema
+      load compiled schema from db
+      parse query against schema
+      if parse-error: throw 400 with error
+      execute query:
+        for each field:
+          resolve via custom-xt-query or default-query
+          execute datalog against db
+          construct result
+      return JSON: {data: {...}} or {errors: [...]}
+
+    output
+      HTTP 200 OK
+      Content-Type: application/json
+      body: {data} or {errors}
+
+  flow WebDAVCollectionListing
+    description "WebDAV client enumerates collection contents"
+
+    stage PropfindRequest
+      input:
+        PROPFIND /documents/
+        header Depth: 1
+
+    at LocateResource
+      find resource with dave/resource-type = :collection
+
+    at InvokePROPFIND
+      call dave.methods/propfind
+      query all resources with parent = /documents/
+      construct XML multi-status response
+      include {name, size, last-modified, ...}
+
+    output
+      HTTP 207 Multi-Status
+      Content-Type: application/xml
+      body: XML with collection members
+
+  flow ErrorRecoveryFlow
+    description "Handling of internal error during request processing"
+
+    given
+      exception thrown at any stage
+      exception.ex-data contains ::site/request-context
+
+    at wrap-error-handling
+      catch ExceptionInfo e
+      extract status from ex-data
+      if status >= 500:
+        log error with full stack trace
+      otherwise:
+        log at debug level
+      call error-response(req, e)
+
+    at error-response
+      attempt content-negotiation for error format
+      try ordered: put-error-rep, post-error-rep, error-resource
+      if all fail: default to text/plain or text/html
+      if all fail: default 500 response
+
+    at respond
+      set headers with error content-type
+      set body with error message (redacted if untrusted)
+      cache error request in memory
+
+    output
+      HTTP 4xx or 5xx
+      body: error representation
+
+  flow RequestAuditFlow
+    description "Logging and storage of request for audit"
+
+    at wrap-store-request
+      after method handler completes
+      if method in #{:post :put}:
+        extract minimal data:
+          request-id, subject, date, uri, method, status
+        create Request entity:
+          xt/id = request-id
+          site/type = "Request"
+          site/uri, ring.request/method, ring.response/status, site/date
+          pass/subject
+        submit to XTDB
+
+    at wrap-store-request-in-request-cache
+      add to in-memory FIFO cache
+      key = request-id
+      value = minimal request info
+      capacity = 1000 entries
+      old entries GC'd via soft references
+
+    at wrap-log-request
+      always log:
+        [METHOD PADDED] [PATH] [PROTOCOL] [STATUS]
+        MDC["reqid"] = request-id
+
+    purpose
+      audit trail for compliance
+      request cache for debugging
+      access logs for monitoring

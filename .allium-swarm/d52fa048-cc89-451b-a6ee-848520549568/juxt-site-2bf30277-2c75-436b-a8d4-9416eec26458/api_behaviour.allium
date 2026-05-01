@@ -1,0 +1,356 @@
+spec juxt.site.api-behaviour
+  title "juxt-site HTTP API behavior"
+
+  ; Request processing rules
+
+  contract HTTPRequestProcessing
+    role "HTTP Client"
+    role "HTTP Server"
+
+    interaction RequestArrivesAtServer
+      client sends HttpRequest
+      where
+        request.method in #{:get :post :put :delete :head :options :patch :mkcol :propfind}
+        request.uri is-well-formed
+      server receives request
+
+    interaction RequestURIValidation
+      server validates request.path
+      let normalized = normalize-path(request.path)
+      let uri = scheme + authority + normalized
+      ensure
+        ; RFC 3986 Section 6.2.2: path normalization (remove dot-segments)
+        normalized == uri-path(uri)
+        ; Path must not be empty after normalization
+        length(normalized) >= 1
+
+    interaction HostHeaderValidation
+      server parses Host header
+      let host = request.headers["host"] or request.headers["x-forwarded-host"]
+      ensure
+        host matches rfc7230-host-pattern
+        (request.headers["x-forwarded-proto"] in ["http" "https"]) if present
+
+    interaction RequestInitialization
+      server collects:
+        start-date = now()
+        request-id = new-uuid()
+        database = xtdb-snapshot()
+      then request enriched with temporal context
+
+  contract HTTPMethods
+    role "Client"
+    role "Server"
+
+    describe GET
+      when request.method == :get
+      then response returns representation of resource
+        status in #{200 304 404} ; 304 if conditional match
+        may include body (unless conditional-match)
+        ; RFC 7231 Section 4.3.1: GET should not have side effects
+
+    describe HEAD
+      when request.method == :head
+      then response identical to GET
+        status same as GET would return
+        body must be empty
+        headers identical to GET
+        ; RFC 7231 Section 4.3.2
+
+    describe OPTIONS
+      when request.method == :options
+      then
+        bypass authorization checks
+        response status = 200
+        response.headers["Allow"] = comma-separated(allowed-methods)
+        response.body is empty
+        may include CORS headers
+        ; RFC 7231 Section 4.3.7
+
+    describe POST
+      when request.method == :post
+      require
+        request.headers["content-length"] present
+        request.headers["content-type"] present
+        resource.http/acceptable-on-post defined
+      then
+        evaluate content-type negotiation
+        invoke resource.site/post-fn
+        return status in #{201 202 204}
+        may include Location header
+        ; RFC 7231 Section 4.3.3
+
+    describe PUT
+      when request.method == :put
+      require
+        request.headers["content-length"] present
+        resource.http/acceptable-on-put defined if resource exists
+      then
+        evaluate content-type negotiation
+        check preconditions (If-Match, If-None-Match)
+        invoke resource.site/put-fn
+        return status in #{201 204}
+        ; RFC 7231 Section 4.3.4
+
+    describe DELETE
+      when request.method == :delete
+      require
+        can-authorize(:delete on resource)
+      then
+        remove resource from store
+        return status 204
+        ; RFC 7231 Section 4.3.5
+
+    describe PATCH
+      when request.method == :patch
+      then
+        invoke resource.site/patch-fn
+        return status in #{200 204}
+        ; RFC 5789
+
+    describe PROPFIND
+      when request.method == :propfind
+      require
+        resource.dave/resource-type == :collection
+      then
+        return WebDAV property information
+        ; RFC 4918 Section 9.1
+
+    describe MKCOL
+      when request.method == :mkcol
+      then
+        create collection (directory-like resource)
+        return status 201
+        ; RFC 4918 Section 9.3
+
+  contract ContentNegotiation
+    role "Server"
+    role "Client"
+
+    interaction FindRepresentations
+      given resource
+      server queries db for representations
+      let variants = db-query "variant-of == resource.xt/id"
+      let primary-rep = resource if has content-type
+      let reps = variants union (primary-rep if exists)
+      ensure reps not empty for GET/HEAD
+        else throw 404
+
+    interaction NegotiateRepresentation
+      given request.headers[accept*], representations
+      server applies content negotiation algorithm
+      ; Uses juxt/pick library
+
+      evaluate media-type q-values
+      evaluate charset q-values
+      evaluate encoding q-values
+      evaluate language q-values
+
+      select representation with highest q-score
+      let best-rep = pick(request.headers, representations)
+
+      ensure selected-representation selected
+        else throw 406 (Not Acceptable)
+
+    interaction VaryHeader
+      when multiple representations available
+      server computes vary-header
+      let axes = [content-type charset language encoding]
+      let vary = intersect(axes, client-preferences)
+      response.headers["Vary"] = comma-separated(vary)
+
+    interaction ContentLocation
+      when returning variant representation
+      response.headers["Content-Location"] = variant.http/content-location
+      ; RFC 7231 Section 3.1.4.2
+
+  contract ContentValidation
+    role "Server"
+
+    interaction ValidateContentLength
+      given request.body, request.headers["content-length"]
+      let header-length = parse-long(content-length)
+      let actual-length = byte-count(body)
+
+      if not present:
+        throw 411 (Length Required)
+
+      if not integer:
+        throw 400 (Bad Request)
+
+      if > resource.http/max-content-length (default 16MB):
+        throw 413 (Payload Too Large)
+
+    interaction ValidateContentType
+      given request, resource.http/acceptable-on-{put,post}
+      let acceptable = resource[acceptable-on-method]
+      let content-type = parse-content-type(request.headers["content-type"])
+
+      if method in #{:put :post} and acceptable defined:
+        let acceptable-types = decode(acceptable)
+        let rating = rate-representation(acceptable-types, content-type)
+
+        if rating.content-type-qvalue == 0.0:
+          throw 415 (Unsupported Media Type)
+
+        if text-type and no charset:
+          throw 415 (Unsupported Media Type)
+
+  contract PreconditionHandling
+    role "Server"
+    ; RFC 7232: HTTP Conditional Requests
+
+    interaction EvaluateIfMatch
+      given request.headers["if-match"], current-representations
+      let etag-list = parse(if-match)
+
+      if etag-list == "*":
+        if empty(current-representations):
+          throw 412 (Precondition Failed)
+      else:
+        let matches = [rep for rep in reps where strong-match(etag-list, rep.etag)]
+        if empty(matches):
+          throw 412 (Precondition Failed)
+
+    interaction EvaluateIfNoneMatch
+      given request.headers["if-none-match"], selected-representation
+      let etag-list = parse(if-none-match)
+      let rep-etag = selected-representation.http/etag
+
+      if etag-list == "*":
+        if selected-representation exists:
+          if method in #{:get :head}:
+            throw 304 (Not Modified)
+          else:
+            throw 412 (Precondition Failed)
+      else:
+        for etag in etag-list:
+          if weak-match(etag, rep-etag):
+            if method in #{:get :head}:
+              throw 304 (Not Modified)
+            else:
+              throw 412 (Precondition Failed)
+
+    interaction EvaluateIfModifiedSince
+      given request.headers["if-modified-since"], selected-representation
+      require method in #{:get :head}
+      let if-date = parse-http-date(if-modified-since)
+      let rep-date = selected-representation.http/last-modified
+
+      if rep-date not after if-date:
+        throw 304 (Not Modified)
+
+    interaction EvaluateIfUnmodifiedSince
+      given request.headers["if-unmodified-since"], selected-representation
+      let if-date = parse-http-date(if-unmodified-since)
+      let rep-date = selected-representation.http/last-modified
+
+      if rep-date after if-date:
+        throw 412 (Precondition Failed)
+
+  contract ResponseConstruction
+    role "Server"
+
+    interaction SelectRepresentation
+      given acceptable-from-client, representations
+      server performs content negotiation
+      result: selected-representation
+      may be nil (then 404 for GET/HEAD, proceed for others)
+
+    interaction BuildResponseHeaders
+      given selected-representation, request
+      headers = {
+        "Content-Type": selected-rep.http/content-type,
+        "Content-Length": byte-count(selected-rep.body or content),
+        "Content-Encoding": selected-rep.http/content-encoding if present,
+        "Content-Language": selected-rep.http/content-language if present,
+        "Content-Location": selected-rep.http/content-location if variant,
+        "Last-Modified": format-http-date(selected-rep.http/last-modified) if present,
+        "ETag": selected-rep.http/etag if present,
+        "Vary": selected-rep.http/vary if present,
+        "Cache-Control": cache-directive,
+        "Date": format-http-date(now()),
+      }
+
+    interaction SerializeBody
+      given selected-representation
+      if method == :head:
+        body = empty
+      else:
+        body = selected-rep.http/body or
+               encode(selected-rep.http/content, charset) or
+               execute-template(selected-rep.site/template)
+
+    interaction ResponseStatus
+      status = {
+        200 if successful GET/HEAD,
+        201 if POST/PUT created new,
+        204 if POST/PUT success no-content,
+        304 if conditional match,
+        4xx if client error,
+        5xx if server error
+      }
+
+  contract TemplateRendering
+    when selected-representation.site/template present
+
+    interaction LoadTemplate
+      let template-uri = selected-rep.site/template
+      let template-resource = db.query(xt/id == template-uri)
+      ensure template-resource exists
+        else throw 500 (Internal Server Error)
+
+    interaction BuildTemplateModel
+      let model-spec = selected-rep.site/template-model
+      case model-spec:
+        Symbol => resolve-fn(model-spec) with (req)
+        String => db.query(id == model-spec)
+        Map => expand-queries(model-spec, db)
+
+    interaction RenderTemplate
+      use Selmer template engine
+      render(template-resource.http/content, model, context)
+      result: rendered-body
+
+  contract CORS
+    when request.headers["origin"] present
+
+    interaction MatchOrigin
+      let origin = request.headers["origin"]
+      let allowed-origins = resource.site/access-control-allow-origins
+      let pattern = find(allowed-origins, origin)
+
+      if pattern exists:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = pattern.allow-methods
+        response.headers["Access-Control-Allow-Headers"] = pattern.allow-headers
+        if pattern.allow-credentials:
+          response.headers["Access-Control-Allow-Credentials"] = "true"
+
+  contract SecurityHeaders
+    interaction AddSecurityHeaders
+      response.headers["Permissions-Policy"] = "interest-cohort=()"
+      ; TODO: Add more security headers (HSTS, X-Frame-Options, etc.)
+
+  contract RequestLogging
+    interaction LogRequest
+      log [METHOD] [PATH] [PROTOCOL] [STATUS]
+      format: "GET /api/resource HTTP/1.1 200"
+      always on success or client error
+      on server error (5xx), log more detail including stack trace
+
+  contract RequestCaching
+    interaction CacheRecentRequests
+      keep in-memory cache of N=1000 requests
+      use FIFO with soft references (GC friendly)
+      key = request-id
+      value = minimal request/response info
+
+    interaction StoreRequestRecord
+      when method in #{:post :put}
+      store request record in XTDB with:
+        xt/id = request-id
+        site/type = "Request"
+        site/uri, method, status, date
+        pass/subject if authenticated
+      purpose: audit trail

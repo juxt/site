@@ -1,0 +1,282 @@
+spec juxt.site.data-model
+  title "juxt-site persistent data model"
+
+  ; Underlying database is XTDB, a bitemporal datalog engine
+  ; All entities stored with :xt/id as primary key, immutable document store
+  ; Transactions are atomic; bitemporal versioning built-in
+
+  entity PersistentStore
+    description "XTDB document store backing all state"
+    attribute xtdb/tx-log KVStore "Transactional log (RocksDB)"
+    attribute xtdb/document-store KVStore "Document store (RocksDB)"
+    attribute xtdb/index-store KVStore "Index store (RocksDB)"
+
+  ; Resource hierarchy
+
+  entity Resource
+    description "Root entity for all web resources"
+    parent-type "abstract"
+
+    ; Every resource has a URI identifier and type
+    attribute xt/id String "URI: scheme://authority/path"
+    attribute type String "Discriminator: one of known types"
+
+  entity StandardResource extends Resource
+    type "Resource"
+    description "Normal HTTP resource with representations"
+
+  entity Redirect extends Resource
+    type "Redirect"
+    attribute site/location String "Target URI for redirect"
+
+  entity ErrorResource extends Resource
+    type "ErrorResource"
+    description "Specialized response for error status codes"
+    attribute ring.response/status Int "HTTP status: 400, 401, 403, 404, 500, etc."
+
+  entity AuthenticationResource extends Resource
+    type "Token" | "LoginHandler" | "LogoutHandler"
+    description "Resources for authentication flows"
+
+  ; User management entities
+
+  entity User extends Resource
+    type "User"
+    attribute pass/username String "Unique login identifier"
+    attribute name String? "Display name"
+    attribute email String? "Contact email"
+
+  entity Password extends Resource
+    type "Password"
+    description "Bcrypt-hashed password storage"
+    attribute pass/user String "User URI (foreign key)"
+    attribute pass/password-hash String "Bcrypt hash"
+    attribute pass/classification String "Always 'RESTRICTED' for security"
+
+  entity Role extends Resource
+    type "Role"
+    attribute name String "Role name (e.g., 'superuser')"
+    attribute description String? "Role description"
+
+  entity UserRoleMapping extends Resource
+    type "UserRoleMapping"
+    description "Join table: associates users with roles"
+    attribute pass/assignee String "User URI"
+    attribute pass/role String "Role URI"
+
+  ; Authorization model
+
+  entity Rule extends Resource
+    type "Rule"
+    description "Declarative authorization rule"
+    attribute pass/target List "Datalog WHERE clause patterns"
+    attribute pass/effect Keyword ":allow or :deny"
+    attribute pass/limiting-clauses List? "Additional constraints for granted queries"
+    attribute http/max-content-length Long? "Optional payload size limit"
+
+  entity Policy extends Resource
+    type "Policy"
+    description "Collection of related rules"
+
+  ; Content and representation
+
+  entity Representation extends Resource
+    type "Representation"
+    description "Serialized form of resource content"
+    attribute http/content-type String "MIME type"
+    attribute http/content-encoding String? "gzip | deflate | identity"
+    attribute http/content-language String? "Language tag"
+    attribute http/content-length Long? "Byte count"
+    attribute http/body Bytes? "Binary content"
+    attribute http/content String? "Text content (alternative to body)"
+    attribute http/charset String? "Character encoding"
+    attribute http/last-modified Date? "Modification timestamp"
+    attribute http/etag String? "Cache tag"
+    attribute http/vary String? "Vary header value"
+    attribute site/variant-of String? "Primary resource URI"
+
+  ; Template support
+
+  entity Template extends Resource
+    type "Template"
+    description "Selmer template for dynamic content generation"
+    attribute http/content-type String "Output media type"
+    attribute site/body String "Template source code"
+
+  ; GraphQL support
+
+  entity GraphQLSchema extends Resource
+    type "GraphQL"
+    description "GraphQL schema and endpoint"
+    attribute site/graphql-compiled-schema String "Compiled schema"
+    attribute apex/openapi Map? "OpenAPI specification"
+
+  ; WebDAV support
+
+  entity Collection extends Resource
+    type "Resource"
+    attribute dave/resource-type Keyword ":collection"
+    description "WebDAV collection (directory-like)"
+
+  ; Event/trigger system
+
+  entity Trigger extends Resource
+    type "Trigger"
+    description "Post-request action"
+    attribute site/query Map "Datalog query to evaluate"
+    attribute site/action Keyword "Action type to invoke"
+
+  ; Infrastructure
+
+  entity Request extends Resource
+    type "Request"
+    description "Audit trail of HTTP requests"
+    attribute site/uri String "Request URI"
+    attribute ring.request/method Keyword "HTTP method"
+    attribute ring.response/status Int "Response status code"
+    attribute site/date Date "Timestamp"
+    attribute pass/subject Map? "Authenticated subject if any"
+    ; Headers, body not stored for privacy
+
+  entity Session
+    description "In-memory volatile session state"
+    stored-in "memory-only"
+    attribute access_token String "Session identifier"
+    attribute user String "User URI"
+    attribute expires_in Long "Seconds until expiration"
+    attribute expiry-instant Instant "Absolute expiration time"
+    attribute authenticated Boolean "Whether user is authenticated"
+    ; Sessions expire and are removed from memory
+
+  ; Data invariants
+
+  invariant ResourceIDIsURI
+    description "Every resource xt/id must be a valid URI"
+    on Resource r
+    let uri-pattern = #"^[a-z][a-z0-9+.-]*://.*"
+    then matches(r.xt/id, uri-pattern)
+
+  invariant TypeDiscriminatorSpecifies
+    description "Type field determines entity structure"
+    on Resource r
+    then case r.type
+      "User" => r has [pass/username name]
+      "Password" => r has [pass/user pass/password-hash]
+      "Role" => r has [name]
+      "UserRoleMapping" => r has [pass/assignee pass/role]
+      "Rule" => r has [pass/target pass/effect]
+      "Representation" => r has [http/content-type]
+      else true
+
+  invariant PasswordsClassifiedRestricted
+    description "All passwords must be classified RESTRICTED"
+    on Password p
+    then p.pass/classification == "RESTRICTED"
+
+  invariant UserPasswordRelationship
+    description "Password must reference existing user"
+    on Password p
+    let user = load(User, p.pass/user)
+    then user exists
+
+  invariant UserRoleMappingConsistency
+    description "Both assignee and role must reference existing entities"
+    on UserRoleMapping m
+    let user = load(User, m.pass/assignee)
+    let role = load(Role, m.pass/role)
+    then user exists and role exists
+
+  invariant ResourceTypeIsConsistent
+    description "Type field matches entity type"
+    on Resource r
+    where r.type == "User"
+    then r is-instance-of User
+
+  invariant MethodsAreKnownHTTPMethods
+    description "http/methods contains only valid HTTP method keywords"
+    on Resource r
+    where r.http/methods != nil
+    let valid = #{:get :head :post :put :delete :patch :options :propfind :mkcol}
+    then every method in r.http/methods => valid contains method
+
+  invariant ContentTypeIsValidMediaType
+    description "http/content-type follows media-type syntax"
+    on Resource r
+    where r.http/content-type != nil
+    let pattern = #"^[a-zA-Z0-9.-]+/[a-zA-Z0-9.+;-]+$"
+    then matches(r.http/content-type, pattern)
+
+  invariant ETagFormatIsValid
+    description "ETags are quoted strings or * wildcard"
+    on Representation rep
+    where rep.http/etag != nil
+    let pattern = #'^"[^"]*"$|^\*$'
+    then matches(rep.http/etag, pattern)
+
+  invariant BodyContentMutualExclusivity
+    description "Representation has either body OR content, never both"
+    on Representation rep
+    then (rep.http/body != nil) XOR (rep.http/content != nil)
+
+  invariant ContentLengthIsNonnegative
+    description "Content length cannot be negative"
+    on Representation rep
+    where rep.http/content-length != nil
+    then rep.http/content-length >= 0
+
+  invariant RuleTargetIsDatalog
+    description "Rule targets are valid Datalog patterns (Symbol/Vector sequences)"
+    on Rule r
+    then is-valid-datalog-pattern(r.pass/target)
+
+  invariant RuleEffectIsAllowOrDeny
+    description "Rule effect must be :allow or :deny"
+    on Rule r
+    then r.pass/effect in #{:allow :deny}
+
+  invariant NoCircularRoleHierarchy
+    description "Roles cannot form cycles"
+    all UserRoleMapping m1, UserRoleMapping m2
+    where m1.pass/assignee == m2.pass/role and m2.pass/assignee == m1.pass/role
+    then false
+
+  invariant VariantPointsToValidPrimary
+    description "variant-of reference must point to existing resource"
+    on Representation rep
+    where rep.site/variant-of != nil
+    let primary = load(Resource, rep.site/variant-of)
+    then primary exists
+
+  invariant HTTPMethodsNonEmpty
+    description "If http/methods is specified, must not be empty"
+    on Resource r
+    where r.http/methods != nil
+    then count(r.http/methods) > 0
+
+  invariant LastModifiedNotInFuture
+    description "Last-modified date cannot be after current time"
+    on Representation rep
+    where rep.http/last-modified != nil
+    then rep.http/last-modified <= now()
+
+  ; Bitemporal schema (XTDB specific)
+
+  invariant BitemporalValidity
+    description "XTDB valid-time and tx-time are properly ordered"
+    on Resource r
+    let vt = r.xtdb.api/valid-time
+    let tt = r.xtdb.api/tx-time
+    where vt != nil and tt != nil
+    then vt <= tt
+
+  constraint TransactionAtomicity
+    description "All updates to a resource are atomic via single transaction"
+    enforcement "XTDB submit-tx"
+
+  constraint DocumentImmutability
+    description "Stored documents are immutable; updates create new versions"
+    enforcement "XTDB document store semantics"
+
+  constraint TemporalQuerying
+    description "Database supports querying at historical time points"
+    capability "XTDB as-of time API"

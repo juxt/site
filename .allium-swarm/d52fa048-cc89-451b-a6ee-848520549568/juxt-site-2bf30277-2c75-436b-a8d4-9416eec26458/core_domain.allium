@@ -1,0 +1,227 @@
+spec juxt.site.core-domain
+  title "juxt-site core domain model"
+
+  entity Resource
+    id String
+    description "A web-addressable entity with metadata and behavior"
+
+    ; Essential attributes
+    attribute xt/id String "URI identifier for the resource"
+    attribute type String "Resource type: Resource | Redirect | ErrorResource | Rule | User | etc."
+
+    ; HTTP metadata
+    attribute http/methods Set<Keyword> "Set of allowed HTTP methods: :get :post :put :delete :head :options :patch :propfind :mkcol"
+    attribute http/content-type String? "Media type (e.g. application/json, text/html)"
+    attribute http/content String? "Response body as string (for text types)"
+    attribute http/body Bytes? "Response body as bytes (for binary types)"
+    attribute http/content-length Long? "Size in bytes"
+    attribute http/last-modified Date? "Last modification timestamp"
+    attribute http/etag String? "Entity tag for cache validation"
+    attribute http/vary String? "Comma-separated header names affecting representation"
+    attribute http/content-encoding String? "Content encoding: gzip, deflate, etc."
+    attribute http/content-language String? "Language tag (BCP 47)"
+    attribute http/charset String? "Character encoding for text types"
+    attribute http/max-content-length Long? "Maximum payload size in bytes"
+
+    ; Content negotiation
+    attribute http/acceptable-on-put String? "Acceptable content-type for PUT requests"
+    attribute http/acceptable-on-post String? "Acceptable content-type for POST requests"
+    attribute http/representations Vector<Map>? "Available representations (variants)"
+    attribute site/variant-of String? "ID of the primary resource this is a variant of"
+
+    ; Custom handlers
+    attribute site/post-fn Symbol? "Function to invoke on POST: 'ns/fn or actual function"
+    attribute site/put-fn Symbol? "Function to invoke on PUT"
+    attribute site/patch-fn Symbol? "Function to invoke on PATCH"
+    attribute site/get-fn Symbol? "Function to invoke on GET"
+    attribute site/locator-fn Symbol? "Function to locate dynamic resources given request"
+
+    ; Template/GraphQL support
+    attribute site/template String? "URI of template resource for response generation"
+    attribute site/template-model Map? "Model data for template rendering"
+    attribute site/query Map? "Datalog query for dynamic response generation"
+    attribute site/graphql-schema String? "URI of GraphQL schema"
+
+    ; Authorization/Access Control
+    attribute pass/classification String? "Classification level: PUBLIC | RESTRICTED"
+    attribute site/access-control-allow-origins Map<String, Map>? "CORS origin -> {allow-methods allow-headers allow-credentials}"
+
+    ; DAV support
+    attribute dave/resource-type Keyword? "Collection type for WebDAV"
+
+    ; Custom content-location for variants
+    attribute http/content-location String? "Value for Content-Location header"
+
+  entity Representation
+    description "A specific serialization of resource content"
+    attribute http/content-type String "Media type"
+    attribute http/content-encoding String? "Encoding"
+    attribute http/content-language String? "Language"
+    attribute http/content-length Long? "Byte count"
+    attribute http/body Bytes? "Serialized content"
+    attribute http/content String? "Text content"
+    attribute http/vary String? "Negotiation axes"
+
+  entity Rule
+    id String
+    description "Policy rule for authorization decision"
+    attribute xt/id String "Rule URI identifier"
+    attribute type String "Always 'Rule'"
+    attribute pass/target List "Datalog patterns matching against request context"
+    attribute pass/effect Keyword ":allow or :deny"
+    attribute pass/limiting-clauses List? "Additional where-clauses for authorized queries"
+    attribute http/max-content-length Long? "Maximum payload this rule permits"
+
+  entity User
+    id String
+    attribute xt/id String "User URI"
+    attribute type String "Always 'User'"
+    attribute pass/username String "Login name"
+    attribute name String? "Display name"
+    attribute email String? "Email address"
+
+  entity Password
+    id String
+    attribute xt/id String "Password storage URI"
+    attribute type String "Always 'Password'"
+    attribute pass/user String "User URI this belongs to"
+    attribute pass/password-hash String "Bcrypt-hashed password"
+    attribute pass/classification String "Always 'RESTRICTED'"
+
+  entity UserRoleMapping
+    id String
+    description "Association between user and role"
+    attribute xt/id String "Mapping URI"
+    attribute type String "Always 'UserRoleMapping'"
+    attribute pass/assignee String "User URI"
+    attribute pass/role String "Role URI"
+
+  entity Role
+    id String
+    attribute xt/id String "Role URI"
+    attribute type String "Always 'Role'"
+    attribute name String "Role name"
+    attribute description String? "Role description"
+
+  entity Trigger
+    id String
+    description "Post-request action triggered by query evaluation"
+    attribute xt/id String "Trigger URI"
+    attribute type String "Always 'Trigger'"
+    attribute site/query Map "Datalog query pattern to match"
+    attribute site/action Keyword "Action to invoke"
+
+  entity ResourceLocator
+    description "Dynamic resource resolution based on URL pattern"
+    attribute xt/id String "Locator URI"
+    attribute type String "Always 'ResourceLocator' or 'AppRoutes'"
+    attribute site/pattern String "Regex pattern to match against request URI"
+    attribute site/locator-fn Symbol "Function to resolve matching resources"
+
+  entity ErrorResource
+    description "Specialized resource for error responses"
+    attribute xt/id String "Error resource URI"
+    attribute type String "Always 'ErrorResource'"
+    attribute ring.response/status Int "HTTP status this handles"
+
+  entity Session
+    description "In-memory session data (not persisted)"
+    attribute access_token String "Opaque token identifying session"
+    attribute expires_in Long "Expiry seconds from issue time"
+    attribute user String "User URI"
+    attribute expiry-instant Instant "When session expires"
+
+  ; Value objects
+
+  record RequestContext
+    description "Captured request state for rule evaluation"
+    subject Subject? "Authenticated user or nil"
+    resource Map "Resource (without body/content)"
+    request Map "Request metadata (headers, method, path, etc.)"
+    representation Map? "Selected representation"
+    environment Map "Environmental context"
+
+  record Subject
+    description "Authenticated subject (user or client)"
+    attribute pass/user String? "User URI"
+    attribute pass/username String? "Username"
+    attribute pass/authenticated Boolean "True if successfully authenticated"
+
+  record Authorization
+    description "Result of authorization decision"
+    attribute pass/access Keyword ":approved or :denied"
+    attribute matched-rules Vector "Rules that matched this request"
+    attribute limiting-clauses Vector "Query constraints from rules"
+    attribute http/max-content-length Long? "Maximum payload permitted"
+
+  ; Business Rules
+
+  rule SuperuserAlwaysApproved
+    description "Users assigned superuser role can perform any operation"
+    on User u
+    where
+      ; Datalog query pattern in rule target matches u.roles contains superuser
+      target [[user :pass.alpha/user u]
+              [mapping :pass.alpha/role "superuser"]
+              [mapping :pass.alpha/assignee u]]
+    then effect = :allow
+
+  rule PublicResourcesReadable
+    description "Resources classified PUBLIC are readable by everyone"
+    on Resource r
+    where r.pass/classification == "PUBLIC"
+    then effect = :allow for methods [:get :head :options]
+
+  rule RestrictedResourcesDeniedByDefault
+    description "Resources classified RESTRICTED are inaccessible unless explicitly allowed"
+    on Resource r
+    where r.pass/classification == "RESTRICTED"
+    then effect = :deny
+
+  rule OptionsMethodAlwaysAllowed
+    description "OPTIONS method bypasses authorization checks"
+    on HttpMethod m
+    where m == :options
+    then effect = :allow
+
+  rule AuthenticationRequired
+    description "Non-public resources require authentication"
+    on Resource r
+    where r.pass/classification != "PUBLIC"
+    then requires authenticated-subject
+
+  invariant ResourceURIUnique
+    description "Resource IDs (xt/id values) must be unique"
+    all Resource r1, Resource r2
+    where r1.xt/id == r2.xt/id
+    then r1 == r2
+
+  invariant RuleTargetIsValidDatalog
+    description "Rule targets must be valid Datalog patterns"
+    on Rule r
+    let pattern = r.pass/target
+    then is-valid-datalog(pattern)
+
+  invariant UserHasAtMostOneActivePassword
+    description "User can have at most one current password"
+    all Password p1, Password p2
+    where p1.pass/user == p2.pass/user
+    then p1.xt/id == p2.xt/id
+
+  invariant RepresentationBodyConsistency
+    description "Representation must not have both http/body and http/content"
+    on Representation rep
+    then not (rep.http/body != nil and rep.http/content != nil)
+
+  invariant ContentLengthMatchesBody
+    description "Content-Length must match actual body size"
+    on Representation rep
+    let actual-length = byte-count(rep.http/body or rep.http/content)
+    where rep.http/content-length != nil
+    then actual-length == rep.http/content-length
+
+  invariant NoConflictingMethods
+    description "Resource cannot allow conflicting method combinations"
+    on Resource r
+    where contains(r.http/methods, :mkcol) and contains(r.http/methods, :put)
+    then false ; MKCOL is for collections, PUT for resources
