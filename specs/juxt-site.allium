@@ -1,0 +1,304 @@
+-- allium: 3
+-- juxt-site.allium
+--
+-- Site 1.0: a Resource Server built on XTDB. Resources addressed by URI;
+-- representations served with full HTTP semantics. OpenAPI documents
+-- installed via PUT become routable APIs. Pass provides PBAC.
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+external entity XtdbNode {
+    -- Bitemporal document store backing every resource.
+    node_id: String
+}
+
+external entity OpenIdProvider {
+    -- Upstream OIDC identity provider used for authentication.
+    issuer: String
+}
+
+external entity ConfigFile {
+    -- EDN configuration loaded from $HOME/.config/site/config.edn or $SITE_CONFIG.
+    path: String
+}
+
+------------------------------------------------------------
+-- Enums
+------------------------------------------------------------
+
+enum HttpMethod {
+    get | head | post | put | patch | delete | options |
+    propfind | mkcol | copy | move | lock | unlock
+}
+
+enum ResourceKind {
+    static |
+    openapi_document |
+    graphql_schema |
+    template |
+    redirect |
+    variant
+}
+
+enum AuthenticationMethod {
+    basic | bearer | openid_connect | anonymous
+}
+
+enum AccessEffect { permit | deny }
+
+enum UserRole { anonymous | authenticated | superuser }
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+value Uri {
+    scheme: String
+    authority: String
+    path: String
+}
+
+value Representation {
+    content_type: String
+    content_language: String?
+    content_encoding: String?
+    body: String
+    etag: String?
+    last_modified: Timestamp?
+}
+
+------------------------------------------------------------
+-- Entities
+------------------------------------------------------------
+
+entity Resource {
+    uri: Uri
+    kind: ResourceKind
+    representations: Set<Representation>
+    max_content_length: Integer?
+    allowed_methods: Set<HttpMethod>
+    created_at: Timestamp
+}
+
+entity Api {
+    uri: Uri
+    openapi_document: Representation
+    endpoints: ApiEndpoint with api = this
+}
+
+entity ApiEndpoint {
+    api: Api
+    path_template: String
+    methods: Set<HttpMethod>
+    request_schema: String?
+    response_schema: String?
+}
+
+entity Subject {
+    identity: String
+    authenticated_via: AuthenticationMethod
+    roles: Set<String>
+}
+
+entity Role {
+    name: String
+    description: String
+}
+
+entity AccessRule {
+    -- Pass PDP rule, loosely modelled on XACML.
+    target: String
+    effect: AccessEffect
+    condition: String
+}
+
+entity Trigger {
+    -- Side-effecting rule that fires when a query produces results.
+    query: String
+    action: String
+}
+
+entity Request {
+    request_id: String
+    method: HttpMethod
+    uri: Uri
+    caller: Subject
+    started_at: Timestamp
+    status:
+        received |
+        authenticating |
+        authorizing |
+        negotiating |
+        producing |
+        completed |
+        failed
+    response_status: Integer? when status = completed | failed
+
+    transitions status {
+        received -> authenticating
+        authenticating -> authorizing
+        authenticating -> failed
+        authorizing -> negotiating
+        authorizing -> failed
+        negotiating -> producing
+        negotiating -> failed
+        producing -> completed
+        producing -> failed
+        terminal: completed, failed
+    }
+}
+
+------------------------------------------------------------
+-- Actors
+------------------------------------------------------------
+
+actor User {
+    -- HTTP client interacting with Site over its resource API.
+    identified_by: Subject
+}
+
+actor Operator {
+    -- Person running the Site server, holding REPL access on the local socket.
+    identified_by: Subject where authenticated_via = openid_connect
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+surface HttpResourceApi {
+    -- The primary HTTP boundary. Every URI is a resource.
+    facing user: User
+
+    provides:
+        GetResource(user, uri: Uri)
+        HeadResource(user, uri: Uri)
+        PutResource(user, uri: Uri, representation: Representation)
+        PostResource(user, uri: Uri, representation: Representation)
+        PatchResource(user, uri: Uri, representation: Representation)
+        DeleteResource(user, uri: Uri)
+        OptionsResource(user, uri: Uri)
+}
+
+surface WebDavApi {
+    -- DAV verbs implemented by juxt.dave.alpha.
+    facing user: User
+
+    provides:
+        PropFind(user, uri: Uri)
+        MkCol(user, uri: Uri)
+        Copy(user, source: Uri, destination: Uri)
+        Move(user, source: Uri, destination: Uri)
+        Lock(user, uri: Uri)
+        Unlock(user, uri: Uri)
+}
+
+surface OpenIdConnectCallback {
+    -- Callback consumed during OIDC login.
+    facing oidc: User
+
+    provides:
+        OidcCallback(oidc, code: String, state: String)
+}
+
+surface SocketRepl {
+    -- Clojure socket REPL exposed for operators (default port 50505).
+    facing operator: Operator
+
+    provides:
+        EvalForm(operator, form: String)
+}
+
+surface SiteCli {
+    -- bin/site command-line client.
+    facing operator: Operator
+
+    provides:
+        CliGetToken(operator)
+        CliPut(operator, uri: Uri, representation: Representation)
+        CliGet(operator, uri: Uri)
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+rule AuthenticateRequest {
+    when: RequestReceived(request)
+    requires: request.status = received
+    ensures:
+        request.status = authenticating
+}
+
+rule AuthorizeRequest {
+    when: RequestAuthenticated(request)
+    requires: request.status = authenticating
+    ensures:
+        request.status = authorizing
+}
+
+rule PutCreatesOrReplacesResource {
+    when: PutResource(user, uri, representation)
+    ensures:
+        ResourceUpserted(uri: uri, representation: representation)
+}
+
+rule PutOpenApiInstallsApi {
+    when: PutResource(user, uri, representation)
+    requires: representation.content_type = "application/vnd.oai.openapi+json;version=3.0.2"
+    ensures:
+        Api.created(uri: uri, openapi_document: representation)
+}
+
+rule DeleteTombstonesResource {
+    when: DeleteResource(user, uri)
+    ensures:
+        ResourceTombstoned(uri: uri, at: now)
+}
+
+rule TriggerFiresOnMatch {
+    when: TriggerQueryMatched(trigger)
+    ensures:
+        TriggerActionInvoked(trigger: trigger, at: now)
+}
+
+rule BootstrapRequiredBeforeUse {
+    when: ServerStartedAgainstFreshXtdb()
+    ensures:
+        BootstrapRequired(at: now)
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant UriIsCanonicalIdentity {
+    Resources.all(r => exists Resource{uri: r.uri})
+}
+
+invariant ImmutableHistory {
+    Resources.all(r => r.created_at <= now)
+}
+
+invariant AuthorizedAccessOnly {
+    Requests.all(req =>
+        req.status = completed implies req.response_status != null)
+}
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open question "Exact lifecycle of access tokens (issuance, revocation, TTL) — see juxt.pass.alpha.authentication."
+
+open question "GraphQL surface (juxt.site.alpha.graphql, site-schema.graphql, operations.graphql) is present but not modelled here."
+
+open question "Selmer template rendering pipeline and request-template.html role."
+
+open question "Whether triggers run synchronously in the request path or asynchronously."
+
+open question "Concrete OIDC flow steps (authorization code vs implicit) used by juxt.pass.alpha.openid-connect."
+
+open question "Caching semantics in juxt.site.alpha.cache (in-memory? invalidation rules?)."
