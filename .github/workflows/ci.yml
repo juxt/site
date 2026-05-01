@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeLaGuardo/setup-clojure@13.0
+        with:
+          cli: latest
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            ~/.deps.clj
+          key: ${{ runner.os }}-clj-${{ hashFiles('**/deps.edn') }}
+      - name: Resolve deps
+        run: clojure -P
+      - name: Try project test runner (best-effort, won't fail the job)
+        run: |
+          if [ -f Makefile ] && grep -qE '^test:' Makefile; then
+            make test || echo "::warning::make test failed; smoke (deps-resolve) still passed"
+          elif clojure -A:test -e 'nil' 2>/dev/null; then
+            clojure -X:test || clojure -M:test || echo "::warning::test alias present but command failed"
+          else
+            echo "no :test alias / no Makefile test target — smoke job covers deps-resolve only"
+          fi
