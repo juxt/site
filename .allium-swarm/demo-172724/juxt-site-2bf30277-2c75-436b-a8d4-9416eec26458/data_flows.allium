@@ -1,0 +1,336 @@
+name: Data Flows and Request Processing Pipeline
+description: End-to-end request processing, authorization, and response generation flows
+
+request-pipeline:
+  overview: |
+    Ring 2.0 middleware pipeline that processes HTTP requests from entry to response.
+    Each middleware (wrapper) performs a specific step and passes the modified request
+    to the next handler in the chain. Errors are caught globally and converted to
+    appropriate HTTP responses.
+
+  stages:
+    - stage: 1-Ring Adapter
+      handler: wrap-ring-1-adapter
+      purpose: Convert Ring 1.0 keywords to Ring 2.0 namespaced keywords
+      transforms: |
+        :body → :ring.request/body
+        :headers → :ring.request/headers
+        :request-method → :ring.request/method
+        :uri → :ring.request/path
+        etc.
+      output: Ring 2.0 compatible request map
+
+    - stage: 2-Healthcheck
+      handler: wrap-healthcheck
+      purpose: Return 200 OK for monitoring endpoints
+      trigger: path = /_site/healthcheck
+      response: |
+        {:ring.response/status 200
+         :ring.response/body "Site OK!\r\n"}
+      skip-for: Other paths
+
+    - stage: 3-Request Initialization
+      handler: wrap-initialize-request
+      purpose: Set up request context (database, IDs, URIs, timestamps)
+      inputs:
+        - Database snapshot from XTDB node
+        - Base URI from configuration
+        - Host header or X-Forwarded-Host
+        - Scheme from request or X-Forwarded-Proto
+      adds-to-request: |
+        ::site/start-date (java.util.Date)
+        ::site/request-id (unique identifier)
+        ::site/uri (normalized HTTP URI)
+        ::site/db (immutable database snapshot)
+        ::site/xt-node (database node reference)
+        ::site/base-uri (configured base URI)
+      normalization:
+        - Path normalization: Remove dot-segments per RFC 3986
+        - Scheme normalization: Downcase scheme + authority
+        - Port normalization: Omit default ports (80 for HTTP, 443 for HTTPS)
+
+    - stage: 4-Service Availability
+      handler: wrap-service-unavailable?
+      purpose: Check if service is available
+      current-behavior: Always returns true
+      future: Could check database connectivity, maintenance mode, etc.
+      error-response: 503 Service Unavailable with Retry-After header
+
+    - stage: 5-Request Logging
+      handler: wrap-log-request
+      purpose: Log HTTP request at INFO level
+      format: "%-7s %s %s %d" (METHOD PATH PROTOCOL STATUS)
+
+    - stage: 6-Request Storage
+      handler: wrap-store-request
+      purpose: Store request in database (POST/PUT only)
+      storage:
+        - Transactions: POST/PUT requests stored to XTDB
+        - In-memory cache: All requests stored in FIFO soft-reference cache
+      storable-fields: |
+        ::site/request-id, ::site/uri, :ring.request/method,
+        :ring.response/status, ::pass/subject, ::site/date
+      exclusions: |
+        Request/response bodies (raw), ::site/xt-node, sensitive headers
+
+    - stage: 7-CORS Headers
+      handler: wrap-cors-headers
+      purpose: Add CORS headers to response if origin matches
+      inputs:
+        - Request Origin header
+        - Resource ::site/access-control-allow-origins map
+      outputs: |
+        Access-Control-Allow-Origin
+        Access-Control-Allow-Methods
+        Access-Control-Allow-Headers
+        Access-Control-Allow-Credentials
+      matching: Regex pattern matching against allowed origins
+
+    - stage: 8-Security Headers
+      handler: wrap-security-headers
+      purpose: Add security headers to response
+      current-headers: |
+        Permissions-Policy: interest-cohort=() (disable FLoC)
+      future-headers: |
+        Strict-Transport-Security, X-Frame-Options, X-Content-Type-Options,
+        X-XSS-Protection, X-Download-Options, X-Permitted-Cross-Domain-Policies
+
+    - stage: 9-Error Handling
+      handler: wrap-error-handling
+      purpose: Catch all ExceptionInfo exceptions and convert to HTTP responses
+      error-classification:
+        - Status >= 500: Logged as error
+        - Status < 500: Not logged (used for flow control)
+      response-generation:
+        - Attempts to negotiate error representation from resource
+        - Falls back to default HTML/text error pages
+        - Stores error details in request log
+
+    - stage: 10-Method Validation
+      handler: wrap-method-not-implemented?
+      purpose: Verify HTTP method is implemented
+      supported-methods: GET, HEAD, POST, PUT, DELETE, OPTIONS, PATCH, MKCOL, PROPFIND
+      error-response: 501 Not Implemented
+
+    - stage: 11-Resource Location
+      handler: wrap-locate-resource
+      purpose: Find resource definition for URI
+      mechanism:
+        - Query database for ResourceLocator or AppRoutes by pattern matching
+        - Invoke locator-fn (custom function) if defined
+        - Returns Resource entity
+      adds-to-request: ::site/resource
+      error: 500 if multiple locators match, 404 if none found
+
+    - stage: 12-Redirect Handling
+      handler: wrap-redirect
+      purpose: Handle Redirect resource types
+      trigger: Resource has ::site/type = "Redirect"
+      response: |
+        302 Found or 307 Temporary Redirect (depending on method)
+        Location header set to ::site/location
+      note: Uses exception-based flow control to escape pipeline early
+
+    - stage: 13-Representation Discovery
+      handler: wrap-find-current-representations
+      purpose: Find all available representations of resource
+      applies-to: GET, HEAD, PUT methods
+      process:
+        - Call current-representations to query variants and primary representations
+        - For GET/HEAD: 404 if no representations found
+        - For PUT: Allow even if no current representations (creation case)
+      adds-to-request: ::site/current-representations (sequence of representations)
+
+    - stage: 14-Content Negotiation
+      handler: wrap-negotiate-representation
+      purpose: Select best representation from available options
+      algorithm:
+        - Use juxt.pick.alpha to evaluate Accept preferences
+        - Match against Content-Type, Encoding, Language, Charset axes
+        - Track matched axes in Vary header
+      adds-to-request: ::site/selected-representation
+      no-match-behavior: Representation remains nil (may 404 on GET/HEAD)
+
+    - stage: 15-Authentication
+      handler: wrap-authenticate
+      purpose: Identify authenticated subject from request
+      skip-for: OPTIONS method
+      sources:
+        - HTTP Basic Auth (Authorization header)
+        - Cookie-based sessions (X-Access-Token)
+        - Form-based login
+      adds-to-request: ::pass/subject (authenticated user, or nil)
+
+    - stage: 16-Authorization
+      handler: wrap-authorize
+      purpose: Check if subject is permitted access to resource
+      process:
+        - Skip for OPTIONS method
+        - Query database for Rule entities
+        - Invoke rules/match-targets to find matching rules
+        - All matching rules must have effect ::pass/allow
+        - If any rule missing or has deny effect, return 403 or 401
+      authorization-data:
+        - subject: Authenticated user
+        - resource: Resource definition
+        - request: Request map (method, path, headers, etc)
+      effects:
+        - Sets ::pass/authorization in request
+        - Sets ::pass/subject in request
+        - May adjust ::http/max-content-length per authorization rule
+      error-responses:
+        - 401 Unauthorized if not authenticated (subject is nil)
+        - 403 Forbidden if authenticated but not authorized
+
+    - stage: 17-Method Allowance
+      handler: wrap-method-not-allowed?
+      purpose: Verify method is supported by resource
+      check: Method in Resource ::http/methods set
+      adds-to-request: ::site/allowed-methods
+      error-response: 405 Method Not Allowed with Allow header
+
+    - stage: 18-Response Initialization
+      handler: wrap-initialize-response
+      purpose: Set up response headers and finalize response
+      calls: respond function
+      headers-added: |
+        Date (HTTP date format from ::site/start-date)
+        Site-Request-ID
+        Content-Type, Content-Encoding, Content-Language (from representation)
+        Last-Modified, ETag, Vary (if available)
+        Content-Length
+        Content-Range, Trailer, Transfer-Encoding (if applicable)
+
+    - stage: 19-Method Invocation
+      handler: wrap-invoke-method
+      purpose: Execute the HTTP method handler
+      dispatches: |
+        GET/HEAD → GET function (calls conditional/evaluate-preconditions!)
+        POST → POST function
+        PUT → PUT function
+        PATCH → PATCH function
+        DELETE → DELETE function
+        OPTIONS → OPTIONS function
+        PROPFIND → PROPFIND function
+        MKCOL → MKCOL function
+      method-specific-behavior: Documented in api_behaviour.allium
+
+authorization-flow:
+  trigger: wrap-authorize middleware
+  inputs:
+    - subject (authenticated user or nil)
+    - resource (target resource)
+    - request context (method, path, headers, etc)
+  process:
+    - Create request-context map with subject, resource, request, environment
+    - Query for all Rule entities in database
+    - Call rules/match-targets to find matching rules
+    - Evaluate match-targets:
+      1. Create temporary ID map with random UUIDs for each context entity
+      2. Speculatively add these to database with with-tx
+      3. For each rule, evaluate ::pass/target Datalog clauses
+      4. Keep rules where query returns results (matched? = true)
+    - Determine access:
+      - If any matched rule has effect ::pass/deny, access is DENIED
+      - If at least one matched rule has effect ::pass/allow, access is APPROVED
+      - If no rules match at all, access is DENIED
+    - Extract limiting clauses and max-content-length from matched rules
+  outputs:
+    - ::pass/authorization map containing:
+      - ::pass/access (::pass/approved or ::pass/denied)
+      - ::pass/matched-rules (rules that matched)
+      - ::pass/limiting-clauses (query restrictions)
+      - ::http/max-content-length (if specified)
+
+trigger-execution-flow:
+  stage: After response is prepared
+  timing: Before response is returned to client
+  process:
+    1. Query for all Trigger entities in database
+    2. For each trigger:
+       a. Get ::site/query from trigger (Datalog query)
+       b. Create temp-id-map with current request context entities
+       c. Speculatively add to database with with-tx
+       d. Evaluate trigger query against modified database
+       e. If query returns results, trigger is activated
+    3. For each activated trigger:
+       a. Get ::site/action keyword
+       b. Dispatch to run-action! multimethod by action type
+       c. Execute action with request context
+  error-handling:
+    - Exceptions in trigger evaluation are caught and logged
+    - Do not affect response to client
+    - Request processing completes before trigger execution
+
+content-negotiation-flow:
+  inputs:
+    - Request headers: Accept, Accept-Charset, Accept-Encoding, Accept-Language
+    - Available representations from resource or variants
+  process:
+    - Call find-variants to query for variant representations
+    - Collect primary representation if it has content-type
+    - Call current-representations to build final list
+    - Call merge-template-maybe for each representation
+    - Call negotiate-representation with pick algorithm
+  output:
+    - ::site/selected-representation (map) or nil if no acceptable match
+  vary-tracking:
+    - Headers that affected selection are tracked
+    - Vary response header lists these axes
+
+response-generation-flow:
+  inputs:
+    - Selected representation (or null)
+    - Request context
+  process:
+    - Call add-payload to generate :ring.response/body
+    - If body-fn defined: Call body-fn with request
+    - Else if template defined: Render template with template-model
+    - Else if content defined: Use string as body
+    - Else if body defined: Use byte array as body
+    - Else: No body (204, 304, etc)
+  template-rendering:
+    - Retrieve template entity from database
+    - Process template-model (may be function, entity ref, or map)
+    - Render with Selmer or GraphQL dialect
+    - Custom URLStreamHandler loads includes from database
+  error-handling:
+    - If body-fn not resolvable: 500
+    - If template not found: 500
+    - If template rendering fails: 500
+
+error-response-flow:
+  entry: Exception caught by wrap-error-handling
+  process:
+    1. Extract status code and request context from ex-data
+    2. Check if request was properly initialized (has ::site/start-date)
+    3. If status >= 500: Log error with full details
+    4. Call error-response to generate error representation
+  error-representation-selection:
+    1. If PUT method: Try put-error-representations from resource
+    2. If POST method: Try post-error-representations from resource
+    3. Try error-resource-representation (by status code)
+    4. Fall back to default HTML/text error pages
+  default-representations:
+    - text/html: Link to error resource (requires authorization to view)
+    - text/plain: Error message
+  special-cases:
+    - 500 Internal Server Error: Respond immediately with default error
+    - 302/307 Redirects: Use exception as flow control, not error
+
+request-logging-flow:
+  when: After response is complete (wrap-store-request)
+  process:
+    1. Redact sensitive headers (Authorization)
+    2. Truncate large strings (>1024 chars) and collections (>64 items)
+    3. Store storable request snapshot in cache
+    4. For POST/PUT: Also store in XTDB
+  cache-storage:
+    - Type: FIFO soft-reference cache
+    - Capacity: 1000 entries
+    - Purpose: Fast debugging access
+    - Memory: GC'd under pressure
+  database-storage:
+    - Entities stored as :xtdb.api/put transactions
+    - Immutable, queryable record of all modifications
+    - Subject included for audit trail

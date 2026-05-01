@@ -1,0 +1,350 @@
+name: HTTP API Behavior and Request/Response Handling
+description: HTTP semantics, content negotiation, request validation, and response generation
+
+http-methods:
+  - name: GET
+    description: Retrieve resource representation
+    preconditions:
+      - Resource must support :get in ::http/methods
+    processing:
+      - Evaluate conditional request headers (If-Match, If-None-Match, If-Modified-Since, If-Unmodified-Since)
+      - Select best representation via content negotiation (Accept, Accept-Language, Accept-Encoding, Accept-Charset)
+      - Return response status 200 with body
+    postconditions:
+      - Response includes Content-Type, Content-Encoding, Content-Language headers
+      - Response includes ETag and Last-Modified if available
+      - Response includes Vary header listing accepted axes
+    errors:
+      - 304 Not Modified if If-None-Match or If-Modified-Since matches
+      - 412 Precondition Failed if If-Match fails
+      - 404 Not Found if no representations available
+
+  - name: HEAD
+    description: Like GET but without response body
+    processing:
+      - Identical to GET processing
+      - Response body is stripped before transmission
+    response-headers:
+      - Identical to GET, but Content-Length may be calculated differently
+
+  - name: POST
+    description: Create new resource or invoke action
+    parameters:
+      - Content-Type header (required)
+      - Content-Length header (required)
+      - body (encoded per Content-Type)
+    preconditions:
+      - Resource must support :post in ::http/methods
+      - Resource must have ::site/post-fn (function or resolvable symbol)
+      - Request payload must match ::http/acceptable-on-post declared types
+    processing:
+      - Validate Content-Length (required, 411 if missing)
+      - Validate payload size against ::http/max-content-length
+      - Validate Content-Type/Content-Encoding/Content-Language against acceptable preferences
+      - Decode request body per Content-Type
+      - Invoke ::site/post-fn with request context
+      - Handler returns modified request with response status and body
+    response-headers:
+      - Location header if resource created (201)
+      - Content-Type of response representation
+    status-codes:
+      - 201 Created if new resource created
+      - 204 No Content if existing resource updated
+      - 207 Multi-Status if multiple resources created/updated
+      - 400 Bad Request for validation failures
+      - 413 Payload Too Large if size exceeds max-content-length
+      - 415 Unsupported Media Type if Content-Type not acceptable
+    errors:
+      - Missing Content-Length → 411
+      - Payload > max-content-length → 413
+      - Invalid Content-Type → 415
+      - Invalid Content-Encoding → 409
+      - Invalid Content-Language → 415
+      - post-fn not found → 500
+      - post-fn returned nil → 500
+
+  - name: PUT
+    description: Replace or create resource representation
+    parameters:
+      - Content-Type header (required)
+      - Content-Length header (required)
+    preconditions:
+      - Resource must support :put in ::http/methods
+      - Resource must have ::site/put-fn
+      - Content-Range header must not be present
+      - Request must satisfy any If-Match or If-Unmodified-Since conditions
+    processing:
+      - Validate Content-Length (411 if missing)
+      - Validate payload size against ::http/max-content-length
+      - Validate Content-Type/Encoding/Language against ::http/acceptable-on-put
+      - Evaluate preconditions (If-Match, If-Unmodified-Since per RFC 7232)
+      - Decode body per Content-Type, Content-Encoding, Content-Language
+      - Invoke ::site/put-fn with request context
+      - Store uploaded representation in database
+    response-status:
+      - 201 Created if resource did not exist
+      - 204 No Content if resource was updated
+    errors:
+      - Missing Content-Length → 411
+      - Payload > max-content-length → 413
+      - Unsupported Content-Type → 415
+      - If-Match precondition fails → 412
+      - If-Unmodified-Since fails → 412
+      - Content-Range present → 400
+
+  - name: PATCH
+    description: Partial resource modification
+    preconditions:
+      - Resource must support :patch in ::http/methods
+      - Resource must have ::site/patch-fn
+    processing:
+      - Validate body per Content-Type
+      - Invoke ::site/patch-fn with request context
+      - Handler applies partial updates
+    response-status:
+      - 204 No Content if successful
+    errors:
+      - patch-fn not found → 500
+      - Invalid payload → 400
+
+  - name: DELETE
+    description: Remove resource
+    preconditions:
+      - Resource must support :delete in ::http/methods
+    processing:
+      - Submit transaction to delete resource by :xt/id
+      - Await transaction completion
+    response-status:
+      - 204 No Content
+    effects:
+      - Resource is marked deleted in XTDB (immutable, time-versioned)
+
+  - name: OPTIONS
+    description: Query supported methods and CORS policy
+    processing:
+      - Return Allow header with supported HTTP methods
+      - Include CORS headers if request origin matches access-control-allow-origins
+    response-headers:
+      - Allow: comma-separated list of supported methods
+      - Access-Control-Allow-Origin (if origin matches)
+      - Access-Control-Allow-Methods (if CORS enabled)
+      - Access-Control-Allow-Headers (if CORS enabled)
+      - Access-Control-Allow-Credentials (if CORS enabled)
+    response-status:
+      - 200 OK
+    response-body:
+      - Empty (Content-Length: 0)
+
+  - name: PROPFIND
+    description: WebDAV query for resource properties
+    processing:
+      - Delegate to dave.methods/propfind
+
+  - name: MKCOL
+    description: WebDAV collection creation
+    preconditions:
+      - Resource target must not exist
+    processing:
+      - Create collection entity in database
+      - Set type to ::dave/resource-type :collection
+    response-status:
+      - 201 Created
+    response-headers:
+      - DAV: 1 (indicating WebDAV support)
+
+content-negotiation:
+  algorithm: Preference-based selection (juxt.pick.alpha)
+  axes:
+    - Content-Type
+      header: Accept
+      default: application/octet-stream for PUT/POST bodies
+      matching: Quality-value (q=) weighted preference
+
+    - Character Set
+      header: Accept-Charset
+      applies-to: Text/* content types
+      rule: If Accept-Charset present and text type, text must declare charset
+
+    - Content Encoding
+      header: Accept-Encoding
+      values: gzip, deflate, br, identity, etc
+      matching: Quality-value weighted
+
+    - Content Language
+      header: Accept-Language
+      applies-to: Resources with language variants
+      matching: Quality-value weighted
+
+  processes:
+    - name: find-variants
+      description: Query database for variant representations of resource
+      query: |
+        {:find [(pull v [*])]
+         :where [[v ::site/variant-of uri]]
+         :in [uri]}
+
+    - name: current-representations
+      description: Collect all available representations for a resource
+      sources: |
+        1. Explicit ::http/representations list (if present)
+        2. Variants found via find-variants
+        3. Primary representation (resource itself, if has content-type)
+      output: Ordered by preference
+
+    - name: negotiate-representation
+      description: Select best representation matching request preferences
+      algorithm: |
+        For each axis (Content-Type, Charset, Encoding, Language):
+        - Rate each representation based on request preference headers
+        - Track axis values in Vary header
+        - Return representation with highest cumulative quality value
+      no-match-behavior: |
+        If no representation matches Accept headers, return empty (404 on GET/HEAD)
+
+request-validation:
+  - rule: Content-Length Required
+    applies-to: POST, PUT, PATCH
+    violation: Missing Content-Length header
+    status-code: 411 Length Required
+    message: No Content-Length header found
+
+  - rule: Content-Length as Integer
+    applies-to: POST, PUT, PATCH
+    violation: Content-Length is not a valid integer
+    status-code: 400 Bad Request
+    message: Bad content length
+
+  - rule: Payload Size Limit
+    applies-to: POST, PUT
+    violation: Content-Length > resource's ::http/max-content-length (or 16MB default)
+    status-code: 413 Payload Too Large
+    message: Payload too large
+
+  - rule: Content-Type Acceptance
+    applies-to: POST, PUT, PATCH
+    violation: Content-Type not in resource's acceptable types
+    status-code: 415 Unsupported Media Type
+    condition: Resource declares ::http/acceptable-on-{post|put} preferences
+
+  - rule: Text Type Charset
+    applies-to: POST, PUT
+    violation: Text content-type without charset parameter
+    status-code: 415 Unsupported Media Type
+    condition: Accept-Charset header present
+
+  - rule: Content Encoding Acceptance
+    applies-to: POST, PUT
+    violation: Content-Encoding not in acceptable list
+    status-code: 409 Conflict
+    condition: Accept-Encoding header present
+
+  - rule: Content Language Declaration
+    applies-to: POST, PUT
+    violation: Content-Language header missing when Accept-Language present
+    status-code: 409 Conflict
+
+conditional-requests:
+  standard: RFC 7232 (HTTP Conditional Requests)
+
+  headers:
+    - If-Match
+      description: Require resource to match given ETag(s)
+      processing: |
+        1. Evaluate before any state-changing operation
+        2. If header is "*", condition is false if no representations exist
+        3. If header is entity-tag list, condition is false if no tag strongly matches
+      violation-status: 412 Precondition Failed
+      applies-to: All methods except GET, HEAD, OPTIONS, CONNECT, TRACE
+
+    - If-None-Match
+      description: Require resource to NOT match given ETag(s)
+      processing: |
+        1. Evaluate after finding current representations
+        2. Use weak comparison for ETags
+        3. If header is "*", condition is false if any representation exists
+      violation-status: |
+        304 Not Modified (for GET, HEAD)
+        412 Precondition Failed (for other methods)
+
+    - If-Modified-Since
+      description: Return 304 if not modified since given date
+      applies-to: GET, HEAD
+      processing: Compare with representation's ::http/last-modified
+      violation-status: 304 Not Modified
+
+    - If-Unmodified-Since
+      description: Return 412 if modified since given date
+      applies-to: PUT, POST, PATCH, DELETE
+      processing: Compare with representation's ::http/last-modified
+      violation-status: 412 Precondition Failed
+
+response-headers:
+  standard:
+    - Content-Type
+      source: Selected representation ::http/content-type
+      presence: When response has body
+
+    - Content-Length
+      source: Calculated from body size or explicit ::http/content-length
+      presence: Always calculated or stored
+
+    - Content-Encoding
+      source: Selected representation ::http/content-encoding
+      presence: When encoding applied
+
+    - Content-Language
+      source: Selected representation ::http/content-language
+      presence: When language variant selected
+
+    - Content-Location
+      source: Selected representation ::http/content-location (if variant)
+      presence: Optional, for variant representations
+
+    - ETag
+      source: Selected representation ::http/etag
+      presence: Optional, enables caching and conditional requests
+
+    - Last-Modified
+      source: Selected representation ::http/last-modified
+      presence: Optional, enables If-Modified-Since
+
+    - Vary
+      source: Tracked during content negotiation
+      value: Comma-separated list of request headers that affected representation selection
+      example: "Accept, Accept-Encoding, Accept-Language"
+
+    - Cache-Control
+      source: Hardcoded for PUT/POST bodies
+      value: "public, max-age=604800, immutable" (1 week, immutable)
+
+    - Allow
+      source: Resource ::http/methods
+      presence: Required in OPTIONS response, optional in others
+
+    - Access-Control-Allow-*
+      headers: |
+        Origin, Methods, Headers, Credentials
+      source: Resource ::site/access-control-allow-origins configuration
+      presence: If CORS enabled and origin matches
+
+    - Date
+      source: Normalized request start date
+      format: HTTP date format (RFC 7231)
+
+    - Site-Request-ID
+      source: Generated ::site/request-id
+      presence: Always (except may be shortened)
+
+caching:
+  request-logging-cache:
+    type: FIFO soft-reference cache
+    capacity: 1000 entries
+    purpose: Store recent requests for debugging/inspection
+    entry-format: Storable request snapshot
+    key-pattern: Request ID URI
+    query-interface: find(regex-pattern), recent(n)
+
+  browser-caching:
+    mechanism: ETag + If-None-Match
+    mechanism: Last-Modified + If-Modified-Since
+    mechanism: Cache-Control headers

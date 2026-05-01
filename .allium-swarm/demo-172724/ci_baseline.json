@@ -1,0 +1,21 @@
+{
+  "bootstrapped": false,
+  "pre_existing_workflows": [
+    ".github/workflows/ci.yml"
+  ],
+  "lint_report": "actionlint not installed; skipping syntactic validation",
+  "recent_runs": [
+    {
+      "databaseId": 25221784668,
+      "name": "CI",
+      "conclusion": "success",
+      "status": "completed",
+      "headBranch": "allium-swarm/ci-bootstrap-20260501-1626",
+      "headSha": "c924f2d7111ecd916a10766e588bd21ae861edde",
+      "url": "https://github.com/juxt/site/actions/runs/25221784668",
+      "updatedAt": "2026-05-01T16:13:57Z"
+    }
+  ],
+  "baseline_green": true,
+  "generated_at": "2026-05-01T16:14:35.861048312Z"
+}

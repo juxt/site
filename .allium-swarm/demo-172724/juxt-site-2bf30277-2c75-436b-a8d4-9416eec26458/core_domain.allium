@@ -1,0 +1,307 @@
+name: Core Domain Entities and Rules
+description: Fundamental domain concepts for the juxt-site HTTP framework
+
+entities:
+  - name: Resource
+    attributes:
+      - id
+        type: URI string
+        description: Unique identifier for the resource, typically an HTTP URL
+
+      - methods
+        type: set of keywords
+        description: HTTP methods supported by this resource (get, post, put, delete, etc)
+        examples: |
+          #{:get :head :options}
+          #{:get :post :put :delete}
+
+      - content-type
+        type: string
+        optional: true
+        description: Media type of the resource's primary content
+        examples: "text/html;charset=utf-8" | "application/json"
+
+      - type
+        type: string
+        optional: true
+        description: Classification of the resource (Resource, Redirect, ErrorResource, Role, User, Rule, etc)
+
+      - template
+        type: URI string | null
+        optional: true
+        description: Reference to a template resource for rendering this resource
+
+      - template-model
+        type: symbol | string (entity ID) | map
+        optional: true
+        description: Data model for template rendering (can be function, entity ref, or inline map)
+
+      - post-fn, put-fn, patch-fn
+        type: symbol | function
+        optional: true
+        description: Handler functions for POST, PUT, PATCH methods. Symbols are requiring-resolved at runtime.
+
+      - etag
+        type: string
+        optional: true
+        description: Entity tag for HTTP caching and conditional requests
+
+      - last-modified
+        type: java.util.Date
+        optional: true
+        description: Last modification timestamp for If-Modified-Since/If-Unmodified-Since
+
+      - max-content-length
+        type: positive integer
+        optional: true
+        default: 16777216 (2^24)
+        description: Maximum payload size (in bytes) allowed for PUT/POST requests
+
+      - access-control-allow-origins
+        type: map
+        optional: true
+        description: CORS configuration mapping origin patterns to access control rules
+        examples: |
+          {"http://localhost:8000" {...}}
+          {"*" {...}}
+
+      - variant-of
+        type: URI string
+        optional: true
+        description: When present, this resource is a variant (alternative representation) of another resource
+
+  - name: Representation
+    description: A specific form (encoding, language, content-type) of a resource
+    attributes:
+      - id
+        type: URI string
+        description: Unique identifier for this representation
+
+      - content
+        type: string
+        optional: true
+        description: Text body content
+
+      - body
+        type: byte array
+        optional: true
+        description: Binary body content
+
+      - content-type
+        type: string
+        description: Media type
+
+      - content-encoding
+        type: string
+        optional: true
+        description: Encoding transformation applied (gzip, deflate, etc)
+
+      - content-language
+        type: string
+        optional: true
+        description: Language tag (e.g. en, fr, de)
+
+      - content-location
+        type: URI string
+        optional: true
+        description: Alternative URI for accessing this specific representation
+
+      - etag
+        type: string
+        optional: true
+        description: Strong or weak entity tag
+
+      - last-modified
+        type: java.util.Date
+        optional: true
+        description: Modification timestamp
+
+      - vary
+        type: string
+        optional: true
+        description: Comma-separated list of request headers that affect representation selection
+
+  - name: User
+    description: Subject of authentication
+    attributes:
+      - id
+        type: URI string
+
+      - username
+        type: string
+        description: Unique identifier for login
+
+      - name
+        type: string
+        description: Display name or full name
+
+      - email
+        type: string
+        optional: true
+
+      - roles
+        type: set of URI strings
+        optional: true
+        description: References to Role entities this user belongs to
+
+  - name: Password
+    description: Credential storage for user
+    attributes:
+      - id
+        type: URI string
+
+      - user
+        type: URI string
+        description: Reference to the User entity
+
+      - password-hash
+        type: string
+        description: Bcrypt-encrypted password hash
+
+      - classification
+        type: string
+        description: Access control classification, typically "RESTRICTED"
+
+  - name: Role
+    description: Group of permissions
+    attributes:
+      - id
+        type: URI string
+
+      - name
+        type: string
+
+      - description
+        type: string
+        optional: true
+
+  - name: Rule
+    description: Authorization rule determining access based on subject, resource, and request context
+    attributes:
+      - id
+        type: URI string
+
+      - target
+        type: Datalog query clauses
+        description: Query conditions that must match for this rule to apply
+        examples: |
+          [['subject :juxt.pass.alpha/user 'user]
+           ['mapping :juxt.site.alpha/type "UserRoleMapping"]
+           ['mapping :juxt.pass.alpha/role role]]
+
+      - effect
+        type: keyword
+        values: [:pass/allow, :pass/deny]
+        description: Whether the rule permits or denies access
+
+      - max-content-length
+        type: positive integer
+        optional: true
+        description: Maximum upload size permitted by this rule
+
+      - limiting-clauses
+        type: sequence of Datalog clauses
+        optional: true
+        description: Query restrictions applied when authorizing further queries
+
+  - name: Trigger
+    description: Event that fires after a request is processed
+    attributes:
+      - id
+        type: URI string
+
+      - type
+        type: string
+        value: "Trigger"
+
+      - query
+        type: Datalog query
+        description: Condition that determines if the trigger action runs
+
+      - action
+        type: keyword or URI
+        description: Identifies which action handler to invoke
+
+  - name: Session
+    description: Authentication session
+    attributes:
+      - access-token
+        type: string
+        description: Secure random token (URL-safe Base64, 24 bytes)
+
+      - expiry-instant
+        type: java.time.Instant
+        description: Expiration timestamp
+
+      - user-data
+        type: map
+        optional: true
+        description: Session-associated data
+
+
+rules:
+  - name: Resource Identity
+    description: Each resource must have a unique URI as its identifier
+    rule: |
+      Every Resource has exactly one ::site/uri or :xt/id
+
+  - name: Method Support
+    description: A resource can only be accessed via HTTP methods it declares support for
+    rule: |
+      If a request uses method M on Resource R, then M must be in R's ::http/methods
+
+  - name: Content Type Declaration
+    description: Resources must declare their content type unless they are abstract
+    rule: |
+      A Resource with a body or content representation must have ::http/content-type
+
+  - name: Representation Consistency
+    description: Representations of the same resource must have compatible metadata
+    rule: |
+      If Representation A is a variant-of Resource R, and Representation B is the primary
+      representation of R, then both must be accessible through content negotiation
+
+  - name: ETag Consistency
+    description: ETags are immutable for a given representation
+    rule: |
+      Once ::http/etag is assigned to a representation, it does not change across requests
+
+  - name: User Authentication
+    description: A User can only have credentials for authentication
+    rule: |
+      A User must have ::pass/username to be authenticated
+
+  - name: Authorization Evaluation
+    description: Access control decisions are based on rule matching
+    rule: |
+      A request is authorized if at least one Rule matches AND all matching Rules have
+      effect ::pass/allow. If no rules match, access is denied.
+
+  - name: Subject-based Access Control
+    description: Authorization decisions consider the authenticated subject
+    rule: |
+      Access to a resource depends on the ::pass/subject present in the request context
+
+  - name: Content Length Boundaries
+    description: Upload size constraints are enforced from authorization rules
+    rule: |
+      If a Rule permits access with ::http/max-content-length N, then the request
+      payload must be <= N bytes or a 413 status is returned
+
+  - name: Payload Format Validation
+    description: Requests with bodies must conform to resource's acceptable formats
+    rule: |
+      If a Resource declares ::http/acceptable-on-put or ::http/acceptable-on-post,
+      the request's Content-Type and Content-Encoding must match the declared preferences
+
+  - name: Template Resolution
+    description: Templates referenced by resources must exist in the database
+    rule: |
+      If a Resource or Representation has ::site/template pointing to entity E,
+      then E must exist in the database
+
+  - name: Trigger Execution
+    description: Triggers execute after successful request processing
+    rule: |
+      A Trigger's query is evaluated against the post-request database state.
+      If the query returns results, the associated action is invoked once per result set.

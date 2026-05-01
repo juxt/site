@@ -1,0 +1,315 @@
+name: External Dependencies and Contracts
+description: Expectations and contracts with external systems and libraries
+
+external-systems:
+  - name: XTDB (Temporal Database)
+    purpose: Immutable, time-versioned entity storage
+    version-required: Uses modern XTDB API
+    operations-used:
+      - xt/start-node: Initialize database node with config
+      - xt/db: Get current snapshot (immutable)
+      - xt/db-as-of: Query historical snapshot
+      - xt/with-tx: Speculatively add transactions (for authorization)
+      - xt/submit-tx: Queue transaction for commit
+      - xt/await-tx: Block until transaction applied
+      - xt/entity: Fetch single entity by :xt/id
+      - xt/q: Query using Datalog language
+      - xt/pull: Fetch entity with projection
+    configuration:
+      transaction-log: RocksDB key-value store
+      document-store: RocksDB key-value store
+      index-store: RocksDB key-value store
+    contracts:
+      - Atomicity: All transactions are ACID compliant
+      - Immutability: Historical snapshots remain unchanged
+      - Queryability: Datalog queries work across time
+      - Consistency: Entity references via :xt/id are always valid
+    failure-modes:
+      - Database unavailable: xt/start-node fails, application doesn't start
+      - Transaction failure: xt/await-tx throws exception, operation rolled back
+      - Query failure: xt/q throws exception on malformed Datalog
+      - Disk full: RocksDB operations fail, may corrupt data if not handled
+
+  - name: Ring Web Framework
+    purpose: HTTP server abstraction and middleware
+    version: Ring 2.0 (namespaced keywords)
+    request-fields-used: |
+      :ring.request/body (InputStream)
+      :ring.request/headers (map of string → string)
+      :ring.request/method (keyword: get, post, etc)
+      :ring.request/path (URI path)
+      :ring.request/query (query string)
+      :ring.request/protocol (string: "HTTP/1.1")
+      :ring.request/remote-addr (IP address)
+      :ring.request/scheme (keyword: http, https)
+      :ring.request/server-name (hostname)
+      :ring.request/server-port (integer)
+      :ring.request/ssl-client-cert (SSL cert, if present)
+    response-fields-produced: |
+      :ring.response/status (HTTP status code)
+      :ring.response/headers (map of header-name → header-value)
+      :ring.response/body (string, byte-array, or InputStream)
+    adapter: Ring Jetty adapter (or other server adapter)
+    contracts:
+      - Handler is a function (request → response)
+      - Request map is immutable (updates via assoc create new map)
+      - Response status is required (4 digits)
+      - Headers are string keys and values
+      - Body is streamed to client
+    failure-modes:
+      - Request body unreadable: Exception when reading :ring.request/body
+      - Response status not integer: May be accepted or converted by adapter
+      - Response timeout: Adapter closes connection if too slow
+      - Large response body: Streamed in chunks, may timeout
+
+  - name: HTTP Standards (RFC 7231, RFC 7232, RFC 7233, RFC 7235)
+    purpose: Compliance with HTTP protocol specifications
+    standards-implemented:
+      - RFC 7231: HTTP/1.1 Semantics (methods, headers, status codes)
+      - RFC 7232: HTTP/1.1 Conditional Requests (ETags, If-Modified-Since, etc)
+      - RFC 7233: HTTP/1.1 Range Requests (partial content retrieval)
+      - RFC 7235: HTTP/1.1 Authentication (Authorization header, challenges)
+      - RFC 7230: HTTP/1.1 Message Syntax and Routing (headers, CRLF, etc)
+      - RFC 4918: WebDAV (PROPFIND, MKCOL, etc)
+      - RFC 6234: CORS (Origin, Access-Control-Allow-*, etc)
+    contracts:
+      - Status codes must match semantic intent
+      - Headers must follow syntax rules
+      - Methods must follow idempotency rules
+      - Conditional headers evaluated in specified order
+      - Cache headers respected by clients
+    exceptions:
+      - System deviates from standards where necessary (e.g., max-content-length)
+      - Some RFC requirements commented as TODO (e.g., Content-Range support)
+
+  - name: Datalog Query Language (XTDB)
+    purpose: Querying and authorization rule evaluation
+    contract: |
+      Rules and triggers declare Datalog queries.
+      Queries executed against current or speculative database state.
+      Query results determine authorization decisions or trigger activation.
+    syntax: |
+      {:find [?sym ...]
+       :where [[pattern matching clauses ...]
+               [(custom-fn arg) result]]
+       :in [?input-vars ...]}
+    authorization-queries:
+      - ::pass/target: Match against request context
+      - ::pass/limiting-clauses: Restrict further queries
+    trigger-queries:
+      - ::site/query: Determine if action should fire
+    failure-modes:
+      - Malformed Datalog: xt/q throws exception
+      - Missing facts: Query returns empty (rule doesn't match)
+      - Query timeout: Unbounded recursion or cross-product explosion
+      - Transitive closure: Large result sets from complex patterns
+
+  - name: Selmer Template Engine
+    purpose: Dynamic HTML/text response generation
+    contract: |
+      Template resource contains Selmer source code.
+      Rendered with template-model map as context.
+      Custom URLStreamHandler loads includes from database.
+    syntax: |
+      {% for item in items %}{{ item.name }}{% endfor %}
+      {% if user %}Hello, {{ user }}{% endif %}
+      {% include "other-template" %}
+    custom-features:
+      - Custom functions via requiring-resolve (symbol resolution)
+      - Database entity references via custom URLStreamHandler
+      - Template model can be symbol, entity ID, or literal map
+    failure-modes:
+      - Template syntax error: Exception during rendering
+      - Include template not found: 500 error
+      - Function not resolvable: 500 error
+      - Large output: May timeout or exhaust memory
+
+  - name: GraphQL Query Language (via juxt.grab)
+    purpose: Dynamic structured data retrieval in responses
+    contract: |
+      GraphQL schema entity in database defines types and fields.
+      Queries resolved against XTDB database.
+      Field resolvers call template-model functions.
+    implementation:
+      - Library: juxt.grab.alpha (GraphQL implementation)
+      - Schema format: GraphQL SDL or programmatic
+      - Execution: execute-request function
+      - Custom resolvers: Selmer templates with XTDB queries
+    failure-modes:
+      - Invalid GraphQL query: Error response from execute-request
+      - Type not found: Resolver fails
+      - Field resolver function error: Propagates to query result
+
+  - name: Crypto Password Library (bcrypt)
+    purpose: User password hashing and verification
+    contract: |
+      Password hashing via crypto.password.bcrypt/encrypt
+      Deterministic hash: Same password always produces same hash? No (salt).
+      Verification: Compare plaintext against stored hash.
+    usage:
+      - Hashing: encrypt(password-string, cost)
+        Cost 11 used in system (industry-standard)
+      - Verification: check(plaintext, hash) → boolean
+    storage:
+      - Hash stored in Password entity as ::pass/password-hash
+      - Plaintext never stored
+    failure-modes:
+      - Invalid bcrypt hash: Exception on verify
+      - Cost factor too high: Hashing takes excessive time (DoS risk)
+      - Weak password: No validation (delegated to client/policy)
+
+  - name: Reap Library (HTTP Parsing)
+    purpose: RFC-compliant HTTP header parsing
+    contract: |
+      Decoding of Accept, Authorization, If-Match, etc headers.
+      Produces structured data from header strings.
+    decoders-used:
+      - reap/if-match: Parse If-Match header
+      - reap/if-none-match: Parse If-None-Match header
+      - reap/if-modified-since: Parse HTTP date
+      - reap/http-date: Parse HTTP-date format
+      - reap/entity-tag: Parse ETag format
+    failure-modes:
+      - Malformed header: Exception or default value
+      - Invalid date: Exception on parse
+      - Regex syntax error: Exception
+
+  - name: Pick Library (Content Negotiation)
+    purpose: HTTP content negotiation algorithm
+    contract: |
+      Given request preferences (Accept headers) and available representations,
+      select the best match based on quality values.
+    algorithm:
+      - Quality value (q=) weight for each preference
+      - Highest cumulative score wins
+      - Vary header tracks matching axes
+    integration:
+      - juxt.pick.alpha/pick function
+      - Converts Ring headers to internal format
+      - Returns selected representation and vary header
+    failure-modes:
+      - No acceptable representation: Returns nil
+      - Malformed Accept header: Defaults to */*
+
+  - name: Aero Configuration Library
+    purpose: Configuration file parsing with profiles
+    contract: |
+      Configuration EDN file with #profile and #env tags.
+      Aero resolves tags based on active profile.
+    features:
+      - #profile {:dev value1 :prod value2}: Select by profile
+      - #env VARIABLE: Read environment variable
+      - #join [dir filename]: Join paths
+    file-location: |
+      $HOME/.config/site/config.edn or custom via -Dsite.config
+    failure-modes:
+      - File not found: Application fails to start
+      - Malformed EDN: Exception on parse
+      - Required key missing: Application fails
+
+  - name: Integrant Dependency Injection
+    purpose: System initialization and component lifecycle
+    contract: |
+      Components declared as Integrant keys in config.
+      init-key methods set up components.
+      halt-key! methods clean up resources.
+    lifecycle:
+      - ig/prep: Prepare component graph
+      - ig/init: Initialize all components
+      - ig/halt!: Shut down all components
+    components-managed:
+      - ::db/xt-node: XTDB database
+      - ::server/server: HTTP server
+      - ::nrepl/server: REPL server
+    failure-modes:
+      - Circular dependencies: ig/prep fails
+      - Component init exception: Application fails to start
+      - Component halt exception: Shutdown incomplete
+
+  - name: Logging (SLF4J / Clojure Tools Logging)
+    purpose: Request and error logging
+    contract: |
+      Logging via clojure.tools.logging facade.
+      Underlying implementation configurable (Logback, etc).
+    levels:
+      - TRACE: Detailed debug info
+      - DEBUG: General debug info
+      - INFO: Request logging, normal events
+      - WARN: Unexpected but handled situations
+      - ERROR: Errors and exceptions
+    mdc-usage:
+      - MDC put "reqid" with request ID
+      - Cleared after request (in finally block)
+    failure-modes:
+      - Logging misconfigured: May drop logs silently
+      - Log file permissions: May fail to write
+      - Large log messages: May be truncated
+
+  - name: Java Runtime
+    purpose: Runtime environment for application
+    version: Java 11+ (supports modern libraries)
+    contracts:
+      - java.util.Date: Timezone-aware instant
+      - java.time.Instant: UTC instant with nanosecond precision
+      - java.security.SecureRandom: Cryptographic randomness
+      - java.net.URI: URI parsing and normalization
+      - java.util.Base64: URL-safe encoding
+      - java.io.InputStream/OutputStream: Stream I/O
+    failure-modes:
+      - OutOfMemoryError: Application crashes
+      - File descriptor exhaustion: Connections refused
+      - System clock skew: Date calculations incorrect
+      - Timezone changes: Existing Date objects unaffected (instant-based)
+
+transitive-dependencies:
+  note: |
+    System depends on libraries for HTTP parsing (Reap), content negotiation
+    (Pick), template rendering (Selmer), and authentication (bcrypt).
+    Versions are managed via deps.edn and should be kept current for
+    security patches and bug fixes.
+
+  common-failure-modes:
+    - Dependency conflict: Two libraries require incompatible versions
+    - Security vulnerability: Known CVE in transitive dependency
+    - API change: Transitive dependency breaks compatibility
+    - Missing JAR: Corrupted or incomplete dependency download
+
+error-contract-with-clients:
+  principle: |
+    System provides meaningful error responses to enable client recovery.
+  http-status-codes:
+    - 4xx: Client error, client should fix and retry
+    - 5xx: Server error, client should retry after delay
+  error-information:
+    - Status code: Indicates error category
+    - Headers: May include Retry-After, Location, Allow, etc
+    - Body: Error message and optional details
+  sensitive-data:
+    - Exception messages: May be included in 5xx responses
+    - Stack traces: Logged internally, not sent to client
+    - Request details: Logged, not sent (except status/method/path)
+  backwards-compatibility:
+    - Existing 2xx responses: Stable, clients depend on format
+    - New 4xx/5xx codes: May be added for edge cases
+    - Header additions: Should not break existing clients
+
+load-balancer-expectations:
+  healthcheck:
+    - Path: /_site/healthcheck
+    - Response: 200 OK + "Site OK!\r\n"
+    - Frequency: Configurable (typically 5-30 seconds)
+
+  stickiness:
+    - Sessions are stored in-memory (single server)
+    - Load balancer should use sticky sessions or session replication
+    - Without stickiness: Session loss on failover
+
+  timeout-handling:
+    - Default Java timeout: Often 30-60 seconds
+    - Large template rendering: May exceed default
+    - Load balancer should allow 60+ second timeouts for complex requests
+
+  connection-limits:
+    - Default Jetty: 200 concurrent connections
+    - Configurable via server/adapter settings
+    - Load balancer should respect limits gracefully

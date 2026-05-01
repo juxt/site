@@ -1,0 +1,226 @@
+name: Data Model and Persistence Layer
+description: XTDB entity schema and data persistence invariants
+
+storage:
+  system: XTDB (immutable, time-versioned database)
+  transaction-log: RocksDB key-value store
+  document-store: RocksDB key-value store
+  index-store: RocksDB key-value store
+
+entity-types:
+  - name: Core Resource Entity
+    xtdb-key: :xt/id (URI string)
+    attributes:
+      - :xt/id (required)
+      - ::site/type (classification: "Resource", "Redirect", "ErrorResource", "Role", "User", "Rule", etc)
+      - ::http/methods (set of keywords)
+      - ::http/content-type (string)
+      - ::http/content (string body) | ::http/body (byte array)
+      - ::http/etag (string)
+      - ::http/last-modified (java.util.Date)
+      - ::site/template (URI reference)
+      - ::site/template-model (symbol | string | map)
+      - ::site/post-fn | ::site/put-fn | ::site/patch-fn (symbol | function)
+      - ::site/variant-of (URI reference)
+      - ::http/representations (sequence of representation maps)
+      - ::http/max-content-length (long)
+      - ::site/pattern (regex pattern, for locators)
+      - ::site/locator-fn (symbol, for ResourceLocator type)
+      - ::site/access-control-allow-origins (map)
+    example: |
+      {:xt/id "http://localhost:2021/users/alice"
+       ::site/type "User"
+       ::http/methods #{:get :post :put}
+       ::http/content-type "text/html;charset=utf-8"
+       ::pass/username "alice"}
+
+  - name: User Entity
+    parent: Core Resource Entity
+    attributes:
+      - ::pass/username (string, unique per deployment)
+      - ::site/type = "User"
+    invariants:
+      - Must have ::pass/username for authentication
+      - Username should be unique within the system
+
+  - name: Password Credential Entity
+    xtdb-key: :xt/id
+    attributes:
+      - :xt/id (URI)
+      - ::site/type = "Password"
+      - ::pass/user (URI reference to User entity)
+      - ::pass/password-hash (bcrypt hash, result of crypto.password.bcrypt/encrypt)
+      - ::pass/classification (typically "RESTRICTED")
+    example: |
+      {:xt/id "http://localhost:2021/users/alice/_password"
+       ::site/type "Password"
+       ::pass/user "http://localhost:2021/users/alice"
+       ::pass/password-hash "$2a$11$..."
+       ::pass/classification "RESTRICTED"}
+
+  - name: Role Entity
+    parent: Core Resource Entity
+    attributes:
+      - ::site/type = "Role"
+      - :name (string)
+      - :description (string)
+
+  - name: Rule Entity
+    xtdb-key: :xt/id
+    attributes:
+      - :xt/id (URI)
+      - ::site/type = "Rule"
+      - ::pass/target (sequence of Datalog clauses)
+      - ::pass/effect (::pass/allow | ::pass/deny)
+      - ::http/max-content-length (long, optional)
+      - ::pass/limiting-clauses (sequence of Datalog clauses, optional)
+    description: Authorization rules queried during request processing
+    invariants:
+      - ::pass/target must be valid Datalog query clauses
+      - ::pass/effect must be one of the defined values
+      - Rules are OR'd together (any matching rule with allow effect permits access)
+
+  - name: Trigger Entity
+    xtdb-key: :xt/id
+    attributes:
+      - :xt/id (URI)
+      - ::site/type = "Trigger"
+      - ::site/query (map with :find, :where keys - Datalog query)
+      - ::site/action (keyword identifying action handler)
+
+  - name: Request Log Entity
+    xtdb-key: :xt/id
+    attributes:
+      - :xt/id (URI of form http://base/_site/requests/[hex-id])
+      - ::site/type = "Request"
+      - ::site/uri (requested URI)
+      - :ring.request/method (keyword: get, post, put, delete, etc)
+      - :ring.request/headers (map of header name -> value)
+      - :ring.request/query (string)
+      - :ring.response/status (integer: 200, 404, etc)
+      - ::pass/subject (the authenticated subject, if any)
+      - ::site/date (java.util.Date of response)
+      - ::site/duration-millis (request processing time)
+    description: Immutable log of HTTP requests processed
+    note: Only stored for POST and PUT requests; request body is not stored to limit DB size
+
+  - name: Redirect Entity
+    parent: Core Resource Entity
+    attributes:
+      - ::site/type = "Redirect"
+      - ::site/location (URI for redirection target)
+
+  - name: ErrorResource Entity
+    parent: Core Resource Entity
+    attributes:
+      - ::site/type = "ErrorResource"
+      - :ring.response/status (integer matching error condition)
+    description: Custom error page resources keyed by HTTP status code
+
+  - name: Template Entity
+    parent: Core Resource Entity
+    attributes:
+      - ::site/template-dialect (string: "selmer" or other)
+      - ::http/content (string containing template source)
+    description: Reusable template content referenced by representations
+
+  - name: GraphQL Schema Entity
+    xtdb-key: :xt/id
+    attributes:
+      - :xt/id (URI)
+      - :juxt.site.alpha/graphql-schema (GraphQL schema definition)
+    description: GraphQL schema for dynamic query resolution
+
+invariants:
+  - name: Temporal Consistency
+    description: Each entity's :xtdb.api/valid-time and :xtdb.api/tx-id track its history
+    rule: |
+      All entities maintain immutable, time-versioned state. Prior versions remain
+      queryable via with-tx and db-as-of operations.
+
+  - name: Request Log Completeness
+    description: Request entities store immutable snapshots
+    rule: |
+      A Request entity captures the state at response time, excluding:
+      - :ring.request/body (raw request payload)
+      - :ring.response/body (raw response payload)
+      - ::site/xt-node (not serializable)
+      Sensitive headers (e.g., Authorization) are redacted.
+
+  - name: Entity Reference Integrity
+    description: References between entities are via URIs as strings
+    rule: |
+      Foreign key relationships (e.g., ::pass/user in Password) use :xt/id strings
+      rather than object references. Querying must use Datalog clauses to join.
+
+  - name: Representation Variant Tracking
+    description: Variants are linked to primary resources
+    rule: |
+      A Representation with ::site/variant-of URI V is an alternative form of
+      resource V. Primary representation has content-type and no variant-of.
+
+  - name: ETag Immutability
+    description: Once assigned, an ETag does not change
+    rule: |
+      For a given entity state, ::http/etag is deterministic and constant.
+      Etag changes only when entity content changes.
+
+  - name: Content Negotiation Data
+    description: Representations must be independently queryable
+    rule: |
+      Resources that list ::http/representations must ensure each representation
+      is independently queryable and satisfies content-type/language/encoding constraints.
+
+  - name: User Credential Separation
+    description: Passwords are separate entities for security
+    rule: |
+      Password hashes are stored in separate entities from User records,
+      classified as "RESTRICTED" to enable access control.
+
+  - name: Session Store Lifecycle
+    description: Sessions are stored in-memory with expiration
+    rule: |
+      Sessions are not persisted to XTDB. They are stored in an atom and expire
+      when ::expiry-instant passes. Expired sessions are purged on lookup.
+
+  - name: Rule Application Scope
+    description: Rules determine per-method authorization
+    rule: |
+      Rules are evaluated per request. Multiple matching rules are AND'd on
+      effect (all must allow for access). If no rules match, access is denied.
+
+queries:
+  - name: Find all Rules
+    query: |
+      {:find [rule]
+       :where [[rule ::site/type "Rule"]]}
+
+  - name: Find all Triggers
+    query: |
+      {:find [rule]
+       :where [[rule ::site/type "Trigger"]]}
+
+  - name: Find Variants of Resource
+    query: |
+      {:find [(pull v [*])]
+       :where [[v ::site/variant-of uri]]
+       :in [uri]}
+
+  - name: Find Resource by URI Pattern
+    query: |
+      {:find [r grps]
+       :where [[r ::site/type "ResourceLocator"]
+               [r ::site/pattern p]
+               [(re-pattern p) pat]
+               [(re-matches pat uri) grps]]
+       :in [uri]}
+
+  - name: Find Error Resource by Status
+    query: |
+      {:find [(pull er [*])]
+       :where [[er ::site/type "ErrorResource"]
+               [er :ring.response/status status]]
+       :in [status]}
+
+  - name: Recent Requests (for debugging)
+    note: Requests queried via in-memory cache for performance

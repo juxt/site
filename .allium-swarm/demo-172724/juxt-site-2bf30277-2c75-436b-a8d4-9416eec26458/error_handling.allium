@@ -1,0 +1,340 @@
+name: Error Handling, Failure Modes, and Recovery
+description: Error conditions, HTTP status codes, exception handling, and recovery mechanisms
+
+exception-types:
+  - name: ExceptionInfo
+    description: Primary exception type thrown throughout system
+    structure: |
+      {:message "Human-readable error description"
+       :ex-data {::site/request-context {...}
+                 ... additional context ...}}
+    usage: |
+      All application errors thrown as ExceptionInfo via ex-info.
+      Request context (if available) includes request state and desired response status.
+
+  - name: Throwable
+    description: Unexpected runtime exceptions
+    handling: |
+      Caught globally by wrap-error-handling.
+      Results in 500 Internal Server Error.
+
+http-status-codes:
+  success:
+    - code: 200
+      name: OK
+      scenarios:
+        - GET request with representation
+        - HEAD request
+        - Successful method returning content
+
+    - code: 201
+      name: Created
+      scenarios:
+        - POST creating new resource
+        - PUT creating new resource
+      response-headers:
+        - Location: URI of created resource
+
+    - code: 204
+      name: No Content
+      scenarios:
+        - DELETE successful
+        - POST/PUT updating existing resource
+        - PATCH successful
+      response-body: Empty
+
+    - code: 304
+      name: Not Modified
+      scenarios:
+        - GET with If-None-Match matching current ETag
+        - GET with If-Modified-Since >= Last-Modified
+      response-body: Empty
+      response-headers: |
+        Date, Cache-Control, ETag, Vary (as appropriate)
+
+  client-errors:
+    - code: 400
+      name: Bad Request
+      scenarios:
+        - Invalid Content-Length (non-numeric)
+        - Content-Range header on PUT
+        - Invalid request payload
+      recovery: |
+        Client must fix request and retry
+
+    - code: 401
+      name: Unauthorized
+      scenarios:
+        - Request requires authentication
+        - Subject is nil (no valid credentials)
+        - Authorization check fails for unauthenticated request
+      response-headers:
+        - WWW-Authenticate (if applicable)
+      recovery: |
+        Client provides authentication (Basic Auth, form login, etc)
+
+    - code: 403
+      name: Forbidden
+      scenarios:
+        - Subject authenticated but not authorized by rules
+        - Authorization check fails for authenticated subject
+      recovery: |
+        Request denied by policy. Contact administrator if access is needed.
+
+    - code: 404
+      name: Not Found
+      scenarios:
+        - No resource locator matches URI
+        - GET/HEAD with no available representations
+        - Resource does not exist
+      recovery: |
+        Check URI is correct. Resource may not exist or may have been deleted.
+
+    - code: 405
+      name: Method Not Allowed
+      scenarios:
+        - HTTP method not in Resource ::http/methods
+      response-headers:
+        - Allow: comma-separated list of supported methods
+      recovery: |
+        Client uses one of the allowed methods instead
+
+    - code: 409
+      name: Conflict
+      scenarios:
+        - Content-Encoding not in acceptable list (Accept-Encoding header present)
+        - Content-Language header missing (Accept-Language header present)
+      recovery: |
+        Client adjusts Content-Encoding or Content-Language
+
+    - code: 411
+      name: Length Required
+      scenarios:
+        - POST/PUT/PATCH without Content-Length header
+      recovery: |
+        Client provides Content-Length header
+
+    - code: 412
+      name: Precondition Failed
+      scenarios:
+        - If-Match precondition fails (no ETag matches)
+        - If-Unmodified-Since condition fails (resource modified)
+        - If-None-Match for PUT/POST/PATCH with matching ETag
+      recovery: |
+        Client may retry GET to get current ETag, then retry PUT with matching If-Match
+
+    - code: 413
+      name: Payload Too Large
+      scenarios:
+        - Content-Length > Resource ::http/max-content-length
+        - Content-Length > authorization rule limit
+      recovery: |
+        Reduce payload size. Max size may be negotiated via authorization.
+
+    - code: 415
+      name: Unsupported Media Type
+      scenarios:
+        - Content-Type not in Resource ::http/acceptable-on-{post|put}
+        - Content-Charset parameter missing (for text types)
+        - Content-Type/Encoding/Language rated at quality 0.0 by preferences
+      recovery: |
+        Client uses supported content-type, encoding, or language
+
+  server-errors:
+    - code: 500
+      name: Internal Server Error
+      scenarios:
+        - Unhandled exception during request processing
+        - Custom handler (post-fn, put-fn, body-fn) throws exception
+        - Template rendering fails
+        - Database query fails
+        - Resource locator-fn throws exception
+      response-body: |
+        Request ID (for tracking in logs) and optional error details
+      recovery: |
+        Contact support with request ID from response
+
+    - code: 501
+      name: Not Implemented
+      scenarios:
+        - HTTP method is not in supported set (GET, HEAD, POST, etc)
+      recovery: |
+        Method not supported by this server
+
+    - code: 503
+      name: Service Unavailable
+      scenarios:
+        - service-available? function returns false
+      response-headers:
+        - Retry-After: 120 (seconds)
+      recovery: |
+        Client retries after specified delay
+
+error-sources:
+  request-validation:
+    - source: receive-representation
+      errors:
+        - "Missing Content-Length header" → 411
+        - "Bad content length" (non-numeric) → 400
+        - "No body in request" → 400
+        - "Payload too large" → 413
+        - "Content-Type not supported" → 415
+        - "Content-Encoding not supported" → 409
+        - "Content-Language header required" → 409
+        - "Content-Language not supported" → 415
+        - "Content-Range header not allowed" → 400
+
+  resource-location:
+    - source: wrap-locate-resource / locate-with-locators
+      errors:
+        - "Resource locator must have a locator-fn attribute" → 500
+        - "Multiple resource locators match URI" → 500
+        - "post-fn '%s' is not resolvable" → 500
+        - "locator-fn '%s' is not resolvable" → 500
+
+  authentication:
+    - source: wrap-authenticate
+      errors: |
+        Authentication succeeds or returns nil (no subject).
+        Errors propagate from authentication handlers (e.g., password mismatch).
+
+  authorization:
+    - source: wrap-authorize / pdp/authorization
+      errors:
+        - "Unauthorized" (no subject) → 401
+        - "Forbidden" (subject present, not authorized) → 403
+      details: |
+        Detailed authorization info stored in ::pass/authorization
+        May include limiting clauses for further query restrictions
+
+  method-handling:
+    - source: POST/PUT/PATCH handler functions
+      errors:
+        - post-fn/put-fn/patch-fn not found or not resolvable → 500
+        - post-fn/put-fn returned nil → 500
+        - Exception thrown by custom handler → 500 (logged)
+
+  response-generation:
+    - source: add-payload / render-template
+      errors:
+        - "body-fn cannot be resolved: %s" → 500
+        - "Template entity not found" → 500
+        - "Unsupported template dialect" → 500
+        - Template rendering exception → 500
+
+  trigger-execution:
+    - source: wrap-triggers / rules/eval-triggers
+      errors:
+        - Trigger evaluation exceptions → Caught, logged, don't affect response
+        - Action handler exception → Caught, logged, don't affect response
+
+error-response-rendering:
+  process:
+    1. Determine error HTTP status (from request context or default 500)
+    2. Attempt to find custom error representation:
+       a. If PUT method: Check resource ::http/put-error-representations
+       b. If POST method: Check resource ::http/post-error-representations
+       c. Query for ErrorResource by status code
+       d. Use error-resource-representation to generate custom page
+    3. If no custom representation: Fall back to defaults
+    4. Call response/add-payload to generate body
+    5. Call respond to finalize response headers
+
+  fallback-representations:
+    - text/html
+      template: |
+        <status-message>
+        <error-details-link target="_site_error">Error</error-details-link>
+      purpose: |
+        Minimal error page for browsers.
+        Link to detailed error resource (subject to authorization).
+
+    - text/plain
+      template: |
+        <status-message> — <exception-message>
+      purpose: |
+        Detailed error for CLI/API consumers.
+        Includes exception message and stack trace (if available).
+
+error-logging:
+  policy:
+    - Status >= 500: Always logged as ERROR level
+    - Status < 500: Not logged (used for flow control, e.g., 302, 401)
+  context:
+    - Logger line: "%-7s %s %s %d" (METHOD PATH PROTOCOL STATUS)
+    - Error log includes: Exception message, stack trace, ex-data (redacted)
+  sensitive-data:
+    - Authorization header: Redacted as "(redacted)"
+    - request body: Not stored (excluded from logging)
+    - response body: Not stored (excluded from logging)
+  mdc:
+    - MDC puts request ID for correlation
+    - Cleared after response
+
+request-context-tracking:
+  purpose: |
+    Preserve request state as it flows through middleware.
+    Used to generate error responses with appropriate context.
+  mechanism: |
+    ExceptionInfo ex-data contains ::site/request-context map.
+    This map is the request with status code added/updated.
+    Catching middleware uses this context to respond to client.
+  recovery:
+    - If ex-data has ::site/request-context: Use it
+    - Else if ExceptionInfo has valid request: Use request with status 500
+    - Else: Create minimal error response with default body
+
+recovery-mechanisms:
+  authentication-failure:
+    mechanism: Retry with valid credentials
+    preservation: Session token issued via /token endpoint
+
+  authorization-denial:
+    mechanism: Request elevated privileges via administrator
+    preservation: Rules can be updated to grant access
+
+  precondition-failure:
+    mechanism: Get current ETag via GET, then retry PUT with If-Match
+    preservation: ETags updated on resource modification
+
+  payload-size-exceeded:
+    mechanism: Split large payload into multiple requests
+    preservation: Rules may permit larger uploads via authorization
+
+  temporary-server-error:
+    mechanism: Retry after exponential backoff
+    preservation: Request ID included in 500 response for tracking
+
+  database-unavailable:
+    mechanism: Service returns 503, client retries
+    preservation: Retry-After header guides retry timing
+
+  malformed-request:
+    mechanism: Fix validation error and retry
+    preservation: Error message indicates required fix
+
+transaction-safety:
+  principle: |
+    Transactions are atomic and durable. Partial failures don't corrupt state.
+  implementation:
+    - POST/PUT handlers call xt/submit-tx to queue transaction
+    - xt/await-tx blocks until transaction is committed
+    - Exception during await-tx rolls back (XTDB guarantee)
+  implications:
+    - If 201 Created returned: Resource definitely exists
+    - If 204 No Content returned: Resource definitely updated
+    - If error returned before commit: No changes applied
+
+idempotency:
+  principle: |
+    Idempotent operations produce same result regardless of repetition.
+  methods:
+    - GET, HEAD, OPTIONS: Idempotent (read-only)
+    - PUT: Idempotent (with conditional headers, can detect retry)
+    - DELETE: Idempotent (deleting deleted resource succeeds)
+    - POST: Not idempotent (creates new resource each time)
+    - PATCH: Not idempotent (depends on preconditions)
+  implications:
+    - Client can safely retry GET without worry
+    - Client should use If-Match on PUT to detect replay
+    - Client must track POST success externally (Location header)
