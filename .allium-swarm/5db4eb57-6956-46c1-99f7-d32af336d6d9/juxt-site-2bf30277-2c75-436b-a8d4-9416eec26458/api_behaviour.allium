@@ -1,0 +1,318 @@
+; Site HTTP API Behavior - Contracts, Validation, and Responses
+
+(namespace "http://juxt.pro/site/alpha")
+
+(surface "http-methods"
+  "HTTP method support and semantics"
+
+  (contract "GET-method"
+    "Retrieve a representation of a resource"
+    (on-request :GET "/uri"
+      (response-status "200 OK" | "304 Not Modified" | "404 Not Found" | "401 Unauthorized" | "403 Forbidden")
+      (response-includes
+        :content-type
+        :content-encoding
+        :content-language
+        :etag
+        :last-modified
+        :vary
+        :cache-control)
+      (conditionals-evaluated
+        :if-match :if-none-match :if-modified-since :if-unmodified-since)
+      (representation-selected-by
+        "Content negotiation based on Accept headers")))
+
+  (contract "HEAD-method"
+    "Like GET but without response body"
+    (on-request :HEAD "/uri"
+      (response-identical-to :GET)
+      (response-body-omitted)))
+
+  (contract "PUT-method"
+    "Create or replace a resource with complete representation"
+    (on-request :PUT "/uri"
+      (request-requires
+        :content-type :content-length)
+      (request-optional
+        :content-encoding :content-language)
+      (response-status "201 Created" | "204 No Content" | "412 Precondition Failed" | "415 Unsupported Media Type" | "411 Length Required" | "413 Payload Too Large")
+      (conditionals-enforced
+        :if-match :if-unmodified-since)
+      (payload-size-limited
+        "Default max 16MB unless ::http/max-content-length specified")
+      (representation-stored
+        "New representation replaces existing ones")))
+
+  (contract "POST-method"
+    "Create subordinate resources or trigger actions"
+    (on-request :POST "/uri"
+      (request-requires
+        :content-type :content-length)
+      (response-status "200 OK" | "201 Created" | "204 No Content" | "400 Bad Request" | "415 Unsupported Media Type")
+      (handler-invoked
+        "::site/post-fn from resource definition")
+      (payload-size-limited
+        "Default max 16MB")))
+
+  (contract "DELETE-method"
+    "Remove a resource"
+    (on-request :DELETE "/uri"
+      (response-status "200 OK" | "204 No Content" | "404 Not Found")
+      (handler-invoked
+        "::site/delete-fn from resource definition")))
+
+  (contract "PATCH-method"
+    "Partial modification of a resource"
+    (on-request :PATCH "/uri"
+      (response-status "200 OK" | "204 No Content" | "400 Bad Request")
+      (handler-invoked
+        "::site/patch-fn from resource definition")))
+
+  (contract "OPTIONS-method"
+    "Describe communication options"
+    (on-request :OPTIONS "/uri"
+      (response-status "200 OK")
+      (response-includes
+        "allow" "content-length: 0")
+      (cors-headers-included
+        :when "origin header present")))
+
+  (contract "method-not-allowed"
+    "Resource doesn't support requested method"
+    (on-request :POST "/read-only-resource"
+      (response-status "405 Method Not Allowed")
+      (response-includes
+        "allow" "Allow header lists supported methods")))
+
+  (contract "method-not-implemented"
+    "Server doesn't recognize the HTTP method"
+    (on-request :UNKNOWN "/uri"
+      (response-status "501 Not Implemented"))))
+
+(surface "content-negotiation"
+  "Automatic representation selection based on client preferences"
+
+  (contract "accept-header-processing"
+    "Server selects representation matching client preferences"
+    (on-request :GET "/uri"
+      (request-header "Accept: application/json, text/html;q=0.9"
+        (select-representation-where
+          :content-type "matches client preference"
+          :preference-used "application/json"))
+      (response-includes :vary "Accept")))
+
+  (contract "accept-encoding-negotiation"
+    "Server selects encoding matching Accept-Encoding"
+    (on-request :GET "/uri"
+      (request-header "Accept-Encoding: gzip, deflate"
+        (representation-encoded-as
+          :gzip | :deflate | :identity))))
+
+  (contract "accept-language-negotiation"
+    "Server selects language matching Accept-Language"
+    (on-request :GET "/uri"
+      (request-header "Accept-Language: en-US, fr;q=0.8"
+        (representation-language
+          :matches "en" | "fr" | "other"))))
+
+  (contract "not-acceptable"
+    "No representation matches client preferences"
+    (on-request :GET "/uri"
+      (request-header "Accept: application/xml"
+        (only-json-available
+          (response-status "406 Not Acceptable"))))))
+
+(surface "conditional-requests"
+  "RFC 7232 conditional request evaluation"
+
+  (contract "if-match-validation"
+    "Request succeeds only if ETag matches"
+    (on-request :PUT "/uri"
+      (request-header "If-Match: \"abc123\""
+        (etag-matches
+          (proceed-with-request))
+        (etag-mismatch
+          (response-status "412 Precondition Failed")))))
+
+  (contract "if-none-match-validation"
+    "Request succeeds only if ETag doesn't match"
+    (on-request :GET "/uri"
+      (request-header "If-None-Match: \"abc123\""
+        (etag-matches
+          (response-status "304 Not Modified")
+          (response-body-omitted))
+        (etag-mismatch
+          (response-status "200 OK")))))
+
+  (contract "if-modified-since"
+    "Return 304 if unchanged since specified date"
+    (on-request :GET "/uri"
+      (request-header "If-Modified-Since: Mon, 23 May 2022 22:00:00 GMT"
+        (last-modified-after-date
+          (response-status "200 OK"))
+        (last-modified-on-or-before-date
+          (response-status "304 Not Modified")))))
+
+  (contract "if-unmodified-since"
+    "Fail if modified since specified date"
+    (on-request :PUT "/uri"
+      (request-header "If-Unmodified-Since: Mon, 23 May 2022 22:00:00 GMT"
+        (last-modified-before-date
+          (proceed-with-request))
+        (last-modified-on-or-after-date
+          (response-status "412 Precondition Failed")))))
+
+  (contract "precondition-evaluation-order"
+    "RFC 7232 Section 6 evaluation precedence"
+    (step-1 :if-match)
+    (step-2 :if-unmodified-since)
+    (step-3 :if-none-match)
+    (step-4 :if-modified-since)))
+
+(surface "request-validation"
+  "Validation of request payloads"
+
+  (contract "content-type-required"
+    "PUT/POST must include Content-Type header"
+    (on-request :PUT "/uri"
+      (missing-content-type
+        (response-status "400 Bad Request"))))
+
+  (contract "content-length-required"
+    "PUT/POST must include Content-Length header"
+    (on-request :PUT "/uri"
+      (missing-content-length
+        (response-status "411 Length Required"))))
+
+  (contract "payload-size-validation"
+    "Request body must not exceed configured limit"
+    (on-request :PUT "/uri"
+      (request-body-exceeds-max
+        (response-status "413 Payload Too Large"))))
+
+  (contract "content-type-acceptance"
+    "Server validates Content-Type is acceptable"
+    (on-request :PUT "/json-only"
+      (request-body-is "application/json"
+        (proceed-with-request))
+      (request-body-is "text/plain"
+        (response-status "415 Unsupported Media Type"))))
+
+  (contract "charset-requirement"
+    "Text representations must specify charset"
+    (on-request :PUT "/uri"
+      (request-header "Content-Type: text/plain"
+        (no-charset-parameter
+          (response-status "415 Unsupported Media Type"))
+        (charset-parameter-present
+          (proceed-with-request)))))
+
+  (contract "content-range-not-allowed"
+    "Content-Range header not allowed on PUT"
+    (on-request :PUT "/uri"
+      (request-header "Content-Range: bytes 0-100/*"
+        (response-status "400 Bad Request")))))
+
+(surface "response-generation"
+  "Response payload generation and formatting"
+
+  (contract "response-body-sources"
+    "Response body comes from configured source"
+    (representation-has :body
+      (response-body-is "binary content"))
+    (representation-has :content
+      (response-body-is "text content"))
+    (representation-has :body-fn
+      (response-body-is "result of invoking function"))
+    (representation-has :template
+      (response-body-is "rendered template output")))
+
+  (contract "template-rendering"
+    "Templates are rendered with model data"
+    (representation-has-template
+      (template-dialect "selmer")
+      (template-model-from
+        :representation | :resource)
+      (rendered-content "returned as response body")))
+
+  (contract "response-headers"
+    "Response includes appropriate metadata headers"
+    (all-responses-include
+      :content-length
+      :content-type
+      :etag
+      :last-modified)
+    (conditional-responses
+      (when-cached
+        :cache-control)
+      (when-varies
+        :vary)
+      (when-redirects
+        :location))))
+
+(surface "error-responses"
+  "Error status codes and responses"
+
+  (contract "400-bad-request"
+    "Request is malformed or invalid"
+    (malformed-input
+      (response-status "400 Bad Request"))
+    (invalid-header-values
+      (response-status "400 Bad Request"))
+    (missing-required-headers
+      (response-status "400 Bad Request")))
+
+  (contract "401-unauthorized"
+    "Authentication required but not provided"
+    (on-request :GET "/protected"
+      (no-credentials
+        (response-status "401 Unauthorized"))))
+
+  (contract "403-forbidden"
+    "Authenticated but not authorized"
+    (on-request :GET "/protected"
+      (authenticated-but-denied
+        (response-status "403 Forbidden"))))
+
+  (contract "404-not-found"
+    "Resource does not exist"
+    (on-request :GET "/nonexistent"
+      (response-status "404 Not Found")))
+
+  (contract "405-method-not-allowed"
+    "Method not supported for resource"
+    (on-request :POST "/read-only"
+      (response-includes "Allow header with supported methods")))
+
+  (contract "406-not-acceptable"
+    "No representation matches client preferences"
+    (on-request :GET "/resource"
+      (no-matching-representation
+        (response-status "406 Not Acceptable"))))
+
+  (contract "409-conflict"
+    "Request conflicts with resource state"
+    (unsupported-encoding
+      (response-status "409 Conflict")))
+
+  (contract "411-length-required"
+    "Content-Length header missing"
+    (response-status "411 Length Required"))
+
+  (contract "412-precondition-failed"
+    "Conditional request precondition not met"
+    (response-status "412 Precondition Failed"))
+
+  (contract "413-payload-too-large"
+    "Request body exceeds size limit"
+    (response-status "413 Payload Too Large"))
+
+  (contract "415-unsupported-media-type"
+    "Request Content-Type not supported"
+    (response-status "415 Unsupported Media Type"))
+
+  (contract "500-internal-server-error"
+    "Unexpected server error"
+    (unhandled-exception
+      (response-status "500 Internal Server Error"))))
+

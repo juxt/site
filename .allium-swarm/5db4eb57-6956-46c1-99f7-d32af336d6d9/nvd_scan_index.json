@@ -1,0 +1,9 @@
+[
+  {
+    "project": "juxt-site-2bf30277-2c75-436b-a8d4-9416eec26458",
+    "language": "clojure",
+    "scanner": "clj-watson",
+    "output_path": "/home/jdt/ghq/github.com/juxt/allium-swarm/scanner-output/site-pipeline-temporal-5/nvd_scan/juxt-site-2bf30277-2c75-436b-a8d4-9416eec26458.json",
+    "vuln_count": 0
+  }
+]

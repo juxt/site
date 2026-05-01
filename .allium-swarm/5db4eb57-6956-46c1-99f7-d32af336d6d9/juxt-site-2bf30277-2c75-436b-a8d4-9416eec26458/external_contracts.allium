@@ -1,0 +1,369 @@
+; Site External Contracts - Dependencies and Expectations
+
+(namespace "http://juxt.pro/site/alpha")
+
+(external-service "xtdb-database"
+  "XTDB bitemporal database for entity storage"
+
+  (contract "entity-storage"
+    "XTDB provides schemaless entity storage with :xt/id primary key"
+    (expects
+      (xtdb/start-node :config
+        "Initializes XTDB node with specified configuration")
+      (xtdb/submit-tx :node :tx-data
+        "Atomically submits transaction operations")
+      (xtdb/await-tx :node :tx
+        "Blocks until transaction is durably committed")
+      (xtdb/entity :db :id
+        "Retrieves current version of entity by :xt/id")
+      (xtdb/query :db :query :in-vars
+        "Evaluates Datalog query against entities")
+      (xtdb/with-tx :db :tx-data
+        "Returns speculative database with proposed changes"))
+
+    (guarantees
+      "Every submitted transaction is durably persisted"
+      "Queries see committed state only"
+      "Entity updates are atomic"
+      "Bitemporal history is preserved")
+
+    (not-guaranteed
+      "Real-time visibility of transactions during long-running queries"
+      "Automatic schema enforcement (must validate in application)"))
+
+  (contract "datalog-queries"
+    "XTDB provides Datalog query language for pattern matching"
+    (syntax
+      '{:find [result-vars]
+        :where [[entity-pattern attribute value]]
+        :in [in-vars]}
+      "Variables start with ?"
+      "Patterns match entity attributes"
+      "Multiple patterns form AND conditions")
+
+    (expects
+      (query-with-bindings
+        "Query variables can be bound from application"
+        "Patterns match against stored entities")
+      (query-returns-tuples
+        "Results are sequences of matched tuples"))
+
+    (error-handling
+      "Invalid query syntax throws exception"
+      "Non-existent entity references return no matches"
+      "Recursive queries supported")))
+
+  (contract "transaction-semantics"
+    "XTDB transactions are ACID"
+    (properties
+      :atomic "All operations succeed or all fail"
+      :consistent "Database constraints maintained"
+      :isolated "Transactions don't see each other's changes"
+      :durable "Once await-tx returns, changes persist")
+
+    (operation-types
+      [:xtdb.api/put "Insert or update entity"]
+      [:xtdb.api/delete "Mark entity deleted in valid-time"]
+      [:xtdb.api/match "Precondition check during transaction"])
+
+    (expects
+      (tx-succeeds-or-fails-atomically)
+      (concurrent-transactions-dont-block)
+      (speculative-tx-isolation)))
+
+  (contract "bitemporal-history"
+    "XTDB maintains valid-time and transaction-time dimensions"
+    (valid-time
+      "The time an entity is asserted to be valid in business domain"
+      "Queries can access any valid-time")
+    (transaction-time
+      "The time an entity was recorded into the system"
+      "Transaction-time is monotonic and immutable")
+    (expects
+      (can-query-at-past-time
+        "SELECT ... AS OF valid-time"
+        "View system state at any past valid-time")
+      (audit-trail-preserved
+        "All changes are recorded in transaction-time"
+        "Nothing is truly deleted, only marked deleted"))))
+
+(external-service "http-framework"
+  "Ring/Jetty HTTP server framework"
+
+  (contract "request-handling"
+    "Framework provides HTTP requests in Ring format"
+    (request-map
+      :ring.request/method "Keyword: :get, :post, :put, etc."
+      :ring.request/uri "Full request URI including query string"
+      :ring.request/path "Request path only"
+      :ring.request/query "Query string"
+      :ring.request/headers "Map of header name -> value"
+      :ring.request/body "InputStream of request body"
+      :ring.request/scheme "Protocol: :http or :https"
+      :ring.request/server-name "Server hostname"
+      :ring.request/server-port "Server port number"
+      :ring.request/remote-addr "Client IP address"
+      :ring.request/ssl-client-cert "SSL certificate if present")
+
+    (expects
+      (request-method-is-keyword
+        "GET -> :get, POST -> :post, etc.")
+      (headers-are-lowercase-strings
+        "Header names are lowercase, values are strings")
+      (body-is-seekable-stream
+        "Can read request body with .readNBytes()")))
+
+  (contract "response-generation"
+    "Application returns Ring response map"
+    (response-map
+      :ring.response/status "Integer HTTP status (200, 404, etc.)"
+      :ring.response/headers "Map of header -> value strings"
+      :ring.response/body "String, bytes, or InputStream")
+
+    (expects
+      (status-is-integer "Must be valid HTTP status code")
+      (headers-are-strings "Header names and values")
+      (body-can-be-string-or-bytes)))
+
+  (contract "jetty-server"
+    "Jetty serves HTTP requests on configured port"
+    (expects
+      (jetty/run-jetty :handler :options
+        "Start HTTP server with handler function")
+      (handler-receives-ring-request
+        "Handler called with each HTTP request")
+      (handler-returns-ring-response
+        "Handler must return response map")
+      (server-handles-concurrent-requests
+        "Multiple concurrent connections supported"))
+
+    (configuration
+      :port "Port to listen on"
+      :join? "Whether to block waiting for server shutdown")))
+
+(external-service "authentication-service"
+  "Extracts and validates authentication credentials"
+
+  (contract "credential-extraction"
+    "Framework provides credentials from request headers/cookies"
+    (expects
+      (can-read-authorization-header
+        "Authorization: Bearer <token>"
+        "Authorization: Basic <base64>")
+      (can-read-cookies
+        "Cookie: sessionid=...")
+      (can-validate-token-signature
+        "JWT tokens verified against signing key"))
+
+    (returns
+      subject-map
+      {:juxt.pass.alpha/user "user-uri or nil"
+       :juxt.pass.alpha/username "username string or nil"
+       :authenticated "boolean"}))
+
+  (contract "password-validation"
+    "Bcrypt password verification"
+    (expects
+      (password/encrypt :password :cost
+        "Generate bcrypt hash of password")
+      (password/check :plaintext :hash
+        "Verify plaintext against stored hash")))
+
+  (contract "token-management"
+    "JWT or session token handling"
+    (expects
+      (can-extract-token-from-request
+        "FROM Authorization header or cookie")
+      (can-validate-token-signature)
+      (can-check-token-expiration)
+      (can-extract-subject-from-token))))
+
+(external-service "access-control-enforcement"
+  "Policy-based access control (PBAC) via Pass"
+
+  (contract "rule-evaluation"
+    "Datalog rules matched against request context"
+    (context-entities
+      subject "Authenticated user or anonymous"
+      resource "Target resource being accessed"
+      request "HTTP request details"
+      representation "Selected representation"
+      environment "System-wide configuration")
+
+    (expects
+      (rules-are-queried
+        "SELECT rules WHERE type = 'Rule'")
+      (rule-targets-are-datalog-patterns
+        "[[subject :juxt.pass.alpha/user ?user]...]")
+      (rules-evaluated-speculatively
+        "Temporary context entities added to database"
+        "Rules evaluated in isolation")))
+
+  (contract "authorization-decisions"
+    "Rules produce allow or deny decisions"
+    (effect
+      :juxt.pass.alpha/allow "User can perform action"
+      :juxt.pass.alpha/deny "User cannot perform action")
+
+    (decision-logic
+      (when-matching-allow-rule "Access is :approved")
+      (when-matching-deny-rule "Access is :denied")
+      (else "Access is :denied by default"))
+
+    (expects
+      (all-matching-rules-collected)
+      (first-matching-allow-takes-precedence
+        "Allow rule prevents further deny checks"))))
+
+(external-service "content-type-negotiation"
+  "Selects representation matching client preferences"
+
+  (contract "media-type-matching"
+    "Matches Accept header against available content-types"
+    (expects
+      (parse-accept-header
+        "Accept: application/json, text/html;q=0.9")
+      (compute-quality-values
+        "Higher q values = higher priority")
+      (select-best-match
+        "Find representation with highest total quality")))
+
+  (contract "encoding-negotiation"
+    "Matches Accept-Encoding against available encodings"
+    (expectations
+      "identity encoding always available as fallback"
+      "gzip/deflate supported if declared in representation"))
+
+  (contract "language-negotiation"
+    "Matches Accept-Language against language tags"
+    (expectations
+      "Language tags like 'en', 'fr-CA'"
+      "Wildcard '*' matches any language")))
+
+(external-service "template-rendering"
+  "Selmer template engine for response generation"
+
+  (contract "template-syntax"
+    "Selmer template language for HTML/XML"
+    (supports
+      "{{ variable }}" "Variable substitution"
+      "{% if condition %}" "Conditional blocks"
+      "{% for item in items %}" "Iteration"
+      "{% include 'template.html' %}" "Template inclusion"
+      "Custom filters and tags"))
+
+  (contract "template-loading"
+    "Templates loaded from database"
+    (expects
+      (template-loader :xt-template-loader
+        "Custom loader that fetches from XTDB")
+      (loader-opens-url :protocol
+        "Converts template URI to database lookup")))
+
+(external-service "graphql-support"
+  "GraphQL schema and query execution"
+
+  (contract "schema-definition"
+    "OpenAPI and GraphQL schemas describe data"
+    (expects
+      (schema-parsed-from-definition
+        "OpenAPI JSON or GraphQL SDL")
+      (schema-defines-types
+        "Available fields and their types")
+      (schema-defines-validation-rules)))
+
+  (contract "query-execution"
+    "GraphQL queries resolved against XTDB data"
+    (expects
+      (query-parsed-for-syntax)
+      (query-variables-bound-from-request)
+      (schema-used-to-resolve-fields
+        "Each field maps to resolver function")
+      (resolver-functions-query-xtdb
+        "Fetch data from database"))))
+
+(external-service "logging-and-monitoring"
+  "Observability of system behavior"
+
+  (contract "request-logging"
+    "Each request is logged"
+    (expects
+      (log-entry-includes
+        :timestamp
+        :method
+        :uri
+        :status
+        :response-time)))
+
+  (contract "error-logging"
+    "Exceptions are logged with context"
+    (expects
+      (error-includes
+        :timestamp
+        :message
+        :stack-trace
+        :request-context)))
+
+  (contract "performance-monitoring"
+    "Request performance tracked"
+    (expects
+      (can-measure-handler-latency)
+      (can-measure-database-query-time)
+      (can-measure-template-rendering-time))))
+
+(external-dependency "cryptographic-libraries"
+  "Bcrypt for password hashing"
+
+  (contract "password-hashing"
+    "crypto.password.bcrypt library"
+    (expects
+      (bcrypt/encrypt :password :cost
+        "Generate salted bcrypt hash"
+        "cost parameter controls work factor")
+      (bcrypt/check :plaintext :hash
+        "Verify plaintext against hash"))))
+
+(external-dependency "configuration-management"
+  "Aero configuration library"
+
+  (contract "config-file-loading"
+    "EDN configuration with environment substitution"
+    (supports
+      "#env VAR_NAME" "Environment variable substitution"
+      "#profile {:dev ... :prod ...}" "Profile-based config")
+
+    (expects
+      (aero/read-config :file :profile
+        "Load and parse config file"))))
+
+(service-assumptions "xtdb-availability"
+  "System assumes XTDB is available and responsive"
+
+  (risk "database-unavailable"
+    "XTDB crashes or becomes unreachable"
+    (impact "All requests fail with 500 error")
+    (mitigation "Monitor XTDB health, automatic restart"))
+
+  (risk "disk-full"
+    "XTDB storage runs out of disk space"
+    (impact "Transactions fail, system becomes read-only")
+    (mitigation "Monitor disk usage, provision additional storage"))
+
+  (risk "database-corruption"
+    "XTDB internal state corrupted"
+    (impact "System may fail or return incorrect data")
+    (mitigation "Regular backups, corruption detection")))
+
+(service-assumptions "credential-validation"
+  "Authentication service correctly validates tokens/passwords"
+
+  (risk "token-validation-bypass"
+    "Vulnerable token validation logic"
+    (impact "Unauthorized users gain access")
+    (mitigation "Use established crypto libraries, regular security audits"))
+
+  (risk "password-hash-compromise"
+    "Password hashes exposed or breakable"
+    (impact "User credentials compromised")
+    (mitigation "Use strong bcrypt cost factor, secure storage")))
+
