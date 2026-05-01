@@ -1,0 +1,164 @@
+-- allium: 3
+-- site.allium
+-- Distilled from juxt/site (Site 1.0): a Resource Server built on XTDB
+-- that stores web resources and serves OpenAPI-defined APIs with
+-- Policy-Based Access Control (Pass).
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+external entity HttpClient {
+    user_agent: String
+}
+
+external entity XtdbDatabase {
+    name: String
+}
+
+external entity OpenAPIDefinition {
+    content_hash: String
+}
+
+------------------------------------------------------------
+-- Enumerations
+------------------------------------------------------------
+
+enum HttpMethod {
+    get | put | post | delete | head | options | patch
+}
+
+enum AuthzDecision {
+    permit | deny | not_applicable
+}
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+value HttpRequest {
+    method: HttpMethod
+    uri: String
+    content_type: String?
+}
+
+value HttpResponse {
+    status: Integer
+    content_type: String?
+}
+
+value Representation {
+    uri: String
+    content_type: String
+    body_hash: String
+    etag: String?
+}
+
+------------------------------------------------------------
+-- Actors
+------------------------------------------------------------
+
+actor Subject {
+    subject_uri: String
+}
+
+------------------------------------------------------------
+-- Entities
+------------------------------------------------------------
+
+entity Resource {
+    uri: String
+    current: Representation?
+    exists: Boolean
+}
+
+entity ApiDefinition {
+    base_uri: String
+    definition: OpenAPIDefinition
+    served: Boolean
+}
+
+entity AuthzPolicy {
+    policy_uri: String
+    active: Boolean
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+surface HttpApi {
+    put_resource: (request: HttpRequest) -> HttpResponse
+    get_resource: (request: HttpRequest) -> HttpResponse
+    delete_resource: (request: HttpRequest) -> HttpResponse
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+rule PutCreatesOrReplacesRepresentation {
+    when: SubjectSendsRequest(subject, request)
+    requires: request.method = put
+    ensures:
+        Resource.upserted(uri: request.uri, exists: true)
+}
+
+rule GetReturnsCurrentRepresentation {
+    when: SubjectSendsRequest(subject, request)
+    requires: request.method = get
+    ensures:
+        HttpResponse.returned(status: 200, content_type: request.content_type)
+}
+
+rule DeleteRemovesResource {
+    when: SubjectSendsRequest(subject, request)
+    requires: request.method = delete
+    ensures:
+        Resource.updated(uri: request.uri, exists: false)
+}
+
+rule OpenApiDocumentsBecomeApis {
+    when: SubjectSendsRequest(subject, request)
+    requires: request.method = put
+    ensures:
+        ApiDefinition.registered(base_uri: request.uri, served: true)
+}
+
+rule RequestsAreAuthorized {
+    when: SubjectSendsRequest(subject, request)
+    ensures:
+        AuthzDecision.computed(subject: subject, request: request)
+}
+
+rule HistoryIsImmutable {
+    when: ResourceRepresentationChanged(uri)
+    ensures:
+        XtdbDatabase.preserves_prior_versions(uri: uri)
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant DenyByDefault {
+    -- Any request whose AuthzDecision is deny or not_applicable
+    -- must not mutate or reveal a Resource.
+}
+
+invariant ContentAddressableHistory {
+    -- Every Representation ever stored remains retrievable by
+    -- (uri, system_time) from the underlying XtdbDatabase.
+}
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open question "Exact set of authentication mechanisms (basic, bearer, OpenID Connect) supported and their precedence."
+
+open question "Schema and lifecycle of Pass policy documents - how they are loaded, versioned, and revoked."
+
+open question "Content negotiation, conditional and range request semantics are implemented but not modelled here."
+
+open question "Admin and bootstrap surface for installing the initial subject, policy, and OpenAPI documents."
