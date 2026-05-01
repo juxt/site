@@ -1,0 +1,260 @@
+-- allium: 3
+
+-- Site 1.0: an HTTP Resource Server built on top of XTDB. Resources are
+-- XT entities identified by URI; representations are stored, retrieved
+-- and negotiated via standard HTTP. Includes OpenAPI, GraphQL, WebDAV
+-- (dave) and a policy-based authorization module (pass).
+
+------------------------------------------------------------
+-- External entities
+------------------------------------------------------------
+
+external entity User {
+    role: anonymous | authenticated | administrator
+}
+
+external entity XtdbDatabase {
+    -- Bitemporal document store backing every Site resource.
+    name: String
+}
+
+------------------------------------------------------------
+-- Enumerations
+------------------------------------------------------------
+
+enum HttpMethod {
+    GET | HEAD | OPTIONS | PUT | POST | DELETE | PATCH |
+    PROPFIND | PROPPATCH | MKCOL | COPY | MOVE | LOCK | UNLOCK
+}
+
+enum ResourceClassification {
+    static | openapi_definition | graphql_endpoint | dave_collection | other
+}
+
+enum PolicyEffect { permit | deny }
+
+------------------------------------------------------------
+-- Value types
+------------------------------------------------------------
+
+value URI {
+    text: String
+}
+
+value Representation {
+    content_type: String
+    content_encoding: String?
+    content_language: String?
+    body: String
+    etag: String?
+    last_modified: Timestamp?
+}
+
+------------------------------------------------------------
+-- Entities
+------------------------------------------------------------
+
+entity Resource {
+    uri: URI
+    classification: ResourceClassification
+    max_content_length: Integer?
+}
+
+entity Request {
+    method: HttpMethod
+    path: String
+    subject: User
+    resource: Resource?
+    status: Integer?
+
+    state:
+        received |
+        located |
+        authenticated |
+        authorized |
+        negotiated |
+        conditions_checked |
+        processed |
+        responded |
+        failed
+
+    transitions state {
+        received -> located
+        located -> authenticated
+        authenticated -> authorized
+        authorized -> negotiated
+        authorized -> conditions_checked
+        negotiated -> conditions_checked
+        conditions_checked -> processed
+        processed -> responded
+        received -> failed
+        located -> failed
+        authenticated -> failed
+        authorized -> failed
+        negotiated -> failed
+        conditions_checked -> failed
+        processed -> failed
+        terminal: responded, failed
+    }
+}
+
+entity Policy {
+    -- pass / PDP rule loosely modelled on XACML.
+    target: String
+    effect: PolicyEffect
+}
+
+entity Trigger {
+    query: String
+    action: String
+}
+
+entity OpenApiDefinition {
+    uri: URI
+    document: String
+}
+
+actor HttpClient {
+    identified_by: User
+}
+
+actor Operator {
+    identified_by: User where role = administrator
+}
+
+rule LocateResource {
+    when: RequestReceived(request)
+    requires: request.state = received
+    ensures:
+        request.state = located
+        request.resource = lookup(request.path)
+}
+
+rule Authenticate {
+    when: RequestLocated(request)
+    requires: request.state = located
+    ensures:
+        request.state = authenticated
+        request.subject = established_subject(request)
+}
+
+rule Authorize {
+    when: RequestAuthenticated(request)
+    requires: request.state = authenticated
+    requires: exists Policy{effect: permit}
+    ensures:
+        request.state = authorized
+}
+
+rule NegotiateRepresentation {
+    when: RequestAuthorized(request)
+    requires: request.state = authorized
+    requires: request.method = GET or request.method = HEAD
+    ensures:
+        request.state = negotiated
+}
+
+rule CheckPreconditions {
+    when: RequestReadyForPreconditions(request)
+    requires: request.state = negotiated or request.state = authorized
+    ensures:
+        request.state = conditions_checked
+}
+
+rule StoreRepresentationOnPut {
+    when: RequestReadyToProcess(request)
+    requires: request.method = PUT
+    requires: request.state = conditions_checked
+    ensures:
+        request.state = processed
+        request.status = 201
+}
+
+rule DeleteResource {
+    when: RequestReadyToProcess(request)
+    requires: request.method = DELETE
+    requires: request.state = conditions_checked
+    ensures:
+        request.state = processed
+        request.status = 204
+}
+
+rule ServeRepresentation {
+    when: RequestReadyToProcess(request)
+    requires: request.method = GET or request.method = HEAD
+    requires: request.state = conditions_checked
+    ensures:
+        request.state = processed
+        request.status = 200
+}
+
+rule RespondToClient {
+    when: RequestProcessed(request)
+    requires: request.state = processed
+    ensures:
+        request.state = responded
+}
+
+rule TreatOpenApiDocumentSpecially {
+    when: PutWithOpenApiContentType(request, definition)
+    requires: request.method = PUT
+    ensures:
+        request.resource.classification = openapi_definition
+        OpenApiDefinition.created(uri: request.resource.uri, document: definition)
+}
+
+rule FireTriggers {
+    when: XtdbCommitTouchedResource(resource)
+    ensures:
+        TriggersDispatched(resource: resource)
+}
+
+invariant ResourceIdentifiedByUri {
+    Resources.all(r => r.uri != null)
+}
+
+surface HttpApi {
+    facing client: HttpClient
+
+    provides:
+        RequestReceived(request: Request)
+        RequestLocated(request: Request)
+        RequestAuthenticated(request: Request)
+        RequestAuthorized(request: Request)
+        RequestReadyForPreconditions(request: Request)
+        RequestReadyToProcess(request: Request)
+        RequestProcessed(request: Request)
+
+    @guidance
+        -- Single HTTP boundary exposed by Site. Methods supported
+        -- are GET, HEAD, OPTIONS, PUT, POST, DELETE, PATCH plus the
+        -- WebDAV verbs PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK,
+        -- UNLOCK.
+}
+
+surface GraphQlApi {
+    facing client: HttpClient
+
+    provides:
+        GraphQlQueryReceived(request: Request)
+
+    @guidance
+        -- Endpoint POST /_site/graphql.
+}
+
+surface XtdbStore {
+    facing db: XtdbDatabase
+
+    provides:
+        XtdbCommitTouchedResource(resource: Resource)
+        PutWithOpenApiContentType(request: Request, definition: String)
+
+    @guidance
+        -- Bitemporal store keyed by URI.
+}
+
+open question "WebDAV verb preconditions not enumerated."
+open question "Trigger semantics (matching, ordering, retry) not fully inferred."
+open question "Pass policies vs OpenAPI security composition undocumented."
+open question "GraphQL operations should be lifted from site-schema.graphql."
+open question "Caching layer (juxt.site.alpha.cache) not represented."
