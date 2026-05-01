@@ -1,0 +1,194 @@
+; Site Persistent Data Model - XTDB Schema and Invariants
+
+(namespace "http://juxt.pro/site/alpha")
+
+; XTDB uses schemaless entities identified by :xt/id. All entities are stored as documents
+; with bitemporality (valid-time and transaction-time).
+
+(surface "xtdb-storage"
+  "Persistent storage via XTDB bitemporal database"
+
+  (contract "entity-identification"
+    "All entities are keyed by :xt/id URI"
+    (entity-has :xt/id :as "unique-identifier")
+    (entity-has :xt/id is-text))
+
+  (contract "bitemporal-versioning"
+    "All entities are stored with valid-time and transaction-time"
+    (entity-has "valid-time" :optional)
+    (entity-has "transaction-time" :required)
+    (entity-has "tx-id" :optional)
+    "Entities can be queried at any point in valid-time or transaction-time"))
+
+(surface "resource-storage"
+  "Storage and retrieval of resources and representations"
+
+  (contract "resource-persistence"
+    "Resources are persisted as XTDB entities with URI as :xt/id"
+    (on "PUT /resource-uri"
+      (resource-is-created-with :xt/id "/resource-uri")
+      (resource-is-queryable-by :xt/id)
+      (existing-resource-is-updated)))
+
+  (contract "representation-variants"
+    "Multiple representations of a resource are stored as separate entities"
+    (representation-has :xt/id)
+    (representation-has "variant-of" :references "resource-uri")
+    (multiple-variants "same-resource"
+      (variant-1.variant-of = variant-2.variant-of))
+    (representation-is-immutable
+      "Once created, a representation's content is never modified, only new versions created"))
+
+  (contract "content-storage"
+    "Content is stored as either binary body or text content"
+    (or (representation-has "body" :binary)
+        (representation-has "content" :text))
+    (not (and (representation-has "body" :binary)
+              (representation-has "content" :text))
+      "A representation cannot have both binary and text content"))
+
+  (contract "etag-indexing"
+    "ETags are computed and stored for cache validation"
+    (representation-has "etag" :required)
+    (etag-is-computed-from
+      :content
+      :content-type
+      :content-encoding)
+    "ETags remain consistent across valid-time (immutable)")
+
+  (contract "modification-tracking"
+    "Last-modified timestamp is tracked per representation"
+    (representation-has "last-modified" :datetime)
+    (last-modified-equals-created-at
+      "last-modified is set to when representation is created")))
+
+(surface "user-credential-storage"
+  "Storage of user accounts and authentication credentials"
+
+  (contract "user-entity"
+    "Users are stored with authentication identity"
+    (user-has :xt/id)
+    (user-has "username" :unique)
+    (user-has "name" :optional)
+    (user-has "email" :optional))
+
+  (contract "password-encryption"
+    "Passwords are stored using bcrypt encryption, never in plaintext"
+    (password-has :xt/id)
+    (password-has "user" :references "user-uri")
+    (password-hash-is-bcrypt-encrypted
+      "Password must be hashed with bcrypt, not plaintext")
+    (password-has "classification" :optional))
+
+  (contract "user-role-mapping"
+    "User-role relationships are explicit entities"
+    (mapping-has :xt/id)
+    (mapping-has "assignee" :references "user-uri")
+    (mapping-has "role" :references "role-uri")
+    (mapping-type "UserRoleMapping"
+      "Explicit entity type marker")))
+
+(surface "authorization-model"
+  "Storage of authorization rules and policies"
+
+  (contract "rule-entity"
+    "Authorization rules are stored with target patterns and effects"
+    (rule-has :xt/id)
+    (rule-has "target" :datalog-pattern)
+    (rule-has "effect" :keyword :in ["allow" "deny"])
+    (rule-has "description" :optional))
+
+  (contract "rule-evaluation"
+    "Rules are evaluated by matching their target pattern against request context"
+    (target-pattern "is-datalog-query"
+      "Must be a valid Datalog query pattern")
+    (target-pattern "references-context-entities"
+      "Patterns can reference subject, resource, request, environment")
+    (matching-rules "collected"
+      "All rules with matching target patterns are identified")
+    (effect-applied "after-all-rules-evaluated"
+      "First matching allow or deny effect determines access"))
+
+  (contract "role-entity"
+    "Roles are groupings for authorization"
+    (role-has :xt/id)
+    (role-has "name" :required)
+    (role-has "description" :optional)))
+
+(surface "openapi-storage"
+  "Storage of OpenAPI schema definitions"
+
+  (contract "openapi-entity"
+    "OpenAPI definitions are stored as XTDB entities"
+    (openapi-has :xt/id)
+    (openapi-has "openapi" :object
+      "Parsed OpenAPI document structure")
+    (openapi-has "title" :optional)
+    (openapi-has "version" :optional)
+    (openapi-has "description" :optional)))
+
+(surface "query-evaluation"
+  "Datalog query evaluation against stored entities"
+
+  (contract "find-queries"
+    "Entities can be located by Datalog queries"
+    (query-syntax "datalog"
+      "Queries use XTDB Datalog syntax")
+    (query-example
+      '{:find [r]
+        :where [[r :xt/type "Resource"]
+                [r :uri uri]]
+        :in [uri]})
+    (variables-bound-from-query-result
+      "Query results bind variables for use in application logic"))
+
+  (contract "speculative-evaluation"
+    "Queries can be evaluated speculatively with temporary entities"
+    (speculative-db "with-tx"
+      "Create a database that includes proposed transaction")
+    (temporary-entities "assigned-temp-ids"
+      "Speculatively inserted entities get random UUIDs")
+    (evaluation-scope "isolated"
+      "Speculative evaluation does not modify actual database")))
+
+(surface "transaction-semantics"
+  "XTDB transaction processing"
+
+  (contract "transaction-submission"
+    "Transactions are submitted as vectors of operations"
+    (submit-tx [:xtdb.api/put entity]
+      "Insert or update an entity")
+    (submit-tx [:xtdb.api/delete entity-id]
+      "Mark entity as deleted in valid-time")
+    (operations-atomic
+      "All operations in a transaction succeed or fail together"))
+
+  (contract "transaction-awaiting"
+    "The application awaits transaction completion"
+    (await-tx "xt-node tx"
+      "Blocks until transaction is durably committed")
+    (transaction-visibility
+      "Once await-tx returns, changes are visible in all subsequent queries")))
+
+(surface "data-invariants"
+  "System-wide data constraints"
+
+  (contract "unique-resource-uris"
+    "Each resource URI is unique across the system"
+    (no-duplicate :xt/id
+      (select-all "Resource")))
+
+  (contract "unique-usernames"
+    "Each username is globally unique"
+    (no-duplicate "username"
+      (select-all "User")))
+
+  (contract "referential-integrity"
+    "Foreign key references point to existing entities"
+    (password.user "references existing"
+      (select-where "User" :xt/id password.user))
+    (mapping.assignee "references existing"
+      (select-where "User" :xt/id mapping.assignee))
+    (mapping.role "references existing"
+      (select-where "Role" :xt/id mapping.role))))
+

@@ -1,0 +1,362 @@
+; Site Data Flows - End-to-End Request Processing
+
+(namespace "http://juxt.pro/site/alpha")
+
+(flow "http-request-handling"
+  "Complete flow from HTTP request to response"
+
+  (entry-point "http-request-received"
+    "Ring-formatted HTTP request with method, URI, headers, body")
+
+  (step "1-method-validation"
+    "Verify HTTP method is implemented"
+    (check-method-in [:get :head :post :put :delete :patch :options :mkcol :propfind])
+    (on-failure
+      (throw "501 Not Implemented")
+      (exit "error")))
+
+  (step "2-locate-resource"
+    "Find resource definition for requested URI"
+    (query-xtdb
+      "SELECT * FROM resources WHERE uri = ?"
+      :uri)
+    (alternatives
+      "Try OpenAPI definitions"
+      "Try resource locators with patterns"
+      "Try redirect rules"
+      "Use default empty resource"))
+
+  (step "3-redirect-detection"
+    "Check if resource is a redirect"
+    (if-resource-type "Redirect"
+      (response-status (if :get|:head "302 Found" "307 Temporary Redirect"))
+      (response-header "Location" resource.location)
+      (exit "success")))
+
+  (step "4-method-availability"
+    "Verify resource supports requested method"
+    (check resource.methods contains request.method)
+    (on-failure
+      (response-status "405 Method Not Allowed")
+      (response-header "Allow" (join-methods resource.methods))
+      (exit "error")))
+
+  (step "5-authentication"
+    "Extract and validate authentication credentials"
+    (when request.method != :options
+      (check-auth-header
+        "Authorization: Bearer <token>" |
+        "Authorization: Basic <credentials>" |
+        "Cookie: session=..."
+        (on-none
+          (subject = nil)))
+      (validate-credentials
+        (on-invalid
+          (subject = nil)))))
+
+  (step "6-locate-representations"
+    "Find all current representations of resource"
+    (when request.method in [:get :head :put]
+      (query-xtdb
+        "Find representations where variant-of = ? or resource = ?"
+        :uri)
+      (collect-representations)))
+
+  (step "7-content-negotiation"
+    "Select best representation based on client preferences"
+    (when request.method in [:get :head]
+      (when no-representations
+        (response-status "404 Not Found")
+        (exit "error"))
+      (pick-representation
+        (request-header "Accept" (or client-types all-types))
+        (request-header "Accept-Encoding" (or client-encodings identity))
+        (request-header "Accept-Language" (or client-languages any))
+        (request-header "Accept-Charset" (or client-charsets utf-8))))
+    (when request.method in [:put]
+      (representations = all)))
+
+  (step "8-precondition-evaluation"
+    "Check RFC 7232 conditional request headers"
+    (when request.method not-in [:connect :options :trace]
+      (evaluate-if-match
+        (request-header "If-Match" etags)
+        (when-wildcard-and-no-reps
+          (response-status "412 Precondition Failed")))
+      (evaluate-if-unmodified-since
+        (request-header "If-Unmodified-Since" date)
+        (when-modified-after-date
+          (response-status "412 Precondition Failed")))
+      (evaluate-if-none-match
+        (request-header "If-None-Match" etags)
+        (for-get|head
+          (response-status "304 Not Modified")
+          (exit "success"))
+        (for-other-methods
+          (response-status "412 Precondition Failed")))
+      (evaluate-if-modified-since
+        (request-header "If-Modified-Since" date)
+        (when-not-modified-after-date
+          (response-status "304 Not Modified")
+          (exit "success")))))
+
+  (step "9-authorization-evaluation"
+    "Check access control policies"
+    (when request.method != :options
+      (build-request-context
+        subject: subject
+        resource: (dissoc resource :body :content)
+        request: (select-keys request [:method :headers :path :query])
+        representation: (dissoc representation :body :content))
+      (query-matching-rules
+        "FOR EACH rule WHERE rule.target matches request-context"
+        (evaluate-datalog rule.target :in request-context)
+        (when matches
+          (collect-matched-rules)))
+      (determine-authorization
+        (when any-matched-allow-rule
+          (authorization = :allow))
+        (when any-matched-deny-rule
+          (authorization = :deny))
+        (else
+          (authorization = :deny)))
+      (when authorization != :allow
+        (status = (if subject.authenticated? "403 Forbidden" "401 Unauthorized"))
+        (response-status status)
+        (exit "error"))))
+
+  (step "10-receive-request-payload"
+    "For PUT/POST, read and validate request body"
+    (when request.method in [:put :post]
+      (check-header-presence
+        "Content-Type" "Content-Length")
+      (parse-content-length
+        (when parse-error
+          (response-status "400 Bad Request")
+          (exit "error"))
+        (when exceeds-max
+          (response-status "413 Payload Too Large")
+          (exit "error")))
+      (validate-content-type
+        (when not-acceptable
+          (response-status "415 Unsupported Media Type")
+          (exit "error")))
+      (validate-charset-for-text
+        (when missing-charset
+          (response-status "415 Unsupported Media Type")
+          (exit "error")))
+      (read-body-bytes
+        (decode-to-content-string-if-text))))
+
+  (step "11-invoke-method-handler"
+    "Dispatch to HTTP method implementation"
+    (case request.method
+      (:get :head) (invoke GET-handler request)
+      :post (invoke resource.post-fn request)
+      :put (invoke resource.put-fn request)
+      :delete (invoke resource.delete-fn request)
+      :patch (invoke resource.patch-fn request)
+      :options (invoke OPTIONS-handler request)
+      :propfind (invoke PROPFIND-handler request)
+      :mkcol (invoke MKCOL-handler request))
+    (handler-returns
+      (updated-request-with
+        :ring.response/status
+        :ring.response/headers
+        :ring.response/body)))
+
+  (step "12-evaluate-triggers"
+    "Check if any triggers match the request context"
+    (query-triggers
+      "FOR EACH trigger WHERE trigger.query matches updated-context"
+      (evaluate-datalog trigger.query :in request-context)
+      (when matches
+        (collect-matched-triggers)))
+    (execute-trigger-actions
+      "FOR EACH matched-trigger"
+      (invoke trigger.action request)))
+
+  (step "13-build-final-response"
+    "Format HTTP response"
+    (response
+      :status response.status
+      :headers response.headers
+      :body response.body))
+
+  (exit-point "http-response-sent"
+    "Final HTTP response sent to client"))
+
+(flow "get-request-flow"
+  "GET-specific request processing"
+
+  (entry-point "GET /uri"
+    "GET request for resource")
+
+  (precondition "resource-has-current-representations"
+    (representations.count > 0)
+    (else (response-status "404 Not Found")))
+
+  (step "1-select-representation"
+    "Content negotiation selects best match"
+    (representations = current-representations)
+    (selected = negotiate-representation representations client-preferences)
+    (when selected = nil
+      (response-status "406 Not Acceptable")))
+
+  (step "2-evaluate-conditionals"
+    "RFC 7232 conditional checks"
+    (if-match-check)
+    (if-unmodified-since-check)
+    (if-none-match-check
+      (when-match
+        (response-status "304 Not Modified")
+        (exit "not-modified")))
+    (if-modified-since-check
+      (when-not-modified
+        (response-status "304 Not Modified")
+        (exit "not-modified"))))
+
+  (step "3-generate-payload"
+    "Select content source and generate response body"
+    (cond
+      selected.body-fn (invoke selected.body-fn request)
+      selected.template (render-template selected.template request)
+      selected.content (body = selected.content)
+      selected.body (body = selected.body)
+      :else (body = "")))
+
+  (step "4-set-response-headers"
+    "Include required and optional response headers"
+    (headers
+      "Content-Type" selected.content-type
+      "Content-Length" (byte-length body)
+      "Content-Encoding" selected.content-encoding
+      "Content-Language" selected.content-language
+      "Last-Modified" (format-http-date selected.last-modified)
+      "ETag" selected.etag
+      "Vary" selected.vary
+      "Cache-Control" "public, max-age=604800, immutable"))
+
+  (exit-point "200-OK-response"
+    "Return 200 with selected representation"))
+
+(flow "put-request-flow"
+  "PUT-specific request processing"
+
+  (entry-point "PUT /uri"
+    "PUT request with request body")
+
+  (step "1-receive-representation"
+    "Read and validate request payload"
+    (check "Content-Type" present)
+    (check "Content-Length" present)
+    (parse-content-length)
+    (validate-content-length <= max-allowed)
+    (read-payload-bytes)
+    (decode-text-if-needed))
+
+  (step "2-evaluate-preconditions"
+    "RFC 7232 precondition checks (if-match, if-unmodified-since)"
+    (if-match-check
+      (when-none-match
+        (response-status "412 Precondition Failed")))
+    (if-unmodified-since-check
+      (when-modified-since
+        (response-status "412 Precondition Failed"))))
+
+  (step "3-store-representation"
+    "Save new representation in XTDB"
+    (representation
+      :xt/id uri
+      :content-type parsed.content-type
+      :content-encoding parsed.content-encoding
+      :content-language parsed.content-language
+      :body payload-bytes
+      :content payload-string
+      :etag (compute-etag payload)
+      :last-modified (current-timestamp))
+    (submit-xtdb-transaction
+      [:xtdb.api/put representation])
+    (await-transaction-committed))
+
+  (step "4-determine-response-status"
+    "Decide if created or updated"
+    (when existing-representation
+      (response-status "204 No Content"))
+    (when new-resource
+      (response-status "201 Created")
+      (response-header "Location" uri)))
+
+  (exit-point "representation-stored"
+    "New representation persisted"))
+
+(flow "post-request-flow"
+  "POST-specific request processing"
+
+  (entry-point "POST /uri"
+    "POST request to create subordinate resource")
+
+  (step "1-receive-payload"
+    "Read request body"
+    (check "Content-Type" present)
+    (check "Content-Length" present)
+    (read-payload))
+
+  (step "2-invoke-post-handler"
+    "Call resource's post-fn"
+    (post-fn = resource.post-fn)
+    (when post-fn = nil
+      (response-status "500 Internal Server Error")
+      (error "Resource allows POST but has no post-fn"))
+    (result = (invoke post-fn request)))
+
+  (step "3-return-result"
+    "Handler determines response"
+    (response = result))
+
+  (exit-point "post-complete"
+    "POST handler result returned to client"))
+
+(flow "openapi-validation-flow"
+  "Validation of requests against OpenAPI schema"
+
+  (entry-point "openapi-operation-requested"
+    "Request matches OpenAPI endpoint")
+
+  (step "1-locate-openapi-definition"
+    "Find OpenAPI schema for request method/path"
+    (query-xtdb
+      "Find OpenAPI where paths[method][path] exists"))
+
+  (step "2-extract-operation-schema"
+    "Get schema for specific operation"
+    (operation = openapi.paths[request.path][request.method]))
+
+  (step "3-validate-request-parameters"
+    "Check query, path, header, and body parameters"
+    (for-each-parameter-schema
+      (check-required)
+      (check-type)
+      (check-format)
+      (when-invalid
+        (response-status "400 Bad Request"))))
+
+  (step "4-validate-request-body"
+    "If operation expects requestBody, validate against schema"
+    (when operation.requestBody.required
+      (when missing-body
+        (response-status "400 Bad Request")))
+    (validate-content-type
+      (against operation.requestBody.content))
+    (validate-body-json|xml
+      (against operation.requestBody.schema)))
+
+  (step "5-process-request"
+    "Execute operation handler")
+
+  (step "6-validate-response"
+    "Check response matches declared schema"
+    (response-schema = operation.responses[response-status].content.schema)
+    (validate-response-body
+      (against response-schema))))
+

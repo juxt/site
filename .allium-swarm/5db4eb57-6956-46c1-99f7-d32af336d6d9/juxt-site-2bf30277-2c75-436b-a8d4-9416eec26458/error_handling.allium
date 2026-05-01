@@ -1,0 +1,365 @@
+; Site Error Handling - Error Conditions, Failure Modes, and Recovery
+
+(namespace "http://juxt.pro/site/alpha")
+
+(surface "request-validation-errors"
+  "Errors during request structure validation"
+
+  (error "missing-http-method"
+    "HTTP method not provided in request"
+    (status-code "400 Bad Request")
+    (recovery "Request must include valid HTTP method"))
+
+  (error "unsupported-http-method"
+    "Server doesn't implement requested method"
+    (status-code "501 Not Implemented")
+    (recovery "Client must use supported method or wait for implementation"))
+
+  (error "malformed-request-headers"
+    "Request headers cannot be parsed"
+    (status-code "400 Bad Request")
+    (recovery "Client must fix header syntax"))
+
+  (error "missing-content-type"
+    "PUT/POST request missing Content-Type header"
+    (status-code "400 Bad Request")
+    (recovery "Client must include Content-Type header in PUT/POST"))
+
+  (error "missing-content-length"
+    "PUT/POST request missing Content-Length header"
+    (status-code "411 Length Required")
+    (recovery "Client must include Content-Length header"))
+
+  (error "invalid-content-length"
+    "Content-Length header value is not a valid integer"
+    (status-code "400 Bad Request")
+    (recovery "Client must provide valid Content-Length value"))
+
+  (error "payload-exceeds-limit"
+    "Request body size exceeds configured maximum"
+    (status-code "413 Payload Too Large")
+    (recovery "Client must reduce payload size or server increases limit"))
+
+  (error "unsupported-content-type"
+    "Content-Type not acceptable for resource"
+    (status-code "415 Unsupported Media Type")
+    (recovery "Client must use supported Content-Type or resource adds support"))
+
+  (error "missing-charset-for-text"
+    "Text content-type missing charset parameter"
+    (status-code "415 Unsupported Media Type")
+    (recovery "Client must add charset=utf-8 (or other) to Content-Type"))
+
+  (error "unsupported-encoding"
+    "Content-Encoding not acceptable for resource"
+    (status-code "409 Conflict")
+    (recovery "Client must use supported encoding or resource adds support"))
+
+  (error "content-range-on-put"
+    "Content-Range header not allowed on PUT"
+    (status-code "400 Bad Request")
+    (recovery "Client must remove Content-Range from PUT request"))
+
+  (error "method-not-allowed"
+    "Resource doesn't support requested method"
+    (status-code "405 Method Not Allowed")
+    (response-header "Allow" "supported-methods")
+    (recovery "Client must use method from Allow header or resource adds support")))
+
+(surface "precondition-failures"
+  "RFC 7232 conditional request failures"
+
+  (error "if-match-failed"
+    "Provided ETags don't match any current representation"
+    (status-code "412 Precondition Failed")
+    (when-to-occur
+      "PUT request with If-Match header"
+      "ETag values don't match current representation")
+    (recovery
+      "Client must GET current representation, extract ETag, and retry"))
+
+  (error "if-unmodified-since-failed"
+    "Resource modified after specified date"
+    (status-code "412 Precondition Failed")
+    (when-to-occur
+      "PUT/DELETE with If-Unmodified-Since header"
+      "last-modified after specified date")
+    (recovery
+      "Client must refresh and retry with current date"))
+
+  (error "if-none-match-on-put-failed"
+    "ETag matches when should not exist"
+    (status-code "412 Precondition Failed")
+    (when-to-occur
+      "PUT with If-None-Match: *"
+      "Representation already exists")
+    (recovery
+      "Client must use different URI or remove If-None-Match"))
+
+  (error "if-modified-since-not-modified"
+    "Resource unchanged since specified date"
+    (status-code "304 Not Modified")
+    (when-to-occur
+      "GET/HEAD with If-Modified-Since header"
+      "last-modified before or equal to specified date")
+    (recovery
+      "Expected behavior - client can use cached representation")))
+
+(surface "content-negotiation-errors"
+  "Errors when client preferences can't be satisfied"
+
+  (error "no-acceptable-representation"
+    "No representation matches Accept preferences"
+    (status-code "406 Not Acceptable")
+    (when-to-occur
+      "GET request with unsatisfiable Accept header")
+    (recovery
+      "Server adds representation matching preference or client changes preference"))
+
+  (error "no-current-representations"
+    "Resource has no current representations"
+    (status-code "404 Not Found")
+    (when-to-occur
+      "GET/HEAD on resource with no representations")
+    (recovery
+      "PUT a representation or delete the resource")))
+
+(surface "authentication-errors"
+  "Errors related to user authentication"
+
+  (error "missing-credentials"
+    "Request requires authentication but none provided"
+    (status-code "401 Unauthorized")
+    (response-header "WWW-Authenticate" "Bearer|Basic")
+    (when-to-occur
+      "GET /protected without Authorization header"
+      "Protected resource accessed anonymously")
+    (recovery
+      "Client must provide valid credentials"))
+
+  (error "invalid-token"
+    "Authentication token is invalid or expired"
+    (status-code "401 Unauthorized")
+    (when-to-occur
+      "Authorization header with malformed token"
+      "Token signature verification fails"
+      "Token expired")
+    (recovery
+      "Client must obtain new valid token"))
+
+  (error "invalid-credentials"
+    "Username/password combination is incorrect"
+    (status-code "401 Unauthorized")
+    (when-to-occur
+      "Basic auth with wrong password")
+    (recovery
+      "Client must provide correct username and password"))
+
+  (error "user-disabled"
+    "User account is disabled"
+    (status-code "401 Unauthorized")
+    (when-to-occur
+      "Authentication with disabled user account")
+    (recovery
+      "Administrator must re-enable user account")))
+
+(surface "authorization-errors"
+  "Errors related to access control"
+
+  (error "access-denied"
+    "Authenticated but not authorized"
+    (status-code "403 Forbidden")
+    (when-to-occur
+      "User authenticated but no matching allow rule"
+      "Matching deny rule prevents access")
+    (recovery
+      "Administrator must grant permission via role or rule"))
+
+  (error "insufficient-permissions"
+    "User lacks required permissions for operation"
+    (status-code "403 Forbidden")
+    (when-to-occur
+      "DELETE on resource where user lacks delete permission")
+    (recovery
+      "Administrator grants user the required role or rule"))
+
+  (error "resource-classification-denied"
+    "Resource classification prevents access"
+    (status-code "403 Forbidden")
+    (when-to-occur
+      "Accessing RESTRICTED resource without permission")
+    (recovery
+      "Administrator assigns user to role with RESTRICTED access")))
+
+(surface "resource-errors"
+  "Errors related to resource location and state"
+
+  (error "resource-not-found"
+    "Requested resource doesn't exist"
+    (status-code "404 Not Found")
+    (when-to-occur
+      "GET /nonexistent-uri")
+    (recovery
+      "PUT a resource at that URI or request correct URI"))
+
+  (error "multiple-resource-locators-matched"
+    "Multiple patterns matched same URI"
+    (status-code "500 Internal Server Error")
+    (when-to-occur
+      "Two resource locators have overlapping patterns")
+    (recovery
+      "Administrator must fix overlapping patterns"))
+
+  (error "locator-not-found"
+    "Resource locator function not resolvable"
+    (status-code "500 Internal Server Error")
+    (when-to-occur
+      "Resource locator references non-existent function")
+    (recovery
+      "Administrator must fix function reference in locator"))
+
+  (error "handler-function-not-found"
+    "PUT/POST handler function not resolvable"
+    (status-code "500 Internal Server Error")
+    (when-to-occur
+      "Resource has post-fn/put-fn that references missing function")
+    (recovery
+      "Administrator must implement or fix function reference")))
+
+(surface "data-validation-errors"
+  "Errors during request/response validation"
+
+  (error "openapi-validation-failed"
+    "Request doesn't match OpenAPI schema"
+    (status-code "400 Bad Request")
+    (when-to-occur
+      "Request parameter missing required field"
+      "Request body fails JSON schema validation"
+      "Parameter value type doesn't match schema")
+    (recovery
+      "Client must provide correct request matching schema"))
+
+  (error "schema-type-mismatch"
+    "Field value doesn't match declared type"
+    (status-code "400 Bad Request")
+    (recovery
+      "Client must use correct type for field"))
+
+  (error "missing-required-field"
+    "Required field missing from request"
+    (status-code "400 Bad Request")
+    (recovery
+      "Client must include required field"))
+
+  (error "invalid-format"
+    "Field value format doesn't match specification"
+    (status-code "400 Bad Request")
+    (when-to-occur
+      "Date not in RFC 3339 format"
+      "Email doesn't match email pattern")
+    (recovery
+      "Client must use correct format")))
+
+(surface "database-errors"
+  "Errors from XTDB persistence layer"
+
+  (error "transaction-failed"
+    "XTDB transaction couldn't commit"
+    (status-code "500 Internal Server Error")
+    (when-to-occur
+      "Disk full or corruption"
+      "Concurrent modification conflict")
+    (recovery
+      "Check XTDB logs, resolve issue, retry"))
+
+  (error "entity-not-found"
+    "Referenced entity missing from database"
+    (status-code "500 Internal Server Error")
+    (when-to-occur
+      "Rule references entity that was deleted"
+      "Referential integrity violation")
+    (recovery
+      "Correct the data or recreate missing entity"))
+
+  (error "query-evaluation-error"
+    "Datalog query evaluation failed"
+    (status-code "500 Internal Server Error")
+    (when-to-occur
+      "Rule target pattern has syntax error"
+      "Query references non-existent variable")
+    (recovery
+      "Fix the Datalog query syntax")))
+
+(surface "template-rendering-errors"
+  "Errors during response template rendering"
+
+  (error "template-not-found"
+    "Referenced template resource not in database"
+    (status-code "500 Internal Server Error")
+    (recovery
+      "Create template resource or update template reference"))
+
+  (error "template-loading-failed"
+    "Template file couldn't be loaded"
+    (status-code "500 Internal Server Error")
+    (recovery
+      "Verify template file exists and is readable"))
+
+  (error "template-rendering-error"
+    "Template engine failed to render"
+    (status-code "500 Internal Server Error")
+    (when-to-occur
+      "Template syntax error"
+      "Undefined variable in template")
+    (recovery
+      "Fix template syntax or provide required variables"))
+
+  (error "unsupported-template-dialect"
+    "Template dialect not recognized"
+    (status-code "500 Internal Server Error")
+    (recovery
+      "Use supported dialect (e.g., 'selmer') or add support")))
+
+(surface "error-recovery-strategies"
+  "How the system recovers from errors"
+
+  (strategy "retry-with-backoff"
+    "For transient errors, retry with exponential backoff"
+    (when-applicable
+      "Database temporarily unavailable"
+      "Transaction conflict")
+    (implementation
+      (attempt-1 "immediate")
+      (attempt-2 "after 100ms")
+      (attempt-3 "after 200ms")
+      (fail "after 3 attempts")))
+
+  (strategy "graceful-degradation"
+    "Fall back to default behavior"
+    (when-applicable
+      "Optional feature unavailable"
+      "Preference can't be satisfied")
+    (examples
+      "Content negotiation fails -> use default representation"
+      "Template rendering fails -> use stored content"))
+
+  (strategy "circuit-breaker"
+    "Stop attempting if external service consistently fails"
+    (when-applicable
+      "Authentication service unreachable"
+      "Template loading repeatedly fails")
+    (states
+      :closed "requests proceed normally"
+      :open "requests fail immediately"
+      :half-open "test if service recovered"))
+
+  (strategy "error-propagation"
+    "Surface error to client with details"
+    (when-applicable
+      "Unrecoverable errors"
+      "Client action required to resolve")
+    (information-provided
+      "HTTP status code"
+      "Error message"
+      "Remediation guidance")))
+

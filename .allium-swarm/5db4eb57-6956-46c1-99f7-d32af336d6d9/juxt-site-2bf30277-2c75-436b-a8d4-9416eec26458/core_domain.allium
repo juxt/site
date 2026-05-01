@@ -1,0 +1,199 @@
+; Site Core Domain - Entities, Value Objects, and Business Rules
+
+(namespace "http://juxt.pro/site/alpha")
+
+(entity "Resource"
+  "A target URI that can be accessed and modified via HTTP."
+  (attribute "uri" :text :required
+    "The canonical URI identifier for this resource")
+  (attribute "type" :text
+    "Resource type classification (e.g., 'StaticRepresentation', 'Redirect', 'AppRoutes')")
+  (attribute "methods" :set-of-keyword :required
+    "HTTP methods allowed on this resource (get, head, post, put, delete, patch, options)")
+  (attribute "put-fn" :value-object
+    "Optional function (symbol or fn) to handle PUT requests for this resource")
+  (attribute "post-fn" :value-object
+    "Optional function (symbol or fn) to handle POST requests for this resource")
+  (attribute "patch-fn" :value-object
+    "Optional function (symbol or fn) to handle PATCH requests for this resource")
+  (attribute "delete-fn" :value-object
+    "Optional function (symbol or fn) to handle DELETE requests for this resource")
+  (attribute "body-fn" :value-object
+    "Optional function to dynamically generate response body")
+  (attribute "locator-fn" :value-object
+    "For ResourceLocator types, function that locates resources matching a URI pattern")
+  (attribute "representations" :set-of-value-objects
+    "Static list of representations if not using variants"))
+
+(entity "Representation"
+  "A concrete variant of a resource, characterized by media type and encoding."
+  (attribute "content-type" :text
+    "Media type (e.g., 'application/json', 'text/html;charset=utf-8')")
+  (attribute "content-encoding" :text
+    "Encoding type (e.g., 'gzip', 'deflate')")
+  (attribute "content-language" :text
+    "Language tag (e.g., 'en', 'fr-CA')")
+  (attribute "body" :binary
+    "Raw binary content of the representation")
+  (attribute "content" :text
+    "Text content (for text-based representations)")
+  (attribute "charset" :text
+    "Character set if applicable (e.g., 'utf-8')")
+  (attribute "etag" :text :required
+    "Entity tag for conditional request support")
+  (attribute "last-modified" :datetime :required
+    "Timestamp when this representation was last modified")
+  (attribute "template" :text
+    "URI of a template to render this representation (references another resource)")
+  (attribute "template-dialect" :text
+    "Template engine dialect (e.g., 'selmer')")
+  (attribute "template-model" :value-object
+    "Data model for template rendering (symbol, string URI, or map)")
+  (attribute "vary" :set-of-text
+    "HTTP Vary header dimensions (e.g., Accept, Accept-Language)")
+  (attribute "content-length" :integer
+    "Size in bytes of the representation body")
+  (attribute "content-location" :text
+    "Location URI for variant identification"))
+
+(entity "User"
+  "An authenticated principal with identity and associated credentials."
+  (attribute "username" :text :required :unique
+    "Username for authentication")
+  (attribute "name" :text
+    "Full human-readable name")
+  (attribute "email" :text
+    "Email address for communication"))
+
+(entity "Password"
+  "Encrypted password credential for a user."
+  (attribute "user" :text :required
+    "URI reference to the User entity")
+  (attribute "password-hash" :text :required
+    "Bcrypt-encrypted password hash")
+  (attribute "classification" :text
+    "Security classification (e.g., 'RESTRICTED')"))
+
+(entity "Role"
+  "A grouping for authorization purposes."
+  (attribute "name" :text :required
+    "Role identifier (e.g., 'superuser', 'editor')")
+  (attribute "description" :text
+    "Human-readable role description"))
+
+(entity "UserRoleMapping"
+  "Association between a User and a Role."
+  (attribute "assignee" :text :required
+    "URI reference to the User")
+  (attribute "role" :text :required
+    "URI reference to the Role"))
+
+(entity "Rule"
+  "An authorization rule that permits or denies access based on matching conditions."
+  (attribute "target" :value-object :required
+    "Datalog query pattern to match against request context")
+  (attribute "effect" :keyword :required
+    "Authorization decision: :allow or :deny")
+  (attribute "description" :text
+    "Human-readable description of the rule's purpose")
+  (attribute "matched?" :boolean
+    "Whether this rule matched the current request context (computed)"))
+
+(entity "Redirect"
+  "HTTP redirect from one URI to another."
+  (attribute "resource" :text :required
+    "Source URI being redirected from")
+  (attribute "location" :text :required
+    "Destination URI")
+  (attribute "type" :text :const "Redirect"
+    "Entity type marker"))
+
+(entity "OpenAPI"
+  "An OpenAPI schema definition that drives API request/response validation."
+  (attribute "openapi" :value-object :required
+    "Parsed OpenAPI definition object")
+  (attribute "title" :text
+    "API title from OpenAPI info")
+  (attribute "version" :text
+    "API version from OpenAPI info")
+  (attribute "description" :text
+    "API description from OpenAPI info"))
+
+(entity "Trigger"
+  "An event-driven action triggered when a condition is met."
+  (attribute "query" :value-object :required
+    "Datalog query to identify when trigger fires")
+  (attribute "action" :value-object :required
+    "Action to execute when query matches"))
+
+(entity "ResourceLocator"
+  "Pattern-based locator that matches URIs and locates resources dynamically."
+  (attribute "pattern" :text :required
+    "Regex pattern to match against URIs")
+  (attribute "locator-fn" :value-object :required
+    "Function to invoke with pattern groups and context to locate resource")
+  (attribute "description" :text
+    "Description of what this locator matches"))
+
+(entity "AppRoutes"
+  "Client-side application routing configuration."
+  (attribute "pattern" :text :required
+    "Regex pattern for URI matching"))
+
+(entity "Template"
+  "Template definition for response rendering."
+  (attribute "dialect" :text :required
+    "Template engine (e.g., 'selmer')")
+  (attribute "content-type" :text
+    "Default content-type if not specified in representation")
+  (attribute "content-encoding" :text
+    "Default encoding if not specified")
+  (attribute "content-language" :text
+    "Default language if not specified"))
+
+; Business Rules
+(rule "must-have-uri"
+  "Every resource must have a URI identifier"
+  (resource.uri is-required))
+
+(rule "representation-requires-content"
+  "Every representation must have either body, content, body-fn, or template"
+  (or (representation.body is-present)
+      (representation.content is-present)
+      (representation.body-fn is-present)
+      (representation.template is-present)))
+
+(rule "user-is-unique-by-username"
+  "No two users can have the same username"
+  (unique-by user :username))
+
+(rule "password-requires-user"
+  "Every password record must reference an existing user"
+  (password.user references user.uri))
+
+(rule "role-mapping-valid-references"
+  "Role mapping must reference existing user and role"
+  (and (mapping.assignee references user.uri)
+       (mapping.role references role.uri)))
+
+(rule "rule-target-is-datalog-pattern"
+  "Rule target must be a valid Datalog query pattern"
+  (rule.target is-datalog-query-pattern))
+
+(rule "etag-identifies-representation"
+  "ETags are computed from representation content and uniquely identify a version"
+  (etag is-computed-from representation.content
+         representation.content-type
+         representation.content-encoding))
+
+(rule "methods-are-standard-http"
+  "Resource methods must be valid HTTP verbs"
+  (methods is-subset-of [:get :head :post :put :delete :patch :options :mkcol :propfind]))
+
+(rule "immutable-representations"
+  "Once created, representations are immutable in XTDB bitemporal history"
+  (and (representation.etag is-immutable)
+       (representation.last-modified is-immutable)
+       (representation.body is-immutable)
+       (representation.content is-immutable)))
+
