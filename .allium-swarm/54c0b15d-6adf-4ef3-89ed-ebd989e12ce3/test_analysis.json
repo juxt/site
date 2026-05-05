@@ -1,0 +1,89 @@
+{
+  "test_projects": [
+    {
+      "name": "juxt-site (main)",
+      "framework": "clojure.test + kaocha",
+      "run_command": "make test",
+      "ci_commands": [
+        "clojure -M:test -m kaocha.runner --reporter kaocha.report/dots",
+        "./bin/kaocha :test --plugin kaocha.plugin/junit-xml --junit-xml-file test-results/kaocha/results.xml",
+        "clojure -M:test -m kaocha.runner"
+      ],
+      "side_effects": [
+        "XTDB in-memory database creation during test setup (with-xt fixture)",
+        "Database writes via submit-and-await! (xtdb.api/put transactions)",
+        "HTTP request/response handler invocations (with-handler fixture)"
+      ],
+      "setup": [
+        "Clojure CLI (tools.deps) installed",
+        "OpenJDK 11+ (CircleCI uses openjdk-11, Docker uses openjdk-17)",
+        "Maven cache (~/.m2/repository, ~/.gitlibs, ~/.deps.clj)",
+        "No external services required - XTDB uses in-memory RocksDB by default",
+        "Test paths: test/"
+      ]
+    },
+    {
+      "name": "opt/insite",
+      "framework": "jest",
+      "run_command": "npm test",
+      "ci_commands": [
+        "npm test -- --watchAll=false",
+        "yarn test -- --watchAll=false"
+      ],
+      "side_effects": [],
+      "setup": [
+        "Node.js 12+",
+        "npm or yarn package manager",
+        "Dependencies installed via: npm install or yarn install",
+        "Test file: opt/insite/src/App.test.js",
+        "Uses React Testing Library for component testing"
+      ]
+    },
+    {
+      "name": "opt/insite-console",
+      "framework": "jest",
+      "run_command": "npm test",
+      "ci_commands": [
+        "npm test -- --watchAll=false",
+        "yarn test -- --watchAll=false"
+      ],
+      "side_effects": [],
+      "setup": [
+        "Node.js 12+",
+        "npm or yarn package manager",
+        "Dependencies installed via: npm install or yarn install",
+        "No test files present - test framework available but unused"
+      ]
+    },
+    {
+      "name": "docs",
+      "framework": "none (linting and type checking only)",
+      "run_command": "N/A - no test suite",
+      "ci_commands": [
+        "npm run ci-check: runs prettier:diff, lint, and tsc in parallel",
+        "npm run lint: next lint",
+        "npm run tsc: tsc --noEmit"
+      ],
+      "side_effects": [],
+      "setup": [
+        "Node.js 12+",
+        "npm package manager",
+        "Dependencies installed via: npm install",
+        "Uses Next.js for documentation site - no unit tests"
+      ]
+    },
+    {
+      "name": "opt/graphiql",
+      "framework": "none",
+      "run_command": "N/A - no test suite",
+      "ci_commands": [],
+      "side_effects": [],
+      "setup": [
+        "Node.js 12+",
+        "npm or yarn package manager",
+        "Dependencies installed via: npm install or yarn install",
+        "No test files present"
+      ]
+    }
+  ]
+}

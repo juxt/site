@@ -1,0 +1,173 @@
+namespace juxt.site.alpha.data-model
+
+import entities Resource, Representation, User, Role, UserRoleMapping, Rule, Trigger, ResourceLocator
+  from juxt.site.alpha.domain
+
+store: XTDB
+  doc: XTDB is a bitemporal immutable database
+
+storage Resource
+  attributes:
+    xt/id: URI (required)
+    site.alpha/type: string (required)
+    site.alpha/uri: URI (required)
+    site.alpha/methods: set(keyword)
+    site.alpha/put-fn: symbol|function|nil
+    site.alpha/post-fn: symbol|function|nil
+    site.alpha/patch-fn: symbol|function|nil
+    site.alpha/delete-fn: symbol|function|nil
+    site.alpha/description: string?
+    http.alpha/content-type: string?
+    http.alpha/max-content-length: integer
+      default: 16777216  ;; 2^24
+    pass.alpha/classification: string?
+  invariants:
+    i_resource_uri_unique: xt/id is unique key for resources
+    i_resource_methods_valid: methods must be subset of {get, head, post, put, delete, patch, options}
+    i_representation_belongs_to_resource: variant-of references must exist as resources
+    i_resource_locator_pattern_valid: ResourceLocator pattern must be valid regex
+
+storage Representation
+  attributes:
+    xt/id: URI (required)
+    site.alpha/variant-of: URI (required, foreign key to Resource)
+    http.alpha/content-type: string (required)
+    http.alpha/content-language: string?
+    http.alpha/content-encoding: string?
+    http.alpha/content: string?
+    http.alpha/body: bytes?
+    http.alpha/etag: string?
+    http.alpha/last-modified: timestamp
+    http.alpha/charset: string?
+    http.alpha/content-location: URI?
+  invariants:
+    i_representation_variant_of_exists: variant-of must reference existing Resource
+    i_representation_content_xor_body: exactly one of content or body must be non-nil
+    i_representation_etag_required: etag must be present for cacheability
+    i_text_charset_required: if content-type is text/* and not already in content-type, charset must be specified separately
+
+storage User
+  attributes:
+    xt/id: URI (required)
+    pass.alpha/username: string (required, unique)
+    pass.alpha/email: string?
+    name: string?
+    pass.alpha/classification: string?
+  invariants:
+    i_user_username_unique: username must be unique
+    i_user_id_is_uri: xt/id must be URI format
+
+storage Password
+  attributes:
+    xt/id: URI (required)
+    pass.alpha/user: URI (required, foreign key)
+    pass.alpha/password-hash: string (required)
+    pass.alpha/classification: string
+      default: "RESTRICTED"
+  invariants:
+    i_password_user_exists: user reference must exist
+    i_password_hash_is_bcrypt: password-hash must be valid bcrypt hash
+    i_one_password_per_user: only one active password per user
+
+storage Role
+  attributes:
+    xt/id: URI (required, unique)
+    name: string
+    description: string?
+  invariants:
+    i_role_id_unique: xt/id uniquely identifies role
+
+storage UserRoleMapping
+  attributes:
+    xt/id: URI (required)
+    pass.alpha/assignee: URI (required, foreign key to User)
+    pass.alpha/role: URI (required, foreign key to Role)
+  invariants:
+    i_user_role_mapping_assignee_exists: assignee must reference existing User
+    i_user_role_mapping_role_exists: role must reference existing Role
+
+storage Rule
+  attributes:
+    xt/id: URI (required)
+    site.alpha/type: string
+      default: "Rule"
+    pass.alpha/target: datalog-where-clause (required)
+    pass.alpha/effect: keyword (required)
+    site.alpha/description: string?
+  invariants:
+    i_rule_effect_valid: effect must be ::pass/allow or ::pass/deny or ::pass/conditional
+    i_rule_target_valid: target must be valid Datalog query clause
+
+storage Trigger
+  attributes:
+    xt/id: URI (required)
+    site.alpha/type: string
+      default: "Trigger"
+    site.alpha/query: datalog-query (required)
+    site.alpha/action: keyword (required)
+  invariants:
+    i_trigger_query_valid: query must be valid Datalog query
+
+storage ResourceLocator
+  attributes:
+    xt/id: URI (required)
+    site.alpha/type: string
+      default: "ResourceLocator"
+    site.alpha/pattern: regex (required)
+    site.alpha/locator-fn: symbol (required)
+    site.alpha/description: string?
+  invariants:
+    i_locator_pattern_valid: pattern must be valid regex pattern
+    i_locator_fn_resolvable: locator-fn must be resolvable symbol
+
+transaction Resource-Write
+  doc: Transactional write of a resource to the database
+  preconditions:
+    - resource must be structurally valid
+    - all foreign key references must exist
+  steps:
+    1. XTDB submit-tx: [:xtdb.api/put resource]
+    2. XTDB await-tx: wait for transaction to complete
+  postconditions:
+    - resource is visible in database after await-tx returns
+    - xt/id is immutable going forward
+
+transaction Authorization-Check
+  doc: Evaluate rules against request context to determine authorization
+  preconditions:
+    - request context contains resource, method, subject
+    - rules exist in database
+  steps:
+    1. Construct temporary entity map from request context with random xt/ids
+    2. Create speculative database: db/with-tx with temporary entities
+    3. For each rule: evaluate target Datalog query against speculative db
+    4. Collect matched rules (those with target returning results)
+    5. Return set of matched rules with ::pass/matched? = true
+  postconditions:
+    - returns set of rules that matched request context
+    - no side effects on actual database
+
+transaction Session-Creation
+  preconditions:
+    - user authenticated
+    - credentials verified
+  steps:
+    1. Generate 24-byte random access-token via SecureRandom
+    2. Base64-URL-encode token
+    3. Store in in-memory sessions-by-access-token atom
+    4. Set expiry-instant to current time + expires-in seconds
+  postconditions:
+    - access-token stored and retrievable
+    - expires-in seconds determine TTL
+    - token is cryptographically random
+
+transaction Session-Lookup
+  preconditions:
+    - access-token provided
+  steps:
+    1. Call expire-sessions! to remove expired entries
+    2. Get session from sessions-by-access-token atom by token
+    3. Return session or nil
+  postconditions:
+    - expired sessions not returned
+    - concurrent expiry management via atom swap

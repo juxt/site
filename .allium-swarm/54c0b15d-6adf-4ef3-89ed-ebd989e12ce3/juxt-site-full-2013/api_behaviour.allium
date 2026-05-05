@@ -1,0 +1,240 @@
+namespace juxt.site.alpha.api-behaviour
+
+import entities Resource, Representation, User, Rule, Session
+  from juxt.site.alpha.domain
+
+surface HTTP
+  protocol: HTTP/1.1
+  doc: HTTP request/response interface using Ring abstraction
+
+contract HTTP-GET
+  doc: Retrieves a resource representation
+  request:
+    method: GET | HEAD
+    uri: URI
+    headers:
+      If-Match: entity-tag? (RFC 7232)
+      If-None-Match: entity-tag* (RFC 7232)
+      If-Modified-Since: http-date? (RFC 7232)
+      If-Unmodified-Since: http-date? (RFC 7232)
+      Accept: media-range* (RFC 7231)
+      Accept-Charset: charset-range* (RFC 7231)
+      Accept-Language: language-range* (RFC 7231)
+      Accept-Encoding: encoding-range* (RFC 7231)
+      Authorization: credentials? (RFC 7235)
+
+  preconditions:
+    resource must exist at URI
+    subject must be authenticated if resource requires it
+    authorization rules must allow GET on resource
+
+  response cases:
+    200 OK:
+      body: representation selected by content negotiation
+      headers:
+        Content-Type: media-type
+        Content-Language: language-tag?
+        Content-Encoding: encoding?
+        ETag: entity-tag
+        Last-Modified: http-date
+        Vary: *
+        Cache-Control: cache-directive*
+
+    304 Not Modified:
+      condition: If-None-Match matches OR If-Modified-Since is current
+      body: (empty)
+      headers:
+        ETag: entity-tag
+        Last-Modified: http-date
+
+    404 Not Found:
+      condition: resource does not exist
+      body: error representation
+
+    406 Not Acceptable:
+      condition: no representation matches Accept constraints
+      body: error representation with available representations
+
+    401 Unauthorized:
+      condition: authentication required but not provided
+      body: error representation
+
+    403 Forbidden:
+      condition: subject lacks permission for GET
+      body: error representation
+
+contract HTTP-PUT
+  doc: Creates or replaces a resource
+  request:
+    method: PUT
+    uri: URI
+    headers:
+      Content-Type: media-type (required)
+      Content-Length: integer (required)
+      Content-Language: language-tag? (RFC 7231)
+      Content-Encoding: encoding? (RFC 7231)
+      If-Match: entity-tag* (RFC 7232)
+      If-None-Match: entity-tag*
+      Authorization: credentials?
+    body: byte[]
+
+  validation:
+    Content-Length must be present
+    Content-Length must be <= resource's max-content-length (default 2^24 bytes)
+    If-None-Match with * means resource must not exist
+    If-Match with * means resource must exist
+    Content-Type must be in resource's acceptable-on-put list
+    request charset required for text/* types that declare charset requirements
+
+  response cases:
+    201 Created:
+      condition: new resource created
+      headers:
+        Location: URI of created resource
+        ETag: entity-tag
+
+    204 No Content:
+      condition: existing resource replaced
+      headers:
+        ETag: entity-tag
+
+    400 Bad Request:
+      condition: missing Content-Length, oversized, invalid charset
+
+    411 Length Required:
+      condition: Content-Length header missing
+
+    413 Payload Too Large:
+      condition: Content-Length exceeds max-content-length
+
+    415 Unsupported Media Type:
+      condition: Content-Type not in acceptable-on-put
+
+    412 Precondition Failed:
+      condition: If-Match or If-None-Match condition false
+
+contract HTTP-POST
+  doc: Submits data for processing; behavior determined by resource's post-fn
+  request:
+    method: POST
+    uri: URI
+    headers:
+      Content-Type: media-type (required)
+      Content-Length: integer (required)
+      Content-Language: language-tag?
+      Authorization: credentials?
+    body: byte[]
+
+  preconditions:
+    resource must define post-fn
+    post-fn may be function or resolvable symbol
+
+  response cases:
+    200 OK:
+      condition: post-fn returns response with 200 status
+      body: post-fn determined
+
+    201 Created:
+      condition: post-fn returns 201 or new variant created
+      headers:
+        Location: URI of new variant/resource
+
+    204 No Content:
+      condition: post-fn returns 204
+
+    400 Bad Request:
+      condition: Content-Length missing or invalid
+
+    500 Internal Server Error:
+      condition: post-fn undefined, unresolvable, or throws exception
+
+contract HTTP-DELETE
+  doc: Removes a resource
+  request:
+    method: DELETE
+    uri: URI
+    headers:
+      Authorization: credentials?
+
+  response cases:
+    204 No Content:
+      condition: resource deleted successfully
+
+    404 Not Found:
+      condition: resource does not exist
+
+    403 Forbidden:
+      condition: subject lacks permission
+
+contract Content-Negotiation
+  doc: Selects representation variant based on Accept headers
+
+  algorithm:
+    1. Collect all representations of resource (via variant-of)
+    2. Include primary resource if it has content-type
+    3. Rate each representation using juxt/pick against Accept preferences
+    4. Return highest-rated representation
+    5. Include Vary header listing which headers influenced selection
+
+contract Authorization-Decision
+  doc: Determines if request is allowed based on rules
+
+  algorithm:
+    1. Evaluate all Rule entities against request context
+    2. Create speculative database with request context entities
+    3. For each Rule: evaluate target Datalog query
+    4. Collect matched rules
+    5. If any ::pass/allow rule matches: allow
+    6. If any ::pass/deny rule matches: deny
+    7. Otherwise: deny (default deny)
+
+contract Representation-Selection
+  doc: Finds and validates representation to serve
+
+  steps:
+    1. Locate resource by URI
+    2. Find all variants (via site.alpha/variant-of)
+    3. Apply content negotiation
+    4. Merge template metadata if representation uses template
+    5. Return selected representation with negotiated metadata
+
+contract Conditional-Request-Evaluation
+  doc: RFC 7232 precondition evaluation order
+
+  precondition-order:
+    1. If If-Match header present:
+       - If * and no representations: 412 Precondition Failed
+       - If ETags and none strong-match: 412
+    2. Else If If-Unmodified-Since present:
+       - If selected representation modified after date: 412
+    3. If If-None-Match header present:
+       - If * and representation exists: 304 Not Modified (GET/HEAD) or 412
+       - If ETag weak-matches any: 304 (GET/HEAD) or 412
+    4. Else If If-Modified-Since present and GET/HEAD:
+       - If not modified after date: 304 Not Modified
+
+contract HTTP-Status-Codes
+  doc: Mapping of application state to HTTP status codes
+
+  2xx Success:
+    200 OK: representation returned successfully
+    201 Created: new resource created
+    204 No Content: request succeeded, no body
+
+  3xx Redirection:
+    304 Not Modified: precondition satisfied
+    307 Temporary Redirect: redirect to another URI
+
+  4xx Client Error:
+    400 Bad Request: invalid Content-Length, oversized payload
+    401 Unauthorized: authentication required
+    403 Forbidden: authorization denied
+    404 Not Found: resource does not exist
+    406 Not Acceptable: no matching representation
+    411 Length Required: Content-Length header missing
+    412 Precondition Failed: If-Match/If-None-Match failed
+    413 Payload Too Large: exceeds max-content-length
+    415 Unsupported Media Type: Content-Type not acceptable
+
+  5xx Server Error:
+    500 Internal Server Error: unhandled exception, misconfiguration

@@ -1,0 +1,9 @@
+[
+  {
+    "project": "juxt-site-full-2013",
+    "language": "clojure",
+    "scanner": "clj-watson",
+    "output_path": "/home/jdt/ghq/github.com/juxt/allium-swarm/scanner-output/site-pipeline-FULL/nvd_scan_after/juxt-site-full-2013.json",
+    "vuln_count": 0
+  }
+]

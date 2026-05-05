@@ -1,0 +1,24 @@
+{
+  "scan_date": "2026-05-01",
+  "project": "juxt-site-full-2013",
+  "language": "clojure",
+  "scanner": "clj-watson",
+  "total_vulnerabilities_found": 0,
+  "vulnerabilities": [],
+  "upgrade_attempts": [],
+  "skipped_transitive_cves": [],
+  "summary": {
+    "successful_upgrades": 0,
+    "failed_upgrades": 0,
+    "skipped_upgrades": 0,
+    "status": "NO_VULNERABILITIES"
+  },
+  "notes": [
+    "NVD scan completed with zero vulnerabilities detected in direct dependencies",
+    "Direct dependencies scanned: XTDB, Ring/Jetty, XTDB RocksDB, Selmer, Malli, crypto-password (bcrypt), juxt/pick, juxt/grab, and others",
+    "No CVEs requiring upgrade",
+    "Scan confidence note: absence of vulnerabilities does not eliminate all risk (zero-days, spec-implied risks, custom vulnerability logic)",
+    "Recommend running clj-watson with --recursive flag to analyze full transitive dependency tree",
+    "No test-gated upgrades required"
+  ]
+}
