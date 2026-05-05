@@ -1,0 +1,313 @@
+namespace juxt.site.alpha.error-handling
+
+error-condition MissingContentLength
+  status: 411 Length Required
+  when: PUT/POST request lacks Content-Length header
+  message: "No Content-Length header found"
+  recovery: Client must provide Content-Length header and retry
+  data-in-error: ::site/request-context with status 411
+
+error-condition PayloadTooLarge
+  status: 413 Payload Too Large
+  when: Content-Length > resource's ::http/max-content-length
+  message: "Payload too large"
+  default-max: 16777216  ;; 2^24 bytes
+  recovery: Client must send smaller payload
+  data-in-error: ::site/request-context with status 413
+
+error-condition BadContentLength
+  status: 400 Bad Request
+  when: Content-Length header cannot be parsed as Long
+  message: "Bad content length"
+  cause: NumberFormatException during Long/parseLong
+  recovery: Client must provide valid numeric Content-Length
+  data-in-error: ::site/request-context with status 400
+
+error-condition NoRequestBody
+  status: 400 Bad Request
+  when: PUT/POST request has Content-Length but no body
+  message: "No body in request"
+  recovery: Client must include request body matching Content-Length
+  data-in-error: ::site/request-context with status 400
+
+error-condition UnsupportedContentType
+  status: 415 Unsupported Media Type
+  when: request Content-Type not in resource's acceptable-on-put/post list
+  message: "The content-type of the request payload is not supported by the resource"
+  trigger: pick qvalue for content-type = 0.0
+  recovery: Client must use acceptable Content-Type (check representation)
+  data-in-error:
+    ::acceptable: resource's acceptable-on-put/post
+    ::content-type: provided Content-Type
+    ::site/request-context with status 415
+
+error-condition UnsupportedCharset
+  status: 415 Unsupported Media Type
+  when: request charset not in resource's acceptable-on-put/post
+  message: "The charset of the Content-Type header in the request is not supported by the resource"
+  trigger: pick qvalue for charset = 0.0
+  recovery: Client must use acceptable charset
+  data-in-error:
+    ::acceptable: resource's acceptable list
+    ::content-type: provided Content-Type with charset
+    ::site/request-context with status 415
+
+error-condition TextMissingCharset
+  status: 415 Unsupported Media Type
+  when:
+    - Content-Type is text/*
+    - No charset parameter in Content-Type
+    - Resource has accept-charset preferences
+  message: "The Content-Type header in the request is a text type and is required to specify its charset as a media-type parameter"
+  recovery: Client must add charset to Content-Type (e.g. text/plain;charset=utf-8)
+  data-in-error:
+    ::acceptable: resource's acceptable list
+    ::content-type: provided Content-Type
+    ::site/request-context with status 415
+
+error-condition UnsupportedContentEncoding
+  status: 409 Conflict
+  when: Content-Encoding not in resource's acceptable-on-put
+  message: "The content-encoding in the request is not supported by the resource"
+  trigger: pick qvalue for content-encoding = 0.0
+  recovery: Client must use acceptable Content-Encoding
+  data-in-error:
+    ::acceptable: resource's acceptable list
+    ::content-encoding: provided encoding
+    ::site/request-context with status 409
+
+error-condition ContentRangeNotAllowed
+  status: 400 Bad Request
+  when: PUT request has Content-Range header
+  message: "Content-Range header not allowed on a PUT request"
+  recovery: Client must remove Content-Range header
+  data-in-error: ::site/request-context with status 400
+
+error-condition PreconditionFailed-IfMatch
+  status: 412 Precondition Failed
+  when: If-Match header condition not met
+  cases:
+    - If-Match: * but no representations exist
+    - If-Match: [etags] but none strong-match current representations
+  message: "If-Match precondition failed"
+  recovery: Client should retry without If-Match or with correct ETags
+  data-in-error: ::site/request-context with status 412
+
+error-condition PreconditionFailed-IfUnmodifiedSince
+  status: 412 Precondition Failed
+  when: representation modified after If-Unmodified-Since date
+  message: "Precondition failed"
+  recovery: Client should retry without precondition or get current Last-Modified
+  data-in-error: ::site/request-context with status 412
+
+error-condition PreconditionFailed-IfNoneMatch
+  status: 412 Precondition Failed
+  when: PUT/DELETE and If-None-Match doesn't match
+  message: "If-None-Match precondition failed"
+  recovery: Client should retry with correct ETags
+  data-in-error:
+    ::matching-entity-tag: ETag that matched
+    ::site/request-context with status 412
+
+error-condition NotModified-IfNoneMatch
+  status: 304 Not Modified
+  when: GET/HEAD and If-None-Match matches using weak comparison
+  body: (empty)
+  message: "Not modified"
+  recovery: Client can use cached representation
+  data-in-error:
+    ::matching-entity-tag: ETag that matched
+    ::site/request-context with status 304
+
+error-condition NotModified-IfModifiedSince
+  status: 304 Not Modified
+  when: GET/HEAD and representation not modified after If-Modified-Since
+  body: (empty)
+  message: "Not modified"
+  recovery: Client can use cached representation
+  data-in-error: ::site/request-context with status 304
+
+error-condition Unauthorized
+  status: 401 Unauthorized
+  when: Anonymous subject attempting protected operation
+  message: "Unauthorized"
+  recovery: Client must authenticate (login) and retry
+  data-in-error: ::site/request-context with status 401
+
+error-condition Forbidden
+  status: 403 Forbidden
+  when: Authenticated subject lacks authorization for operation
+  message: "Forbidden"
+  trigger: No ::pass/allow rule matched request
+  recovery: Request is denied; different permissions required
+  data-in-error: ::site/request-context with status 403
+
+error-condition NotFound
+  status: 404 Not Found
+  when:
+    - Resource not found in XTDB
+    - No OpenAPI definition matches
+    - No ResourceLocator pattern matches
+  message: "Not Found"
+  recovery: Client should verify URI or check available resources
+  data-in-error: ::site/request-context with status 404
+
+error-condition NotAcceptable
+  status: 406 Not Acceptable
+  when: No representation satisfies Accept* header constraints
+  message: "Not Acceptable"
+  when-happens: All representations have qvalue 0 for all dimensions
+  recovery: Client should modify Accept preferences
+  data-in-error:
+    available-representations: list of representations
+    ::site/request-context with status 406
+
+error-condition PostFnUndefined
+  status: 500 Internal Server Error
+  when: POST request but resource has no post-fn
+  message: "Resource allows POST but doesn't have a post-fn function"
+  cause: ::site/post-fn not defined in resource
+  recovery: Configure post-fn on resource
+  data-in-error: ::site/request-context with status 500
+
+error-condition PostFnUnresolvable
+  status: 500 Internal Server Error
+  when: post-fn is symbol but requiring-resolve fails
+  message: "post-fn '<symbol>' is not resolvable"
+  cause: requiring-resolve returns nil or throws exception
+  recovery: Configure correct resolvable symbol for post-fn
+  data-in-error:
+    ::post-fn: the unresolvable symbol
+    ::site/request-context with status 500
+
+error-condition PostFnInvalidType
+  status: 500 Internal Server Error
+  when: post-fn is neither function nor symbol
+  message: "post-fn is neither a function or a symbol, but type '<type>'"
+  recovery: Configure post-fn as function or resolvable symbol
+  data-in-error: ::site/request-context with status 500
+
+error-condition PutFnUnresolvable
+  status: 500 Internal Server Error
+  when: put-fn is symbol but requiring-resolve fails
+  message: "put-fn '<symbol>' is not resolvable"
+  recovery: Configure correct resolvable symbol for put-fn
+  data-in-error: ::site/request-context with status 500
+
+error-condition ResourceLocatorUnresolvable
+  status: 500 Internal Server Error
+  when: ResourceLocator locator-fn symbol cannot be resolved
+  message: "Resource locator must be a symbol"
+  recovery: Configure locator-fn as resolvable symbol
+  data-in-error:
+    ::locator: the ResourceLocator entity
+    ::site/request-context with status 500
+
+error-condition MultipleResourceLocatorMatches
+  status: 500 Internal Server Error
+  when: Multiple ResourceLocators match the same URI pattern
+  message: "Multiple resource locators returned from query that match URI"
+  cause: Ambiguous pattern matching configuration
+  recovery: Fix ResourceLocator patterns to be unambiguous
+  data-in-error:
+    ::locators: [list of matching locator IDs]
+    ::site/request-context with status 500
+
+error-condition RuleEvaluationFailure
+  status: (context dependent)
+  when: Exception during rule target evaluation
+  message: "Failed to evaluate rules"
+  cause: Invalid Datalog query or database state error
+  recovery: Logs error, returns empty rule set (defaults to DENY)
+  side-effect: Error logged, rules evaluation fails gracefully
+
+error-condition TemplateLoadingFailure
+  status: 500 Internal Server Error
+  when: Template resource not found in database
+  message: "Failed to find template resource: <uri>"
+  recovery: Ensure template resource exists with correct URI
+  data-in-error:
+    ::template-uri: requested template URI
+    context: Selmer template loading
+
+error-condition TemplateRenderingFailure
+  status: 500 Internal Server Error
+  when: Selmer template rendering throws exception
+  cause: Invalid Selmer syntax, missing variables, etc.
+  recovery: Debug template syntax and variable availability
+  data-in-error:
+    ::template: template URI
+    context: Selmer rendering error
+
+error-condition TemplateBodyMissing
+  status: 500 Internal Server Error
+  when: Template processed but body is nil
+  message: "Template body is nil"
+  recovery: Ensure template produces output
+  data-in-error:
+    ::template: template URI
+    ::template-resource: template entity
+
+error-condition InvalidValidationSchema
+  status: 400 Bad Request
+  when: Malli validation of request fails
+  cause: Request payload structure/type mismatch
+  recovery: Client should provide conforming payload structure
+  data-in-error:
+    validation-errors: Malli error messages
+
+error-condition DatabaseTransactionFailure
+  status: 500 Internal Server Error
+  when: XTDB transaction submit or await fails
+  cause: XTDB configuration error, storage error
+  recovery: Check XTDB health, storage availability
+  data-in-error:
+    ::error: XTDB exception message
+
+unhandled-exception
+  when: Any exception not caught by specific handlers
+  behavior:
+    Thread.setDefaultUncaughtExceptionHandler wraps in ex-info
+    message: "Default Exception caught:"
+    contains: original throwable
+  recovery: Log exception, system should be restarted
+
+error-recovery Recovery-Strategies
+
+strategy Retry-with-Backoff
+  applicable-to:
+    - Database transaction failures
+    - Transient network errors
+  implementation: Client-side retry with exponential backoff
+  max-retries: Implementation dependent
+
+strategy Client-Correction
+  applicable-to:
+    - Missing Content-Length
+    - Unsupported Content-Type
+    - Invalid preconditions
+  implementation: Client corrects request and retries
+  cost: Network roundtrip
+
+strategy Immediate-Rejection
+  applicable-to:
+    - Forbidden (403)
+    - Not Found (404)
+    - Not Acceptable (406)
+  implementation: No retry, terminal error
+  cost: Request fails
+
+strategy Configuration-Fix
+  applicable-to:
+    - Missing post-fn/put-fn
+    - Unresolvable symbols
+    - Invalid ResourceLocator pattern
+  implementation: Admin must fix configuration
+  cost: Downtime until fixed
+
+strategy Graceful-Degradation
+  applicable-to:
+    - Rule evaluation failure
+    - Template rendering failure
+  implementation: Fail conservatively (deny access, log error)
+  cost: Request denied but system continues

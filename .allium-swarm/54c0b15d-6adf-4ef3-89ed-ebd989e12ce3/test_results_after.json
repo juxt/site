@@ -1,0 +1,42 @@
+[
+  {
+    "project": "juxt-site (main)",
+    "command": "make test",
+    "exit_code": 0,
+    "stdout": "clojure -M:test -m kaocha.runner --reporter kaocha.report/dots \"test\"\n[(.....)(................................)(..)(.............................)(...........................)(..........................)(.......)]\\n[32m67 tests, 128 assertions, 0 failures.[m\n",
+    "stderr": "WARNING: abs already refers to: #'clojure.core/abs in namespace: juxt.clojars-mirrors.encore.v3v9v2.taoensso.encore, being replaced by: #'juxt.clojars-mirrors.encore.v3v9v2.taoensso.encore/abs\n",
+    "duration": "29.273s"
+  },
+  {
+    "project": "opt/insite",
+    "command": "npm test",
+    "exit_code": 254,
+    "stdout": "",
+    "stderr": "npm error code ENOENT\nnpm error syscall open\nnpm error path /home/jdt/ghq/github.com/juxt/allium-swarm/clones/juxt-site-full-2013/package.json\nnpm error errno -2\nnpm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/home/jdt/ghq/github.com/juxt/allium-swarm/clones/juxt-site-full-2013/package.json'\nnpm error enoent This is related to npm not being able to find a file.\nnpm error enoent\nnpm error A complete log of this run can be found in: /home/jdt/.npm/_logs/2026-05-01T19_29_50_012Z-debug-0.log\n",
+    "duration": "277.939762ms"
+  },
+  {
+    "project": "opt/insite-console",
+    "command": "npm test",
+    "exit_code": 254,
+    "stdout": "",
+    "stderr": "npm error code ENOENT\nnpm error syscall open\nnpm error path /home/jdt/ghq/github.com/juxt/allium-swarm/clones/juxt-site-full-2013/package.json\nnpm error errno -2\nnpm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/home/jdt/ghq/github.com/juxt/allium-swarm/clones/juxt-site-full-2013/package.json'\nnpm error enoent This is related to npm not being able to find a file.\nnpm error enoent\nnpm error A complete log of this way to run the tests, it can be found in: /home/jdt/.npm/_logs/2026-05-01T19_29_50_288Z-debug-0.log\n",
+    "duration": "227.88851ms"
+  },
+  {
+    "project": "docs",
+    "command": "N/A - no test suite",
+    "exit_code": 127,
+    "stdout": "",
+    "stderr": "sh: line 1: N/A: No such file or directory\n",
+    "duration": "3.257082ms"
+  },
+  {
+    "project": "opt/graphiql",
+    "command": "N/A - no test suite",
+    "exit_code": 127,
+    "stdout": "",
+    "stderr": "sh: line 1: N/A: No such file or directory\n",
+    "duration": "2.831585ms"
+  }
+]

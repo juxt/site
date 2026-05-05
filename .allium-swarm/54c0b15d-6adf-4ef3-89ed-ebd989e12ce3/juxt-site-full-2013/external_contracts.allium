@@ -1,0 +1,360 @@
+namespace juxt.site.alpha.external-contracts
+
+external-dependency XTDB
+  module: com.xtdb/xtdb-core, com.xtdb/xtdb-rocksdb, com.xtdb/xtdb-lucene
+  purpose: Immutable bitemporal database for storing resources, rules, users, etc.
+
+  contract xtdb/start-node
+    receives:
+      xtdb/tx-log configuration: {:kv-store {...}}
+      xtdb/document-store configuration: {:kv-store {...}}
+      xtdb/index-store configuration: {:kv-store {...}}
+    returns: Node instance
+    provides:
+      xtdb.api/q (Datalog querying)
+      xtdb.api/entity (document retrieval)
+      xtdb.api/submit-tx (transaction submission)
+      xtdb.api/await-tx (transaction waiting)
+      xtdb.api/with-tx (speculative transactions)
+
+  guarantees:
+    - ACID transactions on submitted entities
+    - Bitemporal queries (valid-time and transaction-time)
+    - Datalog query language support
+    - Document storage with immutability
+    - Fast entity lookups by xt/id (URI)
+
+  limitations:
+    - No mutation of existing documents (only put/delete)
+    - Datalog queries evaluated in query time context
+    - Network HTTP server is separate module
+
+external-dependency Ring/Jetty
+  modules: ring/ring-jetty-adapter, ring/ring-core
+  purpose: HTTP server and request/response abstraction
+
+  contract ring.adapter.jetty/run-jetty
+    receives:
+      handler: function(ring-request) -> ring-response
+      options: {:port integer, :join? boolean, ...}
+    returns: Server instance
+    provides:
+      - HTTP server listening on port
+      - Ring-formatted request maps
+      - Ring-formatted response maps
+
+  ring-request format:
+    :ring.request/method: keyword (get, post, put, delete, head, patch, options, trace, connect)
+    :ring.request/uri: string (request URI)
+    :ring.request/headers: map {\"header-name\" \"value\"}
+    :ring.request/body: InputStream
+    additional: protocol, scheme, server-name, server-port, etc.
+
+  ring-response format:
+    :ring.response/status: integer (200, 404, 500, etc.)
+    :ring.response/headers: map {\"header-name\" \"value\"}
+    :ring.response/body: string|bytes|InputStream|lazy-seq
+
+  guarantees:
+    - Jetty handles HTTP/1.1 protocol
+    - Handler receives one request per invocation
+    - MBeans exposed for monitoring (JMX)
+
+external-dependency Aero
+  module: aero/aero
+  purpose: Configuration file reading with profile support
+
+  contract aero/read-config
+    receives:
+      config-file: File
+      options: {:profile keyword}
+    returns: configuration map with Integrant tags resolved
+    integrant-tag-support: reader method for 'ig/ref
+
+  usage:
+    - Reads EDN configuration
+    - Supports #profile {:dev value1 :prod value2}
+    - Supports #env HOME expansion
+    - Supports #join path concatenation
+    - Integrant refs for dependency specification
+
+external-dependency Integrant
+  module: integrant/integrant
+  purpose: Dependency injection and system lifecycle management
+
+  contract ig/init-key, ig/halt-key!
+    receives: configuration with ::module/key entries
+    provides:
+      ig/prep: prepare configuration (load namespaces, validate)
+      ig/init: initialize system (build dependency graph)
+      ig/halt!: shutdown system
+
+  system-keys used:
+    ::db/xt-node: starts XTDB node with config
+    ::server/server: starts Ring/Jetty HTTP server
+    ::nrepl/server: starts nREPL for development
+
+  guarantees:
+    - Dependency ordering enforced
+    - Shutdown in reverse order
+    - Ref-based dependency specification
+
+external-dependency juxt/pick
+  module: juxt/pick
+  purpose: Content negotiation (Accept header parsing and rating)
+
+  contract juxt.pick.alpha.ring/pick
+    receives:
+      ring-request: with :headers
+      representations: [map, ...]
+      options: {::pick/vary? boolean}
+    returns:
+      {::pick/representation selected-rep
+       ::pick/vary [varied-over-headers]}
+
+  contract juxt.pick.alpha.ring/decode-maybe
+    receives: representation with content-type and encoding
+    returns: decoded representation with charset extracted
+
+  guarantees:
+    - Rates representations based on Accept preferences
+    - Implements RFC 7231 media-type matching
+    - Returns Vary header indicating preference dimensions used
+
+external-dependency juxt/grab
+  module: juxt/grab
+  purpose: GraphQL schema validation and document parsing
+
+  contract juxt.grab.alpha.schema/as-schema
+    receives: GraphQL schema definition
+    returns: parsed schema structure
+
+  contract juxt.grab.alpha.execution/execute-request
+    receives: parsed schema, document, variables
+    returns: GraphQL execution result
+
+  guarantees:
+    - GraphQL schema validation
+    - Document parsing and execution
+    - Field resolution via provided executors
+
+external-dependency juxt/reap
+  module: (imported, not in deps.edn)
+  purpose: RFC parser combinators (RFC 7230, 7231, 7232, 7235)
+
+  provides:
+    juxt.reap.alpha.decoders: Header field decoders
+    juxt.reap.alpha.rfc7232: Entity-tag and precondition parsing
+    juxt.reap.alpha.rfc7231: Media-type, date parsing
+    juxt.reap.alpha.rfc7235: Authorization header parsing
+
+  guarantees:
+    - Parses HTTP headers according to RFC specs
+    - Provides predicates for strong/weak comparison
+    - Formats dates and entity-tags
+
+external-dependency Malli
+  module: metosin/malli
+  purpose: Schema validation for GraphQL and request payloads
+
+  contract malli.core/validate
+    receives: schema, data
+    returns: true|error map
+
+  guarantees:
+    - Type and structure validation
+    - Error messages via malli.error/humanize
+
+external-dependency Crypto-Password (bcrypt)
+  module: crypto-password/crypto-password
+  purpose: Password hashing and verification
+
+  contract crypto.password.bcrypt/encrypt
+    receives: plaintext password
+    returns: bcrypt hash string
+    properties: deterministic hash, suitable for storage
+
+  contract crypto.password.bcrypt/check
+    receives: plaintext password, stored hash
+    returns: boolean
+    guarantees: timing-safe comparison
+
+  guarantees:
+    - Industry-standard bcrypt algorithm
+    - Salting and cost factor included
+    - Timing-attack resistant verification
+
+external-dependency Selmer
+  module: selmer/selmer
+  purpose: Template rendering engine (Jinja2-like)
+
+  contract selmer.parser/render
+    receives: template string, model map
+    returns: rendered string
+    syntax: {{ variable }}, {% for item in items %}, etc.
+
+  custom-loaders:
+    xt-template-loader: proxy URLStreamHandler for loading templates from XTDB
+
+  guarantees:
+    - Jinja2-compatible template syntax
+    - Custom tag extensibility
+    - Model variable substitution
+
+external-dependency java-http-clj
+  module: java-http-clj/java-http-clj
+  purpose: HTTP client for OAuth2 and OpenID Connect integration
+
+  usage:
+    - Fetching JWKs from OpenID provider
+    - Exchanging authorization codes for tokens
+
+  guarantees:
+    - HTTP request building and execution
+    - JSON response parsing
+
+external-dependency java-jwt
+  module: com.auth0/java-jwt
+  purpose: JWT token creation and verification
+
+  contract JWT.create
+    receives: claims (issuer, subject, audience, expiration)
+    returns: JWT token string
+
+  contract JWT.require
+    receives: algorithm
+    returns: verifier that can verify tokens
+
+  guarantees:
+    - JWT encoding per RFC 7519
+    - Signature verification with keys
+    - Claim validation
+
+external-dependency jwks-rsa
+  module: com.auth0/jwks-rsa
+  purpose: JWK set fetching and caching for token verification
+
+  usage:
+    - Fetch public keys from OpenID provider's /.well-known/jwks.json
+    - Cache keys with TTL
+    - Verify JWT signatures with fetched keys
+
+  guarantees:
+    - Handles key rotation
+    - Caches keys to reduce network calls
+
+external-dependency Tick
+  module: tick/tick
+  purpose: Time and date handling
+
+  usage:
+    - Instant/date arithmetic
+    - Format conversion
+
+  guarantees:
+    - Java.time-based date/time operations
+    - Zone-aware calculations
+
+external-dependency Selmer (continued)
+  integrations:
+    - Custom filters for domain-specific rendering
+    - Nested template loading via xt-template-loader
+
+  extension-points:
+    add-filter!: register custom template filters
+    add-tag!: register custom template tags
+
+external-dependency Jsonista
+  module: metosin/jsonista
+  purpose: JSON serialization and deserialization
+
+  contract jsonista.core/read-value
+    receives: JSON string or bytes
+    returns: Clojure map
+
+  contract jsonista.core/write-value-as-string
+    receives: Clojure map
+    returns: JSON string
+
+  guarantees:
+    - Fast JSON parsing
+    - Keyword conversion
+
+external-dependency json-html
+  module: json-html/json-html
+  purpose: HTML rendering of JSON for debugging
+
+  usage:
+    - Converting JSON structures to HTML representation
+    - Interactive JSON browsing
+
+external-dependency clj-yaml
+  module: clj-yaml/clj-yaml
+  purpose: YAML parsing and generation
+
+  usage:
+    - Alternative representation format support
+
+  contract clj-yaml/parse-string
+    receives: YAML string
+    returns: Clojure map
+
+external-dependency Hiccup
+  module: hiccup/hiccup
+  purpose: HTML generation from Clojure data structures
+
+  contract hiccup/html
+    receives: hiccup vectors ([:div [:p \"content\"]])
+    returns: HTML string
+
+  guarantees:
+    - Escaping for XSS prevention
+    - Compact HTML output
+
+external-system OpenID Connect Provider
+  used-for: OAuth2 authentication and authorization
+  integration: juxt.pass.alpha.openid-connect
+
+  expected-endpoints:
+    /.well-known/openid-configuration
+    /authorize
+    /token
+    /.well-known/jwks.json
+
+  contract:
+    - Accepts authorization code grant requests
+    - Returns ID tokens and access tokens
+    - Publishes JWK set for token verification
+    - Implements standard OpenID Connect protocol
+
+  failure-modes:
+    - Network timeout: authentication fails
+    - Invalid JWK set: token verification fails
+    - Token expired: session invalid
+
+external-system Email Service
+  used-for: Notifications and password reset (optional)
+  integration: (configurable via triggers)
+
+  expected-capability:
+    - SMTP or HTTP-based email sending
+    - HTML and plaintext templates
+
+  failure-modes:
+    - Send failure: logged, trigger action fails but continues
+
+external-system Storage
+  purpose: Persist XTDB database files
+  location: ~/.local/share/site/db/
+  components:
+    - txes/: transaction log via RocksDB
+    - docs/: document store via RocksDB
+    - idxs/: index store via RocksDB
+
+  guarantees:
+    - RocksDB provides durability
+    - ACID guarantees from XTDB
+
+  failure-modes:
+    - Disk full: new transactions fail
+    - Corruption: requires recovery/restore

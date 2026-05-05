@@ -1,0 +1,51 @@
+{
+  "bootstrapped": false,
+  "pre_existing_workflows": [
+    ".github/workflows/ci.yml"
+  ],
+  "lint_report": "actionlint not installed; skipping syntactic validation",
+  "recent_runs": [
+    {
+      "databaseId": 25224655943,
+      "name": "CI",
+      "conclusion": "success",
+      "status": "completed",
+      "headBranch": "allium-swarm/reports/d52fa048-cc89-451b-a6ee-848520549568",
+      "headSha": "c3cd1007116882e5d27e2142edf13814ad5ee4b3",
+      "url": "https://github.com/juxt/site/actions/runs/25224655943",
+      "updatedAt": "2026-05-01T17:22:05Z"
+    },
+    {
+      "databaseId": 25222608475,
+      "name": "CI",
+      "conclusion": "success",
+      "status": "completed",
+      "headBranch": "allium-swarm/reports/demo-172724",
+      "headSha": "96c8d1f0c05841b0b52763f2239dc7210f40041a",
+      "url": "https://github.com/juxt/site/actions/runs/25222608475",
+      "updatedAt": "2026-05-01T16:28:05Z"
+    },
+    {
+      "databaseId": 25222132094,
+      "name": "CI",
+      "conclusion": "success",
+      "status": "completed",
+      "headBranch": "master",
+      "headSha": "190517e1ebcf24fbb764a0decce11d3adcfe7bb2",
+      "url": "https://github.com/juxt/site/actions/runs/25222132094",
+      "updatedAt": "2026-05-01T16:15:45Z"
+    },
+    {
+      "databaseId": 25221784668,
+      "name": "CI",
+      "conclusion": "success",
+      "status": "completed",
+      "headBranch": "allium-swarm/ci-bootstrap-20260501-1626",
+      "headSha": "c924f2d7111ecd916a10766e588bd21ae861edde",
+      "url": "https://github.com/juxt/site/actions/runs/25221784668",
+      "updatedAt": "2026-05-01T16:13:57Z"
+    }
+  ],
+  "baseline_green": true,
+  "generated_at": "2026-05-01T19:14:08.35663901Z"
+}

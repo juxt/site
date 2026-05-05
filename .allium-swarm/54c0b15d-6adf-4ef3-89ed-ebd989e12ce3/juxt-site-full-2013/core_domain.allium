@@ -1,0 +1,182 @@
+namespace juxt.site.alpha.domain
+
+entity Resource
+  doc: An HTTP resource stored in the database
+  id: URI
+  attributes:
+    uri: URI
+      doc: Canonical identifier of the resource
+      invariant: unique
+    type: string
+      doc: Resource type (e.g. "StaticRepresentation", "AppRoutes")
+      default: "Resource"
+    methods: set(keyword)
+      doc: HTTP methods allowed on this resource (get, head, post, put, delete, patch, options)
+      default: #{:get}
+    put-fn: symbol|function|nil
+      doc: Function to handle PUT requests on this resource
+    post-fn: symbol|function|nil
+      doc: Function to handle POST requests on this resource
+    patch-fn: symbol|function|nil
+      doc: Function to handle PATCH requests on this resource
+    delete-fn: symbol|function|nil
+      doc: Function to handle DELETE requests on this resource
+    description: string?
+      doc: Human-readable description of this resource
+
+entity Representation
+  doc: A variant of a resource in a specific format (content-type, language, encoding)
+  id: URI
+  attributes:
+    variant-of: URI
+      doc: Reference to the parent resource
+    content-type: string
+      doc: MIME type (e.g. application/json, text/html)
+    content-language: string?
+      doc: Language tag (e.g. en, fr)
+    content-encoding: string?
+      doc: Encoding (e.g. gzip, deflate)
+    content: string?
+      doc: Text representation body
+    body: bytes?
+      doc: Binary representation body
+    etag: string?
+      doc: Strong or weak ETag for caching and conditional requests
+    last-modified: timestamp
+      doc: Last modification time for If-Modified-Since checks
+    charset: string?
+      doc: Character set for text representations
+
+entity User
+  doc: An authenticated subject in the system
+  id: URI
+  attributes:
+    username: string
+      invariant: unique
+      doc: Unique username for login
+    email: string?
+      doc: Email address
+    name: string?
+      doc: Full name
+    classification: string?
+      doc: Access classification (e.g. RESTRICTED, PUBLIC)
+
+entity Password
+  doc: Bcrypt-hashed password credential for a user
+  id: URI
+  attributes:
+    user: URI
+      invariant: reference User
+      doc: Reference to the user
+    password-hash: string
+      doc: Bcrypt-hashed password
+    classification: string
+      default: "RESTRICTED"
+
+entity Role
+  doc: A collection of permissions that can be assigned to users
+  id: URI
+  attributes:
+    name: string
+      doc: Role name (e.g. superuser, admin, viewer)
+    description: string?
+      doc: Role description
+
+entity UserRoleMapping
+  doc: Assignment of a user to a role
+  id: URI
+  attributes:
+    assignee: URI
+      invariant: reference User
+      doc: User being assigned a role
+    role: URI
+      invariant: reference Role
+      doc: Role being assigned
+
+entity Rule
+  doc: Authorization policy rule that determines who can perform which actions
+  id: URI
+  attributes:
+    type: string
+      default: "Rule"
+    target: datalog-query
+      doc: Datalog :where clause matching request context for rule to apply
+    effect: keyword
+      doc: Authorization decision (::pass/allow, ::pass/deny)
+    description: string?
+      doc: Rule description
+
+entity Trigger
+  doc: Event-driven action that fires when certain data conditions are met
+  id: URI
+  attributes:
+    type: string
+      default: "Trigger"
+    query: datalog-query
+      doc: Datalog query to match against request context
+    action: keyword
+      doc: Action type to execute when triggered
+
+entity ResourceLocator
+  doc: Configurable URL pattern matching for dynamic resource location
+  id: URI
+  attributes:
+    type: string
+      default: "ResourceLocator"
+    pattern: regex
+      doc: Regex pattern to match against request URI
+    locator-fn: symbol
+      doc: Function to call to locate the matched resource
+    description: string?
+
+entity Session
+  doc: User authentication session with expiry
+  attributes:
+    access-token: string
+      doc: URL-safe base64 encoded random token
+    subject: URI
+      doc: User being authenticated in this session
+    expiry-instant: timestamp
+      doc: When this session expires
+    expires-in: integer
+      doc: Seconds until expiry
+
+value-object Representation-Preferences
+  doc: Content negotiation preferences from Accept headers
+  fields:
+    accept: [media-range]
+    accept-charset: [charset-range]
+    accept-language: [language-range]
+    accept-encoding: [encoding-range]
+
+value-object Request-Instance
+  doc: Validated and parsed request payload
+  fields:
+    resource: URI
+    variant: URI?
+    content: string?
+    content-type: string
+    content-language: string?
+    content-encoding: string?
+
+rule superuser-can-do-everything
+  doc: Users with superuser role can perform all operations
+  matches:
+    user has role superuser
+  then:
+    allow all operations on all resources
+
+rule public-resources-readable
+  doc: PUBLIC classified resources can be read by anyone
+  matches:
+    request method is GET, HEAD, or OPTIONS
+    AND resource classification is PUBLIC
+  then:
+    allow the read
+
+rule restricted-resources-forbidden
+  doc: RESTRICTED resources cannot be accessed unless explicitly allowed
+  matches:
+    resource classification is RESTRICTED
+  then:
+    deny access unless another rule allows it

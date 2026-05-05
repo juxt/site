@@ -1,0 +1,347 @@
+namespace juxt.site.alpha.data-flows
+
+import entities Resource, Representation, User, Rule, Session
+  from juxt.site.alpha.domain
+
+flow Inbound-HTTP-Request
+  doc: Entry point for HTTP request processing
+
+  start: Ring adapter receives HTTP request
+
+  steps:
+    1. Extract request components
+       input: Ring request map with :ring.request/method, :ring.request/headers, :ring.request/body
+       output: normalized request map with ::site/uri, ::site/db, ::site/xt-node
+
+    2. Generate request ID
+       input: request
+       output: ::site/request-id (unique identifier for this request)
+
+    3. Locate resource
+       input: URI from request
+       steps:
+         a. Query XTDB for resource with matching xt/id
+         b. If not found, check OpenAPI definitions
+         c. If not found, check ResourceLocators with pattern matching
+       output: resource entity or 404
+
+    4. Locate session / authenticate subject
+       input: Authorization header or session cookie
+       steps:
+         a. If Authorization header: parse credentials
+         b. If bearer token: lookup session by access-token
+         c. Extract ::pass/subject (user) from session
+       output: subject URI or anonymous
+
+    5. Evaluate authorization rules
+       input: resource, request method, subject, request context
+       algorithm:
+         a. Load all Rule entities from database
+         b. Build temporary request context map with resource, method, subject, uri
+         c. Create speculative db with temporary entities
+         d. For each rule: evaluate target datalog query
+         e. Filter to matched rules
+         f. Check if any ::pass/allow rule matched for this operation
+       output: authorized:true|false
+
+    6. Handle authorization denial
+       if not authorized:
+         output: 401 Unauthorized (if anonymous) or 403 Forbidden
+         flow_exit: error response
+
+    7. Route to HTTP method handler
+       input: request, resource, method
+       dispatch to:
+         - GET: juxt.site.alpha.handler/GET
+         - HEAD: same as GET but omit body
+         - PUT: juxt.site.alpha.handler/PUT
+         - POST: juxt.site.alpha.handler/POST
+         - DELETE: juxt.site.alpha.handler/DELETE
+         - PATCH: juxt.site.alpha.handler/PATCH
+
+  end: HTTP response returned to client
+
+flow HTTP-GET-Processing
+  doc: Retrieve and return a resource representation
+
+  start: GET request on authorized resource
+
+  steps:
+    1. Evaluate preconditions (RFC 7232)
+       input: If-Match, If-None-Match, If-Modified-Since, If-Unmodified-Since headers
+       steps:
+         a. Query for all current representations of resource
+         b. Evaluate preconditions in RFC 7232 order
+         c. Throw exception if precondition fails
+       exception_output: 304 Not Modified or 412 Precondition Failed
+
+    2. Find representations
+       input: resource URI
+       steps:
+         a. Find all Representation entities with variant-of = resource
+         b. Include primary resource if it has content-type
+       output: list of representation options
+
+    3. Perform content negotiation
+       input: Accept, Accept-Charset, Accept-Language, Accept-Encoding headers
+       algorithm:
+         a. Use juxt/pick to rate each representation
+         b. Select highest-rated representation
+         c. Determine Vary header based on preference usage
+       output: selected Representation, Vary header
+
+    4. Merge template metadata
+       input: selected representation
+       if representation has ::site/template:
+         a. Load template entity from database
+         b. Merge template's content-type, content-encoding, content-language
+       output: representation with template metadata
+
+    5. Generate response body
+       if representation has ::site/template:
+         a. Load template from xt-template-loader
+         b. Process template model (resolve if symbol, load if URI)
+         c. Expand queries in template model
+         d. Render with Selmer
+         output: rendered string/bytes
+       else:
+         output: ::http/content or ::http/body directly
+
+    6. Build response
+       input: selected representation, body, Vary header
+       output: Ring response map
+         :ring.response/status 200
+         :ring.response/headers with Content-Type, ETag, Last-Modified, Vary, Cache-Control
+         :ring.response/body as string or bytes
+
+  end: 200 OK with representation body
+
+flow HTTP-PUT-Processing
+  doc: Create or replace a resource with new representation
+
+  start: PUT request with body
+
+  steps:
+    1. Receive and validate representation
+       input: request body, Content-Type, Content-Length
+       steps:
+         a. Parse Content-Length header, convert to long
+         b. Validate Content-Length is present (required)
+         c. Validate Content-Length <= resource's max-content-length
+         d. Decode request body with Content-Type and Content-Encoding
+         e. Extract text content or bytes depending on type
+         f. Validate charset declaration for text types
+         g. Build decoded representation object
+       output: decoded representation or validation error
+
+    2. Validate content against resource requirements
+       input: decoded representation, resource
+       steps:
+         a. If resource has acceptable-on-put list:
+            - Rate representation against acceptable list
+            - Check if content-type has qvalue > 0
+            - Check if charset (if required) has qvalue > 0
+         b. If resource accepts specific encodings:
+            - Validate provided encoding is acceptable
+       output: validated or 415 Unsupported Media Type
+
+    3. Call resource's put-fn
+       input: representation, request
+       if put-fn defined:
+         a. Resolve put-fn if symbol
+         b. Call (put-fn request)
+       output: modified request with response status/headers
+
+    4. Store representation in database
+       input: representation
+       steps:
+         a. Determine if resource exists
+         b. Generate new URI for variant if needed
+         c. Submit XTDB transaction: [:xtdb.api/put representation]
+         d. Wait for transaction with await-tx
+       output: transaction confirmed
+
+    5. Build response
+       if new resource:
+         status: 201 Created
+         headers: Location: new resource URI
+       else:
+         status: 204 No Content
+       headers: ETag of stored representation
+
+  end: 201/204 response with Location header if new
+
+flow HTTP-POST-Processing
+  doc: Submit data to resource for processing
+
+  start: POST request with body
+
+  steps:
+    1. Receive representation
+       similar to PUT: parse, validate, decode
+       output: decoded representation
+
+    2. Validate post-fn exists
+       input: resource
+       if not (fn? post-fn) and not (symbol? post-fn):
+         output: 500 Internal Server Error
+
+    3. Resolve post-fn
+       input: post-fn (may be function or symbol)
+       if symbol:
+         a. Call requiring-resolve
+         b. If nil: 500 error
+       output: callable post-fn or error
+
+    4. Call post-fn
+       input: request with received-representation
+       post-fn determines:
+         - What to do with representation
+         - Whether to create new resources
+         - Response status and headers
+       output: modified request or exception
+
+    5. Build response
+       input: result from post-fn
+       output: Ring response with status/headers determined by post-fn
+
+  end: post-fn determined response (typically 200, 201, 204)
+
+flow Authentication-Flow
+  doc: User login and session creation
+
+  start: POST /token with username and password
+
+  steps:
+    1. Parse login credentials
+       input: form-encoded body
+       extract: username, password
+
+    2. Locate user
+       input: username
+       query XTDB: {:find [u] :where [[u ::pass/username username]]}
+       output: User entity or not found
+
+    3. Load password hash
+       input: user URI
+       query: {:find [ph] :where [[ph ::pass/user user]]}
+       output: Password entity or not found
+
+    4. Verify password
+       input: submitted password, stored hash
+       bcrypt comparison: crypto.password.bcrypt/check
+       output: true/false
+
+    5. Generate session
+       if password matches:
+         a. Generate access-token (24 random bytes, base64 encoded)
+         b. Get expires-in from resource (default 24*3600 seconds)
+         c. Calculate expiry-instant = now + expires-in
+         d. Store in sessions-by-access-token atom
+       output: {\"access_token\": token, \"expires_in\": seconds}
+
+    6. Build response
+       input: token, expires_in
+       status: 200 OK
+       body: JSON with access_token and expires_in
+
+  end: Client receives bearer token
+
+flow Authorization-Rule-Evaluation
+  doc: Determine if request is allowed based on stored rules
+
+  start: Request needs authorization decision
+
+  steps:
+    1. Load rules
+       input: database
+       query: {:find [r] :where [[r ::site/type \"Rule\"]]}
+       output: list of Rule entities
+
+    2. Build request context
+       input: resource, method, subject, uri
+       create temporary map:
+         :request {::site/uri uri, :ring.request/method method}
+         :resource {::site/type, ::pass/classification, ...}
+         :subject {::pass/username, ...}
+
+    3. Create speculative database
+       input: request context
+       steps:
+         a. Generate random xt/ids for each context entity
+         b. Use db/with-tx to create temporary database state
+         c. Put context entities with random ids
+       output: temporary db state
+
+    4. Evaluate each rule
+       for rule in rules:
+         a. Get rule's target (datalog where-clause)
+         b. Construct query: {:find [success] :where target :in [temp-ids]}
+         c. Execute query against speculative db
+         d. If query returns results: matched = true, else false
+           (note: presence of result indicates condition met, not semantic truth)
+       output: matched rules
+
+    5. Decide authorization
+       input: matched rules
+       algorithm:
+         a. Filter matched rules by effect
+         b. If any ::pass/allow rule matched: ALLOW
+         c. Else if any ::pass/deny rule matched: DENY
+         d. Else: DENY (default deny)
+
+    6. Throw exception if denied
+       if not authorized:
+         context error: ::site/request-context with status 403 or 401
+
+  end: Authorization allowed or exception thrown
+
+flow Trigger-Action-Execution
+  doc: Execute actions when trigger conditions match
+
+  start: Data written to database
+
+  steps:
+    1. Load triggers
+       query: {:find [t] :where [[t ::site/type \"Trigger\"]]}
+       output: list of Trigger entities
+
+    2. Evaluate triggers
+       for trigger in triggers:
+         a. Get trigger's query (datalog)
+         b. Execute against request context
+         c. If results: trigger matched with action-data
+       output: matched triggers with action-data
+
+    3. Execute actions
+       for {trigger action-data} in matched:
+         a. Get action from trigger
+         b. Call triggers/run-action! multimethod
+         c. Dispatch on (get-in action [:trigger ::site/action])
+         d. Execute side effects (logging, notifications, etc)
+       output: side effects
+
+  end: All matched triggers executed
+
+flow Session-Expiry-Management
+  doc: Clean up expired sessions from in-memory store
+
+  start: Session lookup or background cleanup
+
+  steps:
+    1. Get current date
+       output: now (Date)
+
+    2. Expire sessions
+       input: sessions-by-access-token atom, now
+       steps:
+         a. For each session: check if now.toInstant > expiry-instant
+         b. Keep only non-expired sessions
+         c. Update atom with filtered map
+       output: atom updated with expired entries removed
+
+    3. Lookup session (if on critical path)
+       input: access-token
+       output: session or nil
+
+  end: Only valid (non-expired) sessions available
